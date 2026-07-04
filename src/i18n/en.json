@@ -21,7 +21,7 @@
   "estResidence": "Years lived in Canada by 65 (from age 18)",
   "estResult": "Estimate",
   "estApply": "Apply",
-  "cppEstNote": "Approximates the CPP rule: your best 39 years between 18 and 65 count (about 17% of low years are dropped). Stopping contributions at FIRE dilutes the average - why early retirees rarely get the maximum. Check My Service Canada Account for exact figures.",
+  "cppEstNote": "Approximates the CPP rule: your best 39 years between 18 and 65 count (the dropout removes 17% of the contributory period). Stopping contributions at FIRE dilutes the average - why early retirees rarely get the maximum. After applying, the calculator also remembers your work history: claiming early (say at 60) shortens the divisor to ~35 years, so zero-income years dilute less - handled automatically. The CPP enhancement (post-2019 contributions) is not modelled, so the estimate leans conservative. Check My Service Canada Account for exact figures.",
   "oasEstNote": "OAS is residence-based, not work-based: 40 years in Canada after age 18 gives the full amount, fewer years are prorated (common for immigrants).",
   "coupleNote": "Accounts and spending are household totals; tax assumes ideal income splitting between spouses.",
   "accounts": "Accounts",
@@ -44,7 +44,7 @@
   "mix_conservative": "Conservative 40/60 (~2.4%)",
   "mix_gic": "GIC ladder (~0.8%)",
   "benefits": "Government benefits & strategy",
-  "cppStartAge": "CPP/QPP start age (60–70)",
+  "cppStartAge": "CPP/QPP start age (60–70; QPP up to 72)",
   "cppAnnualAt65": "Estimated CPP/QPP per year at 65",
   "oasStartAge": "OAS start age (65–70)",
   "oasAnnualAt65": "OAS per year at 65",
@@ -224,7 +224,7 @@
     },
     "marginalrate": {
       "title": "Marginal tax rate",
-      "body": "The rate on your next dollar of income - not the average on all of it. Canada's brackets are progressive: only the slice above each threshold pays that bracket's rate. Planning is largely about controlling the marginal rate - the meltdown keeps RRSP draws in the lowest bracket, while the clawback acts as a hidden extra 15% marginal rate at higher incomes."
+      "body": "The rate on your next dollar of income - not the average on all of it. Canada's brackets are progressive: only the slice above each threshold pays that bracket's rate. Planning is largely about controlling the marginal rate - the meltdown keeps RRSP draws in the lowest bracket, while the clawback acts as a hidden extra 15% marginal rate at higher incomes. Ontario residents also face the surtax and health premium on top (see the entry)."
     },
     "correlation": {
       "title": "Return correlation",
@@ -249,6 +249,10 @@
     "gis": {
       "title": "GIS - Guaranteed Income Supplement",
       "body": "A tax-free top-up for low-income seniors (up to ~$13,500/yr for a single in 2026), paid only while receiving OAS and income-tested: roughly 50-60 cents lost per dollar of taxable income, reaching zero near $22,800 (single). A hidden benefit for FIRE folks: the income test excludes OAS itself, and TFSA withdrawals are completely invisible to it - an early retiree living on TFSA and already-taxed capital after 65 can report near-zero income and collect the full amount. Capturing it requires the RRSP to be essentially empty before 65 (RRIF minimums would eat the GIS) and usually pairs with deferring CPP to 70. Not to be confused with a GIC."
+    },
+    "surtax": {
+      "title": "Ontario surtax & health premium",
+      "body": "Ontario's two stealth add-ons: (1) the surtax - once provincial tax itself passes ~$5,800 it is increased by 20%, and by a further 36% past ~$7,400, effectively multiplying high-income provincial marginal rates by 1.2-1.56x; (2) the Ontario Health Premium - up to $900 per person per year, tiered on taxable income. Both settle on the tax return; they are why Ontario feels more expensive than its bracket table suggests. The calculator applies both automatically for ON residents."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

@@ -9,7 +9,13 @@ import {
 } from './types'
 import { incomeTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
-import { cppAnnual, gisAnnual, oasAnnual, oasAfterClawback } from './benefits'
+import {
+  cppAnnual,
+  earlyClaimDilutionRelief,
+  gisAnnual,
+  oasAnnual,
+  oasAfterClawback,
+} from './benefits'
 import { rrifMinFactor } from './rrif'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
@@ -216,19 +222,36 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       extraTaxable += dist
       const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
 
-      if (age >= inputs.cppStartAge) cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge)
+      // QPP can be deferred to 72 (since 2024); CPP caps at 70
+      const cppMaxAge = inputs.province === 'QC' ? 72 : 70
+      if (age >= inputs.cppStartAge) {
+        const relief = inputs.cppWork
+          ? earlyClaimDilutionRelief(
+              inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
+            )
+          : 1
+        cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
+      }
       if (partner && partnerAge! >= partner.cppStartAge) {
-        cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge)
+        const relief = partner.cppWork
+          ? earlyClaimDilutionRelief(
+              partner.cppWork.startWorkAge, partner.cppWork.retireAge, partner.cppStartAge,
+            )
+          : 1
+        cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge, cppMaxAge) * relief
       }
 
+      // OAS rises 10% automatically at 75
       const oasGrossPerPerson = [
-        age >= inputs.oasStartAge ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) : 0,
+        age >= inputs.oasStartAge
+          ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
+          : 0,
       ]
       const agesPerPerson = [age]
       if (partner) {
         oasGrossPerPerson.push(
           partnerAge! >= partner.oasStartAge
-            ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge)
+            ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge) * (partnerAge! >= 75 ? 1.1 : 1)
             : 0,
         )
         agesPerPerson.push(partnerAge!)

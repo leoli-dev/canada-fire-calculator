@@ -165,6 +165,13 @@ describe('runProjection', () => {
     expect(r.estateTax).toBeCloseTo(0, -2)
   })
 
+  it('OAS rises 10% automatically at 75', () => {
+    const r = runProjection(base)
+    const at74 = r.rows.find((x) => x.age === 74)!
+    const at75 = r.rows.find((x) => x.age === 75)!
+    expect(at75.oas).toBeCloseTo(at74.oas * 1.1, 0)
+  })
+
   it('GIS: a TFSA-funded retiree receives it from 65; RRSP income claws it back', () => {
     const tfsaLiving = runProjection({
       ...base,

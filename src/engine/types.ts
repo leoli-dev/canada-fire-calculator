@@ -23,12 +23,19 @@ export const STRATEGIES: Strategy[] = ['meltdownPaced', 'rrspFirst', 'nonRegFirs
  */
 export type Goal = 'legacy' | 'dieWithZero'
 
+/** Work history from the CPP estimator; lets the engine refine early claims. */
+export interface CppWork {
+  startWorkAge: number
+  retireAge: number
+}
+
 export interface Partner {
   currentAge: number
   cppStartAge: number
   cppAnnualAt65: number
   oasStartAge: number
   oasAnnualAt65: number
+  cppWork?: CppWork | null
 }
 
 export interface PrincipalResidence {
@@ -76,10 +83,12 @@ export interface Inputs {
   balances: Record<AccountType, number>
   /** adjusted cost base (book value) of non-registered holdings */
   nonRegBook: number
-  /** CPP/QPP start age, 60–70 */
+  /** CPP/QPP start age, 60–70 (QPP defers to 72) */
   cppStartAge: number
   /** user's estimated CPP/QPP annual benefit if taken at 65, today's dollars */
   cppAnnualAt65: number
+  /** work history from the estimator; refines the early-claim dilution */
+  cppWork?: CppWork | null
   /** OAS start age, 65–70 */
   oasStartAge: number
   /** OAS annual benefit at 65, today's dollars */

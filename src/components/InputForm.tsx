@@ -274,7 +274,8 @@ export function InputForm() {
         {inputs.partner && <p className="subhead">{t('benefitsSelf')}</p>}
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
         <Num label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} step={500} onChange={(v) => set({ cppAnnualAt65: v })} />
-        <CppEstimator retireAge={inputs.fireAge} onApply={(v) => set({ cppAnnualAt65: v })} />
+        <CppEstimator retireAge={inputs.fireAge}
+          onApply={(v, work) => set({ cppAnnualAt65: v, cppWork: work })} />
         <Num label={t('oasStartAge')} value={inputs.oasStartAge} onChange={(v) => set({ oasStartAge: v })} />
         <Num label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} step={100} onChange={(v) => set({ oasAnnualAt65: v })} />
         <OasEstimator onApply={(v) => set({ oasAnnualAt65: v })} />
@@ -288,7 +289,8 @@ export function InputForm() {
               onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: v } })} />
             <CppEstimator
               retireAge={inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge)}
-              onApply={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: v } })}
+              onApply={(v, work) =>
+                set({ partner: { ...inputs.partner!, cppAnnualAt65: v, cppWork: work } })}
             />
             <Num label={t('oasStartAge')} value={inputs.partner.oasStartAge}
               onChange={(v) => set({ partner: { ...inputs.partner!, oasStartAge: v } })} />

@@ -22,7 +22,10 @@ function Row(props: {
 }
 
 /** Estimate CPP/QPP at 65 from work history; contributions stop at retireAge. */
-export function CppEstimator(props: { retireAge: number; onApply: (v: number) => void }) {
+export function CppEstimator(props: {
+  retireAge: number
+  onApply: (v: number, work: { startWorkAge: number; retireAge: number }) => void
+}) {
   const { t } = useTranslation()
   const cad = useCad()
   const [startWorkAge, setStartWorkAge] = useState(25)
@@ -38,7 +41,12 @@ export function CppEstimator(props: { retireAge: number; onApply: (v: number) =>
         <span>
           {t('estResult')}: <strong>{cad(estimate)}</strong>
         </span>
-        <button type="button" onClick={() => props.onApply(Math.round(estimate))}>
+        <button
+          type="button"
+          onClick={() =>
+            props.onApply(Math.round(estimate), { startWorkAge, retireAge: props.retireAge })
+          }
+        >
           {t('estApply')}
         </button>
       </div>

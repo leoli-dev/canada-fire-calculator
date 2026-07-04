@@ -181,7 +181,8 @@ const better = (a: ProjectionResult, b: ProjectionResult) =>
 /** Scan the primary person's CPP and OAS start ages for the best outcome. */
 export function scanBenefitTiming(inputs: Inputs): { best: TimingResult; current: TimingResult } {
   let best: TimingResult | null = null
-  for (let cppAge = 60; cppAge <= 70; cppAge++) {
+  const cppCap = inputs.province === 'QC' ? 72 : 70 // QPP defers to 72
+  for (let cppAge = 60; cppAge <= cppCap; cppAge++) {
     for (const oasAge of [65, 66, 67, 68, 69, 70]) {
       const result = runProjection({ ...inputs, cppStartAge: cppAge, oasStartAge: oasAge })
       if (!best || better(result, best.result)) {

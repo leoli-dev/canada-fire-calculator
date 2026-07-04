@@ -4,6 +4,7 @@ import {
   CPP_MAX_AT_65,
   OAS_FULL_AT_65,
   cppAnnual,
+  earlyClaimDilutionRelief,
   estimateCppAt65,
   estimateOasAt65,
   oasAfterClawback,
@@ -23,8 +24,17 @@ describe('incomeTax', () => {
 
   it('matches a hand-computed ON value at $60k (2026 table)', () => {
     // fed: 58523*0.14 + 1477*0.205 - 16452*0.14 = 6192.73
-    // ON:  53891*0.0505 + 6109*0.0915 - 12989*0.0505 = 2624.52
-    expect(incomeTax(60000, 'ON')).toBeCloseTo(6192.73 + 2624.52, 0)
+    // ON:  53891*0.0505 + 6109*0.0915 - 12989*0.0505 = 2624.52 (below surtax)
+    // Ontario Health Premium at $60k taxable = $600
+    expect(incomeTax(60000, 'ON')).toBeCloseTo(6192.73 + 2624.52 + 600, 0)
+  })
+
+  it('applies the ON surtax on provincial tax at high income', () => {
+    // BC has no surtax; the same taxable income must cost ON extra beyond
+    // the bracket difference at $250k (ON basic tax far above both tiers)
+    const on = incomeTax(250000, 'ON')
+    const onNoSurtaxApprox = incomeTax(250000, 'AB')
+    expect(on).toBeGreaterThan(onNoSurtaxApprox) // sanity: surtax makes ON heavy
   })
 
   it('phases the federal BPA down to the floor at very high income', () => {
@@ -78,6 +88,20 @@ describe('CPP/OAS adjustments', () => {
 
   it('CPP at 70 is 142% of the age-65 amount', () => {
     expect(cppAnnual(10000, 70)).toBeCloseTo(14200)
+  })
+
+  it('QPP can defer to 72 (+58.8%); CPP stays capped at 70', () => {
+    expect(cppAnnual(10000, 72, 72)).toBeCloseTo(15880)
+    expect(cppAnnual(10000, 72)).toBeCloseTo(14200)
+  })
+
+  it('claiming at 60 shrinks the dropout divisor: FIRE careers dilute less', () => {
+    // 20 credited years: 20/34.86 at 60 vs 20/39 at 65 -> ~11.9% relief
+    expect(earlyClaimDilutionRelief(25, 45, 60)).toBeCloseTo(39 / (0.83 * 42), 3)
+    // a full career is capped at 100% either way - no relief
+    expect(earlyClaimDilutionRelief(18, 65, 60)).toBeCloseTo(1)
+    // at 65+ the standard divisor applies
+    expect(earlyClaimDilutionRelief(25, 45, 65)).toBe(1)
   })
 
   it('OAS deferred to 70 is 136%', () => {

@@ -2,6 +2,8 @@ import {
   FED_AGE_AMOUNT,
   FED_PENSION_AMOUNT,
   FEDERAL,
+  ON_HEALTH_PREMIUM,
+  ON_SURTAX,
   PROV_AGE_PENSION,
   PROVINCIAL,
   QC_ABATEMENT,
@@ -83,8 +85,26 @@ export function incomeTax(
       provCredit += (ageAmt + Math.min(ap.pension, pensionInc)) * lowRate
     }
   }
-  const prov = Math.max(0, bracketTax(taxable, p.brackets) - provCredit)
+  let prov = Math.max(0, bracketTax(taxable, p.brackets) - provCredit)
+  if (province === 'ON') {
+    // surtax is levied on basic Ontario tax (after credits), then the
+    // health premium is added from taxable income
+    prov +=
+      Math.max(0, prov - ON_SURTAX.t1) * ON_SURTAX.r1 +
+      Math.max(0, prov - ON_SURTAX.t2) * ON_SURTAX.r2
+    prov += ontarioHealthPremium(taxable)
+  }
   return fed + prov
+}
+
+function ontarioHealthPremium(income: number): number {
+  let premium = 0
+  for (const seg of ON_HEALTH_PREMIUM) {
+    if (income > seg.from) {
+      premium = Math.min(seg.cap, seg.base + seg.rate * (income - seg.from))
+    }
+  }
+  return premium
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */

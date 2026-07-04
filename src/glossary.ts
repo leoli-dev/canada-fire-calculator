@@ -38,6 +38,7 @@ export const TERMS: TermDef[] = [
   { id: 'taxdrag', patterns: ['税拖累', 'tax drag', 'Tax drag', 'frein fiscal', 'Frein fiscal'] },
   { id: 'agecredit', patterns: ['年龄额度', 'age amount', 'Age amount', "montant en raison de l'âge", "Montant en raison de l'âge"] },
   { id: 'pensioncredit', patterns: ['养老金收入抵免', 'pension income credit', 'Pension income credit', 'crédit pour revenu de pension', 'Crédit pour revenu de pension'] },
+  { id: 'surtax', patterns: ['surtax', 'Surtax', '附加税', 'surtaxe', 'Surtaxe'] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

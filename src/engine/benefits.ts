@@ -1,10 +1,37 @@
 // CPP/QPP and OAS start-age adjustments and OAS clawback. 2025 figures.
 
-/** CPP/QPP: -0.6%/month before 65 (floor age 60), +0.7%/month after (cap 70). */
-export function cppAnnual(annualAt65: number, startAge: number): number {
-  const months = (Math.min(70, Math.max(60, startAge)) - 65) * 12
+/**
+ * CPP/QPP: -0.6%/month before 65 (floor age 60), +0.7%/month after.
+ * CPP deferral caps at 70; QPP allows 72 since 2024 (up to +58.8%) —
+ * pass maxAge 72 for Quebec.
+ */
+export function cppAnnual(annualAt65: number, startAge: number, maxAge = 70): number {
+  const months = (Math.min(maxAge, Math.max(60, startAge)) - 65) * 12
   const factor = months < 0 ? 1 + months * 0.006 : 1 + months * 0.007
   return annualAt65 * factor
+}
+
+/**
+ * Claiming before 65 shortens the contributory period (18 → claim age), and
+ * the 17% general dropout with it: at 60 the divisor is ~35 years, not 39,
+ * so a FIRE retiree's zero-income years dilute less. Returns the multiplier
+ * (≥1) to apply on top of the age-65 estimate for a work history that ended
+ * by the claim age; 1 when the history is unknown or the claim is at 65+.
+ */
+export function earlyClaimDilutionRelief(
+  startWorkAge: number,
+  retireAge: number,
+  claimAge: number,
+): number {
+  if (claimAge >= 65) return 1
+  const from = Math.max(18, startWorkAge)
+  const credited65 = Math.max(0, Math.min(65, retireAge) - from)
+  const creditedClaim = Math.max(0, Math.min(claimAge, retireAge) - from)
+  if (credited65 <= 0 || creditedClaim <= 0) return 1
+  const divisorAtClaim = 0.83 * (claimAge - 18)
+  const ratio65 = Math.min(1, credited65 / 39)
+  const ratioClaim = Math.min(1, creditedClaim / divisorAtClaim)
+  return ratioClaim / ratio65
 }
 
 /** OAS: no early start; +0.6%/month deferred past 65 (cap 70). */
