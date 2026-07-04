@@ -30,6 +30,7 @@ export const TERMS: TermDef[] = [
   { id: 'bridge', patterns: ['桥接期', 'bridge period', 'Bridge period', 'bridge years', 'années-pont'] },
   { id: 'sequencerisk', patterns: ['收益顺序风险', 'sequence-of-returns risk', 'sequence-of-returns', 'sequence of returns', 'séquence des rendements'] },
   { id: 'realdollars', patterns: ['今日购买力', "today's purchasing power", 'purchasing power', "pouvoir d'achat", 'pouvoir d’achat', 'real dollars'] },
+  { id: 'marginalrate', patterns: ['边际税率', 'marginal rate', 'Marginal rate', 'taux marginal', 'Taux marginal'] },
   { id: 'splitting', patterns: ['收入分割', 'income splitting', 'Income splitting', 'fractionnement de revenu', 'Fractionnement de revenu'] },
 ]
 

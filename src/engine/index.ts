@@ -1,5 +1,5 @@
 export * from './types'
-export { incomeTax } from './tax'
+export { incomeTax, marginalRate } from './tax'
 export {
   cppAnnual,
   oasAnnual,

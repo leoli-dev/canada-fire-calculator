@@ -184,6 +184,20 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 }
 .tag.best { background: #e5f2e6; color: var(--green); }
 
+.table-scroll {
+  max-height: 460px; overflow: auto; border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.table-scroll thead th {
+  position: sticky; top: 0; background: var(--card); z-index: 1;
+  box-shadow: 0 1px 0 var(--line);
+}
+.year-table { font-size: 0.8rem; }
+.year-table td, .year-table th { padding: 5px 8px; white-space: nowrap; }
+.year-table .strong { font-weight: 600; }
+.year-table .bridge-row { background: #fdf6f4; }
+.tag.poor-tag { background: #fbe9e9; color: var(--red); margin-left: 4px; }
+
 .table-title {
   margin: 16px 0 6px; font-size: 0.85rem; font-weight: 650; color: var(--ink-soft);
 }

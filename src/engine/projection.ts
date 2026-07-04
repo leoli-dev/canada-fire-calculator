@@ -26,6 +26,7 @@ const STRATEGY_ORDER: Record<Strategy, AccountType[]> = {
 interface WithdrawalOutcome {
   withdrawals: Record<AccountType, number>
   tax: number
+  taxablePerPerson?: number
   /** portion of the year's tax attributable to RRSP/RRIF withdrawals */
   rrspTax: number
   oasNet: number
@@ -86,7 +87,8 @@ function evaluate(
   const netCash = cpp + oasNet + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = baseTaxable + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
-  return { withdrawals: w, tax, rrspTax, oasNet, netCash }
+  const taxablePerPerson = totalTaxable / oasGrossPerPerson.length
+  return { withdrawals: w, tax, rrspTax, oasNet, netCash, taxablePerPerson }
 }
 
 /** Binary-search the gross withdrawal needed to hit the spending target. */
@@ -159,6 +161,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let netCash = 0
     let shortfall = 0
     let extraTaxable = 0
+    let taxablePerPerson = 0
 
     // principal residence sale: tax-free, proceeds become investable
     const pr = inputs.principalResidence
@@ -239,6 +242,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       rrspTaxTotal += out.rrspTax
       oas = out.oasNet
       netCash = out.netCash
+      taxablePerPerson = out.taxablePerPerson ?? 0
 
       if (netCash < inputs.retirementSpending - 0.01) {
         shortfall = inputs.retirementSpending - netCash
@@ -270,6 +274,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       balances: { ...bal },
       withdrawals, cpp, oas, tax, netCash, shortfall,
       propertyValue: prValue + ipValue,
+      taxablePerPerson,
     })
   }
 

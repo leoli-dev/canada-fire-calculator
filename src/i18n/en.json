@@ -218,6 +218,10 @@
     "splitting": {
       "title": "Income splitting (couples)",
       "body": "Canada taxes individuals, so under progressive rates the same household income split across two returns pays far less than piled on one (two personal amounts, two runs up the low brackets). Couple mode assumes an ideal 50/50 split. Reality check: before 65, RRSP withdrawals are taxed to the account owner only and cannot be split — an even split during the bridge requires both spouses to hold comparable RRSP balances, which unbalanced couples should fix in advance with spousal RRSP contributions."
+    },
+    "marginalrate": {
+      "title": "Marginal tax rate",
+      "body": "The rate on your next dollar of income — not the average on all of it. Canada's brackets are progressive: only the slice above each threshold pays that bracket's rate. Planning is largely about controlling the marginal rate — the meltdown keeps RRSP draws in the lowest bracket, while the clawback acts as a hidden extra 15% marginal rate at higher incomes."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
@@ -246,5 +250,12 @@
   "numberHave": "With current savings and your property plan, you are projected to hold about {{amount}} at {{age}} — ",
   "numberSurplus": "a surplus of {{amount}}.",
   "numberGap": "a shortfall of {{amount}}.",
-  "numberExplain": "Method: a binary search for the minimum investable assets at age {{age}} that lets the plan — with your withdrawal strategy, property-sale plan and CPP/OAS settings — spend through age {{life}} without running out. Assets are assumed split like your current TFSA/RRSP/non-registered mix (account tax treatment matters). Because government benefits and the home sale are counted, this is usually far below the crude \"25× spending\" rule."
+  "numberExplain": "Method: a binary search for the minimum investable assets at age {{age}} that lets the plan — with your withdrawal strategy, property-sale plan and CPP/OAS settings — spend through age {{life}} without running out. Assets are assumed split like your current TFSA/RRSP/non-registered mix (account tax treatment matters). Because government benefits and the home sale are counted, this is usually far below the crude \"25× spending\" rule.",
+  "yearTableTitle": "Year-by-year detail (after FIRE)",
+  "yearTableNote": "Where each year's money comes from, how much tax, at which bracket — audit-grade detail. Amounts are always today's purchasing power (brackets are defined in real terms); taxable income is per person after income splitting; marginal rate = federal + provincial statutory bracket (QC abatement applied). Rows marked ! have a spending shortfall.",
+  "colAge": "Age",
+  "colGross": "Gross total",
+  "colNet": "After-tax cash",
+  "colTaxable": "Taxable/person",
+  "colMarginal": "Marginal rate"
 }

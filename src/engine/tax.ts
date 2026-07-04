@@ -27,3 +27,19 @@ export function incomeTax(taxable: number, province: Province): number {
   )
   return fed + prov
 }
+
+/** Statutory combined marginal rate at a taxable income (QC abatement applied). */
+export function marginalRate(taxable: number, province: Province): number {
+  if (taxable <= 0) return 0
+  const at = (brackets: Bracket[]) => {
+    let prev = 0
+    for (const b of brackets) {
+      if (taxable <= b.upTo && taxable > prev) return b.rate
+      prev = b.upTo
+    }
+    return brackets[brackets.length - 1].rate
+  }
+  let fed = at(FEDERAL.brackets)
+  if (province === 'QC') fed *= 1 - QC_ABATEMENT
+  return fed + at(PROVINCIAL[province].brackets)
+}

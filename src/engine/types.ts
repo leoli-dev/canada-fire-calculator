@@ -105,6 +105,8 @@ export interface YearRow {
   shortfall: number
   /** unsold real estate value at end of year */
   propertyValue: number
+  /** taxable income per person this year (0 during accumulation) */
+  taxablePerPerson: number
 }
 
 export interface ProjectionResult {

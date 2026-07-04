@@ -6,6 +6,7 @@ import { useStore } from './store'
 import { InputForm } from './components/InputForm'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
+import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
 import { MonteCarloCard } from './components/MonteCarloCard'
 import { StrategyCard } from './components/StrategyCard'
@@ -78,6 +79,7 @@ export default function App() {
             </p>
           )}
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
+          <YearTable result={result} inputs={inputs} />
           <StrategyCard inputs={inputs} />
           <TimingCard inputs={inputs} />
           <MonteCarloCard inputs={inputs} scale={scale} />
