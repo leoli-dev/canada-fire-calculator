@@ -59,8 +59,10 @@ export interface Inputs {
   savingsSplit: Record<AccountType, number>
   /** desired after-tax annual spending in retirement, today's dollars */
   retirementSpending: number
-  /** real (inflation-adjusted) annual return per account */
+  /** real (inflation-adjusted) annual return per account, gross of fees */
   returns: Record<AccountType, number>
+  /** annual investment fee (MER) subtracted from every account's return */
+  fees?: number
   /** current balances */
   balances: Record<AccountType, number>
   /** adjusted cost base (book value) of non-registered holdings */

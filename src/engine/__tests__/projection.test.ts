@@ -54,6 +54,12 @@ describe('runProjection', () => {
     expect(r.depletedAge!).toBeLessThan(90)
   })
 
+  it('fees reduce growth: final net worth drops when an MER is charged', () => {
+    const noFees = runProjection(base)
+    const withFees = runProjection({ ...base, fees: 0.02 })
+    expect(withFees.finalNetWorth).toBeLessThan(noFees.finalNetWorth)
+  })
+
   it('never lets balances go negative', () => {
     const r = runProjection({ ...base, retirementSpending: 200000 })
     for (const row of r.rows) {

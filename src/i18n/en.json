@@ -32,6 +32,8 @@
   "savingsSplit": "Savings allocation (%)",
   "mixLabel": "Asset mix per account",
   "mixNote": "Presets set a real return and volatility from FP Canada-style assumptions.",
+  "feesLabel": "Investment fees (MER, %/yr)",
+  "feesHint": "Every account's return is reduced by this rate. FP Canada assumptions are gross of fees - net returns require subtracting them: broad index ETFs run ~0.2%, bank mutual funds often 2%+, and a 2% MER can turn a 4% withdrawal rate into a 2% one.",
   "mix_allStocks": "100% stocks (~4.3% real)",
   "mix_aggressive": "Aggressive 80/20 (~3.7%)",
   "mix_balanced": "Balanced 60/40 (~3.0%)",
@@ -222,6 +224,10 @@
     "correlation": {
       "title": "Return correlation",
       "body": "Whether two investments move together. Your TFSA, RRSP and non-registered accounts usually hold the same markets - in a bear market they fall together, so spreading money across account wrappers diversifies nothing. The Monte Carlo here applies the same yearly market draw to every account precisely so wrappers aren't mistaken for diversification (that mistake would inflate the success rate). What actually lowers volatility is the asset mix (stocks vs bonds), not the account shell."
+    },
+    "mer": {
+      "title": "MER - management expense ratio",
+      "body": "The share of assets a fund silently deducts every year (you never see a bill, but it is real). Broad index ETFs charge ~0.05-0.25%; actively managed bank mutual funds commonly 1.5-2.5%. Over 30 years a 2% fee consumes roughly forty percent of the final portfolio. This calculator treats return assumptions as gross of fees and subtracts the rate you enter separately."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

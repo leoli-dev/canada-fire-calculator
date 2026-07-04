@@ -32,6 +32,8 @@
   "savingsSplit": "Répartition de l'épargne (%)",
   "mixLabel": "Répartition d'actifs par compte",
   "mixNote": "Les préréglages fixent rendement réel et volatilité selon des hypothèses de type FP Canada.",
+  "feesLabel": "Frais de placement (RFG, %/an)",
+  "feesHint": "Le rendement de chaque compte est réduit de ce taux. Les hypothèses FP Canada sont avant frais - il faut les soustraire : FNB indiciels ~0,2 %, fonds communs bancaires souvent 2 %+, et un RFG de 2 % peut transformer un taux de retrait de 4 % en 2 %.",
   "mix_allStocks": "100 % actions (~4,3 % réel)",
   "mix_aggressive": "Audacieux 80/20 (~3,7 %)",
   "mix_balanced": "Équilibré 60/40 (~3,0 %)",
@@ -222,6 +224,10 @@
     "correlation": {
       "title": "Corrélation des rendements",
       "body": "Deux placements montent-ils et baissent-ils ensemble ? Vos CELI, REER et comptes non enregistrés détiennent souvent les mêmes marchés : en marché baissier, ils chutent ensemble - répartir l'argent entre enveloppes ne diversifie rien. La simulation Monte-Carlo applique donc le même tirage de marché annuel à tous les comptes, pour ne pas confondre enveloppes et diversification (cette confusion gonflerait le taux de réussite). Ce qui réduit vraiment la volatilité, c'est la répartition d'actifs (actions vs obligations), pas l'enveloppe."
+    },
+    "mer": {
+      "title": "RFG - ratio des frais de gestion",
+      "body": "La part d'actifs qu'un fonds prélève silencieusement chaque année (aucune facture, mais bien réel). FNB indiciels : ~0,05-0,25 %; fonds communs bancaires gérés activement : souvent 1,5-2,5 %. Sur 30 ans, 2 % de frais consomment environ quarante pour cent du portefeuille final. Le calculateur traite les rendements comme avant frais et soustrait séparément le taux saisi."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",

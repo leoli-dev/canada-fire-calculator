@@ -189,6 +189,9 @@ export function InputForm() {
           <p className="hint">
             {ACCOUNTS.map((a) => `${t(a)}: ${(inputs.returns[a] * 100).toFixed(1)}%`).join(' · ')}
           </p>
+          <Num label={t('feesLabel')} value={(inputs.fees ?? 0) * 100} step={0.05}
+            onChange={(v) => set({ fees: Math.max(0, v) / 100 })} />
+          <p className="hint"><Jargon text={t('feesHint')} /></p>
         </details>
 
         <details>

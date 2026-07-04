@@ -264,7 +264,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     }
 
     for (const t of ACCOUNT_TYPES) {
-      bal[t] *= 1 + (sample ? sample(age, t) : inputs.returns[t])
+      bal[t] *= 1 + (sample ? sample(age, t) : inputs.returns[t]) - (inputs.fees ?? 0)
     }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     if (ipValue > 0 && ip) ipValue *= 1 + ip.appreciation

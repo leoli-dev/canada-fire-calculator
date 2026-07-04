@@ -28,6 +28,7 @@ export const DEFAULT_INPUTS: Inputs = {
   savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
   retirementSpending: 50000,
   returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
+  fees: 0.002,
   volatilities: { tfsa: 0.12, rrsp: 0.12, nonReg: 0.12 },
   balances: { tfsa: 100000, rrsp: 200000, nonReg: 100000 },
   nonRegBook: 80000,
@@ -115,7 +116,8 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'fire-inputs',
-      version: 3,
+      // v4: fees (MER) input added; defaults fill in via merge
+      version: 4,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state) => state as Store,

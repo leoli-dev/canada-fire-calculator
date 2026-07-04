@@ -147,7 +147,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     }
     for (const t of ACCOUNT_TYPES) {
       bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
-      bal[t] *= 1 + inputs.returns[t]
+      bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     if (ipValue > 0 && ip) ipValue *= 1 + ip.appreciation
