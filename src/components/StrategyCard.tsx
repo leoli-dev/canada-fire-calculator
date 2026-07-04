@@ -23,8 +23,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
   )
 
   return (
-    <div className="chart-card">
-      <h3>{t('strategyTitle')}</h3>
+    <details className="chart-card collapsible">
+      <summary><h3>{t('strategyTitle')}</h3></summary>
       <table className="compare-table">
         <thead>
           <tr>
@@ -74,6 +74,6 @@ export function StrategyCard(props: { inputs: Inputs }) {
         </tbody>
       </table>
       <p className="hint"><Jargon text={dwz ? t('strategyNoteDwz') : t('strategyNote')} /></p>
-    </div>
+    </details>
   )
 }

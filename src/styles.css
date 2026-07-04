@@ -184,10 +184,7 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 }
 .tag.best { background: #e5f2e6; color: var(--green); }
 
-.table-scroll {
-  max-height: 460px; overflow: auto; border: 1px solid var(--line);
-  border-radius: 8px;
-}
+.table-scroll { overflow-x: auto; }
 .table-scroll thead th {
   position: sticky; top: 0; background: var(--card); z-index: 1;
   box-shadow: 0 1px 0 var(--line);
@@ -216,6 +213,20 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 .good { color: var(--green); }
 .warn { color: var(--amber); }
 .poor { color: var(--red); }
+
+details.collapsible summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: space-between; margin: 0; user-select: none;
+}
+details.collapsible summary::-webkit-details-marker { display: none; }
+details.collapsible summary h3 { margin: 0; }
+details.collapsible summary::after {
+  content: '▸'; color: var(--ink-faint); font-size: 0.9rem;
+  transition: transform 0.15s ease;
+}
+details.collapsible[open] summary::after { transform: rotate(90deg); }
+details.collapsible[open] summary { margin-bottom: 12px; }
+details.collapsible summary:hover::after { color: var(--ink); }
 
 footer {
   margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line);

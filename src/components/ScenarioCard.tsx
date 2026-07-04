@@ -31,9 +31,9 @@ export function ScenarioCard() {
   const resultNow = useMemo(() => runProjection(inputs), [inputs])
 
   return (
-    <div className="chart-card">
+    <details className="chart-card collapsible">
+      <summary><h3>{t('scenarioTitle')}</h3></summary>
       <div className="card-head">
-        <h3>{t('scenarioTitle')}</h3>
         <div>
           <button onClick={saveScenarioA}>{t('scenarioSave')}</button>
           {scenarioA && (
@@ -66,6 +66,6 @@ export function ScenarioCard() {
       ) : (
         <p className="hint"><Jargon text={t('scenarioHint')} /></p>
       )}
-    </div>
+    </details>
   )
 }

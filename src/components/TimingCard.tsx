@@ -128,8 +128,8 @@ export function TimingCard(props: { inputs: Inputs }) {
   const bestIsCurrent = best.cpp === inputs.cppStartAge && best.oas === inputs.oasStartAge
 
   return (
-    <div className="chart-card">
-      <h3>{t('timingTitle')}</h3>
+    <details className="chart-card collapsible">
+      <summary><h3>{t('timingTitle')}</h3></summary>
       <p className="hint">
         <Jargon text={t('timingWhy', { life: inputs.lifeExpectancy })} />
       </p>
@@ -164,6 +164,6 @@ export function TimingCard(props: { inputs: Inputs }) {
         )}
       </div>
       <p className="hint"><Jargon text={t('timingNote')} /></p>
-    </div>
+    </details>
   )
 }

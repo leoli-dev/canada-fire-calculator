@@ -14,8 +14,8 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   if (rows.length === 0) return null
 
   return (
-    <div className="chart-card">
-      <h3>{t('yearTableTitle')}</h3>
+    <details className="chart-card collapsible">
+      <summary><h3>{t('yearTableTitle')}</h3></summary>
       <p className="hint"><Jargon text={t('yearTableNote')} /></p>
       <div className="table-scroll">
         <table className="compare-table year-table">
@@ -61,6 +61,6 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </details>
   )
 }
