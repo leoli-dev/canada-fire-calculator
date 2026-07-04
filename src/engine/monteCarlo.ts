@@ -1,10 +1,23 @@
 import { runProjection } from './projection'
 import type { Inputs } from './types'
 
+export interface FailureProfile {
+  count: number
+  /** earliest age any failed run went broke */
+  earliestDepletedAge: number | null
+  /** median depletion age among failed runs */
+  medianDepletedAge: number | null
+  /** mean annual return over the first 5 post-FIRE years, failed runs */
+  avgEarlyReturnFailed: number | null
+  /** same, successful runs — the gap is sequence-of-returns risk made visible */
+  avgEarlyReturnSuccess: number | null
+}
+
 export interface MonteCarloResult {
   trials: number
   successRate: number
   bands: { age: number; p10: number; p50: number; p90: number }[]
+  failures: FailureProfile
 }
 
 const DEFAULT_VOLS = { tfsa: 0.1, rrsp: 0.1, nonReg: 0.1 }
@@ -30,9 +43,28 @@ export function runMonteCarlo(
 
   let successes = 0
   const totalsByYear: number[][] = []
+  const failDepletedAges: number[] = []
+  const earlyFailed: number[] = []
+  const earlySuccess: number[] = []
   for (let t = 0; t < trials; t++) {
-    const r = runProjection(inputs, (_age, acct) => inputs.returns[acct] + vols[acct] * gauss())
-    if (r.success) successes++
+    let earlySum = 0
+    let earlyN = 0
+    const r = runProjection(inputs, (age, acct) => {
+      const ret = inputs.returns[acct] + vols[acct] * gauss()
+      if (age >= inputs.fireAge && age < inputs.fireAge + 5) {
+        earlySum += ret
+        earlyN++
+      }
+      return ret
+    })
+    const earlyAvg = earlyN > 0 ? earlySum / earlyN : 0
+    if (r.success) {
+      successes++
+      earlySuccess.push(earlyAvg)
+    } else {
+      failDepletedAges.push(r.depletedAge!)
+      earlyFailed.push(earlyAvg)
+    }
     r.rows.forEach((row, i) => {
       const total =
         row.balances.tfsa + row.balances.rrsp + row.balances.nonReg + row.propertyValue
@@ -47,5 +79,14 @@ export function runMonteCarlo(
     return { age: ages[i], p10: q(0.1), p50: q(0.5), p90: q(0.9) }
   })
 
-  return { trials, successRate: successes / trials, bands }
+  failDepletedAges.sort((a, b) => a - b)
+  const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
+  const failures: FailureProfile = {
+    count: failDepletedAges.length,
+    earliestDepletedAge: failDepletedAges[0] ?? null,
+    medianDepletedAge: failDepletedAges[Math.floor(failDepletedAges.length / 2)] ?? null,
+    avgEarlyReturnFailed: mean(earlyFailed),
+    avgEarlyReturnSuccess: mean(earlySuccess),
+  }
+  return { trials, successRate: successes / trials, bands, failures }
 }

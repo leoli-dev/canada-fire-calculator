@@ -66,6 +66,33 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
             </strong>{' '}
             <span className="hint">({t('mcTrials', { n: mc.trials })})</span>
           </p>
+          {mc.failures.count > 0 ? (
+            <div className="fail-profile">
+              <p>
+                <Jargon
+                  text={t('mcFailStats', {
+                    count: mc.failures.count,
+                    pct: Math.round((mc.failures.count / mc.trials) * 100),
+                    earliest: mc.failures.earliestDepletedAge,
+                    median: mc.failures.medianDepletedAge,
+                  })}
+                />
+              </p>
+              {mc.failures.avgEarlyReturnFailed !== null &&
+                mc.failures.avgEarlyReturnSuccess !== null && (
+                  <p>
+                    <Jargon
+                      text={t('mcFailWhy', {
+                        failed: (mc.failures.avgEarlyReturnFailed * 100).toFixed(1),
+                        succeeded: (mc.failures.avgEarlyReturnSuccess * 100).toFixed(1),
+                      })}
+                    />
+                  </p>
+                )}
+            </div>
+          ) : (
+            <p className="hint">{t('mcNoFail', { n: mc.trials })}</p>
+          )}
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />

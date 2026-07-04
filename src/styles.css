@@ -209,6 +209,11 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 
 /* ---------- monte carlo ---------- */
 .mc-rate { margin: 12px 0 6px; color: var(--ink-soft); }
+.fail-profile {
+  background: #fbf4f2; border: 1px solid #f0dcd6; border-radius: 8px;
+  padding: 10px 14px; margin: 8px 0 12px; font-size: 0.86rem; color: var(--ink-soft);
+}
+.fail-profile p { margin: 4px 0; }
 .mc-rate strong { font-size: 1.35rem; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .good { color: var(--green); }
 .warn { color: var(--amber); }
