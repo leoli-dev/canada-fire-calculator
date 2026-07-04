@@ -165,6 +165,33 @@ describe('runProjection', () => {
     expect(r.estateTax).toBeCloseTo(0, -2)
   })
 
+  it('GIS: a TFSA-funded retiree receives it from 65; RRSP income claws it back', () => {
+    const tfsaLiving = runProjection({
+      ...base,
+      strategy: 'tfsaFirst' as const,
+      savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      balances: { tfsa: 3000000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 9024,
+    })
+    const at64 = tfsaLiving.rows.find((r) => r.age === 64)!
+    const at70 = tfsaLiving.rows.find((r) => r.age === 70)!
+    expect(at64.gis).toBe(0) // GIS requires OAS
+    expect(at70.gis).toBeCloseTo(13478, -1) // zero taxable income -> full single GIS
+
+    const rrspLiving = runProjection({
+      ...base,
+      strategy: 'rrspFirst' as const,
+      balances: { tfsa: 0, rrsp: 3000000, nonReg: 0 },
+      nonRegBook: 0,
+      savingsSplit: { tfsa: 0, rrsp: 1, nonReg: 0 },
+      oasAnnualAt65: 9024,
+    })
+    const rrsp70 = rrspLiving.rows.find((r) => r.age === 70)!
+    expect(rrsp70.gis).toBe(0) // ~$60k taxable income is far past the cutoff
+  })
+
   it('TFSA-only withdrawals pay no tax in the bridge with no other income', () => {
     const r = runProjection({
       ...base,

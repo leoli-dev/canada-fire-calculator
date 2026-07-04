@@ -85,6 +85,7 @@
   "incomeChartNote": "Stacked areas are gross cash sources; the dashed line is tax paid.",
   "cppLabel": "CPP/QPP",
   "oasLabel": "OAS",
+  "gisLabel": "GIS",
   "taxLabel": "Tax",
   "strategyTitle": "Withdrawal-order comparison",
   "stratOutcome": "Outcome",
@@ -244,6 +245,10 @@
     "pensioncredit": {
       "title": "Pension income credit",
       "body": "The first $2,000 of eligible pension income each year earns a federal credit (provinces add their own amounts). From age 65, RRIF withdrawals qualify - which is why planners suggest drawing at least $2,000 a year from a RRIF after 65: that slice is nearly tax-free. RRSP withdrawals never qualify at any age. The calculator applies the credit to RRSP/RRIF draws from 65 automatically."
+    },
+    "gis": {
+      "title": "GIS - Guaranteed Income Supplement",
+      "body": "A tax-free top-up for low-income seniors (up to ~$13,500/yr for a single in 2026), paid only while receiving OAS and income-tested: roughly 50-60 cents lost per dollar of taxable income, reaching zero near $22,800 (single). A hidden benefit for FIRE folks: the income test excludes OAS itself, and TFSA withdrawals are completely invisible to it - an early retiree living on TFSA and already-taxed capital after 65 can report near-zero income and collect the full amount. Capturing it requires the RRSP to be essentially empty before 65 (RRIF minimums would eat the GIS) and usually pairs with deferring CPP to 70. Not to be confused with a GIC."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

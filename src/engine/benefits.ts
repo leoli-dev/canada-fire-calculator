@@ -42,6 +42,30 @@ export function estimateOasAt65(residenceYearsBy65: number): number {
 }
 
 // 2026 income year (2025: $93,454; the old $90,997 was the 2024 threshold)
+/**
+ * GIS (Guaranteed Income Supplement), 2026 Q3 annualized. Linear
+ * approximation of the official tables: the maximum benefit shrinks to zero
+ * at the income cutoff. GIS income excludes OAS itself — and TFSA
+ * withdrawals are invisible to it, which is why low-taxable-income early
+ * retirees can qualify.
+ */
+export const GIS_SINGLE = { max: 13478, cutoff: 22800 }
+export const GIS_COUPLE = { maxEach: 8113, cutoff: 30096 }
+
+/**
+ * Annual household GIS. `receivingOas` flags each spouse actually receiving
+ * OAS (GIS requires it); `householdIncome` is taxable income excluding OAS.
+ * A couple with only one pensioner is approximated with the single rate.
+ */
+export function gisAnnual(receivingOas: boolean[], householdIncome: number): number {
+  const receiving = receivingOas.filter(Boolean).length
+  if (receiving === 0) return 0
+  if (receivingOas.length === 2 && receiving === 2) {
+    return Math.max(0, 2 * GIS_COUPLE.maxEach * (1 - householdIncome / GIS_COUPLE.cutoff))
+  }
+  return Math.max(0, GIS_SINGLE.max * (1 - householdIncome / GIS_SINGLE.cutoff))
+}
+
 export const OAS_CLAWBACK_THRESHOLD = 95323
 export const OAS_CLAWBACK_RATE = 0.15
 

@@ -18,6 +18,7 @@ export const TERMS: TermDef[] = [
   { id: 'cpp', patterns: ['CPP', 'QPP', 'RPC', 'RRQ'] },
   { id: 'oas', patterns: ['OAS', 'SV'] },
   { id: 'gic', patterns: ['GIC', 'CPG', '定存'] },
+  { id: 'gis', patterns: ['GIS', 'SRG'] },
   { id: 'ympe', patterns: ['YMPE', 'MGA'] },
   { id: 'meltdown', patterns: ['meltdown', 'Meltdown'] },
   { id: 'clawback', patterns: ['clawback', 'Clawback'] },

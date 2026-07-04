@@ -9,7 +9,7 @@ import {
 } from './types'
 import { incomeTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
-import { cppAnnual, oasAnnual, oasAfterClawback } from './benefits'
+import { cppAnnual, gisAnnual, oasAnnual, oasAfterClawback } from './benefits'
 import { rrifMinFactor } from './rrif'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
@@ -30,6 +30,8 @@ interface WithdrawalOutcome {
   /** portion of the year's tax attributable to RRSP/RRIF withdrawals */
   rrspTax: number
   oasNet: number
+  /** GIS received (tax-free, income-tested on taxable income excl. OAS) */
+  gis: number
   netCash: number
 }
 
@@ -91,11 +93,17 @@ function evaluate(
       pensionIncome,
     })
   }
-  const netCash = cpp + oasNet + w.tfsa + w.rrsp + w.nonReg - tax
+  // GIS: requires receiving OAS; income test on taxable income excl. OAS
+  // (TFSA withdrawals are invisible to it)
+  const gis = gisAnnual(
+    oasGrossPerPerson.map((o) => o > 0),
+    baseTaxable,
+  )
+  const netCash = cpp + oasNet + gis + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = baseTaxable + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
-  const taxablePerPerson = totalTaxable / oasGrossPerPerson.length
-  return { withdrawals: w, tax, rrspTax, oasNet, netCash, taxablePerPerson }
+  const taxablePerPerson = totalTaxable / persons
+  return { withdrawals: w, tax, rrspTax, oasNet, gis, netCash, taxablePerPerson }
 }
 
 /** Binary-search the gross withdrawal needed to hit the spending target. */
@@ -165,6 +173,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let withdrawals: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
     let cpp = 0
     let oas = 0
+    let gis = 0
     let tax = 0
     let netCash = 0
     let shortfall = 0
@@ -262,6 +271,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       tax = out.tax
       rrspTaxTotal += out.rrspTax
       oas = out.oasNet
+      gis = out.gis
       netCash = out.netCash
       taxablePerPerson = out.taxablePerPerson ?? 0
 
@@ -295,7 +305,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     rows.push({
       age, phase,
       balances: { ...bal },
-      withdrawals, cpp, oas, tax, netCash, shortfall,
+      withdrawals, cpp, oas, gis, tax, netCash, shortfall,
       propertyValue: prValue + ipValue,
       taxablePerPerson,
     })

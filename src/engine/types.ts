@@ -109,6 +109,8 @@ export interface YearRow {
   cpp: number
   /** OAS actually received, after clawback */
   oas: number
+  /** GIS received — tax-free, requires OAS, income-tested (TFSA invisible) */
+  gis: number
   tax: number
   /** after-tax cash available this year */
   netCash: number

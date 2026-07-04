@@ -85,6 +85,7 @@
   "incomeChartNote": "Les aires empilées sont les sources brutes; la ligne pointillée est l'impôt payé.",
   "cppLabel": "RPC/RRQ",
   "oasLabel": "SV",
+  "gisLabel": "SRG",
   "taxLabel": "Impôt",
   "strategyTitle": "Comparaison des ordres de décaissement",
   "stratOutcome": "Résultat",
@@ -244,6 +245,10 @@
     "pensioncredit": {
       "title": "Crédit pour revenu de pension",
       "body": "Les premiers 2 000 $ de revenu de pension admissible par année donnent un crédit fédéral (les provinces ajoutent le leur). Dès 65 ans, les retraits FERR sont admissibles - d'où le conseil classique de retirer au moins 2 000 $ par an d'un FERR après 65 ans : cette tranche est presque libre d'impôt. Les retraits REER directs ne sont jamais admissibles. Le calculateur applique le crédit aux retraits REER/FERR dès 65 ans."
+    },
+    "gis": {
+      "title": "SRG - Supplément de revenu garanti",
+      "body": "Prestation non imposable pour aînés à faible revenu (jusqu'à ~13 500 $/an pour une personne seule en 2026), versée seulement avec la SV et testée sur le revenu : environ 50-60 cents perdus par dollar de revenu imposable, nulle vers 22 800 $ (personne seule). Avantage caché pour le FIRE : le test exclut la SV elle-même et les retraits CELI y sont invisibles - un retraité précoce vivant de son CELI après 65 ans peut déclarer un revenu quasi nul et toucher le plein montant. Il faut que le REER soit pratiquement vide avant 65 ans (les minimums FERR grugeraient le SRG), souvent combiné au report du RPC à 70 ans. À ne pas confondre avec un CPG."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",

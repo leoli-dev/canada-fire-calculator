@@ -85,6 +85,7 @@
   "incomeChartNote": "堆叠面积为税前现金来源；虚线为当年所缴税款。",
   "cppLabel": "CPP/QPP",
   "oasLabel": "OAS",
+  "gisLabel": "GIS",
   "taxLabel": "税",
   "strategyTitle": "取钱顺序对比",
   "stratOutcome": "结果",
@@ -244,6 +245,10 @@
     "pensioncredit": {
       "title": "养老金收入抵免（Pension Income Credit）",
       "body": "每年前 $2,000 的\"合格养老金收入\"享受联邦税收抵免（各省另有省级额度），65 岁起 RRIF 取款即算合格收入——这正是规划圈建议 65 岁后每年至少从 RRIF 取 $2,000 的原因：这部分几乎免税。注意 RRSP 直接取款任何年龄都不算合格养老金收入。本计算器对 65 岁后的 RRSP/RRIF 取款自动计入。"
+    },
+    "gis": {
+      "title": "GIS — 保证收入补助",
+      "body": "发给低收入老人的免税补助（2026 年单身最高约 $13,500/年），条件是正在领 OAS 且应税收入低（单身超过约 $22,800 归零，应税收入每多 $1 少领约 $0.5-0.6）。对 FIRE 人群是隐藏福利：收入测试不含 OAS 本身，而 TFSA 取款完全不可见——65 岁后靠 TFSA 和已缴税本金生活的早退者可以一边零应税收入一边领全额 GIS。想吃到它，RRSP 必须在 65 岁前基本清空（否则 RRIF 强制取款会吃掉 GIS），CPP 也常配合推迟到 70。注意别和 GIC（定存）混淆。"
     }
   },
   "targetReachedEarly": "能达标：最早 {{age}} 岁就能攒到 {{target}}；到 {{fireAge}} 岁（FIRE）时约有 {{amount}}。",
