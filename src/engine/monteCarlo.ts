@@ -23,7 +23,10 @@ export interface MonteCarloResult {
 const DEFAULT_VOLS = { tfsa: 0.1, rrsp: 0.1, nonReg: 0.1 }
 
 /**
- * Repeated projections with normally-distributed annual returns per account.
+ * Repeated projections with normally-distributed annual returns.
+ * Each year draws ONE market shock shared by every account (same market, so
+ * accounts move together; sampling them independently would diversify away
+ * portfolio volatility across account wrappers and overstate success rates).
  * Returns the success rate and 10/50/90th-percentile net-worth bands by age.
  */
 export function runMonteCarlo(
@@ -49,8 +52,14 @@ export function runMonteCarlo(
   for (let t = 0; t < trials; t++) {
     let earlySum = 0
     let earlyN = 0
+    const shockByAge = new Map<number, number>()
     const r = runProjection(inputs, (age, acct) => {
-      const ret = inputs.returns[acct] + vols[acct] * gauss()
+      let z = shockByAge.get(age)
+      if (z === undefined) {
+        z = gauss()
+        shockByAge.set(age, z)
+      }
+      const ret = inputs.returns[acct] + vols[acct] * z
       if (age >= inputs.fireAge && age < inputs.fireAge + 5) {
         earlySum += ret
         earlyN++

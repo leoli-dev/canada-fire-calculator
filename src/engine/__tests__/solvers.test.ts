@@ -266,6 +266,20 @@ describe('monte carlo & asset blending', () => {
     )
   })
 
+  it('draws one shared market shock per year, not one per account', () => {
+    // gauss() consumes exactly two rand() draws (u and v, both nonzero here);
+    // with the shock shared across the three accounts, a trial consumes
+    // 2 × years draws — independent per-account sampling would use 3× that.
+    let calls = 0
+    const rand = () => {
+      calls++
+      return 0.5
+    }
+    runMonteCarlo(base, 1, rand)
+    const years = base.lifeExpectancy - base.currentAge + 1
+    expect(calls).toBe(2 * years)
+  })
+
   it('percentile bands are ordered', () => {
     const mc = runMonteCarlo(base, 100)
     for (const b of mc.bands) {

@@ -97,7 +97,7 @@
   "mcTrials": "{{n}} essais",
   "mcBand": "10e–90e centile",
   "mcMedian": "Médiane",
-  "mcNote": "Lecture : la ligne foncée est la médiane des 1 000 essais; la bande ombrée couvre du 10e au 90e centile - 8 essais sur 10 y tombent. Repères : ≥85 % de réussite est solide, 70–85 % serré, <70 % suggère de réduire les dépenses ou de retarder le FIRE.",
+  "mcNote": "Lecture : la ligne foncée est la médiane des 1 000 essais; la bande ombrée couvre du 10e au 90e centile - 8 essais sur 10 y tombent. Vos comptes détiennent le même marché : tous partagent le tirage annuel (corrélation), répartir l'argent entre enveloppes n'annule pas la volatilité. Lisez le taux de réussite comme la probabilité de ne jamais devoir s'ajuster : sous 100 %, certains scénarios exigent de réduire les dépenses - pas la faillite. Il est aussi sensible à l'hypothèse de rendement : un demi-point le déplace de plusieurs points. Repères : ≥85 % solide, 70–85 % serré, <70 % suggère de réduire les dépenses ou de retarder le FIRE.",
   "mcIdle": "Qu'est-ce que Monte-Carlo ? Les graphiques ci-dessus supposent le même rendement chaque année, mais les vrais marchés alternent bonnes et mauvaises années. Monte-Carlo rend chaque rendement annuel aléatoire (selon la volatilité de votre répartition) et rejoue le plan entier 1 000 fois, comptant la fréquence où l'argent dure jusqu'à l'espérance de vie - c'est le taux de réussite. Cela expose le risque de séquence des rendements : un marché baissier juste après le FIRE fait bien plus mal. Cliquez pour lancer.",
   "scenarioTitle": "Comparaison de scénarios",
   "scenarioSave": "Sauvegarder comme A",
@@ -218,6 +218,10 @@
     "marginalrate": {
       "title": "Taux marginal d'imposition",
       "body": "Le taux sur votre prochain dollar de revenu - pas la moyenne sur l'ensemble. Les paliers canadiens sont progressifs : seule la tranche au-dessus de chaque seuil paie le taux de ce palier. Planifier, c'est surtout contrôler le taux marginal - le meltdown garde les retraits REER au premier palier, et la récupération de la SV agit comme 15 % de taux marginal caché."
+    },
+    "correlation": {
+      "title": "Corrélation des rendements",
+      "body": "Deux placements montent-ils et baissent-ils ensemble ? Vos CELI, REER et comptes non enregistrés détiennent souvent les mêmes marchés : en marché baissier, ils chutent ensemble - répartir l'argent entre enveloppes ne diversifie rien. La simulation Monte-Carlo applique donc le même tirage de marché annuel à tous les comptes, pour ne pas confondre enveloppes et diversification (cette confusion gonflerait le taux de réussite). Ce qui réduit vraiment la volatilité, c'est la répartition d'actifs (actions vs obligations), pas l'enveloppe."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
