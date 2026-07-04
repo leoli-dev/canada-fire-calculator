@@ -236,6 +236,14 @@
     "taxdrag": {
       "title": "Tax drag",
       "body": "The non-registered account is the only wrapper that leaks tax: interest, dividends and yearly ETF distributions are taxed even if you withdraw nothing (foreign dividends also lose a 15% withholding tax), steadily eroding compound growth. TFSA/RRSP growth is untouched - which is why withdrawal-order wisdom says not to let non-registered money linger. The calculator adds your distribution yield to each year’s taxable income; reinvested distributions raise the ACB so they are not taxed again at sale."
+    },
+    "agecredit": {
+      "title": "Age amount",
+      "body": "A tax credit for those 65+: the federal amount is up to $9,208 in 2026 (reduced at 15% of net income above ~$46,400, gone near $107,800), with provincial amounts on top (ON $6,342, BC $5,927, AB $6,345; Quebec folds it into a combined family-tested retirement credit). It matters for meltdown planning: keeping taxable income under the phase-out start saves each person well over a thousand dollars a year. The calculator applies it automatically from 65."
+    },
+    "pensioncredit": {
+      "title": "Pension income credit",
+      "body": "The first $2,000 of eligible pension income each year earns a federal credit (provinces add their own amounts). From age 65, RRIF withdrawals qualify - which is why planners suggest drawing at least $2,000 a year from a RRIF after 65: that slice is nearly tax-free. RRSP withdrawals never qualify at any age. The calculator applies the credit to RRSP/RRIF draws from 65 automatically."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
@@ -266,7 +274,7 @@
   "numberGap": "a shortfall of {{amount}}.",
   "numberExplain": "Method: a binary search for the minimum investable assets at age {{age}} that lets the plan - with your withdrawal strategy, property-sale plan and CPP/OAS settings - spend through age {{life}} without running out. Assets are assumed split like your current TFSA/RRSP/non-registered mix (account tax treatment matters). Because government benefits and the home sale are counted, this is usually far below the crude \"25× spending\" rule.",
   "yearTableTitle": "Year-by-year detail (after FIRE)",
-  "yearTableNote": "Where each year's money comes from, how much tax, at which bracket - audit-grade detail. Amounts are always today's purchasing power (brackets are defined in real terms); taxable income is per person after income splitting; marginal rate = federal + provincial statutory bracket (QC abatement applied). Rows marked ! have a spending shortfall.",
+  "yearTableNote": "Where each year's money comes from, how much tax, at which bracket - audit-grade detail. Amounts are always today's purchasing power (brackets are defined in real terms); taxable income is per person after income splitting; marginal rate = federal + provincial statutory bracket (QC abatement applied). Rows marked ! have a spending shortfall. From 65 the tax math automatically includes the age amount and pension income credit (the age amount shrinks as income rises).",
   "colAge": "Age",
   "colGross": "Gross total",
   "colNet": "After-tax cash",

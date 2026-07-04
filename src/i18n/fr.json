@@ -236,6 +236,14 @@
     "taxdrag": {
       "title": "Frein fiscal",
       "body": "Le compte non enregistré est la seule enveloppe qui fuit : intérêts, dividendes et distributions annuelles de FNB sont imposés même sans retrait (les dividendes étrangers subissent aussi une retenue de 15 %), ce qui érode la croissance composée. Le CELI et le REER croissent à l'abri - d'où la règle de décaissement de ne pas laisser traîner l'argent non enregistré. Le calculateur ajoute votre taux de distribution au revenu imposable de chaque année; les distributions réinvesties augmentent le PBR pour éviter une double imposition à la vente."
+    },
+    "agecredit": {
+      "title": "Montant en raison de l'âge",
+      "body": "Crédit d'impôt pour les 65 ans et plus : montant fédéral jusqu'à 9 208 $ en 2026 (réduit à 15 % du revenu net au-delà de ~46 400 $, nul vers 107 800 $), plus les montants provinciaux (ON 6 342 $, C.-B. 5 927 $, AB 6 345 $; le Québec l'intègre à un crédit retraite combiné testé sur le revenu familial). Important pour le meltdown : rester sous le seuil de réduction économise plus de mille dollars par personne par an. Le calculateur l'applique automatiquement dès 65 ans."
+    },
+    "pensioncredit": {
+      "title": "Crédit pour revenu de pension",
+      "body": "Les premiers 2 000 $ de revenu de pension admissible par année donnent un crédit fédéral (les provinces ajoutent le leur). Dès 65 ans, les retraits FERR sont admissibles - d'où le conseil classique de retirer au moins 2 000 $ par an d'un FERR après 65 ans : cette tranche est presque libre d'impôt. Les retraits REER directs ne sont jamais admissibles. Le calculateur applique le crédit aux retraits REER/FERR dès 65 ans."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
@@ -266,7 +274,7 @@
   "numberGap": "un manque de {{amount}}.",
   "numberExplain": "Méthode : recherche binaire du minimum d'actifs investissables à {{age}} ans permettant au plan - avec votre stratégie de décaissement, la vente immobilière et vos réglages RPC/SV - de dépenser jusqu'à {{life}} ans sans épuisement. Les actifs sont répartis comme vos comptes actuels. Comme les prestations et la vente de la maison comptent, ce chiffre est bien plus bas que la règle grossière du « 25× les dépenses ».",
   "yearTableTitle": "Détail année par année (après FIRE)",
-  "yearTableNote": "D'où vient l'argent chaque année, combien d'impôt, à quel palier - détail de niveau audit. Montants toujours en pouvoir d'achat d'aujourd'hui; revenu imposable par personne après fractionnement de revenu; taux marginal = palier fédéral + provincial (abattement QC inclus). Les lignes marquées ! ont un manque à combler.",
+  "yearTableNote": "D'où vient l'argent chaque année, combien d'impôt, à quel palier - détail de niveau audit. Montants toujours en pouvoir d'achat d'aujourd'hui; revenu imposable par personne après fractionnement de revenu; taux marginal = palier fédéral + provincial (abattement QC inclus). Les lignes marquées ! ont un manque à combler. Dès 65 ans, le calcul inclut automatiquement le montant en raison de l'âge et le crédit pour revenu de pension (le premier diminue avec le revenu).",
   "colAge": "Âge",
   "colGross": "Total brut",
   "colNet": "Net après impôt",

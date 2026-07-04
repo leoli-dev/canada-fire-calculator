@@ -43,6 +43,32 @@ describe('incomeTax', () => {
   it('QC total exceeds ON at the same income despite the abatement', () => {
     expect(incomeTax(80000, 'QC')).toBeGreaterThan(incomeTax(80000, 'ON'))
   })
+
+  it('the age amount lowers tax for 65+ at modest income and phases out at high income', () => {
+    const under65 = incomeTax(40000, 'ON', { age: 60 })
+    const senior = incomeTax(40000, 'ON', { age: 70 })
+    // full amounts: federal 9,208*14% + ON 6,342*5.05% = 1,609.39
+    expect(under65 - senior).toBeCloseTo(9208 * 0.14 + 6342 * 0.0505, 0)
+    // fully phased out well above every zero-point ($107,819 fed / $89,490 ON)
+    expect(incomeTax(150000, 'ON', { age: 70 })).toBeCloseTo(incomeTax(150000, 'ON'), 1)
+  })
+
+  it('the pension income credit applies to RRIF income at 65+', () => {
+    const without = incomeTax(40000, 'ON', { age: 70 })
+    const withPension = incomeTax(40000, 'ON', { age: 70, pensionIncome: 5000 })
+    // capped at $2,000 federal (14%) and $1,796 ON (5.05%)
+    expect(without - withPension).toBeCloseTo(2000 * 0.14 + 1796 * 0.0505, 0)
+  })
+
+  it('QC combines age and retirement-income amounts with an 18.75% family test', () => {
+    const low = incomeTax(30000, 'QC', { age: 70, pensionIncome: 5000 })
+    const base = incomeTax(30000, 'QC', { age: 60 })
+    // QC block: (3,986 + 3,541) * 14%; federal age+pension credits also
+    // apply, discounted by the 16.5% abatement
+    const qcPart = (3986 + 3541) * 0.14
+    const fedPart = (9208 * 0.14 + 2000 * 0.14) * (1 - 0.165)
+    expect(base - low).toBeCloseTo(qcPart + fedPart, 0)
+  })
 })
 
 describe('CPP/OAS adjustments', () => {

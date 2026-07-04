@@ -54,6 +54,7 @@ function evaluate(
   gainFraction: number,
   cpp: number,
   oasGrossPerPerson: number[],
+  agesPerPerson: number[],
   extraTaxable: number,
   steps: Step[],
   inputs: Inputs,
@@ -74,15 +75,21 @@ function evaluate(
     if (remaining <= 0) break
   }
 
+  const persons = oasGrossPerPerson.length
   const baseTaxable =
     cpp + extraTaxable + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
-  const share = baseTaxable / oasGrossPerPerson.length
+  const share = baseTaxable / persons
   let oasNet = 0
   let tax = 0
-  for (const oasGross of oasGrossPerPerson) {
-    const personOas = oasAfterClawback(oasGross, share)
+  for (let i = 0; i < persons; i++) {
+    const personOas = oasAfterClawback(oasGrossPerPerson[i], share)
     oasNet += personOas
-    tax += incomeTax(share + personOas, inputs.province)
+    // RRIF withdrawals at 65+ qualify as eligible pension income
+    const pensionIncome = agesPerPerson[i] >= 65 ? w.rrsp / persons : 0
+    tax += incomeTax(share + personOas, inputs.province, {
+      age: agesPerPerson[i],
+      pensionIncome,
+    })
   }
   const netCash = cpp + oasNet + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = baseTaxable + oasNet
@@ -99,13 +106,14 @@ function solveWithdrawals(
   gainFraction: number,
   cpp: number,
   oasGrossPerPerson: number[],
+  agesPerPerson: number[],
   extraTaxable: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, extraTaxable, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -207,12 +215,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const oasGrossPerPerson = [
         age >= inputs.oasStartAge ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) : 0,
       ]
+      const agesPerPerson = [age]
       if (partner) {
         oasGrossPerPerson.push(
           partnerAge! >= partner.oasStartAge
             ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge)
             : 0,
         )
+        agesPerPerson.push(partnerAge!)
       }
 
       const rrifMin = bal.rrsp * rrifMinFactor(age)
@@ -246,7 +256,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
 
       const out = solveWithdrawals(
         inputs.retirementSpending, bal, forcedRrsp, gainFraction, cpp,
-        oasGrossPerPerson, extraTaxable, steps, inputs,
+        oasGrossPerPerson, agesPerPerson, extraTaxable, steps, inputs,
       )
       withdrawals = out.withdrawals
       tax = out.tax

@@ -1,5 +1,20 @@
-import { FEDERAL, PROVINCIAL, QC_ABATEMENT, type Bracket } from './taxData'
+import {
+  FED_AGE_AMOUNT,
+  FED_PENSION_AMOUNT,
+  FEDERAL,
+  PROV_AGE_PENSION,
+  PROVINCIAL,
+  QC_ABATEMENT,
+  type Bracket,
+} from './taxData'
 import type { Province } from './types'
+
+export interface PersonCredits {
+  /** the taxpayer's age — 65+ unlocks the age amount */
+  age?: number
+  /** eligible pension income (RRIF withdrawals at 65+) for the pension credit */
+  pensionIncome?: number
+}
 
 function bracketTax(income: number, brackets: Bracket[]): number {
   let tax = 0
@@ -22,19 +37,53 @@ function federalBpa(taxable: number): number {
   return bpa - (bpa - bpaMin) * phase
 }
 
-/** Combined federal + provincial income tax on taxable income. */
-export function incomeTax(taxable: number, province: Province): number {
+/**
+ * Combined federal + provincial income tax on taxable income.
+ * Optional retiree credits: the age amount (65+, income-tested) and the
+ * pension income amount, both federal and provincial. Taxable income stands
+ * in for net income in the phase-outs.
+ */
+export function incomeTax(
+  taxable: number,
+  province: Province,
+  credits?: PersonCredits,
+): number {
   if (taxable <= 0) return 0
-  let fed = Math.max(
-    0,
-    bracketTax(taxable, FEDERAL.brackets) - federalBpa(taxable) * FEDERAL.brackets[0].rate,
-  )
+  const senior = (credits?.age ?? 0) >= 65
+  const pensionInc = credits?.pensionIncome ?? 0
+
+  let fedCredit = federalBpa(taxable) * FEDERAL.brackets[0].rate
+  if (senior) {
+    const ageAmt = Math.max(
+      0,
+      FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold),
+    )
+    fedCredit += ageAmt * FEDERAL.brackets[0].rate
+    fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * FEDERAL.brackets[0].rate
+  }
+  let fed = Math.max(0, bracketTax(taxable, FEDERAL.brackets) - fedCredit)
   if (province === 'QC') fed *= 1 - QC_ABATEMENT
+
   const p = PROVINCIAL[province]
-  const prov = Math.max(
-    0,
-    bracketTax(taxable, p.brackets) - p.bpa * p.brackets[0].rate,
-  )
+  const lowRate = p.brackets[0].rate
+  let provCredit = p.bpa * lowRate
+  if (senior) {
+    const ap = PROV_AGE_PENSION[province]
+    if (province === 'QC') {
+      // combined age + retirement-income amount, family-income-tested at
+      // 18.75%; applied per person on their income share (50/50 split)
+      const combined = ap.ageMax + Math.min(ap.pension, pensionInc)
+      provCredit +=
+        Math.max(0, combined - ap.ageRate * Math.max(0, taxable - ap.ageThreshold)) * lowRate
+    } else {
+      const ageAmt = Math.max(
+        0,
+        ap.ageMax - ap.ageRate * Math.max(0, taxable - ap.ageThreshold),
+      )
+      provCredit += (ageAmt + Math.min(ap.pension, pensionInc)) * lowRate
+    }
+  }
+  const prov = Math.max(0, bracketTax(taxable, p.brackets) - provCredit)
   return fed + prov
 }
 
