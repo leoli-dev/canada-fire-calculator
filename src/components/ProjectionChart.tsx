@@ -14,7 +14,6 @@ import {
 } from 'recharts'
 import type { ProjectionResult } from '../engine'
 import { useCad } from '../format'
-import { Jargon } from './Jargon'
 
 const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', property: '#8d6e63' }
 
@@ -44,7 +43,7 @@ export function ProjectionChart(props: {
 
   return (
     <div className="chart-card">
-      <h3><Jargon text={t('chartTitle')} /></h3>
+      <h3>{t('chartTitle')}</h3>
       <ResponsiveContainer width="100%" height={380}>
         <ComposedChart data={data} margin={{ top: 24, right: 16, bottom: 0, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />

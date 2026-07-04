@@ -49,7 +49,7 @@ export function IncomeChart(props: {
 
   return (
     <div className="chart-card">
-      <h3><Jargon text={t('incomeChartTitle')} /></h3>
+      <h3>{t('incomeChartTitle')}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />

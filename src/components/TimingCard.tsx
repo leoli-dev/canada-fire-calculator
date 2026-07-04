@@ -129,15 +129,15 @@ export function TimingCard(props: { inputs: Inputs }) {
 
   return (
     <div className="chart-card">
-      <h3><Jargon text={t('timingTitle')} /></h3>
+      <h3>{t('timingTitle')}</h3>
       <p className="hint">
         <Jargon text={t('timingWhy', { life: inputs.lifeExpectancy })} />
       </p>
 
-      <h4 className="table-title"><Jargon text={t('timingCppTitle')} /></h4>
+      <h4 className="table-title">{t('timingCppTitle')}</h4>
       {renderTable(cppRows, inputs.cppStartAge, currentCpp, (age) => set({ cppStartAge: age }))}
 
-      <h4 className="table-title"><Jargon text={t('timingOasTitle')} /></h4>
+      <h4 className="table-title">{t('timingOasTitle')}</h4>
       {renderTable(oasRows, inputs.oasStartAge, currentOas, (age) => set({ oasStartAge: age }))}
 
       <div className="card-head" style={{ marginTop: 14 }}>

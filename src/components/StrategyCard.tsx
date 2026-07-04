@@ -24,7 +24,7 @@ export function StrategyCard(props: { inputs: Inputs }) {
 
   return (
     <div className="chart-card">
-      <h3><Jargon text={t('strategyTitle')} /></h3>
+      <h3>{t('strategyTitle')}</h3>
       <table className="compare-table">
         <thead>
           <tr>

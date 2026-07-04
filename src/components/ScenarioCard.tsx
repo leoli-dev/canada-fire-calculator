@@ -33,7 +33,7 @@ export function ScenarioCard() {
   return (
     <div className="chart-card">
       <div className="card-head">
-        <h3><Jargon text={t('scenarioTitle')} /></h3>
+        <h3>{t('scenarioTitle')}</h3>
         <div>
           <button onClick={saveScenarioA}>{t('scenarioSave')}</button>
           {scenarioA && (

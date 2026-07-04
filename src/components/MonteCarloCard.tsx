@@ -52,7 +52,7 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
   return (
     <div className="chart-card">
       <div className="card-head">
-        <h3><Jargon text={t('mcTitle')} /></h3>
+        <h3>{t('mcTitle')}</h3>
         <button className="primary" onClick={run} disabled={running}>
           {running ? t('mcRunning') : t('mcRun')}
         </button>
