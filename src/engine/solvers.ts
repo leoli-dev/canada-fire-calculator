@@ -145,6 +145,11 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
       bal.nonReg += ipValue - gainTax
       ipValue = 0
     }
+    // mirror the projection's accumulation-phase tax drag on distributions
+    bal.nonReg -=
+      bal.nonReg *
+      (inputs.nonRegDistributionYield ?? 0) *
+      (inputs.accumulationMarginalRate ?? 0.35)
     for (const t of ACCOUNT_TYPES) {
       bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)

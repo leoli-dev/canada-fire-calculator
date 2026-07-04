@@ -131,6 +131,40 @@ describe('runProjection', () => {
     expect(at70.cpp).toBeCloseTo(16000)
   })
 
+  it('tax drag: distributions are taxed yearly and lower the final net worth', () => {
+    const noDrag = runProjection(base)
+    const dragged = runProjection({ ...base, nonRegDistributionYield: 0.03 })
+    expect(dragged.finalNetWorth).toBeLessThan(noDrag.finalNetWorth)
+    // even a TFSA-first bridge year shows tax once distributions exist
+    const bridge = runProjection({
+      ...base,
+      strategy: 'tfsaFirst' as const,
+      balances: { tfsa: 1500000, rrsp: 0, nonReg: 1500000 },
+      nonRegBook: 1500000,
+      nonRegDistributionYield: 0.03,
+    })
+    const bridgeRow = bridge.rows.find((x) => x.phase === 'bridge')!
+    expect(bridgeRow.tax).toBeGreaterThan(0)
+  })
+
+  it('tax drag raises the ACB: reinvested distributions are not taxed twice', () => {
+    // all-interest portfolio never sold until death: with the yield fully
+    // distributed and reinvested, book value tracks the balance and the
+    // estate has no unrealized gain left to tax
+    const r = runProjection({
+      ...base,
+      strategy: 'tfsaFirst' as const,
+      savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      returns: { tfsa: 0.05, rrsp: 0.05, nonReg: 0.03 },
+      balances: { tfsa: 3000000, rrsp: 0, nonReg: 500000 },
+      nonRegBook: 500000,
+      nonRegDistributionYield: 0.03,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 0,
+    })
+    expect(r.estateTax).toBeCloseTo(0, -2)
+  })
+
   it('TFSA-only withdrawals pay no tax in the bridge with no other income', () => {
     const r = runProjection({
       ...base,

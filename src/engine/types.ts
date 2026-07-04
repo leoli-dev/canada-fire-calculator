@@ -63,6 +63,15 @@ export interface Inputs {
   returns: Record<AccountType, number>
   /** annual investment fee (MER) subtracted from every account's return */
   fees?: number
+  /**
+   * Non-registered tax drag: the fraction of the balance paid out each year
+   * as taxable distributions (interest/dividends/ETF payouts, reinvested).
+   * Taxed yearly as ordinary income — a deliberate simplification given no
+   * dividend-credit modelling.
+   */
+  nonRegDistributionYield?: number
+  /** marginal rate applied to those distributions before FIRE (working years) */
+  accumulationMarginalRate?: number
   /** current balances */
   balances: Record<AccountType, number>
   /** adjusted cost base (book value) of non-registered holdings */

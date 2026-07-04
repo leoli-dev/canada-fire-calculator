@@ -29,6 +29,8 @@ export const DEFAULT_INPUTS: Inputs = {
   retirementSpending: 50000,
   returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
   fees: 0.002,
+  nonRegDistributionYield: 0.02,
+  accumulationMarginalRate: 0.35,
   volatilities: { tfsa: 0.12, rrsp: 0.12, nonReg: 0.12 },
   balances: { tfsa: 100000, rrsp: 200000, nonReg: 100000 },
   nonRegBook: 80000,

@@ -29,6 +29,10 @@
   "rrsp": "RRSP / RRIF",
   "nonReg": "Non-registered",
   "nonRegBook": "Non-registered cost base (ACB)",
+  "nonRegTaxTitle": "Non-registered tax drag",
+  "nonRegYieldLabel": "Annual distributions (interest/dividends, %/yr)",
+  "nonRegYieldHint": "Interest, dividends and ETF distributions in a non-registered account are taxed the year they are paid even when auto-reinvested - that is tax drag. In retirement it joins your taxable income; during working years it is taxed at the marginal rate below. Broad equity ETFs distribute ~2%; bonds/GICs more. Set 0 to disable.",
+  "accMarginalLabel": "Working-years marginal tax rate (%)",
   "savingsSplit": "Savings allocation (%)",
   "mixLabel": "Asset mix per account",
   "mixNote": "Presets set a real return and volatility from FP Canada-style assumptions.",
@@ -228,6 +232,10 @@
     "mer": {
       "title": "MER - management expense ratio",
       "body": "The share of assets a fund silently deducts every year (you never see a bill, but it is real). Broad index ETFs charge ~0.05-0.25%; actively managed bank mutual funds commonly 1.5-2.5%. Over 30 years a 2% fee consumes roughly forty percent of the final portfolio. This calculator treats return assumptions as gross of fees and subtracts the rate you enter separately."
+    },
+    "taxdrag": {
+      "title": "Tax drag",
+      "body": "The non-registered account is the only wrapper that leaks tax: interest, dividends and yearly ETF distributions are taxed even if you withdraw nothing (foreign dividends also lose a 15% withholding tax), steadily eroding compound growth. TFSA/RRSP growth is untouched - which is why withdrawal-order wisdom says not to let non-registered money linger. The calculator adds your distribution yield to each year’s taxable income; reinvested distributions raise the ACB so they are not taxed again at sale."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

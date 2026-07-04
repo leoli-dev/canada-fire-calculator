@@ -171,6 +171,15 @@ export function InputForm() {
         <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onChange={(v) => set({ nonRegBook: v })} />
 
         <details>
+          <summary><Jargon text={t('nonRegTaxTitle')} /></summary>
+          <p className="hint"><Jargon text={t('nonRegYieldHint')} /></p>
+          <Num label={t('nonRegYieldLabel')} value={(inputs.nonRegDistributionYield ?? 0) * 100} step={0.5}
+            onChange={(v) => set({ nonRegDistributionYield: Math.max(0, v) / 100 })} />
+          <Num label={t('accMarginalLabel')} value={(inputs.accumulationMarginalRate ?? 0.35) * 100} step={1}
+            onChange={(v) => set({ accumulationMarginalRate: Math.max(0, Math.min(60, v)) / 100 })} />
+        </details>
+
+        <details>
           <summary>{t('mixLabel')}</summary>
           <p className="hint"><Jargon text={t('mixNote')} /></p>
           {ACCOUNTS.map((a) => (

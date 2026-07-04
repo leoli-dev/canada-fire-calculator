@@ -179,13 +179,24 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       ipValue = 0
     }
 
+    // non-registered tax drag: yearly distributions are taxable when paid,
+    // then reinvest (raising the ACB so they aren't taxed again at sale)
+    const dist = bal.nonReg * (inputs.nonRegDistributionYield ?? 0)
+
     if (phase === 'accumulation') {
       for (const t of ACCOUNT_TYPES) {
         const c = inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
         bal[t] += c
         if (t === 'nonReg') nonRegBook += c
       }
+      // working years: distributions taxed at the assumed marginal rate,
+      // with the tax paid out of the account
+      const dragTax = dist * (inputs.accumulationMarginalRate ?? 0.35)
+      bal.nonReg -= dragTax
+      nonRegBook += dist - dragTax
+      tax = dragTax
     } else {
+      extraTaxable += dist
       const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
 
       if (age >= inputs.cppStartAge) cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge)
@@ -261,6 +272,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         bal.nonReg += surplus
         nonRegBook += surplus
       }
+      // reinvested distributions raise the ACB (already taxed this year)
+      nonRegBook += dist
     }
 
     for (const t of ACCOUNT_TYPES) {

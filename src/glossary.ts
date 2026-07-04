@@ -34,6 +34,7 @@ export const TERMS: TermDef[] = [
   { id: 'splitting', patterns: ['收入分割', 'income splitting', 'Income splitting', 'fractionnement de revenu', 'Fractionnement de revenu'] },
   { id: 'correlation', patterns: ['收益相关性', '同涨同跌', 'correlation', 'Correlation', 'corrélation', 'Corrélation'] },
   { id: 'mer', patterns: ['MER', 'RFG', '管理费率'] },
+  { id: 'taxdrag', patterns: ['税拖累', 'tax drag', 'Tax drag', 'frein fiscal', 'Frein fiscal'] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

@@ -29,6 +29,10 @@
   "rrsp": "REER / FERR",
   "nonReg": "Non enregistré",
   "nonRegBook": "Prix de base rajusté (PBR) du non enregistré",
+  "nonRegTaxTitle": "Frein fiscal du compte non enregistré",
+  "nonRegYieldLabel": "Distributions annuelles (intérêts/dividendes, %/an)",
+  "nonRegYieldHint": "Les intérêts, dividendes et distributions de FNB d'un compte non enregistré sont imposés l'année où ils sont versés, même réinvestis automatiquement - c'est le frein fiscal. À la retraite, ils s'ajoutent au revenu imposable; pendant les années de travail, ils sont imposés au taux marginal ci-dessous. FNB d'actions : ~2 %; obligations/CPG : davantage. Mettre 0 pour désactiver.",
+  "accMarginalLabel": "Taux marginal pendant les années de travail (%)",
   "savingsSplit": "Répartition de l'épargne (%)",
   "mixLabel": "Répartition d'actifs par compte",
   "mixNote": "Les préréglages fixent rendement réel et volatilité selon des hypothèses de type FP Canada.",
@@ -228,6 +232,10 @@
     "mer": {
       "title": "RFG - ratio des frais de gestion",
       "body": "La part d'actifs qu'un fonds prélève silencieusement chaque année (aucune facture, mais bien réel). FNB indiciels : ~0,05-0,25 %; fonds communs bancaires gérés activement : souvent 1,5-2,5 %. Sur 30 ans, 2 % de frais consomment environ quarante pour cent du portefeuille final. Le calculateur traite les rendements comme avant frais et soustrait séparément le taux saisi."
+    },
+    "taxdrag": {
+      "title": "Frein fiscal",
+      "body": "Le compte non enregistré est la seule enveloppe qui fuit : intérêts, dividendes et distributions annuelles de FNB sont imposés même sans retrait (les dividendes étrangers subissent aussi une retenue de 15 %), ce qui érode la croissance composée. Le CELI et le REER croissent à l'abri - d'où la règle de décaissement de ne pas laisser traîner l'argent non enregistré. Le calculateur ajoute votre taux de distribution au revenu imposable de chaque année; les distributions réinvesties augmentent le PBR pour éviter une double imposition à la vente."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
