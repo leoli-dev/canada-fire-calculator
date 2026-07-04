@@ -12,12 +12,22 @@ function bracketTax(income: number, brackets: Bracket[]): number {
   return tax
 }
 
+/** Enhanced federal BPA phases down to the floor across the 4th bracket. */
+function federalBpa(taxable: number): number {
+  const { bpa, bpaMin, brackets } = FEDERAL
+  if (bpaMin === undefined) return bpa
+  const from = brackets[2].upTo
+  const to = brackets[3].upTo
+  const phase = Math.min(1, Math.max(0, (taxable - from) / (to - from)))
+  return bpa - (bpa - bpaMin) * phase
+}
+
 /** Combined federal + provincial income tax on taxable income. */
 export function incomeTax(taxable: number, province: Province): number {
   if (taxable <= 0) return 0
   let fed = Math.max(
     0,
-    bracketTax(taxable, FEDERAL.brackets) - FEDERAL.bpa * FEDERAL.brackets[0].rate,
+    bracketTax(taxable, FEDERAL.brackets) - federalBpa(taxable) * FEDERAL.brackets[0].rate,
   )
   if (province === 'QC') fed *= 1 - QC_ABATEMENT
   const p = PROVINCIAL[province]

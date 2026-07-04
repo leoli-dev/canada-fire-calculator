@@ -1,6 +1,7 @@
 // Asset-class real return and volatility assumptions, loosely based on the
-// FP Canada Projection Assumption Guidelines (nominal minus ~2.1% inflation).
-// Update annually alongside taxData.ts.
+// FP Canada Projection Assumption Guidelines 2026 (nominal minus 2.1%
+// inflation). PAG returns are gross of fees — the engine subtracts the
+// user's fee (MER) input separately. Update annually alongside taxData.ts.
 export type AssetClass = 'stocks' | 'bonds' | 'gic' | 'cash'
 export const ASSET_CLASSES: AssetClass[] = ['stocks', 'bonds', 'gic', 'cash']
 
@@ -10,10 +11,11 @@ export interface AssetAssumption {
 }
 
 export const ASSET_ASSUMPTIONS: Record<AssetClass, AssetAssumption> = {
-  stocks: { realReturn: 0.045, volatility: 0.12 },
-  bonds: { realReturn: 0.013, volatility: 0.05 },
-  gic: { realReturn: 0.01, volatility: 0.01 },
-  cash: { realReturn: 0.002, volatility: 0.005 },
+  // PAG 2026 nominal: equities ~6.4% blended, fixed income 3.2%, short 2.4%
+  stocks: { realReturn: 0.043, volatility: 0.12 },
+  bonds: { realReturn: 0.011, volatility: 0.05 },
+  gic: { realReturn: 0.008, volatility: 0.01 },
+  cash: { realReturn: 0.003, volatility: 0.005 },
 }
 
 export type AssetMix = Record<AssetClass, number>

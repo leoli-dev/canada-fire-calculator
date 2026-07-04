@@ -13,9 +13,10 @@ export function oasAnnual(annualAt65: number, startAge: number): number {
   return annualAt65 * (1 + months * 0.006)
 }
 
-// 2025 figures — update annually
-export const CPP_MAX_AT_65 = 17196
-export const OAS_FULL_AT_65 = 8732
+// 2026 figures — update annually. CPP max rises each year with the
+// enhancement phase-in; OAS is the 65-74 rate (75+ gets +10%).
+export const CPP_MAX_AT_65 = 18092
+export const OAS_FULL_AT_65 = 9024
 
 /**
  * Rough CPP/QPP estimate at 65: best 39 of the years between 18 and 65 count
@@ -40,7 +41,8 @@ export function estimateOasAt65(residenceYearsBy65: number): number {
   return OAS_FULL_AT_65 * Math.min(1, Math.max(0, residenceYearsBy65) / 40)
 }
 
-export const OAS_CLAWBACK_THRESHOLD = 90997
+// 2026 income year (2025: $93,454; the old $90,997 was the 2024 threshold)
+export const OAS_CLAWBACK_THRESHOLD = 95323
 export const OAS_CLAWBACK_RATE = 0.15
 
 /** OAS received after recovery tax, given net income excluding OAS. */

@@ -17,7 +17,7 @@
   "estCppTitle": "Pas certain ? Estimer selon l'historique de travail",
   "estOasTitle": "Pas certain ? Estimer selon les années de résidence",
   "estStartWorkAge": "Âge de début du travail à temps plein",
-  "estRatio": "Revenu moyen en % du plafond MGA (2025 : ~71 300 $)",
+  "estRatio": "Revenu moyen en % du plafond MGA (2026 : ~74 600 $)",
   "estResidence": "Années vécues au Canada avant 65 ans (dès 18 ans)",
   "estResult": "Estimation",
   "estApply": "Appliquer",
@@ -32,11 +32,11 @@
   "savingsSplit": "Répartition de l'épargne (%)",
   "mixLabel": "Répartition d'actifs par compte",
   "mixNote": "Les préréglages fixent rendement réel et volatilité selon des hypothèses de type FP Canada.",
-  "mix_allStocks": "100 % actions (~4,5 % réel)",
-  "mix_aggressive": "Audacieux 80/20 (~3,9 %)",
-  "mix_balanced": "Équilibré 60/40 (~3,2 %)",
-  "mix_conservative": "Prudent 40/60 (~2,5 %)",
-  "mix_gic": "Échelle de CPG (~1,0 %)",
+  "mix_allStocks": "100 % actions (~4,3 % réel)",
+  "mix_aggressive": "Audacieux 80/20 (~3,7 %)",
+  "mix_balanced": "Équilibré 60/40 (~3,0 %)",
+  "mix_conservative": "Prudent 40/60 (~2,4 %)",
+  "mix_gic": "Échelle de CPG (~0,8 %)",
   "benefits": "Prestations gouvernementales et stratégie",
   "cppStartAge": "Âge de début RPC/RRQ (60–70)",
   "cppAnnualAt65": "RPC/RRQ annuel estimé à 65 ans",
@@ -157,7 +157,7 @@
     },
     "oas": {
       "title": "SV - Sécurité de la vieillesse",
-      "body": "Pension fondée sur la résidence, indépendante du travail : 40 ans au Canada après 18 ans donnent le plein montant (~8 700 $/an en 2025), sinon au prorata. Débute à 65 ans, reportable à 70 (+0,6 %/mois). Un revenu élevé déclenche la récupération (clawback)."
+      "body": "Pension fondée sur la résidence, indépendante du travail : 40 ans au Canada après 18 ans donnent le plein montant (~9 024 $/an en 2026, +10 % automatique à 75 ans), sinon au prorata. Débute à 65 ans, reportable à 70 (+0,6 %/mois). Un revenu élevé déclenche la récupération (clawback)."
     },
     "gic": {
       "title": "CPG - Certificat de placement garanti",
@@ -173,7 +173,7 @@
     },
     "clawback": {
       "title": "Récupération de la SV (clawback)",
-      "body": "Au-delà d’un seuil de revenu net (~91 000 $ en 2025), la SV est récupérée à 15 % de l’excédent; vers 148 000 $ elle tombe à zéro. Les gros retraits FERR en sont un déclencheur fréquent."
+      "body": "Au-delà d’un seuil de revenu net (95 323 $ en 2026), la SV est récupérée à 15 % de l’excédent; vers 155 000 $ elle tombe à zéro. Les gros retraits FERR en sont un déclencheur fréquent."
     },
     "fire": {
       "title": "FIRE - Indépendance financière, retraite anticipée",

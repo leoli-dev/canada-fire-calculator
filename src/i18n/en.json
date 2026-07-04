@@ -17,7 +17,7 @@
   "estCppTitle": "Not sure? Estimate from work history",
   "estOasTitle": "Not sure? Estimate from residence years",
   "estStartWorkAge": "Age full-time work began",
-  "estRatio": "Average earnings as % of the YMPE cap (2025: ~$71,300)",
+  "estRatio": "Average earnings as % of the YMPE cap (2026: ~$74,600)",
   "estResidence": "Years lived in Canada by 65 (from age 18)",
   "estResult": "Estimate",
   "estApply": "Apply",
@@ -32,11 +32,11 @@
   "savingsSplit": "Savings allocation (%)",
   "mixLabel": "Asset mix per account",
   "mixNote": "Presets set a real return and volatility from FP Canada-style assumptions.",
-  "mix_allStocks": "100% stocks (~4.5% real)",
-  "mix_aggressive": "Aggressive 80/20 (~3.9%)",
-  "mix_balanced": "Balanced 60/40 (~3.2%)",
-  "mix_conservative": "Conservative 40/60 (~2.5%)",
-  "mix_gic": "GIC ladder (~1.0%)",
+  "mix_allStocks": "100% stocks (~4.3% real)",
+  "mix_aggressive": "Aggressive 80/20 (~3.7%)",
+  "mix_balanced": "Balanced 60/40 (~3.0%)",
+  "mix_conservative": "Conservative 40/60 (~2.4%)",
+  "mix_gic": "GIC ladder (~0.8%)",
   "benefits": "Government benefits & strategy",
   "cppStartAge": "CPP/QPP start age (60–70)",
   "cppAnnualAt65": "Estimated CPP/QPP per year at 65",
@@ -157,7 +157,7 @@
     },
     "oas": {
       "title": "OAS - Old Age Security",
-      "body": "A residence-based pension, independent of work: 40 years in Canada after age 18 earns the full amount (~$8,700/yr in 2025), fewer years prorate. Starts at 65, deferrable to 70 (+0.6%/month). High income triggers the clawback."
+      "body": "A residence-based pension, independent of work: 40 years in Canada after age 18 earns the full amount (~$9,024/yr in 2026, +10% automatically at 75), fewer years prorate. Starts at 65, deferrable to 70 (+0.6%/month). High income triggers the clawback."
     },
     "gic": {
       "title": "GIC - Guaranteed Investment Certificate",
@@ -173,7 +173,7 @@
     },
     "clawback": {
       "title": "OAS Clawback (recovery tax)",
-      "body": "Net income above a threshold (~$91,000 in 2025) claws back OAS at 15% of the excess; around $148,000 it reaches zero. Large RRIF withdrawals are a common trigger - avoiding it is one goal of withdrawal-order planning."
+      "body": "Net income above a threshold ($95,323 in 2026) claws back OAS at 15% of the excess; around $155,000 it reaches zero. Large RRIF withdrawals are a common trigger - avoiding it is one goal of withdrawal-order planning."
     },
     "fire": {
       "title": "FIRE - Financial Independence, Retire Early",

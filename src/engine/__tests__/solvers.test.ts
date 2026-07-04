@@ -85,10 +85,10 @@ describe('compareStrategies / scanBenefitTiming', () => {
     const rs = compareStrategies(base)
     const paced = rs.find((r) => r.strategy === 'meltdownPaced')!
     const aggressive = rs.find((r) => r.strategy === 'rrspFirst')!
-    // ON lowest bracket top is $52,886; RRSP draw + CPP + OAS never exceeds it
+    // ON lowest bracket top is $53,891 (2026); RRSP draw + CPP + OAS stays inside
     for (const row of paced.result.rows) {
       if (row.phase === 'accumulation') continue
-      expect(row.withdrawals.rrsp + row.cpp + row.oas).toBeLessThanOrEqual(52886 + 1)
+      expect(row.withdrawals.rrsp + row.cpp + row.oas).toBeLessThanOrEqual(53891 + 1)
     }
     expect(paced.result.estateValue).toBeGreaterThan(aggressive.result.estateValue)
   })

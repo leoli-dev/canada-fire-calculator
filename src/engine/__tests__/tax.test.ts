@@ -21,10 +21,19 @@ describe('incomeTax', () => {
     expect(incomeTax(12000, 'ON')).toBe(0)
   })
 
-  it('matches a hand-computed ON value at $60k', () => {
-    // fed: 57375*0.14 + 2625*0.205 - 16129*0.14 = 6312.44
-    // ON:  52886*0.0505 + 7114*0.0915 - 12747*0.0505 = 2677.65
-    expect(incomeTax(60000, 'ON')).toBeCloseTo(6312.44 + 2677.65, 0)
+  it('matches a hand-computed ON value at $60k (2026 table)', () => {
+    // fed: 58523*0.14 + 1477*0.205 - 16452*0.14 = 6192.73
+    // ON:  53891*0.0505 + 6109*0.0915 - 12989*0.0505 = 2624.52
+    expect(incomeTax(60000, 'ON')).toBeCloseTo(6192.73 + 2624.52, 0)
+  })
+
+  it('phases the federal BPA down to the floor at very high income', () => {
+    // at $300k the enhanced BPA is fully phased out: credit uses $14,829
+    // fed: 8193.22 + 11997.01 + 16742.70 + 22342.18 + 41518*0.33 - 14829*0.14
+    const fed = 8193.22 + 11997.01 + 16742.7 + 22342.18 + 41518 * 0.33 - 14829 * 0.14
+    // AB: 61200*0.08 + 93059*0.10 + 30852*0.12 + 61702*0.13 + 53187*0.14 - 22769*0.08
+    const ab = 4896 + 9305.9 + 3702.24 + 8021.26 + 7446.18 - 1821.52
+    expect(incomeTax(300000, 'AB')).toBeCloseTo(fed + ab, 0)
   })
 
   it('is monotonically increasing', () => {
@@ -82,9 +91,11 @@ describe('benefit estimators', () => {
 })
 
 describe('rrifMinFactor', () => {
-  it('is zero before 72, tabulated after, capped at 20%', () => {
+  it('is zero before 72, keyed to the Jan-1 age after, capped at 20%', () => {
     expect(rrifMinFactor(65)).toBe(0)
-    expect(rrifMinFactor(72)).toBeCloseTo(0.054)
+    // first mandatory year (turning 72): CRA factor for age 71 at Jan 1
+    expect(rrifMinFactor(72)).toBeCloseTo(0.0528)
+    expect(rrifMinFactor(95)).toBeCloseTo(0.1879)
     expect(rrifMinFactor(100)).toBe(0.2)
   })
 })

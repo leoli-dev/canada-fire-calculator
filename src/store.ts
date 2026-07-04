@@ -27,7 +27,7 @@ export const DEFAULT_INPUTS: Inputs = {
   annualSavings: 40000,
   savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
   retirementSpending: 50000,
-  returns: { tfsa: 0.045, rrsp: 0.045, nonReg: 0.045 },
+  returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
   volatilities: { tfsa: 0.12, rrsp: 0.12, nonReg: 0.12 },
   balances: { tfsa: 100000, rrsp: 200000, nonReg: 100000 },
   nonRegBook: 80000,
