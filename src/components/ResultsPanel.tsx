@@ -29,6 +29,13 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     () => (mode === 'number' ? requiredFireAssets(inputs) : null),
     [mode, inputs],
   )
+  const projectedAtFire = useMemo(
+    () =>
+      mode === 'number'
+        ? targetReport(inputs, Number.MAX_SAFE_INTEGER).assetsAtFire
+        : null,
+    [mode, inputs],
+  )
   const earliestAssets = useMemo(() => {
     if (mode !== 'when' || earliest === null) return null
     const row = runProjection({ ...inputs, fireAge: earliest }).rows.find(
@@ -57,7 +64,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
         ? earliest !== null
         : mode === 'target'
           ? goal !== null && goal.reachedAge !== null && goal.reachedAge <= inputs.fireAge
-          : true
+          : mode === 'number'
+            ? projectedAtFire !== null && fireNumber !== null && projectedAtFire >= fireNumber
+            : true
 
   return (
     <div className={`summary ${ok ? 'ok' : 'bad'}`}>
@@ -125,9 +134,26 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
       )}
 
       {mode === 'number' && (
-        <p className="verdict">
-          {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber ?? 0) })}
-        </p>
+        <>
+          <p className="verdict">
+            {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber ?? 0) })}
+          </p>
+          {projectedAtFire !== null && fireNumber !== null && (
+            <p>
+              <Jargon
+                text={
+                  t('numberHave', { age: inputs.fireAge, amount: cad(projectedAtFire) }) +
+                  (projectedAtFire >= fireNumber
+                    ? t('numberSurplus', { amount: cad(projectedAtFire - fireNumber) })
+                    : t('numberGap', { amount: cad(fireNumber - projectedAtFire) }))
+                }
+              />
+            </p>
+          )}
+          <p className="hint">
+            <Jargon text={t('numberExplain', { age: inputs.fireAge, life: inputs.lifeExpectancy })} />
+          </p>
+        </>
       )}
 
       {mode === 'target' && (

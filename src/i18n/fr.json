@@ -73,7 +73,7 @@
   "depleted": "L'argent s'épuise à {{age}} ans.",
   "whenAnswer": "Âge FIRE le plus précoce qui réussit : {{age}} ans.",
   "whenNever": "Aucun âge FIRE jusqu'à 75 ans ne fonctionne avec les paramètres actuels.",
-  "numberAnswer": "Se retirer à {{age}} ans exige environ {{amount}} en placements (répartis comme vos comptes actuels).",
+  "numberAnswer": "Votre chiffre FIRE : environ {{amount}} d'actifs investissables au moment de la retraite à {{age}} ans.",
   "finalNetWorth": "Valeur nette finale",
   "phaseAccumulation": "Accumulation",
   "phaseBridge": "Pont",
@@ -222,5 +222,9 @@
   "displayModeLabel": "Affichage des montants",
   "display_real": "Réel (pouvoir d’achat d’aujourd’hui)",
   "display_nominal": "Nominal (croît avec l’inflation)",
-  "nominalNote": "Mode nominal : chaque montant est converti en valeur nominale future à {{pct}} %/an — retraits et prestations montent chaque année, mais le pouvoir d’achat est identique au mode réel; le calcul se fait toujours en dollars réels."
+  "nominalNote": "Mode nominal : chaque montant est converti en valeur nominale future à {{pct}} %/an — retraits et prestations montent chaque année, mais le pouvoir d’achat est identique au mode réel; le calcul se fait toujours en dollars réels.",
+  "numberHave": "Avec l'épargne actuelle et votre plan immobilier, vous devriez détenir environ {{amount}} à {{age}} ans — ",
+  "numberSurplus": "un surplus de {{amount}}.",
+  "numberGap": "un manque de {{amount}}.",
+  "numberExplain": "Méthode : recherche binaire du minimum d'actifs investissables à {{age}} ans permettant au plan — avec votre stratégie de décaissement, la vente immobilière et vos réglages RPC/SV — de dépenser jusqu'à {{life}} ans sans épuisement. Les actifs sont répartis comme vos comptes actuels. Comme les prestations et la vente de la maison comptent, ce chiffre est bien plus bas que la règle grossière du « 25× les dépenses »."
 }

@@ -73,7 +73,7 @@
   "depleted": "钱在 {{age}} 岁耗尽。",
   "whenAnswer": "最早可行的 FIRE 年龄：{{age}} 岁。",
   "whenNever": "按当前参数，75 岁前没有可行的 FIRE 年龄。",
-  "numberAnswer": "{{age}} 岁退休大约需要 {{amount}} 的投资资产（按当前账户比例分配）。",
+  "numberAnswer": "你的 FIRE 数字：{{age}} 岁退休那一刻，手上需要约 {{amount}} 的投资资产。",
   "finalNetWorth": "最终净资产",
   "phaseAccumulation": "积累期",
   "phaseBridge": "桥接期",
@@ -222,5 +222,9 @@
   "displayModeLabel": "金额显示口径",
   "display_real": "实际（今日购买力）",
   "display_nominal": "名义（含通胀上涨）",
-  "nominalNote": "名义模式：所有金额按每年 {{pct}}% 通胀换算成未来的票面金额——取款和福利逐年上涨，但购买力与「实际」模式完全相同；计算本身始终以实际值进行。"
+  "nominalNote": "名义模式：所有金额按每年 {{pct}}% 通胀换算成未来的票面金额——取款和福利逐年上涨，但购买力与「实际」模式完全相同；计算本身始终以实际值进行。",
+  "numberHave": "按当前储蓄与卖房计划，你 {{age}} 岁时预计实际约有 {{amount}}——",
+  "numberSurplus": "富余 {{amount}}。",
+  "numberGap": "缺口 {{amount}}。",
+  "numberExplain": "判定方法：二分搜索\"{{age}} 岁那一刻至少要有多少投资资产，才能按你的取钱策略、房产出售计划和 CPP/OAS 设置一路花到 {{life}} 岁不断档\"。资产按你当前 TFSA/RRSP/非注册的比例假设分布（账户税性不同会影响结果）。因为算入了政府福利和卖房，这个数字通常比\"年支出×25\"的粗算法小得多。"
 }
