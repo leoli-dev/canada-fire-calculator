@@ -8,6 +8,8 @@ early retirement: account tax treatment (TFSA / RRSP / non-registered), CPP/QPP 
 OAS timing, RRIF forced minimums, the OAS clawback, withdrawal-order strategy, and
 what happens to an RRSP at death. This calculator models all of it.
 
+**Live demo: <https://leoli-dev.github.io/canada-fire-calculator/>**
+
 **Privacy-first: a pure frontend app.** No backend, no account, no AI — your numbers
 never leave the browser (they persist to `localStorage`). English / Français / 中文.
 

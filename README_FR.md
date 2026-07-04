@@ -10,6 +10,8 @@ RPC/RRQ et SV, les retraits minimums obligatoires du FERR, la récupération de 
 SV, l'ordre de décaissement, et le sort du REER au décès. Ce calculateur modélise
 tout cela.
 
+**Démo en ligne : <https://leoli-dev.github.io/canada-fire-calculator/>**
+
 **Application 100 % frontale, axée sur la vie privée** : pas de serveur, pas de
 compte, pas d'IA — vos chiffres ne quittent jamais le navigateur (persistés en
 `localStorage`). Anglais / Français / 中文.

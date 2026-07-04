@@ -7,6 +7,8 @@
 CPP/QPP 与 OAS 的开领时机、RRIF 强制最低取款、OAS 回收税（clawback）、取钱顺序策略、
 以及身后 RRSP 的清算方式。这个计算器把它们全部建模。
 
+**在线使用：<https://leoli-dev.github.io/canada-fire-calculator/>**
+
 **隐私优先的纯前端应用**：无后端、无账号、无 AI——你的数字永远不离开浏览器
 （保存在 localStorage）。支持英语 / 法语 / 中文。
 
