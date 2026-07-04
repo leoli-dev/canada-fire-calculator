@@ -13,12 +13,13 @@ import {
 } from 'recharts'
 import type { Inputs } from '../engine'
 import type { MonteCarloResult } from '../engine/monteCarlo'
-import { useCad } from '../format'
+import { useCad, useCadCompact } from '../format'
 import { Jargon } from './Jargon'
 
 export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) => number }) {
   const { t } = useTranslation()
   const cad = useCad()
+  const cadTick = useCadCompact()
   const workerRef = useRef<Worker | null>(null)
   const [running, setRunning] = useState(false)
   const [mc, setMc] = useState<MonteCarloResult | null>(null)
@@ -99,7 +100,7 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
               <XAxis dataKey="age" type="number" allowDecimals={false}
                 domain={data && data.length ? [data[0].age, data[data.length - 1].age] : undefined}
                 tickCount={12} />
-              <YAxis tickFormatter={(v: number) => cad(v)} width={100} />
+              <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
               <Tooltip
                 formatter={(v, name) =>
                   name === t('mcBand')

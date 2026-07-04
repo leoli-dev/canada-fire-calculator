@@ -44,6 +44,7 @@ export function ScenarioCard() {
         </div>
       </div>
       {scenarioA && resultA ? (
+        <div className="table-scroll">
         <table className="compare-table">
           <thead>
             <tr>
@@ -63,6 +64,7 @@ export function ScenarioCard() {
             </tr>
           </tbody>
         </table>
+        </div>
       ) : (
         <p className="hint"><Jargon text={t('scenarioHint')} /></p>
       )}

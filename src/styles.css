@@ -19,7 +19,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   background: var(--bg);
   color: var(--ink);
@@ -54,7 +54,7 @@ header h1 {
 
 /* ---------- layout ---------- */
 main { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 24px; align-items: start; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- form ---------- */
 fieldset {
@@ -296,3 +296,45 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
   padding: 16px 20px 24px; overflow-y: auto;
   font-size: 0.92rem; line-height: 1.7; color: var(--ink-soft);
 }
+
+
+/* ---------- mobile (explicit collapse, taste-skill 4.7) ---------- */
+@media (max-width: 640px) {
+  .app { padding: 14px 12px 36px; }
+
+  header { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+  header h1 { font-size: 1.15rem; }
+  .tagline { font-size: 0.82rem; }
+  .langs { align-self: flex-end; }
+  .langs button { padding: 5px 10px; }
+
+  main { gap: 14px; }
+  fieldset { padding: 12px 12px 14px; }
+
+  /* fields stack vertically; inputs go full width */
+  .field { flex-direction: column; align-items: stretch; gap: 4px; }
+  .field input, .field select { width: 100%; text-align: left; }
+  .field:has(input[type='checkbox']) {
+    flex-direction: row; align-items: center; justify-content: space-between;
+  }
+  .field:has(input[type='checkbox']) input { width: 18px; }
+
+  .summary { padding: 12px 14px 14px; }
+  .summary .verdict { font-size: 1rem; }
+
+  .mode-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .mode-tabs button { white-space: nowrap; padding: 6px 10px; font-size: 0.78rem; }
+
+  .chart-card { padding: 12px 10px 10px; }
+  .compare-table { font-size: 0.78rem; }
+  .compare-table td, .compare-table th { padding: 6px 6px; }
+
+  .card-head { gap: 8px; }
+  .fail-profile { padding: 8px 10px; font-size: 0.8rem; }
+  .drawer-body { font-size: 0.88rem; }
+}
+
+/* tables always scroll inside their card, never widen the page */
+.table-scroll { -webkit-overflow-scrolling: touch; }
+.table-scroll .compare-table { min-width: max-content; }
+.table-scroll .compare-table td, .table-scroll .compare-table th { white-space: nowrap; }

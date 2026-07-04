@@ -1,6 +1,6 @@
 {
   "title": "🇨🇦 Calculateur FIRE Canada",
-  "tagline": "La retraite anticipée à la canadienne — CELI, REER, RPC/RRQ et SV, modélisés correctement.",
+  "tagline": "La retraite anticipée à la canadienne - CELI, REER, RPC/RRQ et SV, modélisés correctement.",
   "profile": "Profil",
   "currentAge": "Âge actuel",
   "fireAge": "Âge FIRE visé",
@@ -67,7 +67,7 @@
   "mode_last": "Mon argent durera-t-il ?",
   "mode_when": "Quand puis-je me retirer ?",
   "mode_number": "Mon chiffre FIRE ?",
-  "success": "Votre plan fonctionne — l'argent dure jusqu'à {{age}} ans.",
+  "success": "Votre plan fonctionne - l'argent dure jusqu'à {{age}} ans.",
   "depleted": "L'argent s'épuise à {{age}} ans.",
   "whenAnswer": "Âge FIRE le plus précoce qui réussit : {{age}} ans.",
   "whenNever": "Aucun âge FIRE jusqu'à 75 ans ne fonctionne avec les paramètres actuels.",
@@ -97,8 +97,8 @@
   "mcTrials": "{{n}} essais",
   "mcBand": "10e–90e centile",
   "mcMedian": "Médiane",
-  "mcNote": "Lecture : la ligne foncée est la médiane des 1 000 essais; la bande ombrée couvre du 10e au 90e centile — 8 essais sur 10 y tombent. Repères : ≥85 % de réussite est solide, 70–85 % serré, <70 % suggère de réduire les dépenses ou de retarder le FIRE.",
-  "mcIdle": "Qu'est-ce que Monte-Carlo ? Les graphiques ci-dessus supposent le même rendement chaque année, mais les vrais marchés alternent bonnes et mauvaises années. Monte-Carlo rend chaque rendement annuel aléatoire (selon la volatilité de votre répartition) et rejoue le plan entier 1 000 fois, comptant la fréquence où l'argent dure jusqu'à l'espérance de vie — c'est le taux de réussite. Cela expose le risque de séquence des rendements : un marché baissier juste après le FIRE fait bien plus mal. Cliquez pour lancer.",
+  "mcNote": "Lecture : la ligne foncée est la médiane des 1 000 essais; la bande ombrée couvre du 10e au 90e centile - 8 essais sur 10 y tombent. Repères : ≥85 % de réussite est solide, 70–85 % serré, <70 % suggère de réduire les dépenses ou de retarder le FIRE.",
+  "mcIdle": "Qu'est-ce que Monte-Carlo ? Les graphiques ci-dessus supposent le même rendement chaque année, mais les vrais marchés alternent bonnes et mauvaises années. Monte-Carlo rend chaque rendement annuel aléatoire (selon la volatilité de votre répartition) et rejoue le plan entier 1 000 fois, comptant la fréquence où l'argent dure jusqu'à l'espérance de vie - c'est le taux de réussite. Cela expose le risque de séquence des rendements : un marché baissier juste après le FIRE fait bien plus mal. Cliquez pour lancer.",
   "scenarioTitle": "Comparaison de scénarios",
   "scenarioSave": "Sauvegarder comme A",
   "scenarioClear": "Effacer",
@@ -106,7 +106,7 @@
   "scenarioCurrent": "Actuel",
   "scenarioHint": "Sauvegardez un instantané, puis modifiez les paramètres pour comparer.",
   "reset": "Réinitialiser",
-  "disclaimer": "Estimation éducative seulement, en dollars d'aujourd'hui, règles fiscales simplifiées — pas un conseil financier.",
+  "disclaimer": "Estimation éducative seulement, en dollars d'aujourd'hui, règles fiscales simplifiées - pas un conseil financier.",
   "saleLabel": "Vente",
   "mode_target": "Atteindrai-je ma cible ?",
   "targetInputLabel": "Actifs investissables visés au moment FIRE",
@@ -117,71 +117,71 @@
   "strat_rrspFirst": "REER d’abord agressif (déconseillé)",
   "strat_nonRegFirst": "Non enregistré d’abord",
   "strat_tfsaFirst": "CELI d’abord",
-  "meltdownNote": "Le REER finance d'abord les dépenses chaque année, mais seulement selon le besoin et jamais au-delà de la place restante dans le premier palier après RPC/SV (un palier par conjoint) — rien n'est retiré juste pour payer l'impôt d'avance. Le complément vient du non enregistré → CELI; le reste du REER passe 71 ans et sort via les minimums FERR.",
+  "meltdownNote": "Le REER finance d'abord les dépenses chaque année, mais seulement selon le besoin et jamais au-delà de la place restante dans le premier palier après RPC/SV (un palier par conjoint) - rien n'est retiré juste pour payer l'impôt d'avance. Le complément vient du non enregistré → CELI; le reste du REER passe 71 ans et sort via les minimums FERR.",
   "totalTax": "Impôt total (succession incluse)",
   "useStrategy": "Utiliser",
   "estateValue": "Valeur successorale (après impôt)",
   "goal": "Objectif d'optimisation",
   "goal_legacy": "Maximiser la succession",
   "goal_dieWithZero": "Die with Zero (tout dépenser)",
-  "dwzGoalNote": "Les stratégies sont classées selon les dépenses annuelles soutenables. Tous les montants sont en pouvoir d'achat d'aujourd'hui — rendements réels ajustés à l'inflation.",
+  "dwzGoalNote": "Les stratégies sont classées selon les dépenses annuelles soutenables. Tous les montants sont en pouvoir d'achat d'aujourd'hui - rendements réels ajustés à l'inflation.",
   "dwzSpending": "Dépenses annuelles nettes soutenables max",
   "currentSpending": "actuellement",
   "maxSpendingCol": "Dépenses soutenables/an",
-  "strategyNoteDwz": "Classement selon les dépenses soutenables : le plus haut niveau de dépenses réelles que chaque stratégie soutient jusqu'à l'espérance de vie, en finissant près de zéro — moins d'impôt, plus à dépenser.",
-  "dwzNote": "En pouvoir d'achat d'aujourd'hui — rendements ajustés à l'inflation, des dépenses réelles constantes couvrent donc déjà l'inflation.",
+  "strategyNoteDwz": "Classement selon les dépenses soutenables : le plus haut niveau de dépenses réelles que chaque stratégie soutient jusqu'à l'espérance de vie, en finissant près de zéro - moins d'impôt, plus à dépenser.",
+  "dwzNote": "En pouvoir d'achat d'aujourd'hui - rendements ajustés à l'inflation, des dépenses réelles constantes couvrent donc déjà l'inflation.",
   "glossary": {
     "rrsp": {
-      "title": "REER — Régime enregistré d’épargne-retraite",
+      "title": "REER - Régime enregistré d’épargne-retraite",
       "body": "Les cotisations réduisent le revenu imposable; la croissance est à imposition différée; les retraits sont pleinement imposés. À remplir dans les années à revenu élevé, à vider dans les années à faible revenu. Conversion obligatoire en FERR avant la fin de l’année des 71 ans. Pour le FIRE : les années-pont à faible revenu sont la fenêtre idéale (voir meltdown)."
     },
     "rrif": {
-      "title": "FERR — Fonds enregistré de revenu de retraite",
-      "body": "La forme de sortie du REER : conversion obligatoire avant la fin des 71 ans (sans impôt). Dès l’année suivante, retraits minimums obligatoires selon l’âge (5,4 % à 72 ans, jusqu’à 20 % à 95 ans), imposés comme revenu. Un REER trop gros force de gros retraits imposables — la raison du meltdown."
+      "title": "FERR - Fonds enregistré de revenu de retraite",
+      "body": "La forme de sortie du REER : conversion obligatoire avant la fin des 71 ans (sans impôt). Dès l’année suivante, retraits minimums obligatoires selon l’âge (5,4 % à 72 ans, jusqu’à 20 % à 95 ans), imposés comme revenu. Un REER trop gros force de gros retraits imposables - la raison du meltdown."
     },
     "tfsa": {
-      "title": "CELI — Compte d’épargne libre d’impôt",
+      "title": "CELI - Compte d’épargne libre d’impôt",
       "body": "Cotisations après impôt, mais croissance et retraits totalement libres d’impôt; les droits retirés reviennent l’année suivante. L’enveloppe la plus flexible au Canada : les retraits n’affectent jamais le revenu imposable ni la récupération de la SV. Généralement le dernier compte à décaisser. Dans l'ordre de décaissement il passe toujours en dernier : laissez composer la croissance libre d'impôt le plus longtemps, gardez-le comme seule source d'argent sans conséquence fiscale tard dans la vie, et il se transmet libre d'impôt."
     },
     "nonreg": {
       "title": "Compte non enregistré",
-      "body": "Compte de placement ordinaire sans enveloppe fiscale : intérêts pleinement imposés, dividendes admissibles avec crédit, et 50 % du gain en capital réalisé (prix de vente moins PBR) imposable. C’est là que va l’argent une fois CELI et REER pleins. Dans l'ordre de décaissement on le dépense généralement en premier (après la marge à bas taux du REER) — la seule enveloppe qui fuit de l'impôt chaque année."
+      "body": "Compte de placement ordinaire sans enveloppe fiscale : intérêts pleinement imposés, dividendes admissibles avec crédit, et 50 % du gain en capital réalisé (prix de vente moins PBR) imposable. C’est là que va l’argent une fois CELI et REER pleins. Dans l'ordre de décaissement on le dépense généralement en premier (après la marge à bas taux du REER) - la seule enveloppe qui fuit de l'impôt chaque année."
     },
     "acb": {
-      "title": "PBR — Prix de base rajusté",
+      "title": "PBR - Prix de base rajusté",
       "body": "Ce que vous avez payé pour vos actifs non enregistrés (« book cost » chez le courtier). L’impôt s’applique à 50 % de (prix de vente − PBR). PBR élevé = gain plus petit = moins d’impôt. L’encaisse et les CPG ont un PBR égal à la valeur nominale. Mettre 0 gonfle énormément l’impôt calculé."
     },
     "cpp": {
-      "title": "RPC / RRQ — Régime de pensions du Canada / du Québec",
+      "title": "RPC / RRQ - Régime de pensions du Canada / du Québec",
       "body": "La pension gouvernementale liée au travail (RRQ au Québec). Le montant dépend de vos 39 meilleures années de cotisation entre 18 et 65 ans, par rapport au plafond MGA. Début standard à 65 ans; dès 60 ans (−0,6 %/mois) ou jusqu’à 70 ans (+0,7 %/mois, +42 %). La retraite anticipée dilue la moyenne."
     },
     "oas": {
-      "title": "SV — Sécurité de la vieillesse",
+      "title": "SV - Sécurité de la vieillesse",
       "body": "Pension fondée sur la résidence, indépendante du travail : 40 ans au Canada après 18 ans donnent le plein montant (~8 700 $/an en 2025), sinon au prorata. Débute à 65 ans, reportable à 70 (+0,6 %/mois). Un revenu élevé déclenche la récupération (clawback)."
     },
     "gic": {
-      "title": "CPG — Certificat de placement garanti",
-      "body": "Un dépôt à terme : durée bloquée, taux garanti, capital sans risque. Les intérêts sont pleinement imposés chaque année dans un compte non enregistré — les CPG sont plus efficaces dans un CELI ou un REER. À ne pas confondre avec le SRG (supplément pour faible revenu)."
+      "title": "CPG - Certificat de placement garanti",
+      "body": "Un dépôt à terme : durée bloquée, taux garanti, capital sans risque. Les intérêts sont pleinement imposés chaque année dans un compte non enregistré - les CPG sont plus efficaces dans un CELI ou un REER. À ne pas confondre avec le SRG (supplément pour faible revenu)."
     },
     "ympe": {
-      "title": "MGA — Maximum des gains annuels ouvrant droit à pension",
+      "title": "MGA - Maximum des gains annuels ouvrant droit à pension",
       "body": "Le plafond de revenus pour les cotisations et prestations RPC/RRQ (~71 300 $ en 2025). Gagner au moins le MGA fait de l’année une année de cotisation pleine."
     },
     "meltdown": {
       "title": "Meltdown du REER",
-      "body": "Vider délibérément le REER pendant la fenêtre à faible revenu après le FIRE, en gardant le revenu imposable de chaque année dans le premier palier (selon la place laissée par RPC/SV), pour éviter deux événements fiscaux futurs : les minimums FERR forcés et l'imposition du solde au décès. Note : la conversion REER→FERR est libre d'impôt — inutile de le vider avant 71 ans; le reste sort via les minimums FERR."
+      "body": "Vider délibérément le REER pendant la fenêtre à faible revenu après le FIRE, en gardant le revenu imposable de chaque année dans le premier palier (selon la place laissée par RPC/SV), pour éviter deux événements fiscaux futurs : les minimums FERR forcés et l'imposition du solde au décès. Note : la conversion REER→FERR est libre d'impôt - inutile de le vider avant 71 ans; le reste sort via les minimums FERR."
     },
     "clawback": {
       "title": "Récupération de la SV (clawback)",
       "body": "Au-delà d’un seuil de revenu net (~91 000 $ en 2025), la SV est récupérée à 15 % de l’excédent; vers 148 000 $ elle tombe à zéro. Les gros retraits FERR en sont un déclencheur fréquent."
     },
     "fire": {
-      "title": "FIRE — Indépendance financière, retraite anticipée",
+      "title": "FIRE - Indépendance financière, retraite anticipée",
       "body": "Accumuler assez d’actifs investis pour que le revenu passif couvre le coût de la vie, permettant de quitter le travail obligatoire avant l’âge traditionnel. Leviers clés : taux d’épargne, dépenses de retraite, stratégie de décaissement."
     },
     "dwz": {
       "title": "Die with Zero (tout dépenser)",
-      "body": "Un choix de vie : plutôt que de maximiser la succession, dépenser l’argent de son vivant — viser les dépenses stables les plus élevées qui durent exactement jusqu’à l’espérance de vie. Sous cet objectif, les stratégies sont classées par dépenses soutenables."
+      "body": "Un choix de vie : plutôt que de maximiser la succession, dépenser l’argent de son vivant - viser les dépenses stables les plus élevées qui durent exactement jusqu’à l’espérance de vie. Sous cet objectif, les stratégies sont classées par dépenses soutenables."
     },
     "montecarlo": {
       "title": "Simulation Monte-Carlo",
@@ -193,19 +193,19 @@
     },
     "principalresidence": {
       "title": "Exemption pour résidence principale",
-      "body": "Les gains en capital sur votre résidence principale sont entièrement libres d’impôt — l’un des plus grands avantages fiscaux au Canada. Réduire la taille de sa maison libère une somme importante non imposée et investissable. Les immeubles locatifs n’y ont pas droit."
+      "body": "Les gains en capital sur votre résidence principale sont entièrement libres d’impôt - l’un des plus grands avantages fiscaux au Canada. Réduire la taille de sa maison libère une somme importante non imposée et investissable. Les immeubles locatifs n’y ont pas droit."
     },
     "withdrawalorder": {
       "title": "Ordre de décaissement",
-      "body": "Le compte que vous videz en premier peut changer le résultat après impôt de centaines de milliers de dollars. Règle en trois temps : 1) le REER d'abord dans les années à faible revenu, plafonné au premier palier (voir meltdown); 2) le non enregistré ensuite — la seule enveloppe qui fuit de l'impôt chaque année; 3) le CELI toujours en dernier : croissance à jamais libre d'impôt (laissez-la composer le plus longtemps), retraits sans effet sur le palier ni la récupération de la SV (votre seule source d'argent sans conséquence fiscale tard dans la vie), et transmission libre d'impôt au décès. Le tableau comparatif chiffre chaque ordre avec vos propres données."
+      "body": "Le compte que vous videz en premier peut changer le résultat après impôt de centaines de milliers de dollars. Règle en trois temps : 1) le REER d'abord dans les années à faible revenu, plafonné au premier palier (voir meltdown); 2) le non enregistré ensuite - la seule enveloppe qui fuit de l'impôt chaque année; 3) le CELI toujours en dernier : croissance à jamais libre d'impôt (laissez-la composer le plus longtemps), retraits sans effet sur le palier ni la récupération de la SV (votre seule source d'argent sans conséquence fiscale tard dans la vie), et transmission libre d'impôt au décès. Le tableau comparatif chiffre chaque ordre avec vos propres données."
     },
     "bridge": {
       "title": "Années-pont (FIRE → pensions)",
-      "body": "Les années entre le FIRE et le début du RPC/SV : pas de salaire, pas encore de prestations — la fenêtre de revenu imposable la plus basse de votre vie, terrain de chasse du meltdown REER. Un pont plus long exige plus d'autofinancement mais laisse plus de place pour vider le REER à bas taux."
+      "body": "Les années entre le FIRE et le début du RPC/SV : pas de salaire, pas encore de prestations - la fenêtre de revenu imposable la plus basse de votre vie, terrain de chasse du meltdown REER. Un pont plus long exige plus d'autofinancement mais laisse plus de place pour vider le REER à bas taux."
     },
     "sequencerisk": {
       "title": "Risque de séquence des rendements",
-      "body": "Le même rendement moyen avec les mauvaises années dans un ordre différent donne des fins radicalement différentes : un marché baissier juste après le FIRE vous force à vendre au plus bas pour vivre, et le capital entamé ne se rattrape jamais; le même marché baissier à 80 ans est presque inoffensif. C'est le principal risque caché de la retraite anticipée — invisible sur un graphique à rendement fixe, et l'objet principal du taux de réussite Monte-Carlo."
+      "body": "Le même rendement moyen avec les mauvaises années dans un ordre différent donne des fins radicalement différentes : un marché baissier juste après le FIRE vous force à vendre au plus bas pour vivre, et le capital entamé ne se rattrape jamais; le même marché baissier à 80 ans est presque inoffensif. C'est le principal risque caché de la retraite anticipée - invisible sur un graphique à rendement fixe, et l'objet principal du taux de réussite Monte-Carlo."
     },
     "realdollars": {
       "title": "Pouvoir d'achat d'aujourd'hui (réel vs nominal)",
@@ -213,18 +213,18 @@
     },
     "splitting": {
       "title": "Fractionnement de revenu (couples)",
-      "body": "Le Canada impose les personnes : le même revenu de ménage réparti sur deux déclarations paie bien moins d'impôt que concentré sur une seule. Le mode couple suppose un partage idéal 50/50. Attention : avant 65 ans, les retraits REER sont imposés au seul titulaire — un partage égal pendant le pont exige des soldes REER comparables, à préparer d'avance via un REER de conjoint."
+      "body": "Le Canada impose les personnes : le même revenu de ménage réparti sur deux déclarations paie bien moins d'impôt que concentré sur une seule. Le mode couple suppose un partage idéal 50/50. Attention : avant 65 ans, les retraits REER sont imposés au seul titulaire - un partage égal pendant le pont exige des soldes REER comparables, à préparer d'avance via un REER de conjoint."
     },
     "marginalrate": {
       "title": "Taux marginal d'imposition",
-      "body": "Le taux sur votre prochain dollar de revenu — pas la moyenne sur l'ensemble. Les paliers canadiens sont progressifs : seule la tranche au-dessus de chaque seuil paie le taux de ce palier. Planifier, c'est surtout contrôler le taux marginal — le meltdown garde les retraits REER au premier palier, et la récupération de la SV agit comme 15 % de taux marginal caché."
+      "body": "Le taux sur votre prochain dollar de revenu - pas la moyenne sur l'ensemble. Les paliers canadiens sont progressifs : seule la tranche au-dessus de chaque seuil paie le taux de ce palier. Planifier, c'est surtout contrôler le taux marginal - le meltdown garde les retraits REER au premier palier, et la récupération de la SV agit comme 15 % de taux marginal caché."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
   "targetReachedAtFire": "En bonne voie : la cible de {{target}} est atteinte exactement à {{fireAge}} ans (l’année FIRE), avec environ {{amount}}.",
   "total": "Total",
   "whenAssets": "En simulant un FIRE à {{age}} ans, vous détiendriez environ {{amount}} en placements à la fin de cette année-là.",
-  "whenExplain": "Méthode : pour chaque âge à partir d'aujourd'hui, le plan est entièrement simulé comme si vous preniez le FIRE cette année-là — avec votre stratégie de décaissement, le plan de vente immobilière et les âges de début RPC/SV — jusqu'à {{life}} ans. Un âge n'est « faisable » que si les dépenses nettes de {{spending}} sont couvertes chaque année sans épuisement; le premier âge qui réussit est affiché.",
+  "whenExplain": "Méthode : pour chaque âge à partir d'aujourd'hui, le plan est entièrement simulé comme si vous preniez le FIRE cette année-là - avec votre stratégie de décaissement, le plan de vente immobilière et les âges de début RPC/SV - jusqu'à {{life}} ans. Un âge n'est « faisable » que si les dépenses nettes de {{spending}} sont couvertes chaque année sans épuisement; le premier âge qui réussit est affiché.",
   "timingWhy": "Pourquoi l'âge de début compte : prendre le RPC tôt le réduit (à 60 ans, seulement 64 % du montant de 65 ans) et le reporter l'augmente (142 % à 70 ans); la SV commence au plus tôt à 65 ans et atteint 136 % à 70 ans. Mais attendre allonge le pont financé par vos propres actifs. Les tableaux ci-dessous simulent chaque choix jusqu'à {{life}} ans.",
   "timingCppTitle": "RPC/RRQ : impact de chaque âge de début (tout le reste inchangé)",
   "timingOasTitle": "SV : impact de chaque âge de début (tout le reste inchangé)",
@@ -242,20 +242,20 @@
   "displayModeLabel": "Affichage des montants",
   "display_real": "Réel (pouvoir d’achat d’aujourd’hui)",
   "display_nominal": "Nominal (croît avec l’inflation)",
-  "nominalNote": "Mode nominal : chaque montant est converti en valeur nominale future à {{pct}} %/an — retraits et prestations montent chaque année, mais le pouvoir d’achat est identique au mode réel; le calcul se fait toujours en dollars réels.",
-  "numberHave": "Avec l'épargne actuelle et votre plan immobilier, vous devriez détenir environ {{amount}} à {{age}} ans — ",
+  "nominalNote": "Mode nominal : chaque montant est converti en valeur nominale future à {{pct}} %/an - retraits et prestations montent chaque année, mais le pouvoir d’achat est identique au mode réel; le calcul se fait toujours en dollars réels.",
+  "numberHave": "Avec l'épargne actuelle et votre plan immobilier, vous devriez détenir environ {{amount}} à {{age}} ans - ",
   "numberSurplus": "un surplus de {{amount}}.",
   "numberGap": "un manque de {{amount}}.",
-  "numberExplain": "Méthode : recherche binaire du minimum d'actifs investissables à {{age}} ans permettant au plan — avec votre stratégie de décaissement, la vente immobilière et vos réglages RPC/SV — de dépenser jusqu'à {{life}} ans sans épuisement. Les actifs sont répartis comme vos comptes actuels. Comme les prestations et la vente de la maison comptent, ce chiffre est bien plus bas que la règle grossière du « 25× les dépenses ».",
+  "numberExplain": "Méthode : recherche binaire du minimum d'actifs investissables à {{age}} ans permettant au plan - avec votre stratégie de décaissement, la vente immobilière et vos réglages RPC/SV - de dépenser jusqu'à {{life}} ans sans épuisement. Les actifs sont répartis comme vos comptes actuels. Comme les prestations et la vente de la maison comptent, ce chiffre est bien plus bas que la règle grossière du « 25× les dépenses ».",
   "yearTableTitle": "Détail année par année (après FIRE)",
-  "yearTableNote": "D'où vient l'argent chaque année, combien d'impôt, à quel palier — détail de niveau audit. Montants toujours en pouvoir d'achat d'aujourd'hui; revenu imposable par personne après fractionnement de revenu; taux marginal = palier fédéral + provincial (abattement QC inclus). Les lignes marquées ! ont un manque à combler.",
+  "yearTableNote": "D'où vient l'argent chaque année, combien d'impôt, à quel palier - détail de niveau audit. Montants toujours en pouvoir d'achat d'aujourd'hui; revenu imposable par personne après fractionnement de revenu; taux marginal = palier fédéral + provincial (abattement QC inclus). Les lignes marquées ! ont un manque à combler.",
   "colAge": "Âge",
   "colGross": "Total brut",
   "colNet": "Net après impôt",
   "colTaxable": "Imposable/pers.",
   "colMarginal": "Taux marginal",
-  "mcFailStats": "Anatomie des mauvais scénarios : {{count}} essais échoués ({{pct}} %) — le pire s'épuise à {{earliest}} ans, l'échec typique à {{median}} ans.",
-  "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis — le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
-  "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie — aucun scénario d'échec.",
+  "mcFailStats": "Anatomie des mauvais scénarios : {{count}} essais échoués ({{pct}} %) - le pire s'épuise à {{earliest}} ans, l'échec typique à {{median}} ans.",
+  "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis - le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
+  "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie - aucun scénario d'échec.",
   "createdBy": "Créé par"
 }

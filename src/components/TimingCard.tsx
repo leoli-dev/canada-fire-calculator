@@ -82,6 +82,7 @@ export function TimingCard(props: { inputs: Inputs }) {
     currentRow: TimingRow,
     apply: (age: number) => void,
   ) => (
+    <div className="table-scroll">
     <table className="compare-table">
       <thead>
         <tr>
@@ -123,6 +124,7 @@ export function TimingCard(props: { inputs: Inputs }) {
         })}
       </tbody>
     </table>
+    </div>
   )
 
   const bestIsCurrent = best.cpp === inputs.cppStartAge && best.oas === inputs.oasStartAge

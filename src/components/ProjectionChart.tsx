@@ -13,7 +13,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { ProjectionResult } from '../engine'
-import { useCad } from '../format'
+import { useCad, useCadCompact } from '../format'
 
 const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', property: '#8d6e63' }
 
@@ -27,6 +27,7 @@ export function ProjectionChart(props: {
 }) {
   const { t } = useTranslation()
   const cad = useCad()
+  const cadTick = useCadCompact()
   const k = props.scale ?? (() => 1)
   const data = props.result.rows.map((r) => ({
     age: r.age,
@@ -49,7 +50,7 @@ export function ProjectionChart(props: {
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
           <XAxis dataKey="age" type="number" domain={[data[0].age, data[data.length - 1].age]}
             allowDecimals={false} tickCount={12} />
-          <YAxis tickFormatter={(v: number) => cad(v)} width={100} />
+          <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
           <Tooltip formatter={(v) => cad(Number(v))} />
           <Legend />
           {hasProperty && (

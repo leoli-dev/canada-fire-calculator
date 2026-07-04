@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { ProjectionResult } from '../engine'
-import { useCad } from '../format'
+import { useCad, useCadCompact } from '../format'
 import { Jargon } from './Jargon'
 
 const COLORS = {
@@ -29,6 +29,7 @@ export function IncomeChart(props: {
 }) {
   const { t } = useTranslation()
   const cad = useCad()
+  const cadTick = useCadCompact()
   const k = props.scale ?? (() => 1)
   const data = props.result.rows
     .filter((r) => r.phase !== 'accumulation')
@@ -56,7 +57,7 @@ export function IncomeChart(props: {
           <XAxis dataKey="age" type="number" allowDecimals={false}
             domain={[data[0].age, data[data.length - 1].age]}
             tickCount={12} />
-          <YAxis tickFormatter={(v: number) => cad(v)} width={100} />
+          <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
           <Tooltip formatter={(v) => cad(Number(v))} />
           <Legend />
           <Line dataKey="total" name={t('total')} stroke="none" dot={false}
