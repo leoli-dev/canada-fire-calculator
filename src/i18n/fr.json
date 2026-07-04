@@ -256,5 +256,6 @@
   "colMarginal": "Taux marginal",
   "mcFailStats": "Anatomie des mauvais scénarios : {{count}} essais échoués ({{pct}} %) — le pire s'épuise à {{earliest}} ans, l'échec typique à {{median}} ans.",
   "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis — le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
-  "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie — aucun scénario d'échec."
+  "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie — aucun scénario d'échec.",
+  "createdBy": "Créé par"
 }

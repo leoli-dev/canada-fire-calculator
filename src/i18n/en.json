@@ -256,5 +256,6 @@
   "colMarginal": "Marginal rate",
   "mcFailStats": "Anatomy of the unlucky scripts: {{count}} runs failed ({{pct}}%) — the worst went broke at {{earliest}}, the typical failed run at {{median}}.",
   "mcFailWhy": "Failed runs averaged {{failed}}%/yr over the first 5 post-FIRE years, versus {{succeeded}}% for successful runs — the unlucky script is almost always the same one: a bear market right after retiring forces selling at the bottom to fund spending, and the damaged principal never recovers (sequence-of-returns risk). Late bear markets barely hurt.",
-  "mcNoFail": "All {{n}} runs lasted to life expectancy — no failing scripts."
+  "mcNoFail": "All {{n}} runs lasted to life expectancy — no failing scripts.",
+  "createdBy": "Created by"
 }

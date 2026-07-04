@@ -237,6 +237,20 @@ footer {
   margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line);
   font-size: 0.78rem; color: var(--ink-faint);
 }
+footer p { margin: 0 0 4px; }
+footer .credit a { color: var(--blue); text-decoration: none; }
+footer .credit a:hover { text-decoration: underline; }
+
+/* ---------- github corner ---------- */
+.github-corner { position: fixed; top: 0; right: 0; z-index: 30; }
+.github-corner svg { fill: var(--navy); color: var(--bg); display: block; }
+.github-corner:hover .octo-arm { animation: octocat-wave 0.56s ease-in-out; }
+@keyframes octocat-wave {
+  0%, 100% { transform: rotate(0); }
+  20%, 60% { transform: rotate(-25deg); }
+  40%, 80% { transform: rotate(10deg); }
+}
+@media (max-width: 760px) { .github-corner { display: none; } }
 
 /* ---------- glossary ---------- */
 .term {

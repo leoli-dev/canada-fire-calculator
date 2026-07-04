@@ -13,6 +13,7 @@ import { StrategyCard } from './components/StrategyCard'
 import { TimingCard } from './components/TimingCard'
 import { ScenarioCard } from './components/ScenarioCard'
 import { GlossaryDrawer } from './components/GlossaryDrawer'
+import { GithubCorner } from './components/GithubCorner'
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -37,6 +38,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <GithubCorner href="https://github.com/leoli-dev/canada-fire-calculator" />
       <header>
         <div>
           <h1>{t('title')}</h1>
@@ -87,7 +89,15 @@ export default function App() {
         </section>
       </main>
 
-      <footer>{t('disclaimer')}</footer>
+      <footer>
+        <p>{t('disclaimer')}</p>
+        <p className="credit">
+          {t('createdBy')}{' '}
+          <a href="https://xiaojieli.com" target="_blank" rel="noopener noreferrer">
+            Leo Li
+          </a>
+        </p>
+      </footer>
       <GlossaryDrawer />
     </div>
   )
