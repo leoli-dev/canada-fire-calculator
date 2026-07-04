@@ -82,7 +82,7 @@
   "phaseBridge": "Bridge",
   "chartTitle": "Account balances by age",
   "incomeChartTitle": "Retirement income by source",
-  "incomeChartNote": "Stacked areas are gross cash sources; the dashed line is tax paid.",
+  "incomeChartNote": "Stacked areas are gross cash sources; the dashed line is tax paid. A GIS layer (tax-free supplement) appears from 65 when taxable income is low enough.",
   "cppLabel": "CPP/QPP",
   "oasLabel": "OAS",
   "gisLabel": "GIS",

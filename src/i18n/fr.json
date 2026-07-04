@@ -82,7 +82,7 @@
   "phaseBridge": "Pont",
   "chartTitle": "Soldes des comptes par âge",
   "incomeChartTitle": "Revenus de retraite par source",
-  "incomeChartNote": "Les aires empilées sont les sources brutes; la ligne pointillée est l'impôt payé.",
+  "incomeChartNote": "Les aires empilées sont les sources brutes; la ligne pointillée est l'impôt payé. Une couche SRG (supplément non imposable) apparaît dès 65 ans si le revenu imposable est assez bas.",
   "cppLabel": "RPC/RRQ",
   "oasLabel": "SV",
   "gisLabel": "SRG",

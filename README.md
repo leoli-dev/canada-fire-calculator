@@ -40,9 +40,12 @@ number in the UI comes from a deterministic, unit-tested year-by-year simulation
    RRIF minimum withdrawals are forced whether you need them or not.
 
 **The tax engine** applies real federal + provincial marginal brackets (ON / QC / BC /
-AB, 2025–26 figures, data-driven and updated yearly), the basic personal amounts,
-Quebec's federal abatement, 50% capital-gains inclusion tracked against your ACB,
-per-person OAS clawback, and — for couples — income splitting across two returns.
+AB, 2026 figures, data-driven and updated yearly), the basic personal amounts (with
+the federal high-income phase-out), Quebec's federal abatement, Ontario's surtax and
+health premium, the age amount and pension income credit from 65, 50% capital-gains
+inclusion tracked against your ACB, annual tax drag on non-registered distributions,
+per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees,
+and — for couples — income splitting across two returns.
 
 **Withdrawal strategies**, compared side by side with your own numbers:
 
@@ -60,9 +63,12 @@ free). Strategies are therefore ranked by **after-tax estate value** — or, und
 
 **Also modelled**: principal-residence sale (tax-free, e.g. downsizing at a chosen
 age), investment-property sale (gain taxed), CPP/QPP estimation from work history
-(best-39-years rule — early retirement dilutes your average), OAS from residence
-years, CPP 60–70 / OAS 65–70 timing tables, and a Monte Carlo simulation (1,000
-randomized-return runs in a web worker) with a failure-anatomy readout.
+(best-39-years rule with the claim-age dropout divisor — early retirement dilutes
+your average, and claiming early dilutes it less than you'd think), OAS from
+residence years and its automatic +10% at 75, CPP 60–70 (QPP to 72) / OAS 65–70
+timing tables, investment fees (MER), and a Monte Carlo simulation (1,000
+randomized-return runs in a web worker, one shared market shock per year across
+accounts) with a failure-anatomy readout.
 
 ## How to fill in the inputs
 
@@ -142,15 +148,22 @@ explanations are clickable too. 22 entries in all three languages.
 
 - All amounts are **today's purchasing power**; returns are real (net of inflation).
   Tax brackets are held in real terms.
-- Tax data: 2025–26 federal + ON/QC/BC/AB tables, updated manually each year.
+- Tax data: 2026 federal + ON/QC/BC/AB tables (verified against CRA / provincial
+  budgets), updated manually each year.
 - Couple taxation assumes ideal 50/50 income splitting. In reality, pre-65 RRSP
   withdrawals are taxed to the account owner — an even split during the bridge
   requires comparable RRSP balances (plan ahead with a spousal RRSP).
-- Not yet modelled: annual tax drag on non-registered interest/dividends (this
-  *understates* the meltdown strategy's real-world advantage), Ontario surtax,
-  dividend tax credits, TFSA/RRSP contribution-room caps, provinces beyond the four.
-- Monte Carlo uses normally distributed annual returns without cross-asset
-  correlation.
+- Non-registered distributions are taxed yearly as ordinary income (a deliberate
+  simplification: no dividend gross-up/credit); GIS uses a linear approximation of
+  the official tables; enter your annual savings **after tax** — the RRSP refund is
+  not recycled automatically.
+- Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
+  enhancement (post-2019 contributions — estimates lean conservative for younger
+  users), provinces beyond the four, long-term-care cost shocks.
+- Monte Carlo draws one market shock per year shared by all accounts (accounts are
+  fully correlated; what differs is each account's volatility). Success rates are
+  sensitive to the return assumption — read them as "odds of never needing to
+  adjust", not precise probabilities.
 
 **Educational estimate only — not financial advice.**
 

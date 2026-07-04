@@ -82,7 +82,7 @@
   "phaseBridge": "桥接期",
   "chartTitle": "各账户余额随年龄变化",
   "incomeChartTitle": "退休收入来源分层",
-  "incomeChartNote": "堆叠面积为税前现金来源；虚线为当年所缴税款。",
+  "incomeChartNote": "堆叠面积为税前现金来源；虚线为当年所缴税款。65 岁后若应税收入很低，图中还会出现 GIS（免税补助）层。",
   "cppLabel": "CPP/QPP",
   "oasLabel": "OAS",
   "gisLabel": "GIS",

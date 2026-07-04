@@ -45,10 +45,13 @@ l'inflation) :
    les minimums FERR sont forcés, besoin ou pas.
 
 **Le moteur fiscal** : vrais paliers marginaux fédéral + provincial (ON / QC / BC /
-AB, chiffres 2025-26, mis à jour annuellement), montants personnels de base,
-abattement québécois, inclusion de 50 % des gains en capital suivie par le PBR,
-récupération de la SV par personne et, pour les couples, fractionnement du revenu
-sur deux déclarations.
+AB, chiffres 2026, mis à jour annuellement), montants personnels de base (avec la
+réduction fédérale à revenu élevé), abattement québécois, surtaxe et prime-santé de
+l'Ontario, montant en raison de l'âge et crédit pour revenu de pension dès 65 ans,
+inclusion de 50 % des gains en capital suivie par le PBR, frein fiscal annuel sur
+les distributions non enregistrées, récupération de la SV par personne (taux 75+
+inclus), SRG pour les retraités à faible revenu imposable et, pour les couples,
+fractionnement du revenu sur deux déclarations.
 
 **Stratégies de décaissement**, comparées côte à côte avec vos propres chiffres :
 
@@ -68,10 +71,11 @@ par les dépenses annuelles soutenables maximales.
 
 **Également modélisés** : vente de la résidence principale (libre d'impôt),
 vente d'immeuble locatif (gain imposé), estimation RPC/RRQ selon l'historique de
-travail (règle des 39 meilleures années), SV selon les années de résidence,
-tableaux complets des âges de début RPC 60-70 / SV 65-70, et simulation
-Monte-Carlo (1 000 essais à rendements aléatoires dans un web worker) avec
-anatomie des échecs.
+travail (règle des 39 meilleures années avec diviseur ajusté à l'âge de demande),
+SV selon les années de résidence et son +10 % automatique à 75 ans, tableaux
+complets des âges de début RPC 60-70 (RRQ jusqu'à 72) / SV 65-70, frais de
+placement (RFG), et simulation Monte-Carlo (1 000 essais dans un web worker, un
+même tirage de marché annuel pour tous les comptes) avec anatomie des échecs.
 
 ## Comment remplir
 
@@ -144,13 +148,21 @@ langues.
 ## Hypothèses et limites
 
 - Tous les montants sont en **pouvoir d'achat d'aujourd'hui**; rendements réels.
-- Données fiscales 2025-26, fédéral + ON/QC/BC/AB, mises à jour manuellement.
+- Données fiscales 2026, fédéral + ON/QC/BC/AB (vérifiées contre l'ARC et les
+  budgets provinciaux), mises à jour manuellement.
 - Le mode couple suppose un fractionnement idéal 50/50; avant 65 ans, les retraits
   REER sont imposés au seul titulaire — préparez des soldes comparables (REER de
   conjoint).
-- Pas encore modélisés : l'imposition annuelle des revenus non enregistrés (ce qui
-  *sous-estime* l'avantage réel du meltdown), la surtaxe ontarienne, les crédits
-  de dividendes, les plafonds CELI/REER, les autres provinces.
+- Les distributions non enregistrées sont imposées chaque année comme revenu
+  ordinaire (simplification volontaire : pas de majoration/crédit de dividendes);
+  le SRG suit une approximation linéaire des tables officielles; saisissez votre
+  épargne **après impôt** — le remboursement REER n'est pas recyclé.
+- Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
+  du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
+  autres provinces, chocs de soins de longue durée.
+- Monte-Carlo tire un choc de marché par année, partagé par tous les comptes
+  (corrélation complète). Le taux de réussite est sensible à l'hypothèse de
+  rendement — lisez-le comme « probabilité de ne jamais devoir s'ajuster ».
 
 **Estimation éducative seulement — pas un conseil financier.**
 

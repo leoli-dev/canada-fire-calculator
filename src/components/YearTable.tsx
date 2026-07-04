@@ -28,7 +28,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
               <th>{t('tfsa')}</th>
               <th>{t('cppLabel')}</th>
               <th>{t('oasLabel')}</th>
-              {hasGis && <th>{t('gisLabel')}</th>}
+              {hasGis && <th><Jargon text={t('gisLabel')} /></th>}
               <th>{t('colGross')}</th>
               <th>{t('taxLabel')}</th>
               <th>{t('colNet')}</th>
