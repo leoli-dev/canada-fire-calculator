@@ -145,11 +145,11 @@
     },
     "tfsa": {
       "title": "TFSA — Tax-Free Savings Account",
-      "body": "Contributions are after-tax, but growth and withdrawals are completely tax-free, and withdrawn room comes back the next year. The most flexible wrapper in Canada: withdrawals never touch taxable income or trigger OAS clawback. Usually the last account to draw from."
+      "body": "Contributions are after-tax, but growth and withdrawals are completely tax-free, and withdrawn room comes back the next year. The most flexible wrapper in Canada: withdrawals never touch taxable income or trigger OAS clawback. Usually the last account to draw from. In the withdrawal order it always goes last: let the tax-free compounding run longest, keep it as your only zero-tax-consequence cash source late in life, and it passes tax-free at death."
     },
     "nonreg": {
       "title": "Non-registered account",
-      "body": "A plain investment account with no tax wrapper: interest is fully taxed, eligible dividends get a credit, and 50% of realized capital gains (sale price minus ACB) is taxable. Where money goes once TFSA and RRSP room is full."
+      "body": "A plain investment account with no tax wrapper: interest is fully taxed, eligible dividends get a credit, and 50% of realized capital gains (sale price minus ACB) is taxable. Where money goes once TFSA and RRSP room is full. In the withdrawal order it is usually spent first (after the RRSP's low-bracket room) — the only wrapper that keeps leaking taxable income, so the longer it sits the more it leaks."
     },
     "acb": {
       "title": "ACB — Adjusted Cost Base",
@@ -198,6 +198,26 @@
     "principalresidence": {
       "title": "Principal Residence Exemption",
       "body": "Capital gains on your primary home are entirely tax-free — one of the largest tax breaks in Canada. In a FIRE plan, downsizing releases a large tax-free lump sum that becomes investable. Investment properties do not qualify."
+    },
+    "withdrawalorder": {
+      "title": "Withdrawal order (decumulation strategy)",
+      "body": "Which account you tap first in retirement can swing the after-tax outcome by hundreds of thousands. Rule of thumb, three layers: 1) RRSP first in low-income years, capped within the lowest bracket (see meltdown) — it's tax-deferred, the bill comes eventually, so pay it in your cheapest years; 2) non-registered next — the only wrapper that keeps leaking taxable income, so the longer it sits the more it leaks; 3) TFSA always last: growth is permanently tax-free (highest-quality compounding — let it run longest), withdrawals never push up your bracket or trigger the clawback (your only zero-tax-consequence source of cash late in life, after RRIF minimums fill your brackets), and it passes tax-free at death. The comparison card below quantifies each order with your own numbers."
+    },
+    "bridge": {
+      "title": "Bridge period (FIRE → pensions)",
+      "body": "The years between FIRE and the start of CPP/OAS: no salary, no benefits yet — the lowest-taxable-income window of your life, and the prime hunting ground for the RRSP meltdown. A longer bridge needs more self-funded cash but gives more room to drain the RRSP at low rates; the 'defer CPP/OAS' advice only works if the bridge is funded."
+    },
+    "sequencerisk": {
+      "title": "Sequence-of-returns risk",
+      "body": "The same average return with bad years in a different order gives wildly different endings: a bear market in the first years after FIRE forces you to sell assets at the bottom to live, and the damaged principal never recovers; the same bear at 80 is nearly harmless. It is early retirement's biggest hidden risk — invisible in fixed-return charts, and the main thing the Monte Carlo success rate measures."
+    },
+    "realdollars": {
+      "title": "Today's purchasing power (real vs nominal)",
+      "body": "This calculator runs entirely in real dollars: every amount is stated in today's purchasing power and returns are net of inflation. The benefit: a number in any year compares directly to your life today — \"spending 100k a year\" still buys today's 100k worth at 80. Switch to Nominal display to see future face values (rising each year); purchasing power is identical."
+    },
+    "splitting": {
+      "title": "Income splitting (couples)",
+      "body": "Canada taxes individuals, so under progressive rates the same household income split across two returns pays far less than piled on one (two personal amounts, two runs up the low brackets). Couple mode assumes an ideal 50/50 split. Reality check: before 65, RRSP withdrawals are taxed to the account owner only and cannot be split — an even split during the bridge requires both spouses to hold comparable RRSP balances, which unbalanced couples should fix in advance with spousal RRSP contributions."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

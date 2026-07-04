@@ -145,11 +145,11 @@
     },
     "tfsa": {
       "title": "CELI — Compte d’épargne libre d’impôt",
-      "body": "Cotisations après impôt, mais croissance et retraits totalement libres d’impôt; les droits retirés reviennent l’année suivante. L’enveloppe la plus flexible au Canada : les retraits n’affectent jamais le revenu imposable ni la récupération de la SV. Généralement le dernier compte à décaisser."
+      "body": "Cotisations après impôt, mais croissance et retraits totalement libres d’impôt; les droits retirés reviennent l’année suivante. L’enveloppe la plus flexible au Canada : les retraits n’affectent jamais le revenu imposable ni la récupération de la SV. Généralement le dernier compte à décaisser. Dans l'ordre de décaissement il passe toujours en dernier : laissez composer la croissance libre d'impôt le plus longtemps, gardez-le comme seule source d'argent sans conséquence fiscale tard dans la vie, et il se transmet libre d'impôt."
     },
     "nonreg": {
       "title": "Compte non enregistré",
-      "body": "Compte de placement ordinaire sans enveloppe fiscale : intérêts pleinement imposés, dividendes admissibles avec crédit, et 50 % du gain en capital réalisé (prix de vente moins PBR) imposable. C’est là que va l’argent une fois CELI et REER pleins."
+      "body": "Compte de placement ordinaire sans enveloppe fiscale : intérêts pleinement imposés, dividendes admissibles avec crédit, et 50 % du gain en capital réalisé (prix de vente moins PBR) imposable. C’est là que va l’argent une fois CELI et REER pleins. Dans l'ordre de décaissement on le dépense généralement en premier (après la marge à bas taux du REER) — la seule enveloppe qui fuit de l'impôt chaque année."
     },
     "acb": {
       "title": "PBR — Prix de base rajusté",
@@ -198,6 +198,26 @@
     "principalresidence": {
       "title": "Exemption pour résidence principale",
       "body": "Les gains en capital sur votre résidence principale sont entièrement libres d’impôt — l’un des plus grands avantages fiscaux au Canada. Réduire la taille de sa maison libère une somme importante non imposée et investissable. Les immeubles locatifs n’y ont pas droit."
+    },
+    "withdrawalorder": {
+      "title": "Ordre de décaissement",
+      "body": "Le compte que vous videz en premier peut changer le résultat après impôt de centaines de milliers de dollars. Règle en trois temps : 1) le REER d'abord dans les années à faible revenu, plafonné au premier palier (voir meltdown); 2) le non enregistré ensuite — la seule enveloppe qui fuit de l'impôt chaque année; 3) le CELI toujours en dernier : croissance à jamais libre d'impôt (laissez-la composer le plus longtemps), retraits sans effet sur le palier ni la récupération de la SV (votre seule source d'argent sans conséquence fiscale tard dans la vie), et transmission libre d'impôt au décès. Le tableau comparatif chiffre chaque ordre avec vos propres données."
+    },
+    "bridge": {
+      "title": "Années-pont (FIRE → pensions)",
+      "body": "Les années entre le FIRE et le début du RPC/SV : pas de salaire, pas encore de prestations — la fenêtre de revenu imposable la plus basse de votre vie, terrain de chasse du meltdown REER. Un pont plus long exige plus d'autofinancement mais laisse plus de place pour vider le REER à bas taux."
+    },
+    "sequencerisk": {
+      "title": "Risque de séquence des rendements",
+      "body": "Le même rendement moyen avec les mauvaises années dans un ordre différent donne des fins radicalement différentes : un marché baissier juste après le FIRE vous force à vendre au plus bas pour vivre, et le capital entamé ne se rattrape jamais; le même marché baissier à 80 ans est presque inoffensif. C'est le principal risque caché de la retraite anticipée — invisible sur un graphique à rendement fixe, et l'objet principal du taux de réussite Monte-Carlo."
+    },
+    "realdollars": {
+      "title": "Pouvoir d'achat d'aujourd'hui (réel vs nominal)",
+      "body": "Le calculateur fonctionne entièrement en dollars réels : chaque montant est exprimé en pouvoir d'achat d'aujourd'hui et les rendements sont nets d'inflation. Avantage : un chiffre de n'importe quelle année se compare directement à votre vie actuelle. Passez à l'affichage nominal pour voir les valeurs nominales futures; le pouvoir d'achat est identique."
+    },
+    "splitting": {
+      "title": "Fractionnement de revenu (couples)",
+      "body": "Le Canada impose les personnes : le même revenu de ménage réparti sur deux déclarations paie bien moins d'impôt que concentré sur une seule. Le mode couple suppose un partage idéal 50/50. Attention : avant 65 ans, les retraits REER sont imposés au seul titulaire — un partage égal pendant le pont exige des soldes REER comparables, à préparer d'avance via un REER de conjoint."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",

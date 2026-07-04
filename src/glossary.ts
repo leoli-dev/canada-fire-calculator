@@ -26,6 +26,11 @@ export const TERMS: TermDef[] = [
   { id: 'montecarlo', patterns: ['蒙特卡洛', 'Monte Carlo', 'Monte-Carlo'] },
   { id: 'estate', patterns: ['税后遗产价值', '遗产税', '遗产', 'Estate value', 'estate value', 'estate', 'Valeur successorale', 'valeur successorale', 'succession'] },
   { id: 'principalresidence', patterns: ['主要住宅', 'Principal residence', 'principal residence', 'Résidence principale', 'résidence principale'] },
+  { id: 'withdrawalorder', patterns: ['取钱顺序', 'Withdrawal order', 'withdrawal order', 'Ordre de décaissement', 'ordre de décaissement', 'ordres de décaissement'] },
+  { id: 'bridge', patterns: ['桥接期', 'bridge period', 'Bridge period', 'bridge years', 'années-pont'] },
+  { id: 'sequencerisk', patterns: ['收益顺序风险', 'sequence-of-returns risk', 'sequence-of-returns', 'sequence of returns', 'séquence des rendements'] },
+  { id: 'realdollars', patterns: ['今日购买力', "today's purchasing power", 'purchasing power', "pouvoir d'achat", 'pouvoir d’achat', 'real dollars'] },
+  { id: 'splitting', patterns: ['收入分割', 'income splitting', 'Income splitting', 'fractionnement de revenu', 'Fractionnement de revenu'] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

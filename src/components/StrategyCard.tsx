@@ -28,7 +28,7 @@ export function StrategyCard(props: { inputs: Inputs }) {
       <table className="compare-table">
         <thead>
           <tr>
-            <th>{t('withdrawalOrder')}</th>
+            <th><Jargon text={t('withdrawalOrder')} /></th>
             <th>{t('stratOutcome')}</th>
             <th>{t('totalTax')}</th>
             <th>{t('rrspTaxCol')}</th>
