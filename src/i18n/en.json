@@ -261,6 +261,10 @@
     "baristafire": {
       "title": "Barista FIRE — semi-retirement",
       "body": "FIRE without fully stopping: quit the main career and cover part of your spending with part-time work, a small business or odd projects, so the portfolio only funds the gap. The leverage is dramatic — $20k/yr less drawn from the portfolio is, by the 4% rule, roughly $500k less capital you need to save, often years of retirement gained. The income is taxed as ordinary income, but at retirement-level income the marginal rate is low; after 65 it also enjoys the GIS work exemption (the first $5,000 doesn’t count against the income test, and only half of the next $10,000 does). A sibling concept, Coast FIRE: once compounding alone will reach your number, stop saving and earn just enough to cover current expenses. This calculator models it as a fixed pre-tax annual amount over an age range starting no earlier than FIRE."
+    },
+    "debt": {
+      "title": "Debt amortization and inflation",
+      "body": "Mortgage and loan payments are contractually fixed in nominal dollars: the same paper amount every year. This calculator works in today’s purchasing power throughout, so the real burden of that same payment shrinks year after year — at 2% inflation, the final payment of a 25-year mortgage weighs only ~61% of today’s. That is the honest mechanism behind \"inflation pays your mortgage\"; ignoring it overstates debt pressure and pushes your FIRE age out. The engine back-solves the implied interest rate from (balance, annual payment, years remaining) and amortizes year by year; expressed in real dollars, retirement-phase payments add to the spending target and the outstanding balance is subtracted from net worth. Note the semantics of \"annual savings\": it is what you save after debt payments, so a loan paid off before FIRE affects the balance sheet, not retirement cash flow."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
@@ -326,5 +330,19 @@
   "extraIncomeLabel": "Side income",
   "extraIncomeNote": "Part-time work, a small business, selling things — taxed as ordinary income; the GIS income test exempts the first $5,000 of work income plus half of the next $10,000. Don’t subtract it from \"retirement spending\" yourself.",
   "valExtraToBeforeFrom": "End age can’t be before the start age",
-  "valExtraBeforeFire": "Years before FIRE are ignored (side income starts at FIRE)"
+  "valExtraBeforeFire": "Years before FIRE are ignored (side income starts at FIRE)",
+  "debtsSection": "Debts",
+  "debtKind": "Type",
+  "debt_mortgage": "Mortgage",
+  "debt_carLoan": "Car loan",
+  "debt_other": "Other debt",
+  "debtBalance": "Current balance",
+  "debtPaymentLabel": "Payment ($/yr)",
+  "debtYears": "Years remaining",
+  "addDebt": "+ Add debt",
+  "debtNote": "Payments are fixed in nominal dollars — inflation lightens their real weight every year; the engine derives the implied interest rate from (balance, payment, years) and amortizes accordingly. In retirement, payments add to the spending target until paid off; \"annual savings\" is assumed to already be net of debt payments.",
+  "debtLabel": "Debt balance",
+  "netWorthLabel": "Net worth (after debt)",
+  "debtPaymentCol": "Debt pmt",
+  "valDebtUnpayable": "Payment × years is less than the balance — this loan never amortizes; check the three numbers"
 }

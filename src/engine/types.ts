@@ -51,6 +51,23 @@ export interface Partner {
   cppWork?: CppWork | null
 }
 
+export type DebtKind = 'mortgage' | 'carLoan' | 'other'
+export const DEBT_KINDS: DebtKind[] = ['mortgage', 'carLoan', 'other']
+
+/**
+ * A loan with fixed nominal payments. The engine derives the implied
+ * interest rate from (balance, annualPayment, yearsRemaining) and lets
+ * inflation shrink the real weight of the payments over time.
+ */
+export interface Debt {
+  kind: DebtKind
+  /** outstanding balance today */
+  balance: number
+  /** fixed nominal payment per year */
+  annualPayment: number
+  yearsRemaining: number
+}
+
 export interface PrincipalResidence {
   value: number
   /** real annual appreciation */
@@ -128,6 +145,8 @@ export interface Inputs {
   principalResidence?: PrincipalResidence | null
   /** rental/investment properties; store migrates the old singular field */
   investmentProperties?: InvestmentProperty[]
+  /** outstanding loans; payments add to retirement spending until paid off */
+  debts?: Debt[]
 }
 
 export interface YearRow {
@@ -152,6 +171,10 @@ export interface YearRow {
   shortfall: number
   /** unsold real estate value at end of year */
   propertyValue: number
+  /** real (today's-dollar) debt payments made this year */
+  debtPayment: number
+  /** real end-of-year debt balance outstanding */
+  debtBalance: number
   /** taxable income per person this year (0 during accumulation) */
   taxablePerPerson: number
 }

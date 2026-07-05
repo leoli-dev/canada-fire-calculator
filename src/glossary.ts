@@ -41,6 +41,7 @@ export const TERMS: TermDef[] = [
   { id: 'surtax', patterns: ['surtax', 'Surtax', '附加税', 'surtaxe', 'Surtaxe'] },
   { id: 'rent', patterns: ['净租金', '租金', 'Net rent', 'net rent', 'Rent', 'rent', 'Loyer net', 'loyer net', 'Loyer', 'loyer', 'revenu locatif', 'Revenu locatif'] },
   { id: 'baristafire', patterns: ['Barista FIRE', 'barista FIRE', '额外收入', 'Side income', 'side income', 'revenu d’appoint', 'Revenu d’appoint', "revenu d'appoint", "Revenu d'appoint"] },
+  { id: 'debt', patterns: ['负债', '房贷', '还贷', 'Debts', 'debts', 'Debt', 'debt', 'Mortgage', 'mortgage', 'Dettes', 'dettes', 'Dette', 'dette', 'Hypothèque', 'hypothèque'] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

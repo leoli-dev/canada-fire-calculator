@@ -35,12 +35,18 @@ export function ProjectionChart(props: {
     rrsp: Math.round(r.balances.rrsp * k(r.age)),
     nonReg: Math.round(r.balances.nonReg * k(r.age)),
     property: Math.round(r.propertyValue * k(r.age)),
+    debt: Math.round(r.debtBalance * k(r.age)),
     investable: Math.round((r.balances.tfsa + r.balances.rrsp + r.balances.nonReg) * k(r.age)),
     total: Math.round(
       (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.propertyValue) * k(r.age),
     ),
+    netWorth: Math.round(
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.propertyValue - r.debtBalance) *
+        k(r.age),
+    ),
   }))
   const hasProperty = data.some((d) => d.property > 0)
+  const hasDebt = data.some((d) => d.debt > 0)
 
   return (
     <div className="chart-card">
@@ -83,6 +89,14 @@ export function ProjectionChart(props: {
           {hasProperty && (
             <Area type="monotone" dataKey="property" stackId="1" name={t('propertyLabel')}
               stroke={COLORS.property} fill={COLORS.property} fillOpacity={0.45} />
+          )}
+          {hasDebt && (
+            <Line type="monotone" dataKey="debt" name={t('debtLabel')}
+              stroke="#c62828" strokeWidth={2} strokeDasharray="5 3" dot={false} />
+          )}
+          {hasDebt && (
+            <Line type="monotone" dataKey="netWorth" name={t('netWorthLabel')}
+              stroke="#1a2532" strokeWidth={2} dot={false} />
           )}
         </ComposedChart>
       </ResponsiveContainer>

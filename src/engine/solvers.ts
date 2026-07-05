@@ -1,4 +1,5 @@
 import { runProjection } from './projection'
+import { rollDebtsForward } from './debts'
 import { incomeTax } from './tax'
 import {
   ACCOUNT_TYPES,
@@ -43,6 +44,8 @@ export function requiredFireAssets(inputs: Inputs): number {
       partner: inputs.partner
         ? { ...inputs.partner, currentAge: inputs.partner.currentAge + yearsToFire }
         : inputs.partner,
+      // the debts will have amortized for yearsToFire by then
+      debts: rollDebtsForward(inputs.debts ?? [], yearsToFire, inputs.inflation ?? 0.021),
     }).success
 
   let lo = 0

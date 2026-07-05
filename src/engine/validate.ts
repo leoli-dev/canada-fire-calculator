@@ -88,6 +88,16 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       warn('partner.oasAnnualAt65', 'valOasMax', { max: OAS_FULL_AT_65 })
   }
 
+  const debts = inputs.debts ?? []
+  debts.forEach((d, i) => {
+    const at = (f: string) => `debts.${i}.${f}`
+    if (d.balance < 0) err(at('balance'), 'valNegative')
+    if (d.annualPayment < 0) err(at('annualPayment'), 'valNegative')
+    if (d.yearsRemaining < 0) err(at('yearsRemaining'), 'valNegative')
+    if (d.balance > 0 && d.annualPayment * d.yearsRemaining < d.balance)
+      err(at('annualPayment'), 'valDebtUnpayable')
+  })
+
   const ei = inputs.extraIncome
   if (ei) {
     if (ei.annual < 0) err('extraIncome.annual', 'valNegative')

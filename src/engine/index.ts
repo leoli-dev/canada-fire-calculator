@@ -11,6 +11,7 @@ export {
 } from './benefits'
 export { rrifMinFactor } from './rrif'
 export { validateInputs, type ValidationIssue, type Severity } from './validate'
+export { buildDebtStream, impliedRate, rollDebtsForward } from './debts'
 export { pensionStartAge, runProjection, type ReturnSampler } from './projection'
 export {
   compareStrategies,

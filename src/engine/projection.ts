@@ -17,6 +17,7 @@ import {
   oasAfterClawback,
 } from './benefits'
 import { rrifMinFactor } from './rrif'
+import { buildDebtStream } from './debts'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
 export type ReturnSampler = (age: number, account: AccountType) => number
@@ -176,6 +177,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let depletedAge: number | null = null
   let rrspTaxTotal = 0
 
+  // debt payments are fixed in nominal dollars — inflation erodes them in
+  // this real-dollar frame. During accumulation they're assumed already
+  // netted out of annualSavings; in retirement they add to the spending
+  // target until each loan is paid off.
+  const debtStream = buildDebtStream(
+    inputs.debts ?? [],
+    inputs.lifeExpectancy - inputs.currentAge + 1,
+    inputs.inflation ?? 0.021,
+  )
+
   let prValue = inputs.principalResidence?.value ?? 0
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
@@ -198,6 +209,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let shortfall = 0
     let extraTaxable = 0
     let taxablePerPerson = 0
+    const yearIdx = age - inputs.currentAge
+    const debtPayment = debtStream.payments[yearIdx] ?? 0
+    const debtBalance = debtStream.balances[yearIdx] ?? 0
 
     // principal residence sale: tax-free, proceeds become investable
     const pr = inputs.principalResidence
@@ -311,8 +325,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       }
       const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBook) / bal.nonReg) : 0
 
+      // debt payments come on top of living expenses until paid off
+      const spendTarget = inputs.retirementSpending + debtPayment
       const out = solveWithdrawals(
-        inputs.retirementSpending, bal, forcedRrsp, gainFraction, cpp,
+        spendTarget, bal, forcedRrsp, gainFraction, cpp,
         oasGrossPerPerson, agesPerPerson, extraTaxable, rent + extraIncome,
         extraIncome, steps, inputs,
       )
@@ -324,8 +340,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       netCash = out.netCash
       taxablePerPerson = out.taxablePerPerson ?? 0
 
-      if (netCash < inputs.retirementSpending - 0.01) {
-        shortfall = inputs.retirementSpending - netCash
+      if (netCash < spendTarget - 0.01) {
+        shortfall = spendTarget - netCash
         if (depletedAge === null) depletedAge = age
       }
 
@@ -336,7 +352,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       for (const t of ACCOUNT_TYPES) bal[t] -= withdrawals[t]
 
       // surplus cash (e.g. forced RRIF minimum above spending) reinvests taxed
-      const surplus = netCash - inputs.retirementSpending
+      const surplus = netCash - spendTarget
       if (surplus > 0) {
         bal.nonReg += surplus
         nonRegBook += surplus
@@ -361,12 +377,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       extraIncome: phase === 'accumulation' ? 0 : extraIncome,
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
+      debtPayment, debtBalance,
       taxablePerPerson,
     })
   }
 
   const ipTotal = ips.reduce((s, p) => s + p.value, 0)
-  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipTotal
+  const finalDebt = debtStream.balances[inputs.lifeExpectancy - inputs.currentAge] ?? 0
+  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
   const persons = partner ? 2 : 1

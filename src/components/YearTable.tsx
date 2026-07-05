@@ -15,6 +15,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   const hasGis = rows.some((r) => r.gis > 0)
   const hasRent = rows.some((r) => r.rent > 0)
   const hasExtra = rows.some((r) => r.extraIncome > 0)
+  const hasDebt = rows.some((r) => r.debtPayment > 0 || r.debtBalance > 0)
 
   return (
     <details className="chart-card collapsible">
@@ -35,6 +36,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
               {hasExtra && <th><Jargon text={t('extraIncomeLabel')} /></th>}
               <th>{t('colGross')}</th>
               <th>{t('taxLabel')}</th>
+              {hasDebt && <th><Jargon text={t('debtPaymentCol')} /></th>}
               <th>{t('colNet')}</th>
               <th>{t('colTaxable')}</th>
               <th>{t('colMarginal')}</th>
@@ -62,6 +64,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
                   {hasExtra && <td className="num">{cad(r.extraIncome)}</td>}
                   <td className="num strong">{cad(gross)}</td>
                   <td className="num">{cad(r.tax)}</td>
+                  {hasDebt && <td className="num">{cad(r.debtPayment)}</td>}
                   <td className="num strong">{cad(r.netCash)}</td>
                   <td className="num">{cad(r.taxablePerPerson)}</td>
                   <td className="num">{(rate * 100).toFixed(1)}%</td>

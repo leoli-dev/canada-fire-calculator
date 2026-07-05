@@ -261,6 +261,10 @@
     "baristafire": {
       "title": "Barista FIRE — semi-retraite",
       "body": "Le FIRE sans tout arrêter : quitter la carrière principale et couvrir une partie des dépenses par du temps partiel, une petite entreprise ou des contrats, le portefeuille ne finançant que l’écart. L’effet de levier est spectaculaire — 20 k$/an de moins tirés du portefeuille équivalent, selon la règle des 4 %, à environ 500 k$ de capital en moins à accumuler, souvent des années de retraite gagnées. Ce revenu est imposé comme revenu ordinaire, mais à un niveau de revenu de retraite le taux marginal est bas ; après 65 ans il profite aussi de l’exemption du SRG pour revenu de travail (les premiers 5 000 $ ne comptent pas dans le test de revenu, et seulement la moitié des 10 000 $ suivants). Concept cousin, le Coast FIRE : une fois que les intérêts composés suffisent à atteindre votre cible, cesser d’épargner et gagner juste de quoi couvrir les dépenses courantes. Le calculateur le modélise comme un montant annuel avant impôt sur une plage d’âges commençant au plus tôt à FIRE."
+    },
+    "debt": {
+      "title": "Amortissement des dettes et inflation",
+      "body": "Les versements hypothécaires et de prêts sont fixés contractuellement en dollars nominaux : le même montant papier chaque année. Ce calculateur travaille du début à la fin en pouvoir d’achat d’aujourd’hui, donc le fardeau réel d’un même versement rétrécit d’année en année — à 2 % d’inflation, le dernier versement d’une hypothèque de 25 ans ne pèse qu’environ 61 % d’aujourd’hui. C’est le mécanisme honnête derrière « l’inflation paie votre hypothèque » ; l’ignorer surestime la pression de la dette et repousse votre âge FIRE. Le moteur déduit le taux implicite de (solde, versement annuel, années restantes) et amortit année par année ; exprimés en dollars réels, les versements en phase de retraite s’ajoutent à la cible de dépenses et le solde restant est soustrait de la valeur nette. Notez la sémantique de « l’épargne annuelle » : c’est ce que vous épargnez après les versements — une dette remboursée avant FIRE touche le bilan, pas les flux de retraite."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
@@ -326,5 +330,19 @@
   "extraIncomeLabel": "Revenu d’appoint",
   "extraIncomeNote": "Travail à temps partiel, petite entreprise, ventes — imposé comme revenu ordinaire ; le test de revenu du SRG exempte les premiers 5 000 $ de revenu de travail plus la moitié des 10 000 $ suivants. Ne le soustrayez pas vous-même des « dépenses de retraite ».",
   "valExtraToBeforeFrom": "L’âge de fin ne peut pas précéder l’âge de début",
-  "valExtraBeforeFire": "Les années avant FIRE sont ignorées (le revenu commence à FIRE)"
+  "valExtraBeforeFire": "Les années avant FIRE sont ignorées (le revenu commence à FIRE)",
+  "debtsSection": "Dettes",
+  "debtKind": "Type",
+  "debt_mortgage": "Hypothèque",
+  "debt_carLoan": "Prêt auto",
+  "debt_other": "Autre dette",
+  "debtBalance": "Solde actuel",
+  "debtPaymentLabel": "Versement ($/an)",
+  "debtYears": "Années restantes",
+  "addDebt": "+ Ajouter une dette",
+  "debtNote": "Les versements sont fixes en dollars nominaux — l’inflation allège leur poids réel chaque année ; le moteur déduit le taux d’intérêt implicite de (solde, versement, années) et amortit en conséquence. À la retraite, les versements s’ajoutent à la cible de dépenses jusqu’au remboursement ; « l’épargne annuelle » est supposée déjà nette des versements.",
+  "debtLabel": "Solde des dettes",
+  "netWorthLabel": "Valeur nette (après dettes)",
+  "debtPaymentCol": "Versement",
+  "valDebtUnpayable": "Versement × années est inférieur au solde — ce prêt ne s’amortit jamais ; vérifiez les trois nombres"
 }

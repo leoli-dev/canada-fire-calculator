@@ -8,9 +8,11 @@ import {
   WORKSHEET_KEYS,
 } from '../store'
 import {
+  DEBT_KINDS,
   STRATEGIES,
   validateInputs,
   type AccountType,
+  type DebtKind,
   type Goal,
   type Province,
   type Strategy,
@@ -367,6 +369,67 @@ export function InputForm() {
         </button>
         {(inputs.investmentProperties?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('ipNote')} /></p>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend><Jargon text={t('debtsSection')} /></legend>
+        {(inputs.debts ?? []).map((d, i) => {
+          const patch = (part: Partial<typeof d>) => {
+            const next = [...(inputs.debts ?? [])]
+            next[i] = { ...d, ...part }
+            set({ debts: next })
+          }
+          return (
+            <div className="property-card" key={i}>
+              <p className="subhead property-head">
+                {t(`debt_${d.kind}`)} #{i + 1}
+                <button
+                  type="button"
+                  className="remove-item"
+                  onClick={() =>
+                    set({ debts: (inputs.debts ?? []).filter((_, j) => j !== i) })
+                  }
+                >
+                  {t('removeItem')}
+                </button>
+              </p>
+              <label className="field">
+                <span>{t('debtKind')}</span>
+                <select value={d.kind} onChange={(e) => patch({ kind: e.target.value as DebtKind })}>
+                  {DEBT_KINDS.map((k) => (
+                    <option key={k} value={k}>{t(`debt_${k}`)}</option>
+                  ))}
+                </select>
+              </label>
+              <Num label={t('debtBalance')} value={d.balance} step={10000}
+                issue={issueFor(`debts.${i}.balance`)}
+                onChange={(v) => patch({ balance: v })} />
+              <Num label={t('debtPaymentLabel')} value={d.annualPayment} step={1000}
+                issue={issueFor(`debts.${i}.annualPayment`)}
+                onChange={(v) => patch({ annualPayment: v })} />
+              <Num label={t('debtYears')} value={d.yearsRemaining}
+                issue={issueFor(`debts.${i}.yearsRemaining`)}
+                onChange={(v) => patch({ yearsRemaining: v })} />
+            </div>
+          )
+        })}
+        <button
+          type="button"
+          className="add-item"
+          onClick={() =>
+            set({
+              debts: [
+                ...(inputs.debts ?? []),
+                { kind: 'mortgage', balance: 300000, annualPayment: 24000, yearsRemaining: 20 },
+              ],
+            })
+          }
+        >
+          {t('addDebt')}
+        </button>
+        {(inputs.debts?.length ?? 0) > 0 && (
+          <p className="hint"><Jargon text={t('debtNote')} /></p>
         )}
       </fieldset>
 
