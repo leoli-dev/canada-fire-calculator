@@ -126,6 +126,20 @@ export function InputForm() {
         </label>
         <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
         <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
+        <details>
+          <summary>{t('worksheetTitle')}</summary>
+          {WORKSHEET_KEYS.map((k) => (
+            <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
+              onChange={(v) => setWorksheet(k, Math.max(0, v))} />
+          ))}
+          <div className="ws-total">
+            <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
+            <button type="button" disabled={worksheetTotal <= 0}
+              onClick={() => set({ retirementSpending: worksheetTotal })}>
+              {t('wsApply')}
+            </button>
+          </div>
+        </details>
         <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
           onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
         <label className="field">
@@ -210,21 +224,6 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
           </>
         )}
-
-        <details>
-          <summary>{t('worksheetTitle')}</summary>
-          {WORKSHEET_KEYS.map((k) => (
-            <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
-              onChange={(v) => setWorksheet(k, Math.max(0, v))} />
-          ))}
-          <div className="ws-total">
-            <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
-            <button type="button" disabled={worksheetTotal <= 0}
-              onClick={() => set({ retirementSpending: worksheetTotal })}>
-              {t('wsApply')}
-            </button>
-          </div>
-        </details>
       </fieldset>
 
       <fieldset>
