@@ -40,6 +40,7 @@ export const TERMS: TermDef[] = [
   { id: 'pensioncredit', patterns: ['养老金收入抵免', 'pension income credit', 'Pension income credit', 'crédit pour revenu de pension', 'Crédit pour revenu de pension'] },
   { id: 'surtax', patterns: ['surtax', 'Surtax', '附加税', 'surtaxe', 'Surtaxe'] },
   { id: 'rent', patterns: ['净租金', '租金', 'Net rent', 'net rent', 'Rent', 'rent', 'Loyer net', 'loyer net', 'Loyer', 'loyer', 'revenu locatif', 'Revenu locatif'] },
+  { id: 'baristafire', patterns: ['Barista FIRE', 'barista FIRE', '额外收入', 'Side income', 'side income', 'revenu d’appoint', 'Revenu d’appoint', "revenu d'appoint", "Revenu d'appoint"] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

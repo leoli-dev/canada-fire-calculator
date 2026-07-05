@@ -88,6 +88,13 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       warn('partner.oasAnnualAt65', 'valOasMax', { max: OAS_FULL_AT_65 })
   }
 
+  const ei = inputs.extraIncome
+  if (ei) {
+    if (ei.annual < 0) err('extraIncome.annual', 'valNegative')
+    if (ei.toAge < ei.fromAge) err('extraIncome.toAge', 'valExtraToBeforeFrom')
+    if (ei.fromAge < inputs.fireAge) warn('extraIncome.fromAge', 'valExtraBeforeFire')
+  }
+
   const pr = inputs.principalResidence
   if (pr) {
     if (pr.value < 0) err('principalResidence.value', 'valNegative')

@@ -276,6 +276,59 @@ describe('runProjection', () => {
     expect(firstYear.tax).toBeCloseTo(10000 * 0.4, 0)
   })
 
+  it('Barista income reduces withdrawals within its age window only', () => {
+    const r = runProjection({
+      ...base,
+      extraIncome: { annual: 20000, fromAge: 45, toAge: 55 },
+    })
+    const plain = runProjection(base)
+    const total = (row: (typeof r.rows)[number]) =>
+      row.withdrawals.tfsa + row.withdrawals.rrsp + row.withdrawals.nonReg
+    expect(total(r.rows.find((x) => x.age === 50)!)).toBeLessThan(
+      total(plain.rows.find((x) => x.age === 50)!),
+    )
+    expect(r.rows.find((x) => x.age === 50)!.extraIncome).toBe(20000)
+    expect(r.rows.find((x) => x.age === 56)!.extraIncome).toBe(0)
+    // never earlier than FIRE even if fromAge says so
+    const early = runProjection({
+      ...base,
+      extraIncome: { annual: 20000, fromAge: 40, toAge: 55 },
+    })
+    expect(early.rows.find((x) => x.age === 44)!.extraIncome).toBe(0)
+    expect(early.rows.find((x) => x.age === 45)!.extraIncome).toBe(20000)
+  })
+
+  it('GIS work exemption: side income bites less than the same rent', () => {
+    const gisScenario = {
+      ...base,
+      currentAge: 64,
+      fireAge: 64,
+      lifeExpectancy: 70,
+      cppStartAge: 70,
+      oasStartAge: 65,
+      cppAnnualAt65: 0,
+      retirementSpending: 30000,
+      strategy: 'tfsaFirst' as const,
+      balances: { tfsa: 1000000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+    }
+    const withWork = runProjection({
+      ...gisScenario,
+      extraIncome: { annual: 8000, fromAge: 64, toAge: 70 },
+    })
+    const withRent = runProjection({
+      ...gisScenario,
+      investmentProperties: [
+        { value: 300000, acb: 300000, appreciation: 0, sellAtAge: null, annualRent: 8000 },
+      ],
+    })
+    const gisAt66 = (r: ReturnType<typeof runProjection>) =>
+      r.rows.find((x) => x.age === 66)!.gis
+    // first $5,000 of work income is exempt, plus half the next $10,000:
+    // $8,000 of work counts as $1,500; $8,000 of rent counts in full
+    expect(gisAt66(withWork)).toBeGreaterThan(gisAt66(withRent))
+  })
+
   it('rent counts against the GIS income test', () => {
     const gisBase = {
       ...base,

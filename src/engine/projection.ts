@@ -65,6 +65,7 @@ function evaluate(
   agesPerPerson: number[],
   extraTaxable: number,
   cashIncome: number,
+  workIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
@@ -104,10 +105,11 @@ function evaluate(
     })
   }
   // GIS: requires receiving OAS; income test on taxable income excl. OAS
-  // (TFSA withdrawals are invisible to it)
+  // (TFSA withdrawals are invisible to it; work income gets an exemption)
   const gis = gisAnnual(
     oasGrossPerPerson.map((o) => o > 0),
     baseTaxable,
+    workIncome,
   )
   const netCash = cpp + oasNet + gis + cashIncome + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = baseTaxable + oasNet
@@ -127,12 +129,13 @@ function solveWithdrawals(
   agesPerPerson: number[],
   extraTaxable: number,
   cashIncome: number,
+  workIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, cashIncome, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, cashIncome, workIncome, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -214,6 +217,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     }
     // net rent from properties still held (stops the year a property sells)
     const rent = ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0)
+    // Barista FIRE: side income between fromAge (no earlier than FIRE) and toAge
+    const ei = inputs.extraIncome
+    const extraIncome =
+      ei && age >= Math.max(ei.fromAge, inputs.fireAge) && age <= ei.toAge ? ei.annual : 0
 
     // non-registered tax drag: yearly distributions are taxable when paid,
     // then reinvest (raising the ACB so they aren't taxed again at sale)
@@ -291,7 +298,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         )
         const persons = partner ? 2 : 1
         const committedTaxable =
-          cpp + extraTaxable + rent + oasGrossPerPerson.reduce((s, x) => s + x, 0)
+          cpp + extraTaxable + rent + extraIncome + oasGrossPerPerson.reduce((s, x) => s + x, 0)
         const rrspCap = Math.max(rrifMin, bracketTop * persons - committedTaxable)
         steps = [
           { account: 'rrsp', cap: rrspCap },
@@ -306,7 +313,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
 
       const out = solveWithdrawals(
         inputs.retirementSpending, bal, forcedRrsp, gainFraction, cpp,
-        oasGrossPerPerson, agesPerPerson, extraTaxable, rent, steps, inputs,
+        oasGrossPerPerson, agesPerPerson, extraTaxable, rent + extraIncome,
+        extraIncome, steps, inputs,
       )
       withdrawals = out.withdrawals
       tax = out.tax
@@ -349,7 +357,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     rows.push({
       age, phase,
       balances: { ...bal },
-      withdrawals, cpp, oas, gis, rent, tax, netCash, shortfall,
+      withdrawals, cpp, oas, gis, rent,
+      extraIncome: phase === 'accumulation' ? 0 : extraIncome,
+      tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
       taxablePerPerson,
     })

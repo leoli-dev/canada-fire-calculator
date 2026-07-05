@@ -176,6 +176,35 @@ export function InputForm() {
           </>
         )}
 
+        <label className="field">
+          <span><Jargon text={t('extraIncomeToggle')} /></span>
+          <input
+            type="checkbox"
+            checked={!!inputs.extraIncome}
+            onChange={(e) =>
+              set({
+                extraIncome: e.target.checked
+                  ? { annual: 20000, fromAge: inputs.fireAge, toAge: inputs.fireAge + 10 }
+                  : null,
+              })
+            }
+          />
+        </label>
+        {inputs.extraIncome && (
+          <>
+            <Num label={t('extraIncomeAnnual')} value={inputs.extraIncome.annual} step={1000}
+              issue={issueFor('extraIncome.annual')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, annual: v } })} />
+            <Num label={t('extraIncomeFrom')} value={inputs.extraIncome.fromAge}
+              issue={issueFor('extraIncome.fromAge')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, fromAge: v } })} />
+            <Num label={t('extraIncomeTo')} value={inputs.extraIncome.toAge}
+              issue={issueFor('extraIncome.toAge')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, toAge: v } })} />
+            <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
+          </>
+        )}
+
         <details>
           <summary>{t('worksheetTitle')}</summary>
           {WORKSHEET_KEYS.map((k) => (

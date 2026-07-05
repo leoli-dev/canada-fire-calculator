@@ -14,6 +14,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   if (rows.length === 0) return null
   const hasGis = rows.some((r) => r.gis > 0)
   const hasRent = rows.some((r) => r.rent > 0)
+  const hasExtra = rows.some((r) => r.extraIncome > 0)
 
   return (
     <details className="chart-card collapsible">
@@ -31,6 +32,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
               <th>{t('oasLabel')}</th>
               {hasGis && <th><Jargon text={t('gisLabel')} /></th>}
               {hasRent && <th><Jargon text={t('rentLabel')} /></th>}
+              {hasExtra && <th><Jargon text={t('extraIncomeLabel')} /></th>}
               <th>{t('colGross')}</th>
               <th>{t('taxLabel')}</th>
               <th>{t('colNet')}</th>
@@ -42,7 +44,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
             {rows.map((r) => {
               const gross =
                 r.withdrawals.rrsp + r.withdrawals.nonReg + r.withdrawals.tfsa +
-                r.cpp + r.oas + r.gis + r.rent
+                r.cpp + r.oas + r.gis + r.rent + r.extraIncome
               const rate = marginalRate(r.taxablePerPerson, props.inputs.province)
               return (
                 <tr key={r.age} className={r.phase === 'pension' ? '' : 'bridge-row'}>
@@ -57,6 +59,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
                   <td className="num">{cad(r.oas)}</td>
                   {hasGis && <td className="num">{cad(r.gis)}</td>}
                   {hasRent && <td className="num">{cad(r.rent)}</td>}
+                  {hasExtra && <td className="num">{cad(r.extraIncome)}</td>}
                   <td className="num strong">{cad(gross)}</td>
                   <td className="num">{cad(r.tax)}</td>
                   <td className="num strong">{cad(r.netCash)}</td>

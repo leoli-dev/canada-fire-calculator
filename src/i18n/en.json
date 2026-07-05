@@ -257,6 +257,10 @@
     "rent": {
       "title": "Rental income (taxation)",
       "body": "When an investment property is kept for its cash flow instead of sold, the net rent (rent minus property tax, insurance, maintenance, management and other operating costs) is 100% taxable as ordinary income — no 50% capital-gains discount, no dividend credit. Enter the net figure here: during accumulation it is taxed at your working marginal rate and saved into the non-registered account; in retirement it joins taxable income and counts against tax brackets, the OAS clawback and the GIS income test. The sell-vs-hold trade-off: holding keeps the appreciation but the income is heavily taxed and the accrued gain is still taxed at death; selling crystallizes the gain once (half taxable) in exchange for rebalanceable financial assets."
+    },
+    "baristafire": {
+      "title": "Barista FIRE — semi-retirement",
+      "body": "FIRE without fully stopping: quit the main career and cover part of your spending with part-time work, a small business or odd projects, so the portfolio only funds the gap. The leverage is dramatic — $20k/yr less drawn from the portfolio is, by the 4% rule, roughly $500k less capital you need to save, often years of retirement gained. The income is taxed as ordinary income, but at retirement-level income the marginal rate is low; after 65 it also enjoys the GIS work exemption (the first $5,000 doesn’t count against the income test, and only half of the next $10,000 does). A sibling concept, Coast FIRE: once compounding alone will reach your number, stop saving and earn just enough to cover current expenses. This calculator models it as a fixed pre-tax annual amount over an age range starting no earlier than FIRE."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
@@ -314,5 +318,13 @@
   "propRent": "Net rent ($/yr)",
   "addProperty": "+ Add investment property",
   "removeItem": "Remove",
-  "rentLabel": "Rent"
+  "rentLabel": "Rent",
+  "extraIncomeToggle": "Post-FIRE side income (Barista FIRE)",
+  "extraIncomeAnnual": "Extra income ($/yr, pre-tax)",
+  "extraIncomeFrom": "From age",
+  "extraIncomeTo": "To age",
+  "extraIncomeLabel": "Side income",
+  "extraIncomeNote": "Part-time work, a small business, selling things — taxed as ordinary income; the GIS income test exempts the first $5,000 of work income plus half of the next $10,000. Don’t subtract it from \"retirement spending\" yourself.",
+  "valExtraToBeforeFrom": "End age can’t be before the start age",
+  "valExtraBeforeFire": "Years before FIRE are ignored (side income starts at FIRE)"
 }

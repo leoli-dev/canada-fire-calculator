@@ -29,6 +29,19 @@ export interface CppWork {
   retireAge: number
 }
 
+/**
+ * Expected income after FIRE beyond the portfolio (Barista FIRE: part-time
+ * work, a small business, selling things). Taxable as ordinary income;
+ * treated as employment income for the GIS exemption.
+ */
+export interface ExtraIncome {
+  /** net annual amount, today's dollars */
+  annual: number
+  /** clamped to no earlier than fireAge */
+  fromAge: number
+  toAge: number
+}
+
 export interface Partner {
   currentAge: number
   cppStartAge: number
@@ -108,6 +121,8 @@ export interface Inputs {
   fireTargetAssets?: number | null
   /** spouse/partner for household mode; accounts are household totals */
   partner?: Partner | null
+  /** expected post-FIRE side income (Barista FIRE) */
+  extraIncome?: ExtraIncome | null
   /** annual return standard deviation per account, used by Monte Carlo */
   volatilities?: Record<AccountType, number>
   principalResidence?: PrincipalResidence | null
@@ -128,6 +143,8 @@ export interface YearRow {
   gis: number
   /** net rent received from unsold investment properties (taxable) */
   rent: number
+  /** post-FIRE side income received this year (taxable) */
+  extraIncome: number
   tax: number
   /** after-tax cash available this year */
   netCash: number

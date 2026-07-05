@@ -80,17 +80,32 @@ export const GIS_SINGLE = { max: 13478, cutoff: 22800 }
 export const GIS_COUPLE = { maxEach: 8113, cutoff: 30096 }
 
 /**
+ * GIS employment-income exemption: the first $5,000 of work income doesn't
+ * count, and only half of the next $10,000 does.
+ */
+export function gisWorkExemption(workIncome: number): number {
+  const w = Math.max(0, workIncome)
+  return Math.min(5000, w) + 0.5 * Math.min(10000, Math.max(0, w - 5000))
+}
+
+/**
  * Annual household GIS. `receivingOas` flags each spouse actually receiving
  * OAS (GIS requires it); `householdIncome` is taxable income excluding OAS.
+ * `workIncome` is the employment portion, which gets the exemption above.
  * A couple with only one pensioner is approximated with the single rate.
  */
-export function gisAnnual(receivingOas: boolean[], householdIncome: number): number {
+export function gisAnnual(
+  receivingOas: boolean[],
+  householdIncome: number,
+  workIncome = 0,
+): number {
   const receiving = receivingOas.filter(Boolean).length
   if (receiving === 0) return 0
+  const income = Math.max(0, householdIncome - gisWorkExemption(workIncome))
   if (receivingOas.length === 2 && receiving === 2) {
-    return Math.max(0, 2 * GIS_COUPLE.maxEach * (1 - householdIncome / GIS_COUPLE.cutoff))
+    return Math.max(0, 2 * GIS_COUPLE.maxEach * (1 - income / GIS_COUPLE.cutoff))
   }
-  return Math.max(0, GIS_SINGLE.max * (1 - householdIncome / GIS_SINGLE.cutoff))
+  return Math.max(0, GIS_SINGLE.max * (1 - income / GIS_SINGLE.cutoff))
 }
 
 export const OAS_CLAWBACK_THRESHOLD = 95323
