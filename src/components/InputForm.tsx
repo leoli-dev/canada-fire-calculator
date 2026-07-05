@@ -176,6 +176,7 @@ export function InputForm() {
             <option value="nominal">{t('display_nominal')}</option>
           </select>
         </label>
+        <p className="hint"><Jargon text={t('displayModeNote')} /></p>
         <label className="field">
           <span><Jargon text={t('household')} /></span>
           <select
