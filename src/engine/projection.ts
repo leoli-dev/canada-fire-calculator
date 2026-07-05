@@ -66,8 +66,8 @@ function evaluate(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
-  cashIncome: number,
-  workIncome: number,
+  rent: number,
+  extraIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
@@ -89,32 +89,39 @@ function evaluate(
 
   const persons = oasGrossPerPerson.length
   // extraTaxable is taxable but not cash-in-hand (reinvested distributions,
-  // sale gains whose proceeds land in non-registered); cashIncome is both
-  // taxable and spendable (rent, part-time income)
-  const baseTaxable =
-    cpp + extraTaxable + cashIncome + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
-  const share = baseTaxable / persons
+  // sale gains whose proceeds land in non-registered); rent is both taxable
+  // and spendable, and splits like any jointly-held asset. extraIncome
+  // (Barista/side income) cannot: employment-type income is taxed entirely
+  // on whoever earned it — pension splitting and spousal RRSPs don't apply
+  // to it — so it's attributed in full to person 0 instead of pooled.
+  const pooledTaxable =
+    cpp + extraTaxable + rent + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
+  const share = pooledTaxable / persons
   let oasNet = 0
   let tax = 0
   for (let i = 0; i < persons; i++) {
-    const personOas = oasAfterClawback(oasGrossPerPerson[i], share)
+    const personExtra = i === 0 ? extraIncome : 0
+    const personTaxable = share + personExtra
+    const personOas = oasAfterClawback(oasGrossPerPerson[i], personTaxable)
     oasNet += personOas
     // RRIF withdrawals at 65+ qualify as eligible pension income
     const pensionIncome = agesPerPerson[i] >= 65 ? w.rrsp / persons : 0
-    tax += incomeTax(share + personOas, inputs.province, {
+    tax += incomeTax(personTaxable + personOas, inputs.province, {
       age: agesPerPerson[i],
       pensionIncome,
     })
   }
-  // GIS: requires receiving OAS; income test on taxable income excl. OAS
-  // (TFSA withdrawals are invisible to it; work income gets an exemption)
+  // GIS: requires receiving OAS; income test is on combined household income
+  // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
+  // exemption) — a couple's GIS eligibility is assessed on family income
+  // regardless of which spouse earned what
   const gis = gisAnnual(
     oasGrossPerPerson.map((o) => o > 0),
-    baseTaxable,
-    workIncome,
+    pooledTaxable + extraIncome,
+    extraIncome,
   )
-  const netCash = cpp + oasNet + gis + cashIncome + w.tfsa + w.rrsp + w.nonReg - tax
-  const totalTaxable = baseTaxable + oasNet
+  const netCash = cpp + oasNet + gis + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
+  const totalTaxable = pooledTaxable + extraIncome + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   const taxablePerPerson = totalTaxable / persons
   return { withdrawals: w, tax, rrspTax, oasNet, gis, netCash, taxablePerPerson }
@@ -130,14 +137,14 @@ function solveWithdrawals(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
-  cashIncome: number,
-  workIncome: number,
+  rent: number,
+  extraIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, cashIncome, workIncome, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -347,7 +354,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const spendTarget = inputs.retirementSpending + debtPayment
       const out = solveWithdrawals(
         spendTarget, bal, forcedRrsp, gainFraction, cpp,
-        oasGrossPerPerson, agesPerPerson, extraTaxable, rent + extraIncome,
+        oasGrossPerPerson, agesPerPerson, extraTaxable, rent,
         extraIncome, steps, inputs,
       )
       withdrawals = out.withdrawals

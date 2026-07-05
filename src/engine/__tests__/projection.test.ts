@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
+import { incomeTax } from '../tax'
 import type { Inputs } from '../types'
 
 const base: Inputs = {
@@ -380,6 +381,70 @@ describe('runProjection', () => {
     })
     expect(early.rows.find((x) => x.age === 44)!.extraIncome).toBe(0)
     expect(early.rows.find((x) => x.age === 45)!.extraIncome).toBe(20000)
+  })
+
+  it('couple mode: Barista income is taxed entirely on the primary person, not split 50/50', () => {
+    // TFSA alone comfortably covers spending, so extraIncome is the only
+    // taxable amount this year and no RRSP/nonReg withdrawal muddies the math
+    const couple = {
+      ...base,
+      strategy: 'tfsaFirst' as const,
+      retirementSpending: 10000,
+      balances: { tfsa: 5_000_000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 0,
+      extraIncome: { annual: 60000, fromAge: base.fireAge, toAge: base.fireAge + 10 },
+      partner: {
+        currentAge: 45,
+        cppStartAge: 65,
+        cppAnnualAt65: 0,
+        oasStartAge: 65,
+        oasAnnualAt65: 0,
+      },
+    }
+    const r = runProjection(couple)
+    const row = r.rows.find((x) => x.age === base.fireAge)!
+    const expectedTax = incomeTax(60000, base.province, { age: base.fireAge })
+    expect(row.tax).toBeCloseTo(expectedTax, 0)
+    // progressive brackets: taxing it all on one person costs more than an
+    // (incorrect) even split would have
+    const splitTax = 2 * incomeTax(30000, base.province, { age: base.fireAge })
+    expect(row.tax).toBeGreaterThan(splitTax)
+  })
+
+  it('couple mode: extraIncome claws back only the earner\'s own OAS, not the partner\'s', () => {
+    const oasEach = 9024
+    const couple = {
+      ...base,
+      currentAge: 70,
+      fireAge: 70,
+      lifeExpectancy: 75,
+      strategy: 'tfsaFirst' as const,
+      retirementSpending: 10000,
+      balances: { tfsa: 5_000_000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      cppAnnualAt65: 0,
+      oasStartAge: 65,
+      oasAnnualAt65: oasEach,
+      partner: {
+        currentAge: 70,
+        cppStartAge: 65,
+        cppAnnualAt65: 0,
+        oasStartAge: 65,
+        oasAnnualAt65: oasEach,
+      },
+    }
+    const without = runProjection(couple)
+    const withExtra = runProjection({
+      ...couple,
+      extraIncome: { annual: 150000, fromAge: 70, toAge: 74 },
+    })
+    const oasWithout = without.rows.find((x) => x.age === 70)!.oas
+    const oasWith = withExtra.rows.find((x) => x.age === 70)!.oas
+    // only the earner's OAS is fully clawed back; the partner keeps theirs,
+    // so the household drop is close to one person's OAS, not both
+    expect(oasWithout - oasWith).toBeCloseTo(oasEach, -1)
   })
 
   it('GIS work exemption: side income bites less than the same rent', () => {

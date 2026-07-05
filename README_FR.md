@@ -174,9 +174,11 @@ langues.
 - Données fiscales 2026, fédéral + toutes les provinces et tous les territoires
   (vérifiées contre l'ARC, les budgets provinciaux et TaxTips), mises à jour
   manuellement.
-- Le mode couple suppose un fractionnement idéal 50/50; avant 65 ans, les retraits
-  REER sont imposés au seul titulaire — préparez des soldes comparables (REER de
-  conjoint).
+- Le mode couple suppose un fractionnement idéal 50/50 du RPC, des retraits REER,
+  du loyer et des revenus de placement; avant 65 ans, les retraits REER sont
+  imposés au seul titulaire — préparez des soldes comparables (REER de conjoint).
+  Exception : le revenu d'appoint Barista FIRE est imposé entièrement sur vous,
+  car un revenu de type emploi ne peut légalement pas être partagé avec un conjoint.
 - Les distributions non enregistrées et le loyer net sont imposés chaque année
   comme revenu ordinaire (simplification volontaire : pas de majoration/crédit de
   dividendes, pas de DPA locative); le SRG suit une approximation linéaire des

@@ -171,9 +171,11 @@ explanations are clickable too. 33 entries in all three languages.
   Tax brackets are held in real terms.
 - Tax data: 2026 federal + all-province/territory tables (verified against CRA /
   provincial budgets / TaxTips), updated manually each year.
-- Couple taxation assumes ideal 50/50 income splitting. In reality, pre-65 RRSP
-  withdrawals are taxed to the account owner — an even split during the bridge
-  requires comparable RRSP balances (plan ahead with a spousal RRSP).
+- Couple taxation assumes ideal 50/50 income splitting for CPP/RRSP/rental/investment
+  income. In reality, pre-65 RRSP withdrawals are taxed to the account owner — an
+  even split during the bridge requires comparable RRSP balances (plan ahead with a
+  spousal RRSP). Barista-FIRE side income is the exception: it's taxed entirely on
+  you, since employment-type income can't legally be split with a spouse.
 - Non-registered distributions and net rent are taxed yearly as ordinary income (a
   deliberate simplification: no dividend gross-up/credit, no rental CCA); GIS uses a
   linear approximation of the official tables; enter your annual savings **after
