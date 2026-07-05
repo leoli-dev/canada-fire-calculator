@@ -26,6 +26,8 @@ export interface DebtStream {
   payments: number[]
   /** total real end-of-year balance outstanding, indexed by years from now */
   balances: number[]
+  /** real interest portion of that year's payment (deductible for a rental mortgage) */
+  interest: number[]
 }
 
 /**
@@ -47,19 +49,22 @@ export function buildDebtStream(
   const n = Number.isFinite(years) ? Math.max(0, Math.floor(years)) : 0
   const payments = new Array<number>(n).fill(0)
   const balances = new Array<number>(n).fill(0)
+  const interest = new Array<number>(n).fill(0)
   for (const d of debts) {
     if (d.balance <= 0 || d.yearsRemaining <= 0) continue
     const r = impliedRate(d.balance, d.annualPayment, d.yearsRemaining)
     let nominal = d.balance
     for (let t = 0; t < n && t < d.yearsRemaining; t++) {
       const deflate = Math.pow(1 + inflation, -(t + 1))
-      payments[t] += Math.min(d.annualPayment, nominal * (1 + r)) * deflate
-      nominal = Math.max(0, nominal * (1 + r) - d.annualPayment)
+      const interestNominal = nominal * r
+      payments[t] += Math.min(d.annualPayment, nominal + interestNominal) * deflate
+      interest[t] += interestNominal * deflate
+      nominal = Math.max(0, nominal + interestNominal - d.annualPayment)
       if (t === d.yearsRemaining - 1) nominal = 0
       balances[t] += nominal * deflate
     }
   }
-  return { payments, balances }
+  return { payments, balances, interest }
 }
 
 /**

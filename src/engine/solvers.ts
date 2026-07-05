@@ -1,11 +1,12 @@
 import { runProjection } from './projection'
-import { rollDebtsForward } from './debts'
+import { buildDebtStream, rollDebtsForward } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
 import {
   ACCOUNT_TYPES,
   STRATEGIES,
   type Inputs,
+  type Mortgage,
   type ProjectionResult,
   type Strategy,
 } from './types'
@@ -36,6 +37,14 @@ export function requiredFireAssets(inputs: Inputs): number {
 
   // real estate will have appreciated (and debts amortized) by the FIRE year
   const grow = (v: number, rate: number) => v * Math.pow(1 + rate, Math.max(0, yearsToFire))
+  const inflation = inputs.inflation ?? 0.021
+  const rollMortgage = (m?: Mortgage): Mortgage | undefined => {
+    if (!m) return undefined
+    const [rolled] = rollDebtsForward([{ kind: 'mortgage', ...m }], yearsToFire, inflation)
+    return rolled
+      ? { balance: rolled.balance, annualPayment: rolled.annualPayment, yearsRemaining: rolled.yearsRemaining }
+      : undefined
+  }
   // a principal residence sold BEFORE the FIRE age is already cash inside the
   // investable balances the user compares this number against — passing it
   // through would count the house twice (IP sales are clamped to FIRE, so
@@ -57,12 +66,15 @@ export function requiredFireAssets(inputs: Inputs): number {
       partner: inputs.partner
         ? { ...inputs.partner, currentAge: inputs.partner.currentAge + yearsToFire }
         : inputs.partner,
-      principalResidence: pr ? { ...pr, value: grow(pr.value, pr.appreciation) } : null,
+      principalResidence: pr
+        ? { ...pr, value: grow(pr.value, pr.appreciation), mortgage: rollMortgage(pr.mortgage) }
+        : null,
       investmentProperties: (inputs.investmentProperties ?? []).map((p) => ({
         ...p,
         value: grow(p.value, p.appreciation),
+        mortgage: rollMortgage(p.mortgage),
       })),
-      debts: rollDebtsForward(inputs.debts ?? [], yearsToFire, inputs.inflation ?? 0.021),
+      debts: rollDebtsForward(inputs.debts ?? [], yearsToFire, inflation),
     }).success
 
   let lo = 0
@@ -148,12 +160,20 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
   const bal = { ...inputs.balances }
   const pr = inputs.principalResidence
   let prValue = pr?.value ?? 0
+  const horizon = 100 - inputs.currentAge + 1
+  const inflation = inputs.inflation ?? 0.021
+  const prMortgage = pr?.mortgage
+    ? buildDebtStream([{ kind: 'mortgage', ...pr.mortgage }], horizon, inflation)
+    : null
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
     acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
     rent: p.annualRent ?? 0,
+    mortgage: p.mortgage
+      ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], horizon, inflation)
+      : null,
   }))
   const persons = inputs.partner ? 2 : 1
   const marginal = inputs.accumulationMarginalRate ?? 0.35
@@ -163,15 +183,18 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
   let reachedAge: number | null = total >= target ? inputs.currentAge : null
 
   for (let age = inputs.currentAge; age <= 100; age++) {
+    const yearIdx = age - inputs.currentAge
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
-      bal.nonReg += prValue
+      const owed = prMortgage?.balances[yearIdx] ?? 0
+      bal.nonReg += prValue - owed
       prValue = 0
     }
     for (const p of ips) {
       if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
+        const owed = p.mortgage?.balances[yearIdx] ?? 0
         const gainTax =
           incomeTax((Math.max(0, p.value - p.acb) * 0.5) / persons, inputs.province) * persons
-        bal.nonReg += p.value - gainTax
+        bal.nonReg += p.value - owed - gainTax
         p.value = 0
       }
     }
@@ -180,9 +203,15 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     // year-end wrongly credited a whole extra working year)
     if (age === inputs.fireAge) assetsAtFire = bal.tfsa + bal.rrsp + bal.nonReg
     // mirror the projection's accumulation-phase tax drag on distributions,
-    // and save the after-tax rent from properties still held
+    // and save the after-tax rent from properties still held (a linked
+    // mortgage's interest, capped at the rent, is deductible against it)
     bal.nonReg -= bal.nonReg * (inputs.nonRegDistributionYield ?? 0) * marginal
-    bal.nonReg += ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0) * (1 - marginal)
+    const rent = ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0)
+    const rentInterest = Math.min(
+      rent,
+      ips.reduce((s, p) => s + (p.value > 0 ? (p.mortgage?.interest[yearIdx] ?? 0) : 0), 0),
+    )
+    bal.nonReg += rent - (rent - rentInterest) * marginal
     // ...and benefits already being collected while still working
     const cppMaxAge = inputs.province === 'QC' ? 72 : 70
     let benefits = 0

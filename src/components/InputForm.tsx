@@ -307,12 +307,59 @@ export function InputForm() {
         {inputs.principalResidence && (
           <>
             <Num label={t('propValue')} value={inputs.principalResidence.value} step={25000}
+              issue={issueFor('principalResidence.value')}
               onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, value: v } })} />
             <Num label={t('propAppreciation')} value={inputs.principalResidence.appreciation * 100} step={0.5}
               onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, appreciation: v / 100 } })} />
             <OptionalAge label={t('propSellAt')} value={inputs.principalResidence.sellAtAge}
+              issue={issueFor('principalResidence.sellAtAge')}
               onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, sellAtAge: v } })} />
             <p className="hint"><Jargon text={t('prNote')} /></p>
+            <label className="field">
+              <span>{t('hasMortgage')}</span>
+              <input
+                type="checkbox"
+                checked={!!inputs.principalResidence.mortgage}
+                onChange={(e) =>
+                  set({
+                    principalResidence: {
+                      ...inputs.principalResidence!,
+                      mortgage: e.target.checked
+                        ? { balance: 300000, annualPayment: 24000, yearsRemaining: 20 }
+                        : undefined,
+                    },
+                  })
+                }
+              />
+            </label>
+            {inputs.principalResidence.mortgage && (
+              <>
+                <Num label={t('debtBalance')} value={inputs.principalResidence.mortgage.balance} step={10000}
+                  issue={issueFor('principalResidence.mortgage.balance')}
+                  onChange={(v) => set({
+                    principalResidence: {
+                      ...inputs.principalResidence!,
+                      mortgage: { ...inputs.principalResidence!.mortgage!, balance: v },
+                    },
+                  })} />
+                <Num label={t('debtPaymentLabel')} value={inputs.principalResidence.mortgage.annualPayment} step={1000}
+                  issue={issueFor('principalResidence.mortgage.annualPayment')}
+                  onChange={(v) => set({
+                    principalResidence: {
+                      ...inputs.principalResidence!,
+                      mortgage: { ...inputs.principalResidence!.mortgage!, annualPayment: v },
+                    },
+                  })} />
+                <Num label={t('debtYears')} value={inputs.principalResidence.mortgage.yearsRemaining}
+                  issue={issueFor('principalResidence.mortgage.yearsRemaining')}
+                  onChange={(v) => set({
+                    principalResidence: {
+                      ...inputs.principalResidence!,
+                      mortgage: { ...inputs.principalResidence!.mortgage!, yearsRemaining: v },
+                    },
+                  })} />
+              </>
+            )}
           </>
         )}
 
@@ -354,6 +401,34 @@ export function InputForm() {
               <OptionalAge label={t('propSellAt')} value={ip.sellAtAge}
                 issue={issueFor(`investmentProperties.${i}.sellAtAge`)}
                 onChange={(v) => patch({ sellAtAge: v })} />
+              <label className="field">
+                <span>{t('hasMortgage')}</span>
+                <input
+                  type="checkbox"
+                  checked={!!ip.mortgage}
+                  onChange={(e) =>
+                    patch({
+                      mortgage: e.target.checked
+                        ? { balance: 300000, annualPayment: 24000, yearsRemaining: 20 }
+                        : undefined,
+                    })
+                  }
+                />
+              </label>
+              {ip.mortgage && (
+                <>
+                  <Num label={t('debtBalance')} value={ip.mortgage.balance} step={10000}
+                    issue={issueFor(`investmentProperties.${i}.mortgage.balance`)}
+                    onChange={(v) => patch({ mortgage: { ...ip.mortgage!, balance: v } })} />
+                  <Num label={t('debtPaymentLabel')} value={ip.mortgage.annualPayment} step={1000}
+                    issue={issueFor(`investmentProperties.${i}.mortgage.annualPayment`)}
+                    onChange={(v) => patch({ mortgage: { ...ip.mortgage!, annualPayment: v } })} />
+                  <Num label={t('debtYears')} value={ip.mortgage.yearsRemaining}
+                    issue={issueFor(`investmentProperties.${i}.mortgage.yearsRemaining`)}
+                    onChange={(v) => patch({ mortgage: { ...ip.mortgage!, yearsRemaining: v } })} />
+                  <p className="hint"><Jargon text={t('mortgageInterestNote')} /></p>
+                </>
+              )}
             </div>
           )
         })}

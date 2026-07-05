@@ -190,11 +190,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   // this real-dollar frame. During accumulation they're assumed already
   // netted out of annualSavings; in retirement they add to the spending
   // target until each loan is paid off.
-  const debtStream = buildDebtStream(
-    inputs.debts ?? [],
-    inputs.lifeExpectancy - inputs.currentAge + 1,
-    inputs.inflation ?? 0.021,
-  )
+  const years = inputs.lifeExpectancy - inputs.currentAge + 1
+  const inflation = inputs.inflation ?? 0.021
+  const debtStream = buildDebtStream(inputs.debts ?? [], years, inflation)
+
+  // a property-linked mortgage amortizes on its own precomputed stream (same
+  // math as the household debts array) so it can be discharged in full from
+  // sale proceeds instead of continuing forever
+  const prMortgage = inputs.principalResidence?.mortgage
+    ? buildDebtStream([{ kind: 'mortgage', ...inputs.principalResidence.mortgage }], years, inflation)
+    : null
 
   let prValue = inputs.principalResidence?.value ?? 0
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
@@ -203,6 +208,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
     rent: p.annualRent ?? 0,
+    mortgage: p.mortgage
+      ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], years, inflation)
+      : null,
   }))
 
   for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
@@ -219,27 +227,51 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let extraTaxable = 0
     let taxablePerPerson = 0
     const yearIdx = age - inputs.currentAge
-    const debtPayment = debtStream.payments[yearIdx] ?? 0
-    const debtBalance = debtStream.balances[yearIdx] ?? 0
 
-    // principal residence sale: tax-free, proceeds become investable
+    // principal residence sale: tax-free; any linked mortgage is discharged
+    // from the proceeds (a plain cash-flow cost until then — its interest
+    // isn't deductible, unlike a rental's)
     const pr = inputs.principalResidence
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
-      bal.nonReg += prValue
-      nonRegBook += prValue
+      const owed = prMortgage?.balances[yearIdx] ?? 0
+      bal.nonReg += prValue - owed
+      nonRegBook += prValue - owed
       prValue = 0
     }
-    // investment property sales: gain is 50% taxable; clamped to retirement
+    // investment property sales: gain is 50% taxable; clamped to retirement;
+    // a linked mortgage is discharged from the proceeds the same way
     for (const p of ips) {
       if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
+        const owed = p.mortgage?.balances[yearIdx] ?? 0
         extraTaxable += Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
-        bal.nonReg += p.value
-        nonRegBook += p.value
+        bal.nonReg += p.value - owed
+        nonRegBook += p.value - owed
         p.value = 0
       }
     }
-    // net rent from properties still held (stops the year a property sells)
+    // net rent from properties still held (stops the year a property sells);
+    // a linked mortgage's interest (not principal) is deductible against it,
+    // capped at the rent itself — this model doesn't carry forward a rental
+    // loss to shelter other income
     const rent = ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0)
+    const rentMortgageInterest = Math.min(
+      rent,
+      ips.reduce((s, p) => s + (p.value > 0 ? (p.mortgage?.interest[yearIdx] ?? 0) : 0), 0),
+    )
+    extraTaxable -= rentMortgageInterest
+
+    // debt payments/balances shown and charged against spending: the
+    // household's general debts plus any property-linked mortgage still
+    // outstanding (properties already sold this year stop contributing —
+    // their mortgage was just discharged from the sale proceeds above)
+    const debtPayment =
+      (debtStream.payments[yearIdx] ?? 0) +
+      (prValue > 0 ? prMortgage?.payments[yearIdx] ?? 0 : 0) +
+      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.payments[yearIdx] ?? 0 : 0), 0)
+    const debtBalance =
+      (debtStream.balances[yearIdx] ?? 0) +
+      (prValue > 0 ? prMortgage?.balances[yearIdx] ?? 0 : 0) +
+      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[yearIdx] ?? 0 : 0), 0)
     // Barista FIRE: side income between fromAge (no earlier than FIRE) and toAge
     const ei = inputs.extraIncome
     const extraIncome =
@@ -300,9 +332,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const dragTax = dist * marginal
       bal.nonReg -= dragTax
       nonRegBook += dist - dragTax
-      // net rent, taxed at the same marginal rate, is saved on top of
-      // annualSavings (whose hint tells the user to exclude rent)
-      const rentTax = rent * marginal
+      // net rent, taxed at the same marginal rate (after any mortgage
+      // interest deduction), is saved on top of annualSavings (whose hint
+      // tells the user to exclude rent)
+      const rentTax = (rent - rentMortgageInterest) * marginal
       bal.nonReg += rent - rentTax
       nonRegBook += rent - rentTax
       // benefits already being collected pre-FIRE are saved after tax at the

@@ -1,4 +1,4 @@
-import type { Inputs } from './types'
+import type { Inputs, Mortgage } from './types'
 import { CPP_MAX_AT_65, OAS_FULL_AT_65 } from './benefits'
 
 export type Severity = 'error' | 'warning'
@@ -98,6 +98,16 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       err(at('annualPayment'), 'valDebtUnpayable')
   })
 
+  const checkMortgage = (m: Mortgage | undefined, prefix: string) => {
+    if (!m) return
+    const at = (f: string) => `${prefix}.${f}`
+    if (m.balance < 0) err(at('balance'), 'valNegative')
+    if (m.annualPayment < 0) err(at('annualPayment'), 'valNegative')
+    if (m.yearsRemaining < 0) err(at('yearsRemaining'), 'valNegative')
+    if (m.balance > 0 && m.annualPayment * m.yearsRemaining < m.balance)
+      err(at('annualPayment'), 'valDebtUnpayable')
+  }
+
   const ei = inputs.extraIncome
   if (ei) {
     if (ei.annual < 0) err('extraIncome.annual', 'valNegative')
@@ -110,6 +120,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     if (pr.value < 0) err('principalResidence.value', 'valNegative')
     if (pr.sellAtAge !== null && pr.sellAtAge < inputs.currentAge)
       warn('principalResidence.sellAtAge', 'valSellInPast')
+    checkMortgage(pr.mortgage, 'principalResidence.mortgage')
   }
   const ips = inputs.investmentProperties ?? []
   ips.forEach((ip, i) => {
@@ -120,6 +131,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     if (ip.acb > ip.value) warn(at('acb'), 'valAcbAboveValue')
     if (ip.sellAtAge !== null && ip.sellAtAge < inputs.fireAge)
       warn(at('sellAtAge'), 'valSellBeforeFire')
+    checkMortgage(ip.mortgage, at('mortgage'))
   })
 
   return issues

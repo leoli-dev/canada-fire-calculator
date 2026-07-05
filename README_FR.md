@@ -82,7 +82,9 @@ soutenables maximales.
 **Également modélisés** : vente de la résidence principale (libre d'impôt),
 n'importe quel nombre d'immeubles locatifs — chacun vendable à son propre âge
 (gain imposé) ou conservé pour son **revenu locatif net** (imposé comme revenu
-ordinaire, visible pour la récupération de la SV et le SRG), **dettes**
+ordinaire, visible pour la récupération de la SV et le SRG) — avec en option une
+**hypothèque rattachée** à cet immeuble précis (remboursée en priorité sur le
+produit de la vente, ses intérêts déductibles du loyer de cet immeuble), **dettes**
 (hypothèque / prêt auto / autre : le moteur déduit le taux implicite de chaque
 prêt et laisse l'inflation éroder les paiements nominaux fixes — les paiements
 s'ajoutent aux dépenses de retraite jusqu'au remboursement, les soldes réduisent
@@ -190,7 +192,10 @@ langues.
   dettes** — le remboursement REER n'est pas recyclé.
 - Les paiements de dettes sont fixes en dollars nominaux (pas de refinancement ni
   de taux variable); le taux d'intérêt est déduit du trio solde / paiement /
-  années restantes.
+  années restantes. Une hypothèque peut aussi être rattachée directement à un
+  immeuble précis plutôt qu'à la liste générale de dettes — elle est alors
+  remboursée en priorité sur le produit de la vente, et ses intérêts sont
+  déductibles du loyer de cet immeuble tant qu'il est détenu.
 - Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
   du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
   chocs de soins de longue durée.

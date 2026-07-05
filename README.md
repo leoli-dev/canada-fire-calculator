@@ -74,7 +74,9 @@ maximum sustainable annual spending.
 **Also modelled**: principal-residence sale (tax-free, e.g. downsizing at a chosen
 age), any number of investment properties — each sellable at its own age (gain
 taxed) or kept for **net rental income** (taxed as ordinary income, visible to the
-OAS clawback and GIS), **debts** (mortgage / car loan / other: the engine
+OAS clawback and GIS) — optionally leveraged with a **mortgage tied to that specific
+property**, discharged from the sale proceeds and with its interest (not principal)
+deductible against the rent, **debts** (mortgage / car loan / other: the engine
 back-solves each loan's implied rate and lets inflation erode the fixed nominal
 payments — payments join retirement spending until paid off, balances reduce net
 worth and the estate), **Barista-FIRE side income** over a chosen age range (with
@@ -185,7 +187,10 @@ explanations are clickable too. 33 entries in all three languages.
   linear approximation of the official tables; enter your annual savings **after
   tax and after debt payments** — the RRSP refund is not recycled automatically.
 - Debt payments are treated as fixed in nominal dollars (no refinancing or variable
-  rates); the interest rate is implied from balance / payment / years.
+  rates); the interest rate is implied from balance / payment / years. A mortgage
+  can be attached to a specific property instead of the general debt list — it's
+  then discharged from the sale proceeds and its interest (not principal) is
+  deductible against that property's rent, rather than continuing forever.
 - Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
   enhancement (post-2019 contributions — estimates lean conservative for younger
   users), long-term-care cost shocks.

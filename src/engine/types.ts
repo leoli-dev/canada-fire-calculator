@@ -80,12 +80,26 @@ export interface Debt {
   yearsRemaining: number
 }
 
+/** A mortgage tied to one specific property — same shape as Debt minus the
+ * kind tag. Amortizes the same way (implied rate, inflation-eroded nominal
+ * payments) but is discharged from sale proceeds when its property sells,
+ * instead of continuing forever. */
+export interface Mortgage {
+  balance: number
+  annualPayment: number
+  yearsRemaining: number
+}
+
 export interface PrincipalResidence {
   value: number
   /** real annual appreciation */
   appreciation: number
   /** sale is tax-free (principal residence exemption); null = never sell */
   sellAtAge: number | null
+  /** discharged from sale proceeds when the home sells; a plain cash-flow
+   * cost until then (mortgage interest on a principal residence isn't
+   * deductible, so there's no tax interaction, unlike a rental's mortgage) */
+  mortgage?: Mortgage
 }
 
 export interface InvestmentProperty {
@@ -100,6 +114,9 @@ export interface InvestmentProperty {
    * today's dollars). Taxed as ordinary income; stops when the property sells.
    */
   annualRent?: number
+  /** discharged from sale proceeds when the property sells; its interest
+   * portion is deductible against the rent (principal repayment is not) */
+  mortgage?: Mortgage
 }
 
 export interface Inputs {

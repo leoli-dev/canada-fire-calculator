@@ -264,7 +264,7 @@
     },
     "debt": {
       "title": "Debt amortization and inflation",
-      "body": "Mortgage and loan payments are contractually fixed in nominal dollars: the same paper amount every year. This calculator works in today’s purchasing power throughout, so the real burden of that same payment shrinks year after year — at 2% inflation, the final payment of a 25-year mortgage weighs only ~61% of today’s. That is the honest mechanism behind \"inflation pays your mortgage\"; ignoring it overstates debt pressure and pushes your FIRE age out. The engine back-solves the implied interest rate from (balance, annual payment, years remaining) and amortizes year by year; expressed in real dollars, retirement-phase payments add to the spending target and the outstanding balance is subtracted from net worth. Note the semantics of \"annual savings\": it is what you save after debt payments, so a loan paid off before FIRE affects the balance sheet, not retirement cash flow."
+      "body": "Mortgage and loan payments are contractually fixed in nominal dollars: the same paper amount every year. This calculator works in today’s purchasing power throughout, so the real burden of that same payment shrinks year after year — at 2% inflation, the final payment of a 25-year mortgage weighs only ~61% of today’s. That is the honest mechanism behind \"inflation pays your mortgage\"; ignoring it overstates debt pressure and pushes your FIRE age out. The engine back-solves the implied interest rate from (balance, annual payment, years remaining) and amortizes year by year; expressed in real dollars, retirement-phase payments add to the spending target and the outstanding balance is subtracted from net worth. Note the semantics of \"annual savings\": it is what you save after debt payments, so a loan paid off before FIRE affects the balance sheet, not retirement cash flow. A mortgage can also be attached directly to a specific property instead of this general list — the sale then automatically pays it off from the proceeds first, and while held, its interest (not principal) is deductible against that property's rental income, matching how leveraged rentals actually work. Enter each mortgage in one place only, not both."
     },
     "qclevies": {
       "title": "RAMQ premium + FSS contribution (Quebec retirees)",
@@ -365,5 +365,7 @@
   "meltdownCapLabel": "Meltdown ceiling",
   "meltdownCap_bracket1": "Lowest bracket (default, most conservative)",
   "meltdownCap_bracket2": "Second bracket",
-  "meltdownCap_oasClawback": "OAS clawback threshold"
+  "meltdownCap_oasClawback": "OAS clawback threshold",
+  "hasMortgage": "Has a linked mortgage",
+  "mortgageInterestNote": "This mortgage is discharged straight from the sale proceeds when the property sells; while held, its interest portion (not principal) is deductible against the rental income. The payment still counts toward the spending target — don't also enter this loan under \"Debts\" above."
 }

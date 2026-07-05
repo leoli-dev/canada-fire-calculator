@@ -264,7 +264,7 @@
     },
     "debt": {
       "title": "Amortissement des dettes et inflation",
-      "body": "Les versements hypothécaires et de prêts sont fixés contractuellement en dollars nominaux : le même montant papier chaque année. Ce calculateur travaille du début à la fin en pouvoir d’achat d’aujourd’hui, donc le fardeau réel d’un même versement rétrécit d’année en année — à 2 % d’inflation, le dernier versement d’une hypothèque de 25 ans ne pèse qu’environ 61 % d’aujourd’hui. C’est le mécanisme honnête derrière « l’inflation paie votre hypothèque » ; l’ignorer surestime la pression de la dette et repousse votre âge FIRE. Le moteur déduit le taux implicite de (solde, versement annuel, années restantes) et amortit année par année ; exprimés en dollars réels, les versements en phase de retraite s’ajoutent à la cible de dépenses et le solde restant est soustrait de la valeur nette. Notez la sémantique de « l’épargne annuelle » : c’est ce que vous épargnez après les versements — une dette remboursée avant FIRE touche le bilan, pas les flux de retraite."
+      "body": "Les versements hypothécaires et de prêts sont fixés contractuellement en dollars nominaux : le même montant papier chaque année. Ce calculateur travaille du début à la fin en pouvoir d’achat d’aujourd’hui, donc le fardeau réel d’un même versement rétrécit d’année en année — à 2 % d’inflation, le dernier versement d’une hypothèque de 25 ans ne pèse qu’environ 61 % d’aujourd’hui. C’est le mécanisme honnête derrière « l’inflation paie votre hypothèque » ; l’ignorer surestime la pression de la dette et repousse votre âge FIRE. Le moteur déduit le taux implicite de (solde, versement annuel, années restantes) et amortit année par année ; exprimés en dollars réels, les versements en phase de retraite s’ajoutent à la cible de dépenses et le solde restant est soustrait de la valeur nette. Notez la sémantique de « l’épargne annuelle » : c’est ce que vous épargnez après les versements — une dette remboursée avant FIRE touche le bilan, pas les flux de retraite. Une hypothèque peut aussi être rattachée directement à un immeuble précis plutôt qu’à cette liste générale — la vente la rembourse alors automatiquement en priorité sur le produit, et tant que l’immeuble est détenu, ses intérêts (pas le capital) sont déductibles du loyer de cet immeuble, comme dans un vrai montage locatif à effet de levier. Saisissez chaque hypothèque à un seul endroit, pas les deux."
     },
     "qclevies": {
       "title": "Prime RAMQ + cotisation au FSS (retraités québécois)",
@@ -365,5 +365,7 @@
   "meltdownCapLabel": "Plafond du meltdown",
   "meltdownCap_bracket1": "Palier le plus bas (par défaut, le plus prudent)",
   "meltdownCap_bracket2": "Deuxième palier",
-  "meltdownCap_oasClawback": "Seuil de récupération de la SV"
+  "meltdownCap_oasClawback": "Seuil de récupération de la SV",
+  "hasMortgage": "Hypothèque liée",
+  "mortgageInterestNote": "Cette hypothèque est remboursée directement sur le produit de la vente à la vente de l'immeuble; tant qu'il est détenu, la portion d'intérêt (pas le capital) est déductible du revenu locatif. Le versement compte toujours dans la cible de dépenses — ne saisissez pas aussi ce prêt dans « Dettes » ci-dessus."
 }
