@@ -68,9 +68,17 @@ export function incomeTax(
 
   const p = PROVINCIAL[province]
   const lowRate = p.brackets[0].rate
-  let provCredit = p.bpa * lowRate
+  let provBpa = p.bpa
+  if (p.bpaPhaseOut) {
+    // MB: to zero over $200k–$400k; YT mirrors the federal enhanced BPA
+    const { from, to, min } = p.bpaPhaseOut
+    const phase = Math.min(1, Math.max(0, (taxable - from) / (to - from)))
+    provBpa = p.bpa - (p.bpa - min) * phase
+  }
+  let provCredit = provBpa * lowRate
   if (senior) {
     const ap = PROV_AGE_PENSION[province]
+    provCredit += (ap.seniorSupplement ?? 0) * lowRate
     if (province === 'QC') {
       // combined age + retirement-income amount, family-income-tested at
       // 18.75%; applied per person on their income share (50/50 split)

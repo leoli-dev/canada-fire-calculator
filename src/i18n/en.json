@@ -344,5 +344,18 @@
   "debtLabel": "Debt balance",
   "netWorthLabel": "Net worth (after debt)",
   "debtPaymentCol": "Debt pmt",
-  "valDebtUnpayable": "Payment × years is less than the balance — this loan never amortizes; check the three numbers"
+  "valDebtUnpayable": "Payment × years is less than the balance — this loan never amortizes; check the three numbers",
+  "prov_ON": "Ontario",
+  "prov_QC": "Quebec",
+  "prov_BC": "British Columbia",
+  "prov_AB": "Alberta",
+  "prov_MB": "Manitoba",
+  "prov_SK": "Saskatchewan",
+  "prov_NS": "Nova Scotia",
+  "prov_NB": "New Brunswick",
+  "prov_PE": "Prince Edward Island",
+  "prov_NL": "Newfoundland and Labrador",
+  "prov_YT": "Yukon",
+  "prov_NT": "Northwest Territories",
+  "prov_NU": "Nunavut"
 }

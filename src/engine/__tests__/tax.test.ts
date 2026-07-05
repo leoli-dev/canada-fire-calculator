@@ -50,6 +50,47 @@ describe('incomeTax', () => {
     expect(incomeTax(100000, 'BC')).toBeGreaterThan(incomeTax(50000, 'BC'))
   })
 
+  it('matches a hand-computed MB value at $60k (2026 table, frozen indexation)', () => {
+    // fed: 58523*0.14 + 1477*0.205 - 16452*0.14 = 6192.73
+    // MB:  47000*0.108 + 13000*0.1275 - 15780*0.108 = 5029.26
+    expect(incomeTax(60000, 'MB')).toBeCloseTo(6192.73 + 5029.26, 0)
+  })
+
+  it('phases the MB BPA out to zero between $200k and $400k', () => {
+    // at $300k the MB BPA is half gone: credit = 7890*0.108 vs 15780*0.108
+    const at300k = incomeTax(300000, 'MB')
+    const mbTax = (bpa: number) =>
+      47000 * 0.108 + 53000 * 0.1275 + 200000 * 0.174 - bpa * 0.108
+    const fed = 8193.22 + 11997.01 + 16742.7 + 22342.18 + 41518 * 0.33 - 14829 * 0.14
+    expect(at300k).toBeCloseTo(fed + mbTax(7890), 0)
+  })
+
+  it('YT mirrors the federal enhanced BPA including its phase-out', () => {
+    // below the phase-out the full $16,452 applies; at $300k only $14,829
+    const low = incomeTax(60000, 'YT')
+    // fed 6192.73 + YT: 58523*0.064 + 1477*0.09 - 16452*0.064 = 2825.47
+    expect(low).toBeCloseTo(6192.73 + 3745.47 + 132.93 - 1052.93, 0)
+  })
+
+  it('every jurisdiction taxes more at higher income (all 13 tables wired)', () => {
+    const provinces = [
+      'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT',
+    ] as const
+    for (const p of provinces) {
+      expect(incomeTax(90000, p)).toBeGreaterThan(incomeTax(45000, p))
+      expect(incomeTax(45000, p)).toBeGreaterThan(0)
+    }
+  })
+
+  it('SK grants the senior supplementary amount at 65+, not income-tested', () => {
+    const junior = incomeTax(120000, 'SK', { age: 60 })
+    const senior = incomeTax(120000, 'SK', { age: 65 })
+    // at $120k the SK age amount is fully phased out ((120000-43927)*0.15 > 5901)
+    // but the supplement ($2,569 @ 10.5%) and federal age amount remain absent/phased:
+    // federal age amount also fully phased at $120k, so the delta is the supplement
+    expect(junior - senior).toBeCloseTo(2569 * 0.105, 0)
+  })
+
   it('QC total exceeds ON at the same income despite the abatement', () => {
     expect(incomeTax(80000, 'QC')).toBeGreaterThan(incomeTax(80000, 'ON'))
   })

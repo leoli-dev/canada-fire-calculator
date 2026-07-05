@@ -15,6 +15,8 @@ export interface TaxTable {
   bpa: number
   /** BPA floor for high incomes (federal enhanced-BPA phase-out) */
   bpaMin?: number
+  /** provincial BPA phase-out: linear from `from` to `to`, down to `min` */
+  bpaPhaseOut?: { from: number; to: number; min: number }
 }
 
 export const FEDERAL: TaxTable = {
@@ -76,6 +78,103 @@ export const PROVINCIAL: Record<Province, TaxTable> = {
       { upTo: Infinity, rate: 0.15 },
     ],
   },
+  MB: {
+    // indexation frozen at 2024 levels through 2026; BPA phases out to zero
+    // over $200k–$400k net income (2025+)
+    bpa: 15780,
+    bpaPhaseOut: { from: 200000, to: 400000, min: 0 },
+    brackets: [
+      { upTo: 47000, rate: 0.108 },
+      { upTo: 100000, rate: 0.1275 },
+      { upTo: Infinity, rate: 0.174 },
+    ],
+  },
+  SK: {
+    // Affordability Act adds $500/yr to the BPA (2025–2028) on top of indexing
+    bpa: 20381,
+    brackets: [
+      { upTo: 54532, rate: 0.105 },
+      { upTo: 155805, rate: 0.125 },
+      { upTo: Infinity, rate: 0.145 },
+    ],
+  },
+  NS: {
+    // 2025 reform: flat BPA (the income-tested supplement was eliminated)
+    bpa: 11932,
+    brackets: [
+      { upTo: 30995, rate: 0.0879 },
+      { upTo: 61991, rate: 0.1495 },
+      { upTo: 97417, rate: 0.1667 },
+      { upTo: 157124, rate: 0.175 },
+      { upTo: Infinity, rate: 0.21 },
+    ],
+  },
+  NB: {
+    bpa: 13664,
+    brackets: [
+      { upTo: 52333, rate: 0.094 },
+      { upTo: 104666, rate: 0.14 },
+      { upTo: 193861, rate: 0.16 },
+      { upTo: Infinity, rate: 0.195 },
+    ],
+  },
+  PE: {
+    // surtax abolished 2024; the 20% bracket over $200k took effect Jan 2026
+    bpa: 15000,
+    brackets: [
+      { upTo: 33928, rate: 0.095 },
+      { upTo: 65820, rate: 0.1347 },
+      { upTo: 106890, rate: 0.166 },
+      { upTo: 142250, rate: 0.1762 },
+      { upTo: 200000, rate: 0.19 },
+      { upTo: Infinity, rate: 0.2 },
+    ],
+  },
+  NL: {
+    // 2026 budget raises the BPA $11,188 → $15,000 mid-year; $13,094 is the
+    // prorated 2026 figure (TaxTips) — use $15,000 indexed from 2027
+    bpa: 13094,
+    brackets: [
+      { upTo: 44678, rate: 0.087 },
+      { upTo: 89354, rate: 0.145 },
+      { upTo: 159528, rate: 0.158 },
+      { upTo: 223340, rate: 0.178 },
+      { upTo: 285319, rate: 0.198 },
+      { upTo: 570638, rate: 0.208 },
+      { upTo: 1141275, rate: 0.213 },
+      { upTo: Infinity, rate: 0.218 },
+    ],
+  },
+  YT: {
+    // mirrors the federal enhanced BPA, including its phase-out
+    bpa: 16452,
+    bpaPhaseOut: { from: 181440, to: 258482, min: 14829 },
+    brackets: [
+      { upTo: 58523, rate: 0.064 },
+      { upTo: 117045, rate: 0.09 },
+      { upTo: 181440, rate: 0.109 },
+      { upTo: 500000, rate: 0.128 }, // not indexed (tied to small-business limit)
+      { upTo: Infinity, rate: 0.15 },
+    ],
+  },
+  NT: {
+    bpa: 18198,
+    brackets: [
+      { upTo: 53003, rate: 0.059 },
+      { upTo: 106009, rate: 0.086 },
+      { upTo: 172346, rate: 0.122 },
+      { upTo: Infinity, rate: 0.1405 },
+    ],
+  },
+  NU: {
+    bpa: 19659,
+    brackets: [
+      { upTo: 55801, rate: 0.04 },
+      { upTo: 111602, rate: 0.07 },
+      { upTo: 181439, rate: 0.09 },
+      { upTo: Infinity, rate: 0.115 },
+    ],
+  },
 }
 
 // 66.67% proposal was formally cancelled 2025-03; never took effect
@@ -104,7 +203,14 @@ export const FED_PENSION_AMOUNT = 2000
 /** Provincial age & pension amounts (credited at the lowest provincial rate). */
 export const PROV_AGE_PENSION: Record<
   Province,
-  { ageMax: number; ageThreshold: number; ageRate: number; pension: number }
+  {
+    ageMax: number
+    ageThreshold: number
+    ageRate: number
+    pension: number
+    /** SK senior supplementary amount — 65+, not income-tested */
+    seniorSupplement?: number
+  }
 > = {
   ON: { ageMax: 6342, ageThreshold: 47210, ageRate: 0.15, pension: 1796 },
   BC: { ageMax: 5927, ageThreshold: 44119, ageRate: 0.15, pension: 1000 },
@@ -113,4 +219,13 @@ export const PROV_AGE_PENSION: Record<
   // reduced at 18.75% of family net income above the threshold; we apply it
   // per person on their income share, which matches the engine's 50/50 split.
   QC: { ageMax: 3986, ageThreshold: 42955, ageRate: 0.1875, pension: 3541 },
+  MB: { ageMax: 3728, ageThreshold: 27749, ageRate: 0.15, pension: 1000 }, // frozen
+  SK: { ageMax: 5901, ageThreshold: 43927, ageRate: 0.15, pension: 1000, seniorSupplement: 2569 },
+  NS: { ageMax: 5826, ageThreshold: 30828, ageRate: 0.15, pension: 1173 },
+  NB: { ageMax: 6158, ageThreshold: 45844, ageRate: 0.15, pension: 1000 },
+  PE: { ageMax: 6510, ageThreshold: 36600, ageRate: 0.15, pension: 1000 },
+  NL: { ageMax: 7142, ageThreshold: 39138, ageRate: 0.15, pension: 1000 },
+  YT: { ageMax: 9208, ageThreshold: 46432, ageRate: 0.15, pension: 2000 }, // mirrors federal
+  NT: { ageMax: 8902, ageThreshold: 46432, ageRate: 0.15, pension: 1000 },
+  NU: { ageMax: 12550, ageThreshold: 46432, ageRate: 0.15, pension: 2000 },
 }

@@ -344,5 +344,18 @@
   "debtLabel": "Solde des dettes",
   "netWorthLabel": "Valeur nette (après dettes)",
   "debtPaymentCol": "Versement",
-  "valDebtUnpayable": "Versement × années est inférieur au solde — ce prêt ne s’amortit jamais ; vérifiez les trois nombres"
+  "valDebtUnpayable": "Versement × années est inférieur au solde — ce prêt ne s’amortit jamais ; vérifiez les trois nombres",
+  "prov_ON": "Ontario",
+  "prov_QC": "Québec",
+  "prov_BC": "Colombie-Britannique",
+  "prov_AB": "Alberta",
+  "prov_MB": "Manitoba",
+  "prov_SK": "Saskatchewan",
+  "prov_NS": "Nouvelle-Écosse",
+  "prov_NB": "Nouveau-Brunswick",
+  "prov_PE": "Île-du-Prince-Édouard",
+  "prov_NL": "Terre-Neuve-et-Labrador",
+  "prov_YT": "Yukon",
+  "prov_NT": "Territoires du Nord-Ouest",
+  "prov_NU": "Nunavut"
 }

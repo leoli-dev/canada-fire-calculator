@@ -22,7 +22,9 @@ import { useCad } from '../format'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { Jargon } from './Jargon'
 
-const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB']
+const PROVINCES: Province[] = [
+  'ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU',
+]
 const ACCOUNTS: AccountType[] = ['tfsa', 'rrsp', 'nonReg']
 
 function Num(props: {
@@ -116,7 +118,7 @@ export function InputForm() {
             onChange={(e) => set({ province: e.target.value as Province })}
           >
             {PROVINCES.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{p} — {t(`prov_${p}`)}</option>
             ))}
           </select>
         </label>

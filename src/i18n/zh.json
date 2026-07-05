@@ -344,5 +344,18 @@
   "debtLabel": "负债余额",
   "netWorthLabel": "净资产（扣负债）",
   "debtPaymentCol": "还贷",
-  "valDebtUnpayable": "供款 × 年数 小于余额，永远还不完——请检查三个数字"
+  "valDebtUnpayable": "供款 × 年数 小于余额，永远还不完——请检查三个数字",
+  "prov_ON": "安大略",
+  "prov_QC": "魁北克",
+  "prov_BC": "不列颠哥伦比亚",
+  "prov_AB": "阿尔伯塔",
+  "prov_MB": "曼尼托巴",
+  "prov_SK": "萨斯喀彻温",
+  "prov_NS": "新斯科舍",
+  "prov_NB": "新不伦瑞克",
+  "prov_PE": "爱德华王子岛",
+  "prov_NL": "纽芬兰与拉布拉多",
+  "prov_YT": "育空",
+  "prov_NT": "西北地区",
+  "prov_NU": "努纳武特"
 }

@@ -1,4 +1,6 @@
-export type Province = 'AB' | 'BC' | 'ON' | 'QC'
+export type Province =
+  | 'AB' | 'BC' | 'MB' | 'NB' | 'NL' | 'NS' | 'NT' | 'NU'
+  | 'ON' | 'PE' | 'QC' | 'SK' | 'YT'
 
 export type AccountType = 'tfsa' | 'rrsp' | 'nonReg'
 export const ACCOUNT_TYPES: AccountType[] = ['tfsa', 'rrsp', 'nonReg']
