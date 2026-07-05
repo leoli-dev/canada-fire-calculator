@@ -93,6 +93,7 @@
   "taxTotalTaxable": "应税收入合计（家庭）",
   "taxSrcNonReg": "非注册账户（已实现利得+分配收益）",
   "taxSrcProperty": "房产（租金+出售利得）",
+  "taxTaxablePrefix": "应税",
   "strategyTitle": "取钱顺序对比",
   "stratOutcome": "结果",
   "stratOk": "可撑到底",

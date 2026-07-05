@@ -93,6 +93,7 @@
   "taxTotalTaxable": "Total taxable income (household)",
   "taxSrcNonReg": "Non-registered (realized gains + distributions)",
   "taxSrcProperty": "Real estate (rent + sale gains)",
+  "taxTaxablePrefix": "Taxable",
   "strategyTitle": "Withdrawal-order comparison",
   "stratOutcome": "Outcome",
   "stratOk": "Lasts",

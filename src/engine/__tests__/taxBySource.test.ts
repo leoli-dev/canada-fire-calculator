@@ -132,3 +132,67 @@ describe('taxBySource', () => {
     expect(sumSources(at66.taxBySource)).toBeCloseTo(at66.tax, 4)
   })
 })
+
+describe('taxableBySource', () => {
+  it('sums to household total taxable income every year, across strategies and provinces, with rent/debt/Barista/properties all active', () => {
+    for (const strategy of STRATEGIES) {
+      for (const province of PROVINCES) {
+        const r = runProjection({
+          ...base,
+          strategy,
+          province,
+          nonRegDistributionYield: 0.02,
+          extraIncome: { annual: 15000, fromAge: 45, toAge: 60 },
+          debts: [{ kind: 'mortgage', balance: 100000, annualPayment: 12000, yearsRemaining: 15 }],
+          investmentProperties: [
+            { value: 400000, acb: 250000, appreciation: 0.01, sellAtAge: 60, annualRent: 18000 },
+          ],
+          partner: {
+            currentAge: 35,
+            cppStartAge: 65,
+            cppAnnualAt65: 6000,
+            oasStartAge: 65,
+            oasAnnualAt65: 8700,
+          },
+        })
+        const persons = 2
+        for (const row of r.rows) {
+          if (row.phase === 'accumulation') continue
+          expect(sumSources(row.taxableBySource)).toBeCloseTo(row.taxablePerPerson * persons, 4)
+        }
+      }
+    }
+  })
+
+  it('each source\'s tax divided by its taxable income matches the year\'s average rate', () => {
+    const r = runProjection({
+      ...base,
+      strategy: 'meltdownPaced' as const,
+      extraIncome: { annual: 15000, fromAge: 45, toAge: 60 },
+    })
+    const row = r.rows.find((x) => x.age === 50)!
+    const totalTaxable = sumSources(row.taxableBySource)
+    const avgRate = totalTaxable > 0 ? row.tax / totalTaxable : 0
+    expect(row.taxBySource.rrsp).toBeCloseTo(avgRate * row.taxableBySource.rrsp, 4)
+    expect(row.taxBySource.extraIncome).toBeCloseTo(avgRate * row.taxableBySource.extraIncome, 4)
+  })
+
+  it('accumulation-phase taxable income attributes cpp/oas to their gross amounts', () => {
+    const late = {
+      ...base,
+      currentAge: 60,
+      fireAge: 68,
+      lifeExpectancy: 80,
+      cppStartAge: 65,
+      oasStartAge: 66,
+    }
+    const r = runProjection(late)
+    const at66 = r.rows.find((x) => x.age === 66)!
+    expect(at66.taxableBySource.cpp).toBeCloseTo(at66.cpp, 4)
+    expect(at66.taxableBySource.oas).toBeCloseTo(at66.oas, 4)
+    expect(sumSources(at66.taxableBySource)).toBeCloseTo(
+      at66.taxableBySource.nonReg + at66.taxableBySource.property + at66.cpp + at66.oas,
+      4,
+    )
+  })
+})

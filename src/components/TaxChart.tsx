@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   ComposedChart,
   Legend,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -23,12 +22,46 @@ const COLORS = {
   extraIncome: '#7cb342',
 }
 
+const SOURCE_KEYS = ['rrsp', 'nonReg', 'cpp', 'oas', 'property', 'extraIncome'] as const
+type SourceKey = (typeof SOURCE_KEYS)[number]
+
+interface TaxChartRow {
+  age: number
+  total: number
+  totalTaxable: number
+  avgRate: number
+  marginalRate: number
+  rrsp: number
+  nonReg: number
+  cpp: number
+  oas: number
+  property: number
+  extraIncome: number
+  taxableRrsp: number
+  taxableNonReg: number
+  taxableCpp: number
+  taxableOas: number
+  taxableProperty: number
+  taxableExtraIncome: number
+}
+
+const TAXABLE_KEY: Record<SourceKey, keyof TaxChartRow> = {
+  rrsp: 'taxableRrsp',
+  nonReg: 'taxableNonReg',
+  cpp: 'taxableCpp',
+  oas: 'taxableOas',
+  property: 'taxableProperty',
+  extraIncome: 'taxableExtraIncome',
+}
+
 /**
  * Breaks the tax line from IncomeChart down by taxable source. Canada taxes
  * all income together on one bracket ladder, so there is no statutory
  * per-source tax; each slice is that source's share of the total taxable
  * income, scaled against the year's actual tax — the slices always sum to
- * the same total shown as the dashed line above.
+ * the same total shown as the dashed line above. The tooltip pairs each
+ * slice with the taxable income it came from, so it can be cross-referenced
+ * against the gross-income breakdown in the chart above.
  */
 export function TaxChart(props: {
   result: ProjectionResult
@@ -40,10 +73,11 @@ export function TaxChart(props: {
   const cadTick = useCadCompact()
   const k = props.scale ?? (() => 1)
   const persons = props.inputs.partner ? 2 : 1
-  const data = props.result.rows
+  const data: TaxChartRow[] = props.result.rows
     .filter((r) => r.phase !== 'accumulation')
     .map((r) => {
       const s = r.taxBySource
+      const ti = r.taxableBySource
       const totalTaxable = r.taxablePerPerson * persons
       return {
         age: r.age,
@@ -53,25 +87,60 @@ export function TaxChart(props: {
         oas: Math.round(s.oas * k(r.age)),
         property: Math.round(s.property * k(r.age)),
         extraIncome: Math.round(s.extraIncome * k(r.age)),
+        taxableRrsp: Math.round(ti.rrsp * k(r.age)),
+        taxableNonReg: Math.round(ti.nonReg * k(r.age)),
+        taxableCpp: Math.round(ti.cpp * k(r.age)),
+        taxableOas: Math.round(ti.oas * k(r.age)),
+        taxableProperty: Math.round(ti.property * k(r.age)),
+        taxableExtraIncome: Math.round(ti.extraIncome * k(r.age)),
         total: Math.round(r.tax * k(r.age)),
         // household total (not per-person) so it's directly comparable to
-        // the household tax total above it in the same tooltip
+        // the household tax total in the same tooltip
         totalTaxable: Math.round(totalTaxable * k(r.age)),
         avgRate: totalTaxable > 0 ? r.tax / totalTaxable : 0,
         marginalRate: marginalRate(r.taxablePerPerson, props.inputs.province),
       }
     })
 
-  const hasProperty = data.some((d) => d.property > 0)
-  const hasExtra = data.some((d) => d.extraIncome > 0)
+  const hasProperty = data.some((d) => d.property > 0 || d.taxableProperty > 0)
+  const hasExtra = data.some((d) => d.extraIncome > 0 || d.taxableExtraIncome > 0)
 
   if (data.length === 0) return null
 
-  const avgRateLabel = t('taxAvgRate')
-  const marginalRateLabel = t('colMarginal')
-  const formatter = (v: number, name: string) => {
-    if (name === avgRateLabel || name === marginalRateLabel) return `${(v * 100).toFixed(1)}%`
-    return cad(v)
+  const sourceLabels: Record<SourceKey, string> = {
+    rrsp: t('rrsp'),
+    nonReg: t('taxSrcNonReg'),
+    cpp: t('cppLabel'),
+    oas: t('oasLabel'),
+    property: t('taxSrcProperty'),
+    extraIncome: t('extraIncomeLabel'),
+  }
+  const visibleSources: SourceKey[] = [
+    'rrsp', 'nonReg', 'cpp', 'oas',
+    ...(hasProperty ? (['property'] as const) : []),
+    ...(hasExtra ? (['extraIncome'] as const) : []),
+  ]
+
+  function ChartTooltip(tprops: { active?: boolean; payload?: { payload?: TaxChartRow }[]; label?: number }) {
+    const d = tprops.payload?.[0]?.payload
+    if (!tprops.active || !d) return null
+    return (
+      <div style={{
+        margin: 0, padding: 10, background: '#fff',
+        border: '1px solid #ccc', whiteSpace: 'nowrap', fontSize: 13,
+      }}>
+        <p style={{ margin: 0, paddingBottom: 4 }}>{tprops.label}</p>
+        <p style={{ margin: 0, paddingBottom: 4 }}>{t('total')}：{cad(d.total)}</p>
+        {visibleSources.map((key) => (
+          <p key={key} style={{ margin: 0, paddingBottom: 4, color: COLORS[key] }}>
+            {sourceLabels[key]}：{t('taxTaxablePrefix')} {cad(d[TAXABLE_KEY[key]])} → {t('taxLabel')} {cad(d[key])}
+          </p>
+        ))}
+        <p style={{ margin: 0, paddingBottom: 4 }}>{t('taxTotalTaxable')}：{cad(d.totalTaxable)}</p>
+        <p style={{ margin: 0, paddingBottom: 4 }}>{t('taxAvgRate')}：{(d.avgRate * 100).toFixed(1)}%</p>
+        <p style={{ margin: 0 }}>{t('colMarginal')}：{(d.marginalRate * 100).toFixed(1)}%</p>
+      </div>
+    )
   }
 
   return (
@@ -84,14 +153,8 @@ export function TaxChart(props: {
             domain={[data[0].age, data[data.length - 1].age]}
             tickCount={12} />
           <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
-          {/* hidden axis: keeps taxable income (much larger than any tax
-              slice) and the two rate lines from stretching the visible
-              tax-dollar axis above */}
-          <YAxis yAxisId="aux" hide domain={['auto', 'auto']} />
-          <Tooltip formatter={formatter} />
+          <Tooltip content={ChartTooltip} />
           <Legend />
-          <Line dataKey="total" name={t('total')} stroke="none" dot={false}
-            activeDot={false} legendType="none" />
           <Area dataKey="rrsp" stackId="1" name={t('rrsp')} stroke={COLORS.rrsp} fill={COLORS.rrsp} fillOpacity={0.55} />
           <Area dataKey="nonReg" stackId="1" name={t('taxSrcNonReg')} stroke={COLORS.nonReg} fill={COLORS.nonReg} fillOpacity={0.55} />
           <Area dataKey="cpp" stackId="1" name={t('cppLabel')} stroke={COLORS.cpp} fill={COLORS.cpp} fillOpacity={0.55} />
@@ -102,12 +165,6 @@ export function TaxChart(props: {
           {hasExtra && (
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
           )}
-          <Line yAxisId="aux" dataKey="totalTaxable" name={t('taxTotalTaxable')} stroke="none"
-            dot={false} activeDot={false} legendType="none" />
-          <Line yAxisId="aux" dataKey="avgRate" name={avgRateLabel} stroke="none" dot={false}
-            activeDot={false} legendType="none" />
-          <Line yAxisId="aux" dataKey="marginalRate" name={marginalRateLabel} stroke="none"
-            dot={false} activeDot={false} legendType="none" />
         </ComposedChart>
       </ResponsiveContainer>
       <p className="hint"><Jargon text={t('taxChartNote')} /></p>

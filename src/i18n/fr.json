@@ -93,6 +93,7 @@
   "taxTotalTaxable": "Revenu imposable total (ménage)",
   "taxSrcNonReg": "Non enregistré (gains réalisés + distributions)",
   "taxSrcProperty": "Immobilier (loyer + gains de vente)",
+  "taxTaxablePrefix": "Imposable",
   "strategyTitle": "Comparaison des ordres de décaissement",
   "stratOutcome": "Résultat",
   "stratOk": "Dure",

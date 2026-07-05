@@ -227,6 +227,8 @@ export interface YearRow {
   taxablePerPerson: number
   /** this year's tax, allocated proportionally across taxable components */
   taxBySource: TaxBySource
+  /** this year's taxable income (household total), split by component */
+  taxableBySource: TaxBySource
 }
 
 export interface ProjectionResult {

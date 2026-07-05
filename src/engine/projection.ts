@@ -229,6 +229,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let saleGainsTaxable = 0
     let taxablePerPerson = 0
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0 }
+    let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0 }
     const yearIdx = age - inputs.currentAge
 
     // principal residence sale: tax-free; any linked mortgage is discharged
@@ -359,6 +360,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         rrsp: 0, nonReg: dragTax, cpp: cppTax, oas: benefitTax - cppTax,
         property: rentTax, extraIncome: 0,
       }
+      taxableBySource = {
+        rrsp: 0, nonReg: dist, cpp, oas: oasGross,
+        property: rent - rentMortgageInterest, extraIncome: 0,
+      }
     } else {
       extraTaxable += dist
 
@@ -426,6 +431,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         property: taxShare(propertyTaxable),
         extraIncome: taxShare(extraIncome),
       }
+      taxableBySource = {
+        rrsp: withdrawals.rrsp,
+        nonReg: dist + nonRegGainTaxable,
+        cpp,
+        oas,
+        property: propertyTaxable,
+        extraIncome,
+      }
 
       if (netCash < spendTarget - 0.01) {
         shortfall = spendTarget - netCash
@@ -465,7 +478,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
       debtPayment, debtBalance,
-      taxablePerPerson, taxBySource,
+      taxablePerPerson, taxBySource, taxableBySource,
     })
   }
 
