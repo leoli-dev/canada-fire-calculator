@@ -43,11 +43,14 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
   }
 
   const k = props.scale ?? (() => 1)
-  const data = mc?.bands.map((b) => ({
+  const data = mc?.bands.map((b, i) => ({
     age: b.age,
     p10: Math.round(b.p10 * k(b.age)),
     band: Math.round((b.p90 - b.p10) * k(b.age)),
     p50: Math.round(b.p50 * k(b.age)),
+    worst: mc.failures.worstTrajectory
+      ? Math.round(mc.failures.worstTrajectory[i].total * k(b.age))
+      : undefined,
   }))
 
   return (
@@ -109,9 +112,20 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
                 }
               />
               <ReferenceLine x={props.inputs.fireAge} stroke="#b3541e" strokeDasharray="4 4" />
+              {mc.failures.earliestDepletedAge != null && (
+                <ReferenceLine
+                  x={mc.failures.earliestDepletedAge}
+                  stroke="#c0392b"
+                  strokeDasharray="2 3"
+                  label={{ value: t('mcWorstAgeLabel', { age: mc.failures.earliestDepletedAge }), position: 'insideTopRight', fill: '#c0392b', fontSize: 11 }}
+                />
+              )}
               <Area dataKey="p10" stackId="band" stroke="none" fill="transparent" name="p10" />
               <Area dataKey="band" stackId="band" stroke="none" fill="#7da2c9" fillOpacity={0.35} name={t('mcBand')} />
               <Line dataKey="p50" stroke="#1f4e79" strokeWidth={2} dot={false} name={t('mcMedian')} />
+              {data?.some((d) => d.worst !== undefined) && (
+                <Line dataKey="worst" stroke="#c0392b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name={t('mcWorst')} connectNulls />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
           <p className="hint"><Jargon text={t('mcNote')} /></p>

@@ -5,6 +5,7 @@ import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
 import { useStore } from './store'
 import { InputForm } from './components/InputForm'
+import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
 import { YearTable } from './components/YearTable'
@@ -74,6 +75,7 @@ export default function App() {
         </aside>
         <section>
           <ResultsPanel inputs={inputs} result={result} />
+          <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}

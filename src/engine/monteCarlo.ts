@@ -11,6 +11,8 @@ export interface FailureProfile {
   avgEarlyReturnFailed: number | null
   /** same, successful runs — the gap is sequence-of-returns risk made visible */
   avgEarlyReturnSuccess: number | null
+  /** net-worth path of the single run that depleted earliest, for charting */
+  worstTrajectory: { age: number; total: number }[] | null
 }
 
 export interface MonteCarloResult {
@@ -49,6 +51,8 @@ export function runMonteCarlo(
   const failDepletedAges: number[] = []
   const earlyFailed: number[] = []
   const earlySuccess: number[] = []
+  let worstDepletedAge = Infinity
+  let worstTrajectory: number[] | null = null
   for (let t = 0; t < trials; t++) {
     let earlySum = 0
     let earlyN = 0
@@ -67,18 +71,23 @@ export function runMonteCarlo(
       return ret
     })
     const earlyAvg = earlyN > 0 ? earlySum / earlyN : 0
+    // net worth per year, consistent with the deterministic line: debt subtracted
+    const trialTotals = r.rows.map(
+      (row) => row.balances.tfsa + row.balances.rrsp + row.balances.nonReg +
+        row.propertyValue - row.debtBalance,
+    )
     if (r.success) {
       successes++
       earlySuccess.push(earlyAvg)
     } else {
       failDepletedAges.push(r.depletedAge!)
       earlyFailed.push(earlyAvg)
+      if (r.depletedAge! < worstDepletedAge) {
+        worstDepletedAge = r.depletedAge!
+        worstTrajectory = trialTotals
+      }
     }
-    r.rows.forEach((row, i) => {
-      // net worth, consistent with the deterministic line: debt subtracted
-      const total =
-        row.balances.tfsa + row.balances.rrsp + row.balances.nonReg +
-        row.propertyValue - row.debtBalance
+    trialTotals.forEach((total, i) => {
       ;(totalsByYear[i] ??= []).push(total)
     })
   }
@@ -98,6 +107,7 @@ export function runMonteCarlo(
     medianDepletedAge: failDepletedAges[Math.floor(failDepletedAges.length / 2)] ?? null,
     avgEarlyReturnFailed: mean(earlyFailed),
     avgEarlyReturnSuccess: mean(earlySuccess),
+    worstTrajectory: worstTrajectory && ages.map((age, i) => ({ age, total: worstTrajectory![i] })),
   }
   return { trials, successRate: successes / trials, bands, failures }
 }
