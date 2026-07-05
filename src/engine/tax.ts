@@ -7,6 +7,8 @@ import {
   PROV_AGE_PENSION,
   PROVINCIAL,
   QC_ABATEMENT,
+  QC_FSS,
+  QC_RAMQ,
   type Bracket,
 } from './taxData'
 import type { Province } from './types'
@@ -102,6 +104,9 @@ export function incomeTax(
       Math.max(0, prov - ON_SURTAX.t2) * ON_SURTAX.r2
     prov += ontarioHealthPremium(taxable)
   }
+  if (province === 'QC') {
+    prov += qcFssContribution(taxable) + qcRamqPremium(taxable)
+  }
   return fed + prov
 }
 
@@ -113,6 +118,22 @@ function ontarioHealthPremium(income: number): number {
     }
   }
   return premium
+}
+
+/** Quebec Fonds des services de santé contribution — see taxData.ts. */
+export function qcFssContribution(income: number): number {
+  const { t1, t2, cap1, cap2 } = QC_FSS
+  if (income <= t1) return 0
+  if (income <= t2) return Math.min(cap1, (income - t1) * 0.01)
+  return Math.min(cap2, cap1 + (income - t2) * 0.01)
+}
+
+/** Quebec RAMQ prescription-drug-insurance premium — see taxData.ts. */
+export function qcRamqPremium(income: number): number {
+  const { threshold, band1, rate1, rate2, max } = QC_RAMQ
+  const excess = Math.max(0, income - threshold)
+  if (excess <= band1) return excess * rate1
+  return Math.min(max, band1 * rate1 + (excess - band1) * rate2)
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */

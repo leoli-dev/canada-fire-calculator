@@ -224,7 +224,7 @@
     },
     "marginalrate": {
       "title": "Marginal tax rate",
-      "body": "The rate on your next dollar of income - not the average on all of it. Canada's brackets are progressive: only the slice above each threshold pays that bracket's rate. Planning is largely about controlling the marginal rate - the meltdown keeps RRSP draws in the lowest bracket, while the clawback acts as a hidden extra 15% marginal rate at higher incomes. Ontario residents also face the surtax and health premium on top (see the entry)."
+      "body": "The rate on your next dollar of income - not the average on all of it. Canada's brackets are progressive: only the slice above each threshold pays that bracket's rate. Planning is largely about controlling the marginal rate - the meltdown keeps RRSP draws in the lowest bracket, while the clawback acts as a hidden extra 15% marginal rate at higher incomes. Ontario residents also face the surtax and health premium on top (see the entry); Quebec residents face the RAMQ premium and FSS contribution (see the entry)."
     },
     "correlation": {
       "title": "Return correlation",
@@ -265,6 +265,10 @@
     "debt": {
       "title": "Debt amortization and inflation",
       "body": "Mortgage and loan payments are contractually fixed in nominal dollars: the same paper amount every year. This calculator works in today’s purchasing power throughout, so the real burden of that same payment shrinks year after year — at 2% inflation, the final payment of a 25-year mortgage weighs only ~61% of today’s. That is the honest mechanism behind \"inflation pays your mortgage\"; ignoring it overstates debt pressure and pushes your FIRE age out. The engine back-solves the implied interest rate from (balance, annual payment, years remaining) and amortizes year by year; expressed in real dollars, retirement-phase payments add to the spending target and the outstanding balance is subtracted from net worth. Note the semantics of \"annual savings\": it is what you save after debt payments, so a loan paid off before FIRE affects the balance sheet, not retirement cash flow."
+    },
+    "qclevies": {
+      "title": "RAMQ premium + FSS contribution (Quebec retirees)",
+      "body": "Two easily-missed costs for Quebec retirees, settled on the tax return: (1) the RAMQ prescription-drug-insurance premium — anyone without private drug coverage (the common case once you leave an employer, which is most FIRE'd retirees) defaults onto the public plan and pays for it based on reported income, up to about $770/person/year in 2026; (2) the FSS (Fonds des services de santé) contribution — levied on retirement, investment and capital-gains income (OAS excluded), 1% of the amount over roughly $18,500 up to a $150 cap, then another 1% past roughly $64,355 up to a $1,000 cap. Both are per person and settle in one lump sum at tax time; the calculator applies them automatically for QC residents. Assumption: no private drug plan after retirement (true for most FIRE'd retirees who lose employer benefits) — if you keep private coverage, your actual RAMQ premium is zero."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

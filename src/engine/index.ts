@@ -1,5 +1,5 @@
 export * from './types'
-export { incomeTax, marginalRate } from './tax'
+export { incomeTax, marginalRate, qcFssContribution, qcRamqPremium } from './tax'
 export {
   cppAnnual,
   oasAnnual,

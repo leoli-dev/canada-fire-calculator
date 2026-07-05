@@ -42,12 +42,13 @@ number in the UI comes from a deterministic, unit-tested year-by-year simulation
 **The tax engine** applies real federal + provincial marginal brackets (all 13
 provinces and territories, 2026 figures, data-driven and updated yearly), the basic
 personal amounts (with the federal, Manitoba and Yukon high-income phase-outs),
-Quebec's federal abatement, Ontario's surtax and health premium, the age amount and
-pension income credit from 65 (including Saskatchewan's senior supplement), 50%
-capital-gains inclusion tracked against your ACB, annual tax drag on non-registered
-distributions, per-person OAS clawback (75+ rates included), GIS for
-low-taxable-income retirees (with the employment-income exemption), and — for
-couples — income splitting across two returns.
+Quebec's federal abatement, Ontario's surtax and health premium, Quebec's RAMQ
+prescription-drug premium and FSS contribution, the age amount and pension income
+credit from 65 (including Saskatchewan's senior supplement), 50% capital-gains
+inclusion tracked against your ACB, annual tax drag on non-registered distributions,
+per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees
+(with the employment-income exemption), and — for couples — income splitting
+across two returns.
 
 **Withdrawal strategies**, compared side by side with your own numbers:
 
@@ -157,7 +158,7 @@ market in the first five years after FIRE — sequence-of-returns risk).
 
 **The glossary drawer** — every underlined term on the page (RRSP, ACB, meltdown,
 clawback, marginal rate, …) opens a plain-language explanation; terms inside
-explanations are clickable too. 32 entries in all three languages.
+explanations are clickable too. 33 entries in all three languages.
 
 ![Glossary](docs/screenshots/glossary-drawer.png)
 

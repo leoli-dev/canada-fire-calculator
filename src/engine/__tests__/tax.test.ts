@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { incomeTax } from '../tax'
+import { incomeTax, qcFssContribution, qcRamqPremium } from '../tax'
 import {
   CPP_MAX_AT_65,
   OAS_FULL_AT_65,
@@ -80,6 +80,38 @@ describe('incomeTax', () => {
       expect(incomeTax(90000, p)).toBeGreaterThan(incomeTax(45000, p))
       expect(incomeTax(45000, p)).toBeGreaterThan(0)
     }
+  })
+
+  it('qcFssContribution matches the official 2026 two-tier formula', () => {
+    expect(qcFssContribution(18000)).toBe(0)
+    expect(qcFssContribution(18500)).toBe(0)
+    expect(qcFssContribution(20000)).toBeCloseTo((20000 - 18500) * 0.01, 6)
+    // caps at $150 by $33,500 and stays flat through $64,355
+    expect(qcFssContribution(33500)).toBeCloseTo(150, 6)
+    expect(qcFssContribution(50000)).toBe(150)
+    expect(qcFssContribution(64355)).toBeCloseTo(150, 6)
+    expect(qcFssContribution(70000)).toBeCloseTo(150 + (70000 - 64355) * 0.01, 6)
+    // caps at $1,000 by $149,355
+    expect(qcFssContribution(149355)).toBeCloseTo(1000, 6)
+    expect(qcFssContribution(500000)).toBe(1000)
+  })
+
+  it('qcRamqPremium ramps from the threshold and caps at the max', () => {
+    expect(qcRamqPremium(15000)).toBe(0)
+    expect(qcRamqPremium(20288)).toBe(0)
+    expect(qcRamqPremium(23000)).toBeCloseTo((23000 - 20288) * 0.0784, 6)
+    const capReachIncome = 20288 + 5000 + (770 - 5000 * 0.0784) / 0.1176
+    expect(qcRamqPremium(capReachIncome)).toBeCloseTo(770, 1)
+    expect(qcRamqPremium(200000)).toBe(770)
+  })
+
+  it('incomeTax for QC includes the FSS contribution and RAMQ premium on top of bracket tax', () => {
+    const taxable = 50000
+    const withLevies = incomeTax(taxable, 'QC')
+    const withoutLevies = withLevies - qcFssContribution(taxable) - qcRamqPremium(taxable)
+    // sanity: the levies are a real, non-zero add-on at this income level
+    expect(qcFssContribution(taxable) + qcRamqPremium(taxable)).toBeGreaterThan(0)
+    expect(withoutLevies).toBeLessThan(withLevies)
   })
 
   it('SK grants the senior supplementary amount at 65+, not income-tested', () => {

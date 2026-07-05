@@ -47,8 +47,9 @@ l'inflation) :
 **Le moteur fiscal** : vrais paliers marginaux fédéral + provincial (les 13
 provinces et territoires, chiffres 2026, mis à jour annuellement), montants
 personnels de base (avec la réduction à revenu élevé au fédéral, au Manitoba et au
-Yukon), abattement québécois, surtaxe et prime-santé de l'Ontario, montant en
-raison de l'âge et crédit pour revenu de pension dès 65 ans (y compris le
+Yukon), abattement québécois, surtaxe et prime-santé de l'Ontario, prime RAMQ et
+cotisation au FSS au Québec, montant en raison de l'âge et crédit pour revenu de
+pension dès 65 ans (y compris le
 supplément pour aînés de la Saskatchewan), inclusion de 50 % des gains en capital
 suivie par le PBR, frein fiscal annuel sur les distributions non enregistrées,
 récupération de la SV par personne (taux 75+ inclus), SRG pour les retraités à
@@ -159,7 +160,7 @@ séquence des rendements).
 ![Monte-Carlo](docs/screenshots/monte-carlo.png)
 
 **Le tiroir-glossaire** — chaque terme souligné (REER, PBR, meltdown,
-récupération, taux marginal…) ouvre une explication claire; 32 entrées, trois
+récupération, taux marginal…) ouvre une explication claire; 33 entrées, trois
 langues.
 
 ![Glossaire](docs/screenshots/glossary-drawer.png)
