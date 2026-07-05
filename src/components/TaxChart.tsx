@@ -54,7 +54,9 @@ export function TaxChart(props: {
         property: Math.round(s.property * k(r.age)),
         extraIncome: Math.round(s.extraIncome * k(r.age)),
         total: Math.round(r.tax * k(r.age)),
-        taxablePerPerson: Math.round(r.taxablePerPerson * k(r.age)),
+        // household total (not per-person) so it's directly comparable to
+        // the household tax total above it in the same tooltip
+        totalTaxable: Math.round(totalTaxable * k(r.age)),
         avgRate: totalTaxable > 0 ? r.tax / totalTaxable : 0,
         marginalRate: marginalRate(r.taxablePerPerson, props.inputs.province),
       }
@@ -82,6 +84,10 @@ export function TaxChart(props: {
             domain={[data[0].age, data[data.length - 1].age]}
             tickCount={12} />
           <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
+          {/* hidden axis: keeps taxable income (much larger than any tax
+              slice) and the two rate lines from stretching the visible
+              tax-dollar axis above */}
+          <YAxis yAxisId="aux" hide domain={['auto', 'auto']} />
           <Tooltip formatter={formatter} />
           <Legend />
           <Line dataKey="total" name={t('total')} stroke="none" dot={false}
@@ -96,12 +102,12 @@ export function TaxChart(props: {
           {hasExtra && (
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
           )}
-          <Line dataKey="taxablePerPerson" name={t('colTaxable')} stroke="none" dot={false}
+          <Line yAxisId="aux" dataKey="totalTaxable" name={t('taxTotalTaxable')} stroke="none"
+            dot={false} activeDot={false} legendType="none" />
+          <Line yAxisId="aux" dataKey="avgRate" name={avgRateLabel} stroke="none" dot={false}
             activeDot={false} legendType="none" />
-          <Line dataKey="avgRate" name={avgRateLabel} stroke="none" dot={false}
-            activeDot={false} legendType="none" />
-          <Line dataKey="marginalRate" name={marginalRateLabel} stroke="none" dot={false}
-            activeDot={false} legendType="none" />
+          <Line yAxisId="aux" dataKey="marginalRate" name={marginalRateLabel} stroke="none"
+            dot={false} activeDot={false} legendType="none" />
         </ComposedChart>
       </ResponsiveContainer>
       <p className="hint"><Jargon text={t('taxChartNote')} /></p>
