@@ -204,6 +204,24 @@ describe('targetReport', () => {
     expect(withoutSale.assetsAtFire).toBeLessThan(target)
   })
 
+  it('assetsAtFire is the total entering the FIRE year, matching the projection row', () => {
+    const report = targetReport(base, 99_999_999)
+    const row = runProjection(base).rows.find((r) => r.age === base.fireAge - 1)!
+    const entering = row.balances.tfsa + row.balances.rrsp + row.balances.nonReg
+    expect(report.assetsAtFire).toBeCloseTo(entering, 0)
+  })
+
+  it('a principal residence sold before FIRE is not double-counted in the FIRE number', () => {
+    // the sale proceeds are already inside the investable assets the user
+    // compares against, so the required number must not shrink further
+    const withEarlySale = requiredFireAssets({
+      ...base,
+      principalResidence: { value: 800000, appreciation: 0.02, sellAtAge: base.currentAge + 2 },
+    })
+    const without = requiredFireAssets(base)
+    expect(withEarlySale).toBeCloseTo(without, -3)
+  })
+
   it('taxes the investment-property gain on sale in target mode', () => {
     const ipSale = targetReport(
       {

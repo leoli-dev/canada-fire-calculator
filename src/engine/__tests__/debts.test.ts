@@ -108,6 +108,24 @@ describe('debts in the projection', () => {
     expect(withDebt).toBeGreaterThan(without)
   })
 
+  it('FIRE-number solver appreciates real estate to the FIRE year like it rolls debts', () => {
+    // a property sold at FIRE is worth 10 years of appreciation more than today,
+    // so the required portfolio must be smaller than if it never grew
+    const appreciating = requiredFireAssets({
+      ...base,
+      investmentProperties: [
+        { value: 500000, acb: 300000, appreciation: 0.03, sellAtAge: base.fireAge },
+      ],
+    })
+    const flat = requiredFireAssets({
+      ...base,
+      investmentProperties: [
+        { value: 500000, acb: 300000, appreciation: 0, sellAtAge: base.fireAge },
+      ],
+    })
+    expect(appreciating).toBeLessThan(flat)
+  })
+
   it('never throws on transient invalid ages (FIRE age above life expectancy)', () => {
     // typing "100" into the FIRE age field passes through here before
     // validation flags it — the engine must stay a total function

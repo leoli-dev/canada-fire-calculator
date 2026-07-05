@@ -211,6 +211,36 @@ describe('runProjection', () => {
     expect(bridgeRow.withdrawals.tfsa).toBeCloseTo(base.retirementSpending, 0)
   })
 
+  it('benefits claimed before FIRE are collected, taxed, and saved', () => {
+    // still working 60→68, CPP claimed at 65: ages 65-67 must not vanish
+    const late = {
+      ...base,
+      currentAge: 60,
+      fireAge: 68,
+      lifeExpectancy: 80,
+      cppStartAge: 65,
+      oasStartAge: 66,
+    }
+    const r = runProjection(late)
+    const at65 = r.rows.find((x) => x.age === 65)!
+    const at66 = r.rows.find((x) => x.age === 66)!
+    expect(at65.phase).toBe('accumulation')
+    expect(at65.cpp).toBeGreaterThan(0)
+    expect(at66.oas).toBeGreaterThan(0)
+    // the money actually lands: net worth beats an identical plan claiming at FIRE
+    const claimAtFire = runProjection({ ...late, cppStartAge: 68, oasStartAge: 68 })
+    expect(r.finalNetWorth).not.toBe(claimAtFire.finalNetWorth)
+  })
+
+  it('tolerates fractional ages without NaN (RRIF factor floors the age)', () => {
+    const r = runProjection({ ...base, currentAge: 35.5 })
+    expect(Number.isFinite(r.finalNetWorth)).toBe(true)
+    for (const row of r.rows) {
+      expect(Number.isFinite(row.netCash)).toBe(true)
+      expect(Number.isFinite(row.balances.rrsp)).toBe(true)
+    }
+  })
+
   it('handles multiple investment properties selling at different ages', () => {
     const r = runProjection({
       ...base,

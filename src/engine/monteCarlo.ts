@@ -75,8 +75,10 @@ export function runMonteCarlo(
       earlyFailed.push(earlyAvg)
     }
     r.rows.forEach((row, i) => {
+      // net worth, consistent with the deterministic line: debt subtracted
       const total =
-        row.balances.tfsa + row.balances.rrsp + row.balances.nonReg + row.propertyValue
+        row.balances.tfsa + row.balances.rrsp + row.balances.nonReg +
+        row.propertyValue - row.debtBalance
       ;(totalsByYear[i] ??= []).push(total)
     })
   }

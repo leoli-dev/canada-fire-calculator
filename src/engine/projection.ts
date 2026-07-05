@@ -240,61 +240,74 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     // then reinvest (raising the ACB so they aren't taxed again at sale)
     const dist = bal.nonReg * (inputs.nonRegDistributionYield ?? 0)
 
+    // government benefits accrue on each person's own timeline, whether or
+    // not the household has FIRE'd yet (an older partner can be collecting
+    // CPP/OAS during the primary's accumulation years)
+    const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
+    // QPP can be deferred to 72 (since 2024); CPP caps at 70
+    const cppMaxAge = inputs.province === 'QC' ? 72 : 70
+    if (age >= inputs.cppStartAge) {
+      const relief = inputs.cppWork
+        ? earlyClaimDilutionRelief(
+            inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
+          )
+        : 1
+      cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
+    }
+    if (partner && partnerAge! >= partner.cppStartAge) {
+      const relief = partner.cppWork
+        ? earlyClaimDilutionRelief(
+            partner.cppWork.startWorkAge, partner.cppWork.retireAge, partner.cppStartAge,
+          )
+        : 1
+      cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge, cppMaxAge) * relief
+    }
+
+    // OAS rises 10% automatically at 75
+    const oasGrossPerPerson = [
+      age >= inputs.oasStartAge
+        ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
+        : 0,
+    ]
+    const agesPerPerson = [age]
+    if (partner) {
+      oasGrossPerPerson.push(
+        partnerAge! >= partner.oasStartAge
+          ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge) * (partnerAge! >= 75 ? 1.1 : 1)
+          : 0,
+      )
+      agesPerPerson.push(partnerAge!)
+    }
+
     if (phase === 'accumulation') {
       for (const t of ACCOUNT_TYPES) {
         const c = inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
         bal[t] += c
         if (t === 'nonReg') nonRegBook += c
       }
+      const marginal = inputs.accumulationMarginalRate ?? 0.35
       // working years: distributions taxed at the assumed marginal rate,
       // with the tax paid out of the account
-      const dragTax = dist * (inputs.accumulationMarginalRate ?? 0.35)
+      const dragTax = dist * marginal
       bal.nonReg -= dragTax
       nonRegBook += dist - dragTax
       // net rent, taxed at the same marginal rate, is saved on top of
       // annualSavings (whose hint tells the user to exclude rent)
-      const rentTax = rent * (inputs.accumulationMarginalRate ?? 0.35)
+      const rentTax = rent * marginal
       bal.nonReg += rent - rentTax
       nonRegBook += rent - rentTax
-      tax = dragTax + rentTax
+      // benefits already being collected pre-FIRE are saved after tax at the
+      // working marginal rate (no clawback/GIS modelling here — employment
+      // income is unknown, so this leans simple; high earners drawing OAS
+      // while working would really face the recovery tax)
+      const oasGross = oasGrossPerPerson.reduce((s, x) => s + x, 0)
+      const benefitTax = (cpp + oasGross) * marginal
+      bal.nonReg += cpp + oasGross - benefitTax
+      nonRegBook += cpp + oasGross - benefitTax
+      oas = oasGross
+      tax = dragTax + rentTax + benefitTax
     } else {
       extraTaxable += dist
-      const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
-
-      // QPP can be deferred to 72 (since 2024); CPP caps at 70
-      const cppMaxAge = inputs.province === 'QC' ? 72 : 70
-      if (age >= inputs.cppStartAge) {
-        const relief = inputs.cppWork
-          ? earlyClaimDilutionRelief(
-              inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
-            )
-          : 1
-        cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
-      }
-      if (partner && partnerAge! >= partner.cppStartAge) {
-        const relief = partner.cppWork
-          ? earlyClaimDilutionRelief(
-              partner.cppWork.startWorkAge, partner.cppWork.retireAge, partner.cppStartAge,
-            )
-          : 1
-        cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge, cppMaxAge) * relief
-      }
-
-      // OAS rises 10% automatically at 75
-      const oasGrossPerPerson = [
-        age >= inputs.oasStartAge
-          ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
-          : 0,
-      ]
-      const agesPerPerson = [age]
-      if (partner) {
-        oasGrossPerPerson.push(
-          partnerAge! >= partner.oasStartAge
-            ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge) * (partnerAge! >= 75 ? 1.1 : 1)
-            : 0,
-        )
-        agesPerPerson.push(partnerAge!)
-      }
 
       const rrifMin = bal.rrsp * rrifMinFactor(age)
       const forcedRrsp = Math.min(bal.rrsp, rrifMin)

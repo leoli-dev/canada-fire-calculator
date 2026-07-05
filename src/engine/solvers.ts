@@ -1,5 +1,6 @@
 import { runProjection } from './projection'
 import { rollDebtsForward } from './debts'
+import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
 import {
   ACCOUNT_TYPES,
@@ -11,7 +12,7 @@ import {
 
 /** Mode "when can I retire": earliest FIRE age whose plan succeeds. */
 export function findEarliestFireAge(inputs: Inputs): number | null {
-  const cap = Math.min(inputs.lifeExpectancy - 1, 75)
+  const cap = inputs.lifeExpectancy - 1
   for (let age = inputs.currentAge; age <= cap; age++) {
     if (runProjection({ ...inputs, fireAge: age }).success) return age
   }
@@ -33,6 +34,18 @@ export function requiredFireAssets(inputs: Inputs): number {
   const bookRatio = b.nonReg > 0 ? inputs.nonRegBook / b.nonReg : 1
   const yearsToFire = inputs.fireAge - inputs.currentAge
 
+  // real estate will have appreciated (and debts amortized) by the FIRE year
+  const grow = (v: number, rate: number) => v * Math.pow(1 + rate, Math.max(0, yearsToFire))
+  // a principal residence sold BEFORE the FIRE age is already cash inside the
+  // investable balances the user compares this number against — passing it
+  // through would count the house twice (IP sales are clamped to FIRE, so
+  // they can't double up the same way)
+  const pr =
+    inputs.principalResidence &&
+    (inputs.principalResidence.sellAtAge === null ||
+      inputs.principalResidence.sellAtAge >= inputs.fireAge)
+      ? inputs.principalResidence
+      : null
   const succeeds = (T: number) =>
     runProjection({
       ...inputs,
@@ -44,7 +57,11 @@ export function requiredFireAssets(inputs: Inputs): number {
       partner: inputs.partner
         ? { ...inputs.partner, currentAge: inputs.partner.currentAge + yearsToFire }
         : inputs.partner,
-      // the debts will have amortized for yearsToFire by then
+      principalResidence: pr ? { ...pr, value: grow(pr.value, pr.appreciation) } : null,
+      investmentProperties: (inputs.investmentProperties ?? []).map((p) => ({
+        ...p,
+        value: grow(p.value, p.appreciation),
+      })),
       debts: rollDebtsForward(inputs.debts ?? [], yearsToFire, inputs.inflation ?? 0.021),
     }).success
 
@@ -82,7 +99,9 @@ export function maxSustainableSpending(inputs: Inputs): number {
     lo = hi
     hi *= 2
   }
-  if (hi >= 50_000_000) return hi
+  // absurd-portfolio exit: return the last level known to succeed, not the
+  // untested (or failing) doubled value
+  if (hi >= 50_000_000) return lo
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2
     if (ok(mid)) lo = mid
@@ -120,8 +139,9 @@ export interface TargetReport {
  * to continue past the planned FIRE age until the target is hit (delayed
  * FIRE). Planned property sales count toward investable assets (mirroring
  * the projection: principal residence tax-free, investment-property gain
- * taxed); unsold real estate does not. All values are end-of-year, matching
- * the chart rows. Whether the money then lasts for life is a separate
+ * taxed); unsold real estate does not. `assetsAtFire` is the total entering
+ * the FIRE year (plus any sale landing that year), before any further
+ * savings or growth. Whether the money then lasts for life is a separate
  * question (the other modes).
  */
 export function targetReport(inputs: Inputs, target: number): TargetReport {
@@ -155,10 +175,40 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         p.value = 0
       }
     }
+    // assets entering FIRE plus any sale landing that year — snapshot before
+    // this iteration adds a further year of savings and growth (recording at
+    // year-end wrongly credited a whole extra working year)
+    if (age === inputs.fireAge) assetsAtFire = bal.tfsa + bal.rrsp + bal.nonReg
     // mirror the projection's accumulation-phase tax drag on distributions,
     // and save the after-tax rent from properties still held
     bal.nonReg -= bal.nonReg * (inputs.nonRegDistributionYield ?? 0) * marginal
     bal.nonReg += ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0) * (1 - marginal)
+    // ...and benefits already being collected while still working
+    const cppMaxAge = inputs.province === 'QC' ? 72 : 70
+    let benefits = 0
+    if (age >= inputs.cppStartAge) {
+      const relief = inputs.cppWork
+        ? earlyClaimDilutionRelief(
+            inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
+          )
+        : 1
+      benefits += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
+    }
+    if (age >= inputs.oasStartAge)
+      benefits += oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
+    const p2 = inputs.partner
+    if (p2) {
+      const pAge = p2.currentAge + (age - inputs.currentAge)
+      if (pAge >= p2.cppStartAge) {
+        const relief = p2.cppWork
+          ? earlyClaimDilutionRelief(p2.cppWork.startWorkAge, p2.cppWork.retireAge, p2.cppStartAge)
+          : 1
+        benefits += cppAnnual(p2.cppAnnualAt65, p2.cppStartAge, cppMaxAge) * relief
+      }
+      if (pAge >= p2.oasStartAge)
+        benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
+    }
+    bal.nonReg += benefits * (1 - marginal)
     for (const t of ACCOUNT_TYPES) {
       bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
@@ -169,7 +219,6 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     }
 
     total = bal.tfsa + bal.rrsp + bal.nonReg
-    if (age === inputs.fireAge) assetsAtFire = total
     if (reachedAge === null && total >= target) reachedAge = age
     if (age >= inputs.fireAge && reachedAge !== null) break
   }

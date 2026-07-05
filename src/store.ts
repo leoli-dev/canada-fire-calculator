@@ -157,7 +157,9 @@ export const useStore = create<Store>()(
           const investmentProperties =
             raw.investmentProperties ??
             (raw.investmentProperty ? [{ ...raw.investmentProperty }] : [])
-          return { ...DEFAULT_INPUTS, ...raw, strategy, investmentProperties }
+          // drop legacy keys so they don't re-persist forever
+          const { withdrawalOrder: _wo, investmentProperty: _ip, ...rest } = raw
+          return { ...DEFAULT_INPUTS, ...rest, strategy, investmentProperties }
         }
         return {
           ...current,

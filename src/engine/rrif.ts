@@ -12,7 +12,10 @@ const FACTORS: Record<number, number> = {
 }
 
 export function rrifMinFactor(age: number): number {
-  if (age < 72) return 0
-  if (age >= 96) return 0.2
-  return FACTORS[age]
+  // floor: fractional ages from transient input states must not return
+  // undefined (a NaN here silently poisons the whole projection)
+  const a = Math.floor(age)
+  if (a < 72) return 0
+  if (a >= 96) return 0.2
+  return FACTORS[a]
 }
