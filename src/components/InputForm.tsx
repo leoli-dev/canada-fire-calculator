@@ -213,7 +213,7 @@ export function InputForm() {
           <summary>{t('worksheetTitle')}</summary>
           {WORKSHEET_KEYS.map((k) => (
             <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
-              onChange={(v) => setWorksheet(k, v)} />
+              onChange={(v) => setWorksheet(k, Math.max(0, v))} />
           ))}
           <div className="ws-total">
             <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>

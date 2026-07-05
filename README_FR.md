@@ -44,14 +44,16 @@ l'inflation) :
 3. **Pension** (RPC/SV → espérance de vie) : les prestations arrivent; dès 72 ans
    les minimums FERR sont forcés, besoin ou pas.
 
-**Le moteur fiscal** : vrais paliers marginaux fédéral + provincial (ON / QC / BC /
-AB, chiffres 2026, mis à jour annuellement), montants personnels de base (avec la
-réduction fédérale à revenu élevé), abattement québécois, surtaxe et prime-santé de
-l'Ontario, montant en raison de l'âge et crédit pour revenu de pension dès 65 ans,
-inclusion de 50 % des gains en capital suivie par le PBR, frein fiscal annuel sur
-les distributions non enregistrées, récupération de la SV par personne (taux 75+
-inclus), SRG pour les retraités à faible revenu imposable et, pour les couples,
-fractionnement du revenu sur deux déclarations.
+**Le moteur fiscal** : vrais paliers marginaux fédéral + provincial (les 13
+provinces et territoires, chiffres 2026, mis à jour annuellement), montants
+personnels de base (avec la réduction à revenu élevé au fédéral, au Manitoba et au
+Yukon), abattement québécois, surtaxe et prime-santé de l'Ontario, montant en
+raison de l'âge et crédit pour revenu de pension dès 65 ans (y compris le
+supplément pour aînés de la Saskatchewan), inclusion de 50 % des gains en capital
+suivie par le PBR, frein fiscal annuel sur les distributions non enregistrées,
+récupération de la SV par personne (taux 75+ inclus), SRG pour les retraités à
+faible revenu imposable (avec l'exemption pour revenu d'emploi) et, pour les
+couples, fractionnement du revenu sur deux déclarations.
 
 **Stratégies de décaissement**, comparées côte à côte avec vos propres chiffres :
 
@@ -70,12 +72,22 @@ par **valeur successorale après impôt** — ou, sous l'objectif **Die with Zer
 par les dépenses annuelles soutenables maximales.
 
 **Également modélisés** : vente de la résidence principale (libre d'impôt),
-vente d'immeuble locatif (gain imposé), estimation RPC/RRQ selon l'historique de
-travail (règle des 39 meilleures années avec diviseur ajusté à l'âge de demande),
-SV selon les années de résidence et son +10 % automatique à 75 ans, tableaux
-complets des âges de début RPC 60-70 (RRQ jusqu'à 72) / SV 65-70, frais de
-placement (RFG), et simulation Monte-Carlo (1 000 essais dans un web worker, un
-même tirage de marché annuel pour tous les comptes) avec anatomie des échecs.
+n'importe quel nombre d'immeubles locatifs — chacun vendable à son propre âge
+(gain imposé) ou conservé pour son **revenu locatif net** (imposé comme revenu
+ordinaire, visible pour la récupération de la SV et le SRG), **dettes**
+(hypothèque / prêt auto / autre : le moteur déduit le taux implicite de chaque
+prêt et laisse l'inflation éroder les paiements nominaux fixes — les paiements
+s'ajoutent aux dépenses de retraite jusqu'au remboursement, les soldes réduisent
+la valeur nette et la succession), **revenu d'appoint Barista-FIRE** sur une
+plage d'âges choisie (avec l'exemption officielle du SRG pour revenu de travail),
+estimation RPC/RRQ selon l'historique de travail (règle des 39 meilleures années
+avec diviseur ajusté à l'âge de demande), SV selon les années de résidence et son
++10 % automatique à 75 ans, tableaux complets des âges de début RPC 60-70 (RRQ
+jusqu'à 72) / SV 65-70, frais de placement (RFG), et simulation Monte-Carlo
+(1 000 essais dans un web worker, un même tirage de marché annuel pour tous les
+comptes) avec anatomie des échecs. Les entrées sont validées à la saisie —
+ordres d'âges impossibles, montants négatifs, âges de demande hors fenêtre et
+prêts qui ne s'amortissent jamais sont signalés directement dans le formulaire.
 
 ## Comment remplir
 
@@ -93,8 +105,15 @@ langage clair (voir le tiroir-glossaire ci-dessous).
   **PBR** (« book cost » chez le courtier) : seul le gain au-dessus est imposé,
   laisser 0 gonfle énormément l'impôt. Les préréglages de répartition d'actifs
   fixent des rendements réels et volatilités réalistes.
-- **Immobilier** — résidence principale et immeuble locatif optionnels, chacun
-  avec un âge de vente optionnel.
+- **Immobilier** — résidence principale plus n'importe quel nombre d'immeubles
+  locatifs, chacun avec un âge de vente optionnel et un loyer annuel net
+  optionnel (loyer moins frais d'exploitation; il cesse l'année de la vente).
+- **Dettes** — hypothèque, prêt auto ou autre, chacune en (solde, paiement
+  annuel, années restantes). Saisissez comme épargne annuelle ce que vous
+  épargnez réellement *après* les paiements de dettes; le moteur ajoute les
+  paiements aux dépenses de retraite jusqu'au remboursement de chaque prêt.
+- **Revenu d'appoint** — revenu post-FIRE optionnel (Barista FIRE) avec une
+  plage d'âges; ne le soustrayez pas vous-même des dépenses de retraite.
 - **Prestations gouvernementales** — âges de début et montants à 65 ans RPC/RRQ
   et SV, par conjoint, avec estimateurs intégrés (historique de travail pour le
   RPC, années de résidence pour la SV).
@@ -140,7 +159,7 @@ séquence des rendements).
 ![Monte-Carlo](docs/screenshots/monte-carlo.png)
 
 **Le tiroir-glossaire** — chaque terme souligné (REER, PBR, meltdown,
-récupération, taux marginal…) ouvre une explication claire; 22 entrées, trois
+récupération, taux marginal…) ouvre une explication claire; 32 entrées, trois
 langues.
 
 ![Glossaire](docs/screenshots/glossary-drawer.png)
@@ -148,18 +167,23 @@ langues.
 ## Hypothèses et limites
 
 - Tous les montants sont en **pouvoir d'achat d'aujourd'hui**; rendements réels.
-- Données fiscales 2026, fédéral + ON/QC/BC/AB (vérifiées contre l'ARC et les
-  budgets provinciaux), mises à jour manuellement.
+- Données fiscales 2026, fédéral + toutes les provinces et tous les territoires
+  (vérifiées contre l'ARC, les budgets provinciaux et TaxTips), mises à jour
+  manuellement.
 - Le mode couple suppose un fractionnement idéal 50/50; avant 65 ans, les retraits
   REER sont imposés au seul titulaire — préparez des soldes comparables (REER de
   conjoint).
-- Les distributions non enregistrées sont imposées chaque année comme revenu
-  ordinaire (simplification volontaire : pas de majoration/crédit de dividendes);
-  le SRG suit une approximation linéaire des tables officielles; saisissez votre
-  épargne **après impôt** — le remboursement REER n'est pas recyclé.
+- Les distributions non enregistrées et le loyer net sont imposés chaque année
+  comme revenu ordinaire (simplification volontaire : pas de majoration/crédit de
+  dividendes, pas de DPA locative); le SRG suit une approximation linéaire des
+  tables officielles; saisissez votre épargne **après impôt et après paiements de
+  dettes** — le remboursement REER n'est pas recyclé.
+- Les paiements de dettes sont fixes en dollars nominaux (pas de refinancement ni
+  de taux variable); le taux d'intérêt est déduit du trio solde / paiement /
+  années restantes.
 - Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
   du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
-  autres provinces, chocs de soins de longue durée.
+  chocs de soins de longue durée.
 - Monte-Carlo tire un choc de marché par année, partagé par tous les comptes
   (corrélation complète). Le taux de réussite est sensible à l'hypothèse de
   rendement — lisez-le comme « probabilité de ne jamais devoir s'ajuster ».

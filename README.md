@@ -39,13 +39,15 @@ number in the UI comes from a deterministic, unit-tested year-by-year simulation
 3. **Pension** (CPP/OAS → life expectancy): government benefits arrive; from age 72
    RRIF minimum withdrawals are forced whether you need them or not.
 
-**The tax engine** applies real federal + provincial marginal brackets (ON / QC / BC /
-AB, 2026 figures, data-driven and updated yearly), the basic personal amounts (with
-the federal high-income phase-out), Quebec's federal abatement, Ontario's surtax and
-health premium, the age amount and pension income credit from 65, 50% capital-gains
-inclusion tracked against your ACB, annual tax drag on non-registered distributions,
-per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees,
-and — for couples — income splitting across two returns.
+**The tax engine** applies real federal + provincial marginal brackets (all 13
+provinces and territories, 2026 figures, data-driven and updated yearly), the basic
+personal amounts (with the federal, Manitoba and Yukon high-income phase-outs),
+Quebec's federal abatement, Ontario's surtax and health premium, the age amount and
+pension income credit from 65 (including Saskatchewan's senior supplement), 50%
+capital-gains inclusion tracked against your ACB, annual tax drag on non-registered
+distributions, per-person OAS clawback (75+ rates included), GIS for
+low-taxable-income retirees (with the employment-income exemption), and — for
+couples — income splitting across two returns.
 
 **Withdrawal strategies**, compared side by side with your own numbers:
 
@@ -62,13 +64,21 @@ free). Strategies are therefore ranked by **after-tax estate value** — or, und
 **Die-with-Zero** goal, by the maximum sustainable annual spending.
 
 **Also modelled**: principal-residence sale (tax-free, e.g. downsizing at a chosen
-age), investment-property sale (gain taxed), CPP/QPP estimation from work history
+age), any number of investment properties — each sellable at its own age (gain
+taxed) or kept for **net rental income** (taxed as ordinary income, visible to the
+OAS clawback and GIS), **debts** (mortgage / car loan / other: the engine
+back-solves each loan's implied rate and lets inflation erode the fixed nominal
+payments — payments join retirement spending until paid off, balances reduce net
+worth and the estate), **Barista-FIRE side income** over a chosen age range (with
+the official GIS work exemption), CPP/QPP estimation from work history
 (best-39-years rule with the claim-age dropout divisor — early retirement dilutes
 your average, and claiming early dilutes it less than you'd think), OAS from
 residence years and its automatic +10% at 75, CPP 60–70 (QPP to 72) / OAS 65–70
 timing tables, investment fees (MER), and a Monte Carlo simulation (1,000
 randomized-return runs in a web worker, one shared market shock per year across
-accounts) with a failure-anatomy readout.
+accounts) with a failure-anatomy readout. Inputs are validated as you type —
+impossible age orderings, negative amounts, out-of-window claim ages and
+never-amortizing loans are flagged inline.
 
 ## How to fill in the inputs
 
@@ -88,9 +98,16 @@ Work down the left column; every underlined term opens a plain-language explanat
   enter the **ACB** (your broker calls it *book cost*): tax applies only to the gain
   above it, so leaving it at 0 badly overstates tax. Asset-mix presets set realistic
   real returns and volatilities per account.
-- **Real estate** — optional principal residence and investment property, each with
-  an optional sale age. A principal-residence sale is tax-free and becomes investable
-  capital the same year.
+- **Real estate** — optional principal residence plus any number of investment
+  properties, each with an optional sale age and an optional net annual rent
+  (rent minus operating costs; it stops the year the property sells). A
+  principal-residence sale is tax-free and becomes investable capital the same year.
+- **Debts** — mortgage, car loan or other, each as (balance, annual payment, years
+  remaining). Enter your annual savings as what you actually save *after* debt
+  payments; the engine adds the payments to retirement spending until each loan
+  is gone.
+- **Side income** — optional post-FIRE income (Barista FIRE) with an age range;
+  don't subtract it from retirement spending yourself.
 - **Government benefits** — CPP/QPP and OAS start ages and age-65 amounts, per
   spouse. Not sure of the amounts? Use the built-in estimators (work history for
   CPP, residence years for OAS) or copy the exact figures from My Service Canada
@@ -140,7 +157,7 @@ market in the first five years after FIRE — sequence-of-returns risk).
 
 **The glossary drawer** — every underlined term on the page (RRSP, ACB, meltdown,
 clawback, marginal rate, …) opens a plain-language explanation; terms inside
-explanations are clickable too. 22 entries in all three languages.
+explanations are clickable too. 32 entries in all three languages.
 
 ![Glossary](docs/screenshots/glossary-drawer.png)
 
@@ -148,18 +165,20 @@ explanations are clickable too. 22 entries in all three languages.
 
 - All amounts are **today's purchasing power**; returns are real (net of inflation).
   Tax brackets are held in real terms.
-- Tax data: 2026 federal + ON/QC/BC/AB tables (verified against CRA / provincial
-  budgets), updated manually each year.
+- Tax data: 2026 federal + all-province/territory tables (verified against CRA /
+  provincial budgets / TaxTips), updated manually each year.
 - Couple taxation assumes ideal 50/50 income splitting. In reality, pre-65 RRSP
   withdrawals are taxed to the account owner — an even split during the bridge
   requires comparable RRSP balances (plan ahead with a spousal RRSP).
-- Non-registered distributions are taxed yearly as ordinary income (a deliberate
-  simplification: no dividend gross-up/credit); GIS uses a linear approximation of
-  the official tables; enter your annual savings **after tax** — the RRSP refund is
-  not recycled automatically.
+- Non-registered distributions and net rent are taxed yearly as ordinary income (a
+  deliberate simplification: no dividend gross-up/credit, no rental CCA); GIS uses a
+  linear approximation of the official tables; enter your annual savings **after
+  tax and after debt payments** — the RRSP refund is not recycled automatically.
+- Debt payments are treated as fixed in nominal dollars (no refinancing or variable
+  rates); the interest rate is implied from balance / payment / years.
 - Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
   enhancement (post-2019 contributions — estimates lean conservative for younger
-  users), provinces beyond the four, long-term-care cost shocks.
+  users), long-term-care cost shocks.
 - Monte Carlo draws one market shock per year shared by all accounts (accounts are
   fully correlated; what differs is each account's volatility). Success rates are
   sensitive to the return assumption — read them as "odds of never needing to
