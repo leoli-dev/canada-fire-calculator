@@ -8,6 +8,7 @@ import { InputForm } from './components/InputForm'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
+import { TaxChart } from './components/TaxChart'
 import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
 import { MonteCarloCard } from './components/MonteCarloCard'
@@ -94,6 +95,7 @@ export default function App() {
             </p>
           )}
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
+          <TaxChart result={result} inputs={inputs} scale={scale} />
           <YearTable result={result} inputs={inputs} />
           <StrategyCard inputs={inputs} />
           <TimingCard inputs={inputs} />

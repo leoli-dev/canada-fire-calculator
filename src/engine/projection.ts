@@ -5,6 +5,7 @@ import {
   type Phase,
   type ProjectionResult,
   type Strategy,
+  type TaxBySource,
   type YearRow,
 } from './types'
 import { incomeTax, probateTax } from './tax'
@@ -225,7 +226,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let netCash = 0
     let shortfall = 0
     let extraTaxable = 0
+    let saleGainsTaxable = 0
     let taxablePerPerson = 0
+    let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0 }
     const yearIdx = age - inputs.currentAge
 
     // principal residence sale: tax-free; any linked mortgage is discharged
@@ -243,7 +246,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     for (const p of ips) {
       if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
         const owed = p.mortgage?.balances[yearIdx] ?? 0
-        extraTaxable += Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
+        const gain = Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
+        extraTaxable += gain
+        saleGainsTaxable += gain
         bal.nonReg += p.value - owed
         nonRegBook += p.value - owed
         p.value = 0
@@ -343,11 +348,17 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       // income is unknown, so this leans simple; high earners drawing OAS
       // while working would really face the recovery tax)
       const oasGross = oasGrossPerPerson.reduce((s, x) => s + x, 0)
-      const benefitTax = (cpp + oasGross) * marginal
+      const benefitBase = cpp + oasGross
+      const benefitTax = benefitBase * marginal
       bal.nonReg += cpp + oasGross - benefitTax
       nonRegBook += cpp + oasGross - benefitTax
       oas = oasGross
       tax = dragTax + rentTax + benefitTax
+      const cppTax = benefitBase > 0 ? benefitTax * (cpp / benefitBase) : 0
+      taxBySource = {
+        rrsp: 0, nonReg: dragTax, cpp: cppTax, oas: benefitTax - cppTax,
+        property: rentTax, extraIncome: 0,
+      }
     } else {
       extraTaxable += dist
 
@@ -399,6 +410,23 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       netCash = out.netCash
       taxablePerPerson = out.taxablePerPerson ?? 0
 
+      // proportional allocation of this year's tax across taxable
+      // components (each component's share of total taxable income) —
+      // sums exactly to `tax`; see TaxBySource
+      const persons = partner ? 2 : 1
+      const totalTaxable = taxablePerPerson * persons
+      const nonRegGainTaxable = withdrawals.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
+      const propertyTaxable = saleGainsTaxable + rent - rentMortgageInterest
+      const taxShare = (component: number) => (totalTaxable > 0 ? tax * (component / totalTaxable) : 0)
+      taxBySource = {
+        rrsp: taxShare(withdrawals.rrsp),
+        nonReg: taxShare(dist + nonRegGainTaxable),
+        cpp: taxShare(cpp),
+        oas: taxShare(oas),
+        property: taxShare(propertyTaxable),
+        extraIncome: taxShare(extraIncome),
+      }
+
       if (netCash < spendTarget - 0.01) {
         shortfall = spendTarget - netCash
         if (depletedAge === null) depletedAge = age
@@ -437,7 +465,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
       debtPayment, debtBalance,
-      taxablePerPerson,
+      taxablePerPerson, taxBySource,
     })
   }
 

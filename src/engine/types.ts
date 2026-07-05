@@ -180,6 +180,23 @@ export interface Inputs {
   debts?: Debt[]
 }
 
+/**
+ * Proportional allocation of a year's total tax across its taxable
+ * components (each component's share of total taxable income), so the
+ * pieces sum exactly to `tax`. Not a statutory attribution — Canada taxes
+ * combined income under one bracket ladder — but consistent with how
+ * `rrspTax` is already attributed elsewhere in this engine.
+ */
+export interface TaxBySource {
+  rrsp: number
+  nonReg: number
+  cpp: number
+  oas: number
+  /** net rent plus 50%-taxable investment-property sale gains */
+  property: number
+  extraIncome: number
+}
+
 export interface YearRow {
   age: number
   phase: Phase
@@ -208,6 +225,8 @@ export interface YearRow {
   debtBalance: number
   /** taxable income per person this year (0 during accumulation) */
   taxablePerPerson: number
+  /** this year's tax, allocated proportionally across taxable components */
+  taxBySource: TaxBySource
 }
 
 export interface ProjectionResult {

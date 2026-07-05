@@ -143,6 +143,14 @@ TFSA last, benefits layering in on top — is the plan's story in one picture.
 
 ![Income](docs/screenshots/income-chart.png)
 
+**Tax composition by source** — right below it, the same dashed tax line broken down
+into a stacked chart: how much of this year's tax comes from RRSP withdrawals,
+non-registered gains/distributions, CPP/QPP, OAS, rental/property-sale income, or
+Barista-FIRE side income. It's a proportional allocation, not a statutory one (Canada
+taxes all income together on one bracket ladder), but the slices always sum exactly
+to the tax line above. Hovering a point also shows taxable income per person, the
+average tax rate, and the marginal bracket for that year.
+
 **Year-by-year detail** (collapsed by default) — the audit table: every retirement
 year's withdrawals per account, benefits, gross, tax, after-tax cash, taxable income
 per person and the marginal bracket it lands in.

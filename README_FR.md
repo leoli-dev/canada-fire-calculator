@@ -146,6 +146,15 @@ l'impôt payé (pointillé).
 
 ![Revenus](docs/screenshots/income-chart.png)
 
+**Composition de l'impôt par source** — juste en dessous, la même ligne pointillée
+d'impôt éclatée en graphique empilé : quelle part de l'impôt de l'année vient des
+retraits REER, des gains/distributions non enregistrés, du RPC/RRQ, de la SV, du
+loyer/gain de vente immobilier, ou du revenu d'appoint (Barista FIRE). C'est une
+répartition proportionnelle, pas légale (tout le revenu canadien est imposé ensemble
+sur un seul barème), mais les tranches totalisent toujours exactement la ligne
+d'impôt ci-dessus. Survoler un point affiche aussi le revenu imposable par personne,
+le taux d'imposition moyen et le palier marginal de l'année.
+
 **Détail année par année** (replié par défaut) — le tableau d'audit : retraits par
 compte, prestations, brut, impôt, net, revenu imposable par personne et son palier
 marginal.
