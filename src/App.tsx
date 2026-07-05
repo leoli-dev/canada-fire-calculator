@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection } from './engine'
 import { setLanguage } from './i18n'
+import { useGlossary } from './glossary'
 import { useStore } from './store'
 import { InputForm } from './components/InputForm'
 import { ProjectionChart } from './components/ProjectionChart'
@@ -23,6 +24,7 @@ const LANGS = [
 
 export default function App() {
   const { t, i18n } = useTranslation()
+  const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
   const displayMode = useStore((s) => s.displayMode)
   const result = useMemo(() => runProjection(inputs), [inputs])
@@ -43,6 +45,15 @@ export default function App() {
         <div>
           <h1>{t('title')}</h1>
           <p className="tagline">{t('tagline')}</p>
+          <p className="header-disclaimer">
+            <strong>{t('disclaimer')}</strong>
+          </p>
+          <p className="simplifications-note">
+            {t('simplificationsNote')}{' '}
+            <button type="button" className="term" onClick={() => openGlossary('simplifications')}>
+              {t('simplificationsLink')}
+            </button>
+          </p>
         </div>
         <nav className="langs">
           {LANGS.map((l) => (
@@ -90,7 +101,6 @@ export default function App() {
       </main>
 
       <footer>
-        <p>{t('disclaimer')}</p>
         <p className="credit">
           {t('createdBy')}{' '}
           <a href="https://xiaojieli.com" target="_blank" rel="noopener noreferrer">

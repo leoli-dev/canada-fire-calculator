@@ -114,6 +114,8 @@
   "scenarioHint": "Save a snapshot, then change inputs (retire later, spend less…) to compare.",
   "reset": "Reset inputs",
   "disclaimer": "Educational estimate only, today's dollars, simplified tax rules - not financial advice.",
+  "simplificationsNote": "This calculator makes a number of simplifying assumptions — results are an approximation, not a guarantee of reality.",
+  "simplificationsLink": "See what's simplified",
   "saleLabel": "Sale",
   "mode_target": "Will I hit my target?",
   "targetInputLabel": "Target investable assets at FIRE",
@@ -269,6 +271,10 @@
     "qclevies": {
       "title": "RAMQ premium + FSS contribution (Quebec retirees)",
       "body": "Two easily-missed costs for Quebec retirees, settled on the tax return: (1) the RAMQ prescription-drug-insurance premium — anyone without private drug coverage (the common case once you leave an employer, which is most FIRE'd retirees) defaults onto the public plan and pays for it based on reported income, up to about $770/person/year in 2026; (2) the FSS (Fonds des services de santé) contribution — levied on retirement, investment and capital-gains income (OAS excluded), 1% of the amount over roughly $18,500 up to a $150 cap, then another 1% past roughly $64,355 up to a $1,000 cap. Both are per person and settle in one lump sum at tax time; the calculator applies them automatically for QC residents. Assumption: no private drug plan after retirement (true for most FIRE'd retirees who lose employer benefits) — if you keep private coverage, your actual RAMQ premium is zero."
+    },
+    "simplifications": {
+      "title": "What this calculator simplifies",
+      "body": "To keep the math tractable and auditable, this calculator makes a number of simplifications; the results are a directionally honest approximation, not a guarantee of your actual future tax outcome. Couple mode assumes CPP, RRSP withdrawals, rental income and investment income can all be split 50/50 — in reality, RRSP withdrawals before 65 are taxed only to the account owner (unless you've set up a spousal RRSP ahead of time), Barista FIRE side income can't legally be split with a spouse (the calculator already handles this case separately), and the estate tax bill is estimated as an even split between spouses rather than the survivor's own single-filer bracket (usually heavier). Non-registered distributions and net rent are taxed as ordinary income every year (no dividend gross-up/credit, no rental CCA depreciation modelled); GIS and the 60-64 spousal Allowance use a linear approximation of the official tables; TFSA/RRSP contribution room isn't checked and RRSP refunds aren't automatically reinvested; CPP enhancement (post-2019 contributions) isn't modelled, understating younger users' benefits (a conservative direction); debts and mortgages are treated as fixed nominal payments with no refinancing or variable rates; Monte Carlo draws one shared market outcome per year across all accounts (full correlation), when real-world correlation is somewhat lower (also conservative); large one-off costs like long-term care aren't modelled; and some Quebec RAMQ/FSS figures and provincial probate-fee rates are approximated from secondary sources rather than official year-by-year data, since the official sites block automated fetching."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
