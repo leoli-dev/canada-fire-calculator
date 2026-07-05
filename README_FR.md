@@ -58,11 +58,14 @@ couples, fractionnement du revenu sur deux déclarations.
 
 **Stratégies de décaissement**, comparées côte à côte avec vos propres chiffres :
 
-- **Meltdown REER plafonné au premier palier** (défaut) : le REER finance d'abord
+- **Meltdown REER plafonné** (défaut : premier palier) : le REER finance d'abord
   les dépenses, mais seulement selon le besoin et jamais au-delà de la place
-  restante dans le premier palier après RPC/SV (un palier par conjoint); le reste
-  passe 71 ans et sort via les minimums FERR. Rien n'est retiré juste pour payer
-  l'impôt d'avance.
+  restante dans le plafond choisi après RPC/SV (un plafond par conjoint) — le
+  premier palier par défaut, ou le deuxième palier / le seuil de récupération
+  de la SV pour les gros REER, afin d'éviter que l'argent reste coincé au
+  premier palier et finisse en retraits FERR forcés puis imposé à 100 % au
+  décès; le reste passe 71 ans et sort via les minimums FERR. Rien n'est
+  retiré juste pour payer l'impôt d'avance.
 - REER d'abord (agressif), non enregistré d'abord, CELI d'abord — pour voir
   exactement ce que coûte chaque choix.
 

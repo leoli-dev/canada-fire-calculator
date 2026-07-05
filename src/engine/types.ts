@@ -19,6 +19,16 @@ export type Strategy = 'meltdownPaced' | 'rrspFirst' | 'nonRegFirst' | 'tfsaFirs
 export const STRATEGIES: Strategy[] = ['meltdownPaced', 'rrspFirst', 'nonRegFirst', 'tfsaFirst']
 
 /**
+ * How far the paced meltdown fills the RRSP each year before capping:
+ * the first tax bracket (default, most conservative), the second bracket,
+ * or the OAS clawback threshold (common advice for large RRSPs, where
+ * staying in bracket 1 forever strands money into RRIF-forced withdrawals
+ * and a 100%-taxable estate).
+ */
+export type MeltdownCap = 'bracket1' | 'bracket2' | 'oasClawback'
+export const MELTDOWN_CAPS: MeltdownCap[] = ['bracket1', 'bracket2', 'oasClawback']
+
+/**
  * What the plan optimizes for — a life choice, not a calculation detail.
  * - legacy: maximize the after-tax estate at life expectancy
  * - dieWithZero: maximize stable real annual spending, ending near zero
@@ -132,6 +142,8 @@ export interface Inputs {
   oasAnnualAt65: number
   /** how retirement spending is funded */
   strategy: Strategy
+  /** meltdownPaced only: how far to fill the RRSP before capping (default bracket1) */
+  meltdownBracketCap?: MeltdownCap
   /** optimization goal; defaults to legacy */
   goal?: Goal
   /** assumed average inflation, for nominal-dollar display (default 2.1%) */

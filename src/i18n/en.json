@@ -176,7 +176,7 @@
     },
     "meltdown": {
       "title": "RRSP Meltdown",
-      "body": "Deliberately draining the RRSP during the low-income window after FIRE, keeping each year's taxable income within the lowest bracket (whatever room CPP/OAS leaves), to avoid two future tax events: forced RRIF minimums pushing you into higher brackets, and the remaining balance being taxed at the top rate at death. Note: the RRSP→RRIF conversion itself is tax-free, so there is no need to empty it by 71 - the remainder simply dribbles out via RRIF minimums; over-withdrawing just pays extra tax."
+      "body": "Deliberately draining the RRSP during the low-income window after FIRE, keeping each year's taxable income within the lowest bracket (whatever room CPP/OAS leaves), to avoid two future tax events: forced RRIF minimums pushing you into higher brackets, and the remaining balance being taxed at the top rate at death. Note: the RRSP→RRIF conversion itself is tax-free, so there is no need to empty it by 71 - the remainder simply dribbles out via RRIF minimums; over-withdrawing just pays extra tax. The \"meltdown ceiling\" offers three settings: the lowest bracket (default, most conservative), the second bracket, or the OAS clawback threshold - raising it helps large RRSPs empty faster in the early low-income years, reducing future RRIF-forced withdrawals and the fully-taxable balance at death, at the cost of somewhat more tax paid along the way."
     },
     "clawback": {
       "title": "OAS Clawback (recovery tax)",
@@ -361,5 +361,9 @@
   "prov_NL": "Newfoundland and Labrador",
   "prov_YT": "Yukon",
   "prov_NT": "Northwest Territories",
-  "prov_NU": "Nunavut"
+  "prov_NU": "Nunavut",
+  "meltdownCapLabel": "Meltdown ceiling",
+  "meltdownCap_bracket1": "Lowest bracket (default, most conservative)",
+  "meltdownCap_bracket2": "Second bracket",
+  "meltdownCap_oasClawback": "OAS clawback threshold"
 }

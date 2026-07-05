@@ -9,11 +9,13 @@ import {
 } from '../store'
 import {
   DEBT_KINDS,
+  MELTDOWN_CAPS,
   STRATEGIES,
   validateInputs,
   type AccountType,
   type DebtKind,
   type Goal,
+  type MeltdownCap,
   type Province,
   type Strategy,
   type ValidationIssue,
@@ -479,7 +481,22 @@ export function InputForm() {
             ))}
           </select>
         </label>
-        {inputs.strategy === 'meltdownPaced' && <p className="hint"><Jargon text={t('meltdownNote')} /></p>}
+        {inputs.strategy === 'meltdownPaced' && (
+          <>
+            <p className="hint"><Jargon text={t('meltdownNote')} /></p>
+            <label className="field">
+              <span><Jargon text={t('meltdownCapLabel')} /></span>
+              <select
+                value={inputs.meltdownBracketCap ?? 'bracket1'}
+                onChange={(e) => set({ meltdownBracketCap: e.target.value as MeltdownCap })}
+              >
+                {MELTDOWN_CAPS.map((c) => (
+                  <option key={c} value={c}>{t(`meltdownCap_${c}`)}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
       </fieldset>
 
       <button type="button" className="reset" onClick={reset}>{t('reset')}</button>

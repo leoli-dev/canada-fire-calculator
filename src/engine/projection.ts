@@ -10,6 +10,7 @@ import {
 import { incomeTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import {
+  OAS_CLAWBACK_THRESHOLD,
   cppAnnual,
   earlyClaimDilutionRelief,
   gisAnnual,
@@ -312,17 +313,21 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const rrifMin = bal.rrsp * rrifMinFactor(age)
       const forcedRrsp = Math.min(bal.rrsp, rrifMin)
       // bracket-capped meltdown: the RRSP funds spending first, but only as
-      // much as spending needs and never beyond the room left in the lowest
-      // tax bracket (per person) after CPP/OAS. Nothing is withdrawn just to
-      // prepay tax; the remainder rides past 71 and exits via RRIF minimums
-      // (which also stay far below the OAS clawback threshold). If the other
-      // accounts run dry, the RRSP is the uncapped last resort.
+      // much as spending needs and never beyond the room left in the chosen
+      // ceiling (per person) after CPP/OAS — the first bracket by default,
+      // or the second bracket / OAS clawback threshold for large RRSPs where
+      // staying in bracket 1 forever just strands money into RRIF-forced
+      // withdrawals and a fully-taxable estate. Nothing is withdrawn just to
+      // prepay tax; the remainder rides past 71 and exits via RRIF minimums.
+      // If the other accounts run dry, the RRSP is the uncapped last resort.
       let steps: Step[]
       if (inputs.strategy === 'meltdownPaced') {
-        const bracketTop = Math.min(
-          FEDERAL.brackets[0].upTo,
-          PROVINCIAL[inputs.province].brackets[0].upTo,
-        )
+        const capMode = inputs.meltdownBracketCap ?? 'bracket1'
+        const bIdx = capMode === 'bracket2' ? 1 : 0
+        const bracketTop =
+          capMode === 'oasClawback'
+            ? OAS_CLAWBACK_THRESHOLD
+            : Math.min(FEDERAL.brackets[bIdx].upTo, PROVINCIAL[inputs.province].brackets[bIdx].upTo)
         const persons = partner ? 2 : 1
         const committedTaxable =
           cpp + extraTaxable + rent + extraIncome + oasGrossPerPerson.reduce((s, x) => s + x, 0)

@@ -53,9 +53,12 @@ across two returns.
 **Withdrawal strategies**, compared side by side with your own numbers:
 
 - **Bracket-capped RRSP meltdown** (default): the RRSP funds spending first, but only
-  up to the lowest tax bracket's room left after CPP/OAS (one bracket per spouse);
-  the remainder rides past 71 and exits via RRIF minimums. Nothing is withdrawn just
-  to prepay tax.
+  up to a chosen ceiling's room left after CPP/OAS (one ceiling per spouse) —
+  the lowest tax bracket by default, or the second bracket / OAS clawback
+  threshold for large RRSPs where staying in bracket 1 forever just strands
+  money into RRIF-forced withdrawals and a fully-taxable estate. The remainder
+  rides past 71 and exits via RRIF minimums. Nothing is withdrawn just to
+  prepay tax.
 - Aggressive RRSP-first, non-registered-first, TFSA-first — so you can see exactly
   what each choice costs.
 

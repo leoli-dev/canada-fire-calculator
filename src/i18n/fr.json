@@ -176,7 +176,7 @@
     },
     "meltdown": {
       "title": "Meltdown du REER",
-      "body": "Vider délibérément le REER pendant la fenêtre à faible revenu après le FIRE, en gardant le revenu imposable de chaque année dans le premier palier (selon la place laissée par RPC/SV), pour éviter deux événements fiscaux futurs : les minimums FERR forcés et l'imposition du solde au décès. Note : la conversion REER→FERR est libre d'impôt - inutile de le vider avant 71 ans; le reste sort via les minimums FERR."
+      "body": "Vider délibérément le REER pendant la fenêtre à faible revenu après le FIRE, en gardant le revenu imposable de chaque année dans le premier palier (selon la place laissée par RPC/SV), pour éviter deux événements fiscaux futurs : les minimums FERR forcés et l'imposition du solde au décès. Note : la conversion REER→FERR est libre d'impôt - inutile de le vider avant 71 ans; le reste sort via les minimums FERR. Le « plafond du meltdown » propose trois réglages : le palier le plus bas (par défaut, le plus prudent), le deuxième palier, ou le seuil de récupération de la SV - l'augmenter aide les gros REER à se vider plus vite dans les premières années à faible revenu, réduisant les futurs retraits FERR forcés et le solde entièrement imposable au décès, au prix d'un peu plus d'impôt payé en cours de route."
     },
     "clawback": {
       "title": "Récupération de la SV (clawback)",
@@ -361,5 +361,9 @@
   "prov_NL": "Terre-Neuve-et-Labrador",
   "prov_YT": "Yukon",
   "prov_NT": "Territoires du Nord-Ouest",
-  "prov_NU": "Nunavut"
+  "prov_NU": "Nunavut",
+  "meltdownCapLabel": "Plafond du meltdown",
+  "meltdownCap_bracket1": "Palier le plus bas (par défaut, le plus prudent)",
+  "meltdownCap_bracket2": "Deuxième palier",
+  "meltdownCap_oasClawback": "Seuil de récupération de la SV"
 }

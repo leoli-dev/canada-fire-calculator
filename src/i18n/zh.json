@@ -176,7 +176,7 @@
     },
     "meltdown": {
       "title": "RRSP Meltdown（提前融化策略）",
-      "body": "在 FIRE 后的低收入窗口有计划地逐年取出 RRSP，把每年的应税收入压在最低税阶内（扣除 CPP/OAS 占用后的剩余额度），避免将来两个高税事件：RRIF 强制取款推高税率、身后剩余余额按最高税率清算。注意：RRSP→RRIF 转换本身免税，所以不需要在 71 岁前清空——剩余部分之后按 RRIF 最低取款慢慢流出即可，猛取反而多交税。"
+      "body": "在 FIRE 后的低收入窗口有计划地逐年取出 RRSP，把每年的应税收入压在最低税阶内（扣除 CPP/OAS 占用后的剩余额度），避免将来两个高税事件：RRIF 强制取款推高税率、身后剩余余额按最高税率清算。注意：RRSP→RRIF 转换本身免税，所以不需要在 71 岁前清空——剩余部分之后按 RRIF 最低取款慢慢流出即可，猛取反而多交税。\"Meltdown 天花板\"可选三档：最低税阶（默认，最保守）、第二税阶、或 OAS clawback 门槛——RRSP 余额较大的人把天花板抬到第二档甚至 clawback 门槛，能在退休早期多清出一些 RRSP，减少将来 RRIF 强制取款和身后 100% 计税的部分，代价是这些年多交一点税。"
     },
     "clawback": {
       "title": "OAS Clawback（回收税）",
@@ -361,5 +361,9 @@
   "prov_NL": "纽芬兰与拉布拉多",
   "prov_YT": "育空",
   "prov_NT": "西北地区",
-  "prov_NU": "努纳武特"
+  "prov_NU": "努纳武特",
+  "meltdownCapLabel": "Meltdown 天花板",
+  "meltdownCap_bracket1": "最低税阶（默认，最保守）",
+  "meltdownCap_bracket2": "第二税阶",
+  "meltdownCap_oasClawback": "OAS clawback 门槛"
 }

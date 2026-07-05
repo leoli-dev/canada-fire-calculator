@@ -241,6 +241,60 @@ describe('runProjection', () => {
     }
   })
 
+  it('meltdown bracket cap: bracket2 lets more RRSP out per year than bracket1', () => {
+    // ON: bracket1 top = min(58,523 fed, 53,891 ON) = 53,891;
+    // bracket2 top = min(117,045 fed, 107,785 ON) = 107,785 — a spending
+    // target between the two only fully clears the bracket if capped at 2
+    const big = {
+      ...base,
+      strategy: 'meltdownPaced' as const,
+      retirementSpending: 70000,
+      balances: { tfsa: 0, rrsp: 2_000_000, nonReg: 500000 },
+      nonRegBook: 500000,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 0,
+    }
+    const bracket1 = runProjection({ ...big, meltdownBracketCap: 'bracket1' })
+    const bracket2 = runProjection({ ...big, meltdownBracketCap: 'bracket2' })
+    const rrspAt50 = (r: typeof bracket1) => r.rows.find((x) => x.age === 50)!.withdrawals.rrsp
+    expect(rrspAt50(bracket2)).toBeGreaterThan(rrspAt50(bracket1))
+    // bracket1 still meets spending (from non-registered) — just less from RRSP
+    expect(bracket1.rows.find((x) => x.age === 50)!.netCash).toBeGreaterThanOrEqual(70000 - 0.01)
+  })
+
+  it('meltdown bracket cap: default (undefined) matches explicit bracket1', () => {
+    const big = {
+      ...base,
+      strategy: 'meltdownPaced' as const,
+      retirementSpending: 70000,
+      balances: { tfsa: 0, rrsp: 2_000_000, nonReg: 500000 },
+      nonRegBook: 500000,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 0,
+    }
+    const withDefault = runProjection(big)
+    const explicit = runProjection({ ...big, meltdownBracketCap: 'bracket1' })
+    expect(withDefault.finalNetWorth).toBeCloseTo(explicit.finalNetWorth, 0)
+  })
+
+  it('meltdown bracket cap: oasClawback uses the clawback threshold, between ON brackets 1 and 2', () => {
+    // ON: bracket1=53,891 < clawback=95,323 < bracket2=107,785 — a target in
+    // that gap clears fully under oasClawback but not under bracket1
+    const big = {
+      ...base,
+      strategy: 'meltdownPaced' as const,
+      retirementSpending: 90000,
+      balances: { tfsa: 0, rrsp: 2_000_000, nonReg: 500000 },
+      nonRegBook: 500000,
+      cppAnnualAt65: 0,
+      oasAnnualAt65: 0,
+    }
+    const bracket1 = runProjection({ ...big, meltdownBracketCap: 'bracket1' })
+    const clawback = runProjection({ ...big, meltdownBracketCap: 'oasClawback' })
+    const rrspAt50 = (r: typeof bracket1) => r.rows.find((x) => x.age === 50)!.withdrawals.rrsp
+    expect(rrspAt50(clawback)).toBeGreaterThan(rrspAt50(bracket1))
+  })
+
   it('handles multiple investment properties selling at different ages', () => {
     const r = runProjection({
       ...base,
