@@ -47,8 +47,9 @@ prescription-drug premium and FSS contribution, the age amount and pension incom
 credit from 65 (including Saskatchewan's senior supplement), 50% capital-gains
 inclusion tracked against your ACB, annual tax drag on non-registered distributions,
 per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees
-(with the employment-income exemption), and — for couples — income splitting
-across two returns.
+(with the employment-income exemption and the Allowance for a 60-64 spouse),
+probate/estate administration fees on death, and — for couples — income
+splitting across two returns.
 
 **Withdrawal strategies**, compared side by side with your own numbers:
 

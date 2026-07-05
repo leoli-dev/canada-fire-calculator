@@ -53,7 +53,8 @@ pension dès 65 ans (y compris le
 supplément pour aînés de la Saskatchewan), inclusion de 50 % des gains en capital
 suivie par le PBR, frein fiscal annuel sur les distributions non enregistrées,
 récupération de la SV par personne (taux 75+ inclus), SRG pour les retraités à
-faible revenu imposable (avec l'exemption pour revenu d'emploi) et, pour les
+faible revenu imposable (avec l'exemption pour revenu d'emploi et l'Allocation
+pour le conjoint de 60 à 64 ans), frais d'homologation au décès et, pour les
 couples, fractionnement du revenu sur deux déclarations.
 
 **Stratégies de décaissement**, comparées côte à côte avec vos propres chiffres :

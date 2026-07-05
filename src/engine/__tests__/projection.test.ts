@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { incomeTax } from '../tax'
+import { allowanceAnnual } from '../benefits'
 import type { Inputs } from '../types'
 
 const base: Inputs = {
@@ -503,5 +504,69 @@ describe('runProjection', () => {
       r.rows.find((x) => x.age === 66)!.gis
     expect(gisAt66(noRent)).toBeGreaterThan(0)
     expect(gisAt66(withRent)).toBeLessThan(gisAt66(noRent))
+  })
+})
+
+describe('allowanceAnnual', () => {
+  it('pays the 60-64 spouse of a GIS recipient, income-tested to zero at the cutoff', () => {
+    expect(allowanceAnnual([true, false], [67, 62], 0)).toBeGreaterThan(0)
+    expect(allowanceAnnual([true, false], [67, 62], 41616)).toBeCloseTo(0, 0)
+    expect(allowanceAnnual([true, false], [67, 62], 100000)).toBe(0)
+  })
+
+  it('requires exactly one OAS recipient', () => {
+    // neither receiving OAS: no Allowance
+    expect(allowanceAnnual([false, false], [64, 62], 0)).toBe(0)
+    // both receiving OAS: this is GIS_COUPLE territory, not the Allowance
+    expect(allowanceAnnual([true, true], [67, 62], 0)).toBe(0)
+  })
+
+  it('requires the other spouse to be 60-64, not any other age', () => {
+    expect(allowanceAnnual([true, false], [67, 59], 0)).toBe(0)
+    expect(allowanceAnnual([true, false], [67, 65], 0)).toBe(0)
+    expect(allowanceAnnual([true, false], [67, 60], 0)).toBeGreaterThan(0)
+    expect(allowanceAnnual([true, false], [67, 64], 0)).toBeGreaterThan(0)
+  })
+
+  it('does not apply to a single person (only defined for couples)', () => {
+    expect(allowanceAnnual([true], [67], 0)).toBe(0)
+  })
+
+  it('runProjection pays the Allowance to a younger spouse while the primary collects GIS', () => {
+    const r = runProjection({
+      ...base,
+      currentAge: 67,
+      fireAge: 67,
+      lifeExpectancy: 70,
+      cppStartAge: 70,
+      oasStartAge: 65,
+      cppAnnualAt65: 0,
+      retirementSpending: 25000,
+      strategy: 'tfsaFirst' as const,
+      balances: { tfsa: 500000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      partner: {
+        currentAge: 62,
+        cppStartAge: 70,
+        cppAnnualAt65: 0,
+        oasStartAge: 65,
+        oasAnnualAt65: 0, // partner isn't old enough for OAS regardless
+      },
+    })
+    const withoutPartner = runProjection({
+      ...base,
+      currentAge: 67,
+      fireAge: 67,
+      lifeExpectancy: 70,
+      cppStartAge: 70,
+      oasStartAge: 65,
+      cppAnnualAt65: 0,
+      retirementSpending: 25000,
+      strategy: 'tfsaFirst' as const,
+      balances: { tfsa: 500000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+    })
+    const gisAt67 = (r: ReturnType<typeof runProjection>) => r.rows.find((x) => x.age === 67)!.gis
+    expect(gisAt67(r)).toBeGreaterThan(gisAt67(withoutPartner))
   })
 })

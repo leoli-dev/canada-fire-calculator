@@ -11,6 +11,7 @@ import { incomeTax, probateTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import {
   OAS_CLAWBACK_THRESHOLD,
+  allowanceAnnual,
   cppAnnual,
   earlyClaimDilutionRelief,
   gisAnnual,
@@ -115,11 +116,11 @@ function evaluate(
   // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
   // exemption) — a couple's GIS eligibility is assessed on family income
   // regardless of which spouse earned what
-  const gis = gisAnnual(
-    oasGrossPerPerson.map((o) => o > 0),
-    pooledTaxable + extraIncome,
-    extraIncome,
-  )
+  const receivingOas = oasGrossPerPerson.map((o) => o > 0)
+  const gisIncome = pooledTaxable + extraIncome
+  const gis =
+    gisAnnual(receivingOas, gisIncome, extraIncome) +
+    allowanceAnnual(receivingOas, agesPerPerson, gisIncome)
   const netCash = cpp + oasNet + gis + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0

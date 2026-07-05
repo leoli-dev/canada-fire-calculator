@@ -80,6 +80,36 @@ export const GIS_SINGLE = { max: 13478, cutoff: 22800 }
 export const GIS_COUPLE = { maxEach: 8113, cutoff: 30096 }
 
 /**
+ * The Allowance: paid to the 60–64 spouse/common-law partner of a GIS
+ * recipient, tax-free, same linear-approximation shape as GIS. 2026 Q3
+ * figures approximated from secondary sources (~$1,428/month max,
+ * combined-income cutoff ~$41,616) — canada.ca's own tables were
+ * unreachable at time of writing; treat as directional (see devlog). Not
+ * modelling the separate, higher "Allowance for the Survivor" for widowed
+ * applicants, which needs a survivor scenario this engine doesn't have yet.
+ */
+export const ALLOWANCE = { max: 17137, cutoff: 41616 }
+
+/**
+ * Annual Allowance for a 60–64 spouse of a GIS recipient. Requires exactly
+ * one of the two people receiving OAS (the other being under 65, so their
+ * absence isn't itself the reason) and the other aged 60–64. Uses the same
+ * combined household income (excl. OAS) as the GIS test.
+ */
+export function allowanceAnnual(
+  receivingOas: boolean[],
+  agesPerPerson: number[],
+  householdIncome: number,
+): number {
+  if (receivingOas.length !== 2) return 0
+  const oasIdx = receivingOas.findIndex(Boolean)
+  if (oasIdx === -1 || receivingOas[1 - oasIdx]) return 0
+  const otherAge = agesPerPerson[1 - oasIdx]
+  if (otherAge < 60 || otherAge >= 65) return 0
+  return Math.max(0, ALLOWANCE.max * (1 - householdIncome / ALLOWANCE.cutoff))
+}
+
+/**
  * GIS employment-income exemption: the first $5,000 of work income doesn't
  * count, and only half of the next $10,000 does.
  */
