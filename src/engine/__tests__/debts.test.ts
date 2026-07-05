@@ -107,4 +107,15 @@ describe('debts in the projection', () => {
     const without = requiredFireAssets(base)
     expect(withDebt).toBeGreaterThan(without)
   })
+
+  it('never throws on transient invalid ages (FIRE age above life expectancy)', () => {
+    // typing "100" into the FIRE age field passes through here before
+    // validation flags it — the engine must stay a total function
+    const bad = { ...base, fireAge: 100, debts: [mortgage] }
+    expect(() => runProjection(bad)).not.toThrow()
+    expect(() => requiredFireAssets(bad)).not.toThrow()
+    expect(() => runProjection({ ...base, fireAge: 45.5, debts: [mortgage] })).not.toThrow()
+    expect(buildDebtStream([mortgage], -9, 0.02)).toEqual({ payments: [], balances: [] })
+    expect(buildDebtStream([mortgage], NaN, 0.02)).toEqual({ payments: [], balances: [] })
+  })
 })

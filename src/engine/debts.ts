@@ -42,13 +42,16 @@ export function buildDebtStream(
   years: number,
   inflation: number,
 ): DebtStream {
-  const payments = new Array<number>(years).fill(0)
-  const balances = new Array<number>(years).fill(0)
+  // total function: transient UI states can produce negative or fractional
+  // year spans (e.g. FIRE age typed above life expectancy) — never throw
+  const n = Number.isFinite(years) ? Math.max(0, Math.floor(years)) : 0
+  const payments = new Array<number>(n).fill(0)
+  const balances = new Array<number>(n).fill(0)
   for (const d of debts) {
     if (d.balance <= 0 || d.yearsRemaining <= 0) continue
     const r = impliedRate(d.balance, d.annualPayment, d.yearsRemaining)
     let nominal = d.balance
-    for (let t = 0; t < years && t < d.yearsRemaining; t++) {
+    for (let t = 0; t < n && t < d.yearsRemaining; t++) {
       const deflate = Math.pow(1 + inflation, -(t + 1))
       payments[t] += Math.min(d.annualPayment, nominal * (1 + r)) * deflate
       nominal = Math.max(0, nominal * (1 + r) - d.annualPayment)
