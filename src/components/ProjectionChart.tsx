@@ -48,6 +48,10 @@ export function ProjectionChart(props: {
   const hasProperty = data.some((d) => d.property > 0)
   const hasDebt = data.some((d) => d.debt > 0)
 
+  // transient invalid inputs (life expectancy typed below the current age)
+  // can produce zero rows — never crash the page over it
+  if (data.length === 0) return null
+
   return (
     <div className="chart-card">
       <h3>{t('chartTitle')}</h3>
