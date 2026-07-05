@@ -23,7 +23,7 @@ compte, pas d'IA — vos chiffres ne quittent jamais le navigateur (persistés e
 ```sh
 npm install
 npm run dev      # serveur de développement
-npm test         # 48 tests unitaires du moteur (vitest)
+npm test         # tests unitaires du moteur (vitest)
 npm run build    # vérification de types + build de production
 ```
 
@@ -170,10 +170,17 @@ la métrique de classement selon votre objectif. Un clic applique la ligne.
 **Calendrier RPC/SV** — tableaux complets pour chaque âge de début (RPC 60-70,
 SV 65-70).
 
+**Scénario A/B** — enregistrez vos données actuelles comme scénario A, puis
+changez ce que vous voulez et comparez côte à côte le résultat (réussite du plan,
+succession après impôt) avec vos chiffres actuels. Un bouton restaure le scénario A
+comme données actuelles à tout moment — explorer une hypothèse ne vous fait jamais
+perdre votre référence.
+
 **Monte-Carlo** — rendements aléatoires, plan rejoué 1 000 fois. Le panneau
 d'anatomie des échecs montre comment les mauvais scénarios échouent réellement
 (presque toujours : un marché baissier dans les cinq premières années — risque de
-séquence des rendements).
+séquence des rendements), et le graphique superpose la trajectoire du pire scénario
+— celui qui s'est épuisé le plus tôt — par-dessus les bandes de percentiles.
 
 ![Monte-Carlo](docs/screenshots/monte-carlo.png)
 

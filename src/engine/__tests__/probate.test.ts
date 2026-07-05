@@ -81,4 +81,45 @@ describe('probate in the projection estate value', () => {
     })
     expect(withHouse.probateFee).toBeCloseTo(probateTax(1_000_000, 'ON'), 0)
   })
+
+  it('a property-linked mortgage still owing at death reduces both the estate and its probate base', () => {
+    // 25-year mortgage against an 11-year (60->70) projection horizon: a big
+    // balance is still outstanding at life expectancy
+    const withMortgage = runProjection({
+      currentAge: 60,
+      fireAge: 60,
+      lifeExpectancy: 70,
+      province: 'ON',
+      annualSavings: 0,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      retirementSpending: 30000,
+      returns: { tfsa: 0.03, rrsp: 0.03, nonReg: 0.03 },
+      balances: { tfsa: 500000, rrsp: 0, nonReg: 500000 },
+      nonRegBook: 500000,
+      cppStartAge: 70,
+      cppAnnualAt65: 0,
+      oasStartAge: 70,
+      oasAnnualAt65: 0,
+      strategy: 'nonRegFirst' as const,
+      principalResidence: {
+        value: 800000,
+        appreciation: 0,
+        sellAtAge: null,
+        mortgage: { balance: 400000, annualPayment: 26000, yearsRemaining: 25 },
+      },
+    })
+    const lastRow = withMortgage.rows[withMortgage.rows.length - 1]
+    const chartNetWorth =
+      lastRow.balances.tfsa + lastRow.balances.rrsp + lastRow.balances.nonReg +
+      lastRow.propertyValue - lastRow.debtBalance
+
+    // finalNetWorth must agree with the same debtBalance the per-year rows
+    // and the balances/Monte Carlo charts already subtract
+    expect(withMortgage.finalNetWorth).toBeCloseTo(chartNetWorth, 0)
+
+    // probate is charged on the house's net (not gross) value once a
+    // mortgage is registered against it
+    const netHouseValue = lastRow.propertyValue - lastRow.debtBalance
+    expect(withMortgage.probateFee).toBeCloseTo(probateTax(netHouseValue, 'ON'), 0)
+  })
 })

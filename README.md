@@ -20,7 +20,7 @@ never leave the browser (they persist to `localStorage`). English / Français / 
 ```sh
 npm install
 npm run dev      # local dev server
-npm test         # 48 engine unit tests (vitest)
+npm test         # engine unit tests (vitest)
 npm run build    # type-check + production build
 ```
 
@@ -166,10 +166,17 @@ metric for your goal. One click applies any row.
 **CPP/OAS timing** — full tables for every start age (CPP 60–70, OAS 65–70): the
 adjusted annual benefit, the plan outcome, and the delta versus your current choice.
 
+**Scenario A/B** — save your current inputs as Scenario A, then change anything and
+compare outcome-vs-outcome (plan success, after-tax estate) against your current
+numbers, side by side. A restore button brings Scenario A back as your current
+inputs at any time, so exploring a what-if never costs you your baseline.
+
 **Monte Carlo** — randomizes each year's returns and reruns the whole plan 1,000
 times. The success rate is the share of runs that last to life expectancy; the
 failure-anatomy panel shows how the unlucky runs actually fail (almost always: a bear
-market in the first five years after FIRE — sequence-of-returns risk).
+market in the first five years after FIRE — sequence-of-returns risk), and the chart
+overlays the single worst-case trajectory — the run that depleted earliest — on top
+of the percentile bands.
 
 ![Monte Carlo](docs/screenshots/monte-carlo.png)
 

@@ -483,7 +483,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   }
 
   const ipTotal = ips.reduce((s, p) => s + p.value, 0)
-  const finalDebt = debtStream.balances[inputs.lifeExpectancy - inputs.currentAge] ?? 0
+  const lastYearIdx = inputs.lifeExpectancy - inputs.currentAge
+  // any property-linked mortgage still outstanding on a held property at
+  // life expectancy — same components as the per-row debtBalance above,
+  // which the generic debtStream-only figure used to omit (estate looked
+  // richer than the balances/Monte Carlo charts, which do subtract it)
+  const finalPropertyDebt =
+    (prValue > 0 ? prMortgage?.balances[lastYearIdx] ?? 0 : 0) +
+    ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[lastYearIdx] ?? 0 : 0), 0)
+  const finalDebt = (debtStream.balances[lastYearIdx] ?? 0) + finalPropertyDebt
   const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
@@ -495,9 +503,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   const estateTax = incomeTax(deemedTaxable, inputs.province) * persons
   const deemedTotal = bal.rrsp + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)
   const rrspEstateTax = deemedTotal > 0 ? estateTax * (bal.rrsp / deemedTotal) : 0
-  // probate applies to the full market value of non-registered holdings and
-  // unsold real estate; RRSP/RRIF/TFSA bypass it via named beneficiaries
-  const probateFee = probateTax(bal.nonReg + prValue + ipTotal, inputs.province)
+  // probate applies to the net value of non-registered holdings and unsold
+  // real estate (a registered mortgage against the property reduces the
+  // probatable estate); RRSP/RRIF/TFSA bypass it via named beneficiaries
+  const probateFee = probateTax(
+    bal.nonReg + Math.max(0, prValue + ipTotal - finalPropertyDebt),
+    inputs.province,
+  )
   return {
     rows,
     success: depletedAge === null,
