@@ -109,6 +109,7 @@
   "scenarioTitle": "场景对比",
   "scenarioSave": "保存当前为场景 A",
   "scenarioClear": "清除",
+  "scenarioRestore": "恢复场景 A 为当前输入",
   "scenarioA": "场景 A",
   "scenarioCurrent": "当前",
   "scenarioHint": "先保存快照，再改参数（晚两年退、少花 10%…）进行对比。",

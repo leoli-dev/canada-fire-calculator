@@ -83,6 +83,7 @@ interface Store {
   applyMixPreset: (account: AccountType, preset: string) => void
   setWorksheet: (key: string, value: number) => void
   saveScenarioA: () => void
+  restoreScenarioA: () => void
   clearScenarioA: () => void
   reset: () => void
 }
@@ -116,6 +117,8 @@ export const useStore = create<Store>()(
       setWorksheet: (key, value) =>
         set((s) => ({ worksheet: { ...s.worksheet, [key]: value } })),
       saveScenarioA: () => set((s) => ({ scenarioA: structuredClone(s.inputs) })),
+      restoreScenarioA: () =>
+        set((s) => (s.scenarioA ? { inputs: structuredClone(s.scenarioA) } : {})),
       clearScenarioA: () => set({ scenarioA: null }),
       reset: () =>
         set({

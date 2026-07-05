@@ -109,6 +109,7 @@
   "scenarioTitle": "Comparaison de scénarios",
   "scenarioSave": "Sauvegarder comme A",
   "scenarioClear": "Effacer",
+  "scenarioRestore": "Restaurer A comme entrées actuelles",
   "scenarioA": "Scénario A",
   "scenarioCurrent": "Actuel",
   "scenarioHint": "Sauvegardez un instantané, puis modifiez les paramètres pour comparer.",

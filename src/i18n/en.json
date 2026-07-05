@@ -109,6 +109,7 @@
   "scenarioTitle": "Scenario comparison",
   "scenarioSave": "Save current as A",
   "scenarioClear": "Clear",
+  "scenarioRestore": "Restore A as current inputs",
   "scenarioA": "Scenario A",
   "scenarioCurrent": "Current",
   "scenarioHint": "Save a snapshot, then change inputs (retire later, spend less…) to compare.",

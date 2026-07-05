@@ -22,7 +22,7 @@ function Cell(props: { r: ProjectionResult; life: number }) {
 
 export function ScenarioCard() {
   const { t } = useTranslation()
-  const { inputs, scenarioA, saveScenarioA, clearScenarioA } = useStore()
+  const { inputs, scenarioA, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
 
   const resultA = useMemo(
     () => (scenarioA ? runProjection(scenarioA) : null),
@@ -37,9 +37,14 @@ export function ScenarioCard() {
         <div>
           <button onClick={saveScenarioA}>{t('scenarioSave')}</button>
           {scenarioA && (
-            <button className="subtle" onClick={clearScenarioA}>
-              {t('scenarioClear')}
-            </button>
+            <>
+              <button className="subtle" onClick={restoreScenarioA}>
+                {t('scenarioRestore')}
+              </button>
+              <button className="subtle" onClick={clearScenarioA}>
+                {t('scenarioClear')}
+              </button>
+            </>
           )}
         </div>
       </div>
