@@ -15,7 +15,7 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
   const { inputs } = props
 
   return (
-    <div className="chart-card">
+    <div className="chart-card withdrawal-order-card">
       <label className="field">
         <span><Jargon text={t('withdrawalOrder')} /></span>
         <select

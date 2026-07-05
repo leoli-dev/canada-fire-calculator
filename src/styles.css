@@ -84,6 +84,8 @@ legend {
 }
 .field input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--blue); }
 
+.withdrawal-order-card .field select { width: auto; min-width: 260px; max-width: 100%; }
+
 .field:has(.field-issue) { flex-wrap: wrap; }
 .field-issue {
   flex-basis: 100%; font-style: normal; font-size: 0.75rem;
