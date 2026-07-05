@@ -133,12 +133,14 @@
   "goal": "Optimization goal",
   "goal_legacy": "Maximize estate",
   "goal_dieWithZero": "Die with Zero",
-  "dwzGoalNote": "Strategies are ranked by sustainable annual spending. All amounts are today's purchasing power - the engine uses inflation-adjusted real returns, so constant real spending already keeps pace with inflation.",
+  "dwzGoalNote": "Under Die with Zero, strategies are ranked by sustainable annual spending. All amounts are today's purchasing power - the engine uses inflation-adjusted real returns, so constant real spending already keeps pace with inflation.",
   "dwzSpending": "Max sustainable after-tax spending",
   "currentSpending": "currently set",
   "maxSpendingCol": "Sustainable spending/yr",
   "strategyNoteDwz": "Ranked by sustainable spending: the highest real annual spending each strategy can sustain to life expectancy, ending near zero - the less tax paid, the more you can spend.",
   "dwzNote": "In today's purchasing power - returns are inflation-adjusted, so constant real spending already covers inflation.",
+  "dwzRiskWarning": "For reference only, not a recommendation to apply directly: this is a zero-margin theoretical ceiling that assumes every year hits the expected return exactly - once Monte Carlo adds real volatility back in, its success rate is often low. Run the Monte Carlo simulation below first to check the real odds before using this number.",
+  "drawerBack": "Back to previous term",
   "glossary": {
     "rrsp": {
       "title": "RRSP - Registered Retirement Savings Plan",
@@ -190,7 +192,7 @@
     },
     "dwz": {
       "title": "Die with Zero",
-      "body": "A life choice: rather than maximizing an estate, spend the money while alive - target the highest stable spending that lasts exactly to life expectancy. Under this goal the calculator ranks strategies by sustainable annual spending; less tax paid means more to spend."
+      "body": "A life choice: rather than maximizing an estate, spend the money while alive - target the highest stable spending that lasts exactly to life expectancy. Under this goal the calculator ranks strategies by sustainable annual spending; less tax paid means more to spend. Note that this \"max sustainable spending\" is a theoretical ceiling computed assuming every year hits the expected return exactly - it has zero safety margin by construction. Real markets have good years and bad years, and Monte Carlo's success rate for this exact number is often noticeably low - always run Monte Carlo before applying it."
     },
     "montecarlo": {
       "title": "Monte Carlo simulation",

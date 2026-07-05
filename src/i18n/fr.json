@@ -133,12 +133,14 @@
   "goal": "Objectif d'optimisation",
   "goal_legacy": "Maximiser la succession",
   "goal_dieWithZero": "Die with Zero (tout dépenser)",
-  "dwzGoalNote": "Les stratégies sont classées selon les dépenses annuelles soutenables. Tous les montants sont en pouvoir d'achat d'aujourd'hui - rendements réels ajustés à l'inflation.",
+  "dwzGoalNote": "Sous Die with Zero, les stratégies sont classées selon les dépenses annuelles soutenables. Tous les montants sont en pouvoir d'achat d'aujourd'hui - rendements réels ajustés à l'inflation.",
   "dwzSpending": "Dépenses annuelles nettes soutenables max",
   "currentSpending": "actuellement",
   "maxSpendingCol": "Dépenses soutenables/an",
   "strategyNoteDwz": "Classement selon les dépenses soutenables : le plus haut niveau de dépenses réelles que chaque stratégie soutient jusqu'à l'espérance de vie, en finissant près de zéro - moins d'impôt, plus à dépenser.",
   "dwzNote": "En pouvoir d'achat d'aujourd'hui - rendements ajustés à l'inflation, des dépenses réelles constantes couvrent donc déjà l'inflation.",
+  "dwzRiskWarning": "À titre indicatif seulement, non recommandé de l'appliquer tel quel : c'est un plafond théorique à marge de sécurité nulle, qui suppose que chaque année atteint exactement le rendement attendu - dès que Monte-Carlo réintroduit la volatilité réelle, le taux de réussite est souvent faible. Lancez d'abord la simulation Monte-Carlo ci-dessous pour vérifier les vraies chances avant d'utiliser ce chiffre.",
+  "drawerBack": "Retour au terme précédent",
   "glossary": {
     "rrsp": {
       "title": "REER - Régime enregistré d’épargne-retraite",
@@ -190,7 +192,7 @@
     },
     "dwz": {
       "title": "Die with Zero (tout dépenser)",
-      "body": "Un choix de vie : plutôt que de maximiser la succession, dépenser l’argent de son vivant - viser les dépenses stables les plus élevées qui durent exactement jusqu’à l’espérance de vie. Sous cet objectif, les stratégies sont classées par dépenses soutenables."
+      "body": "Un choix de vie : plutôt que de maximiser la succession, dépenser l’argent de son vivant - viser les dépenses stables les plus élevées qui durent exactement jusqu’à l’espérance de vie. Sous cet objectif, les stratégies sont classées par dépenses soutenables. Attention : ces \"dépenses soutenables maximales\" sont un plafond théorique calculé en supposant que chaque année atteint exactement le rendement attendu - une marge de sécurité nulle par construction. Les marchés réels ont de bonnes et de mauvaises années, et le taux de réussite Monte-Carlo pour ce chiffre exact est souvent nettement plus faible - lancez toujours Monte-Carlo avant de l'appliquer."
     },
     "montecarlo": {
       "title": "Simulation Monte-Carlo",

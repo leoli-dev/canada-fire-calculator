@@ -126,6 +126,7 @@ details summary:hover { color: var(--ink); }
 details[open] summary { color: var(--ink); font-weight: 600; }
 
 .hint { font-size: 0.78rem; color: var(--ink-faint); margin: 6px 0 0; }
+.dwz-warning { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 6px 0 0; }
 
 .subhead {
   font-size: 0.78rem; font-weight: 650; color: var(--ink-faint);
@@ -321,12 +322,13 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
   gap: 12px; padding: 18px 20px 12px; margin: 0;
   border-bottom: 1px solid var(--line);
 }
+.drawer-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .drawer h2 { margin: 0; font-size: 1.05rem; letter-spacing: -0.01em; }
-.drawer-close {
+.drawer-close, .drawer-back {
   border: none; background: none; font-size: 1.5rem; line-height: 1;
-  color: var(--ink-faint); cursor: pointer; padding: 0 2px;
+  color: var(--ink-faint); cursor: pointer; padding: 0 2px; flex-shrink: 0;
 }
-.drawer-close:hover { color: var(--ink); }
+.drawer-close:hover, .drawer-back:hover { color: var(--ink); }
 .drawer-body {
   padding: 16px 20px 24px; overflow-y: auto;
   font-size: 0.92rem; line-height: 1.7; color: var(--ink-soft);

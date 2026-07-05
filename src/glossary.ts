@@ -57,13 +57,26 @@ export function termIdFor(match: string): string | undefined {
 }
 
 interface GlossaryState {
+  history: string[]
   term: string | null
   open: (id: string) => void
+  back: () => void
   close: () => void
 }
 
 export const useGlossary = create<GlossaryState>((set) => ({
+  history: [],
   term: null,
-  open: (id) => set({ term: id }),
-  close: () => set({ term: null }),
+  open: (id) =>
+    set((s) => {
+      if (s.history[s.history.length - 1] === id) return s
+      const history = [...s.history, id]
+      return { history, term: id }
+    }),
+  back: () =>
+    set((s) => {
+      const history = s.history.slice(0, -1)
+      return { history, term: history[history.length - 1] ?? null }
+    }),
+  close: () => set({ history: [], term: null }),
 }))

@@ -103,6 +103,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
                 <span className="hint"> ({t('currentSpending')}: {cad(inputs.retirementSpending)})</span>
               </p>
               <p className="hint"><Jargon text={t('dwzNote')} /></p>
+              <p className="dwz-warning"><Jargon text={t('dwzRiskWarning')} /></p>
             </>
           )}
         </>
