@@ -196,7 +196,7 @@
     },
     "estate": {
       "title": "Fiscalité successorale (disposition présumée)",
-      "body": "Le Canada n’a pas d’impôt successoral formel, mais au décès les actifs sont réputés vendus : le REER/FERR restant est entièrement imposé dans la dernière année (sauf roulement au conjoint survivant) et 50 % des gains non réalisés sont imposés. Le CELI et la résidence principale passent libres d’impôt."
+      "body": "Le Canada n’a pas d’impôt successoral formel, mais au décès les actifs sont réputés vendus : le REER/FERR restant est entièrement imposé dans la dernière année (sauf roulement au conjoint survivant) et 50 % des gains non réalisés sont imposés. Le CELI et la résidence principale passent libres d’impôt. Les avoirs non enregistrés et l’immobilier non vendu doivent aussi des **frais d’homologation / d’administration successorale** (selon la province — environ 1,5 % en Ontario, 1,4 % en C.-B., jusqu’à 1,7 % en Nouvelle-Écosse (le plus élevé), quelques centaines de dollars fixes en Alberta et au Québec, rien au Manitoba); le REER/FERR/CELI avec bénéficiaire désigné y échappe entièrement. C’est pourquoi la valeur successorale nette — après impôt de décès et frais d’homologation — est la vraie mesure de comparaison."
     },
     "principalresidence": {
       "title": "Exemption pour résidence principale",

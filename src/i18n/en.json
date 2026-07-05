@@ -196,7 +196,7 @@
     },
     "estate": {
       "title": "Estate taxation (deemed disposition)",
-      "body": "Canada has no formal estate tax, but at death assets are deemed sold: the remaining RRSP/RRIF is fully income in the final year (unless rolled to a surviving spouse) and 50% of unrealized non-registered gains is taxed. TFSA and the principal residence pass tax-free. That is why after-tax estate value is the honest comparison metric."
+      "body": "Canada has no formal estate tax, but at death assets are deemed sold: the remaining RRSP/RRIF is fully income in the final year (unless rolled to a surviving spouse) and 50% of unrealized non-registered gains is taxed. TFSA and the principal residence pass tax-free. Non-registered holdings and unsold real estate also owe **probate / estate administration fees** (province-dependent — roughly 1.5% in Ontario, 1.4% in BC, up to 1.7% in Nova Scotia (the highest), a few hundred dollars flat in Alberta and Quebec, nothing in Manitoba); RRSP/RRIF/TFSA with a named beneficiary bypass it entirely. That is why after-tax estate value — net of both the death-year tax and probate — is the honest comparison metric."
     },
     "principalresidence": {
       "title": "Principal Residence Exemption",

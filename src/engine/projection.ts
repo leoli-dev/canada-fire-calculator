@@ -7,7 +7,7 @@ import {
   type Strategy,
   type YearRow,
 } from './types'
-import { incomeTax } from './tax'
+import { incomeTax, probateTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import {
   OAS_CLAWBACK_THRESHOLD,
@@ -420,13 +420,17 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   const estateTax = incomeTax(deemedTaxable, inputs.province) * persons
   const deemedTotal = bal.rrsp + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)
   const rrspEstateTax = deemedTotal > 0 ? estateTax * (bal.rrsp / deemedTotal) : 0
+  // probate applies to the full market value of non-registered holdings and
+  // unsold real estate; RRSP/RRIF/TFSA bypass it via named beneficiaries
+  const probateFee = probateTax(bal.nonReg + prValue + ipTotal, inputs.province)
   return {
     rows,
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
     estateTax,
-    estateValue: finalNetWorth - estateTax,
+    probateFee,
+    estateValue: finalNetWorth - estateTax - probateFee,
     rrspTax: rrspTaxTotal + rrspEstateTax,
   }
 }

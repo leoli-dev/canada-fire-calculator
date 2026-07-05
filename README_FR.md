@@ -71,9 +71,12 @@ couples, fractionnement du revenu sur deux déclarations.
 
 **Honnêteté successorale** : au décès, le REER/FERR restant est entièrement imposé
 dans la dernière année et la moitié des gains non réalisés est imposée (le CELI et
-la résidence principale passent libres d'impôt). Les stratégies sont donc classées
-par **valeur successorale après impôt** — ou, sous l'objectif **Die with Zero**,
-par les dépenses annuelles soutenables maximales.
+la résidence principale passent libres d'impôt); les avoirs non enregistrés et
+l'immobilier non vendu doivent aussi des frais d'homologation (les 13 barèmes
+provinciaux/territoriaux sont intégrés — les comptes avec bénéficiaire désigné y
+échappent). Les stratégies sont donc classées par **valeur successorale après
+impôt** — ou, sous l'objectif **Die with Zero**, par les dépenses annuelles
+soutenables maximales.
 
 **Également modélisés** : vente de la résidence principale (libre d'impôt),
 n'importe quel nombre d'immeubles locatifs — chacun vendable à son propre âge

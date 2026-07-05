@@ -207,6 +207,12 @@ export interface ProjectionResult {
    * 50% of unrealized non-registered and investment-property gains.
    */
   estateTax: number
+  /**
+   * Probate / estate administration fee on probatable assets (non-registered
+   * account, unsold real estate) — registered accounts bypass it via named
+   * beneficiary designation.
+   */
+  probateFee: number
   /** after-tax estate value — the number strategies should be ranked by */
   estateValue: number
   /**

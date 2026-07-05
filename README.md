@@ -64,8 +64,11 @@ across two returns.
 
 **Estate honesty**: at death the remaining RRSP/RRIF is fully taxable in the final
 year and half of unrealized gains is taxed (TFSA and the principal residence pass
-free). Strategies are therefore ranked by **after-tax estate value** — or, under the
-**Die-with-Zero** goal, by the maximum sustainable annual spending.
+free); non-registered holdings and unsold real estate also owe probate/estate
+administration fees (province-dependent, all 13 tables built in — registered
+accounts bypass it via named beneficiary). Strategies are therefore ranked by
+**after-tax estate value** — or, under the **Die-with-Zero** goal, by the
+maximum sustainable annual spending.
 
 **Also modelled**: principal-residence sale (tax-free, e.g. downsizing at a chosen
 age), any number of investment properties — each sellable at its own age (gain

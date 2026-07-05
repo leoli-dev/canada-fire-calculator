@@ -5,6 +5,7 @@ import {
   ON_HEALTH_PREMIUM,
   ON_SURTAX,
   PROV_AGE_PENSION,
+  PROBATE_RATES,
   PROVINCIAL,
   QC_ABATEMENT,
   QC_FSS,
@@ -134,6 +135,13 @@ export function qcRamqPremium(income: number): number {
   const excess = Math.max(0, income - threshold)
   if (excess <= band1) return excess * rate1
   return Math.min(max, band1 * rate1 + (excess - band1) * rate2)
+}
+
+/** Probate / estate administration fee on probatable assets — see taxData.ts. */
+export function probateTax(value: number, province: Province): number {
+  if (value <= 0) return 0
+  const { flat, rate, threshold } = PROBATE_RATES[province]
+  return flat + rate * Math.max(0, value - threshold)
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */

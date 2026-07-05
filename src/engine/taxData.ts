@@ -216,6 +216,33 @@ export const QC_FSS = { t1: 18500, t2: 64355, cap1: 150, cap2: 1000 }
  */
 export const QC_RAMQ = { threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 }
 
+/**
+ * Probate / estate administration fees: flat + rate * max(0, value − threshold),
+ * applied to probatable assets (non-registered account, unsold real estate).
+ * Registered accounts (RRSP/RRIF/TFSA) bypass probate via named beneficiary
+ * designation — the norm in Canada — so they're excluded from the base.
+ * 2026 figures (taxtips.ca, current as of 2026-01-25); small provinces with
+ * multiple tiers below their main rate (AB, PE, NL, NS, NB) are simplified to
+ * a single flat+rate matching the top tier — immaterial for the sizeable
+ * estates this calculator projects. YT/NT/NU approximated from YT's modest
+ * flat filing fee (NT/NU rates not published; assumed similar).
+ */
+export const PROBATE_RATES: Record<Province, { flat: number; rate: number; threshold: number }> = {
+  ON: { flat: 0, rate: 0.015, threshold: 50000 },
+  BC: { flat: 200, rate: 0.014, threshold: 50000 },
+  AB: { flat: 525, rate: 0, threshold: 0 },
+  QC: { flat: 243, rate: 0, threshold: 0 }, // court will-verification fee
+  MB: { flat: 0, rate: 0, threshold: 0 }, // abolished November 2020
+  SK: { flat: 200, rate: 0.007, threshold: 0 },
+  NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, // highest in Canada
+  NB: { flat: 100, rate: 0.005, threshold: 20000 },
+  PE: { flat: 400, rate: 0.004, threshold: 100000 },
+  NL: { flat: 60, rate: 0.006, threshold: 1000 },
+  YT: { flat: 140, rate: 0, threshold: 0 },
+  NT: { flat: 140, rate: 0, threshold: 0 },
+  NU: { flat: 140, rate: 0, threshold: 0 },
+}
+
 /** Federal age amount (65+): credit base, phased out at 15% above threshold. */
 export const FED_AGE_AMOUNT = { max: 9208, threshold: 46432, rate: 0.15 }
 /** Federal pension income amount (not indexed). */
