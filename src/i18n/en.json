@@ -292,5 +292,19 @@
   "mcFailStats": "Anatomy of the unlucky scripts: {{count}} runs failed ({{pct}}%) - the worst went broke at {{earliest}}, the typical failed run at {{median}}.",
   "mcFailWhy": "Failed runs averaged {{failed}}%/yr over the first 5 post-FIRE years, versus {{succeeded}}% for successful runs - the unlucky script is almost always the same one: a bear market right after retiring forces selling at the bottom to fund spending, and the damaged principal never recovers (sequence-of-returns risk). Late bear markets barely hurt.",
   "mcNoFail": "All {{n}} runs lasted to life expectancy - no failing scripts.",
-  "createdBy": "Created by"
+  "createdBy": "Created by",
+  "valBanner": "{{count}} input error(s) — results below can’t be trusted until fixed",
+  "valAgeRange": "Must be between {{min}} and {{max}}",
+  "valFireBeforeCurrent": "FIRE age can’t be below your current age",
+  "valLifeBeforeFire": "Life expectancy can’t be below the FIRE age",
+  "valNegative": "Can’t be negative",
+  "valCppWindow": "Claim age must be between {{min}} and {{max}}",
+  "valOasWindow": "Claim age must be between {{min}} and {{max}}",
+  "valCppMax": "Above the official maximum of ${{max}}",
+  "valOasMax": "Above the official full amount at 65 (${{max}})",
+  "valSplitSum": "Split adds up to {{sum}}%, should be 100%",
+  "valBookExceeds": "Book value exceeds the non-registered balance (engine caps it)",
+  "valAcbAboveValue": "ACB above market value — a negative gain is taxed as zero",
+  "valSellBeforeFire": "A sale before the FIRE age is deferred to the FIRE year",
+  "valSellInPast": "Sale age is in the past; treated as an immediate sale"
 }

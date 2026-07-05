@@ -292,5 +292,19 @@
   "mcFailStats": "Anatomie des mauvais scénarios : {{count}} essais échoués ({{pct}} %) - le pire s'épuise à {{earliest}} ans, l'échec typique à {{median}} ans.",
   "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis - le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
   "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie - aucun scénario d'échec.",
-  "createdBy": "Créé par"
+  "createdBy": "Créé par",
+  "valBanner": "{{count}} erreur(s) de saisie — les résultats ci-dessous ne sont pas fiables avant correction",
+  "valAgeRange": "Doit être entre {{min}} et {{max}}",
+  "valFireBeforeCurrent": "L’âge FIRE ne peut pas être inférieur à l’âge actuel",
+  "valLifeBeforeFire": "L’espérance de vie ne peut pas être inférieure à l’âge FIRE",
+  "valNegative": "Ne peut pas être négatif",
+  "valCppWindow": "L’âge de début doit être entre {{min}} et {{max}}",
+  "valOasWindow": "L’âge de début doit être entre {{min}} et {{max}}",
+  "valCppMax": "Au-dessus du maximum officiel de {{max}} $",
+  "valOasMax": "Au-dessus du montant complet à 65 ans ({{max}} $)",
+  "valSplitSum": "La répartition totalise {{sum}} %, elle devrait être 100 %",
+  "valBookExceeds": "Le prix de base dépasse le solde non enregistré (plafonné par le moteur)",
+  "valAcbAboveValue": "PBR supérieur à la valeur marchande — un gain négatif est imposé à zéro",
+  "valSellBeforeFire": "Une vente avant l’âge FIRE est reportée à l’année FIRE",
+  "valSellInPast": "L’âge de vente est passé ; traité comme une vente immédiate"
 }

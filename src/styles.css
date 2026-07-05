@@ -82,6 +82,21 @@ legend {
 }
 .field input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--blue); }
 
+.field:has(.field-issue) { flex-wrap: wrap; }
+.field-issue {
+  flex-basis: 100%; font-style: normal; font-size: 0.75rem;
+  text-align: right; margin-top: -2px;
+}
+.field-issue.error { color: var(--red); }
+.field-issue.warning { color: var(--amber); }
+.field input.invalid-error { border-color: var(--red); }
+.field input.invalid-warning { border-color: var(--amber); }
+.validation-banner {
+  background: rgba(198, 40, 40, 0.08); border: 1px solid rgba(198, 40, 40, 0.35);
+  border-radius: var(--radius); color: var(--red);
+  font-size: 0.82rem; padding: 9px 12px; margin: 0 0 12px;
+}
+
 details { margin: 10px 0 2px; }
 details summary {
   cursor: pointer; font-size: 0.86rem; color: var(--ink-soft);

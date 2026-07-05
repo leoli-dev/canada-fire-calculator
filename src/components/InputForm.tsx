@@ -1,11 +1,14 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DEFAULT_PARTNER, MIX_PRESETS, useStore, WORKSHEET_KEYS } from '../store'
 import {
   STRATEGIES,
+  validateInputs,
   type AccountType,
   type Goal,
   type Province,
   type Strategy,
+  type ValidationIssue,
 } from '../engine'
 import { useCad } from '../format'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
@@ -19,16 +22,24 @@ function Num(props: {
   value: number
   onChange: (v: number) => void
   step?: number
+  issue?: ValidationIssue
 }) {
+  const { t } = useTranslation()
   return (
     <label className="field">
       <span><Jargon text={props.label} /></span>
       <input
         type="number"
+        className={props.issue ? `invalid-${props.issue.severity}` : undefined}
         value={props.value}
         step={props.step ?? 1}
         onChange={(e) => props.onChange(Number(e.target.value))}
       />
+      {props.issue && (
+        <em className={`field-issue ${props.issue.severity}`}>
+          {t(props.issue.key, props.issue.params)}
+        </em>
+      )}
     </label>
   )
 }
@@ -37,18 +48,26 @@ function OptionalAge(props: {
   label: string
   value: number | null
   onChange: (v: number | null) => void
+  issue?: ValidationIssue
 }) {
+  const { t } = useTranslation()
   return (
     <label className="field">
       <span><Jargon text={props.label} /></span>
       <input
         type="number"
+        className={props.issue ? `invalid-${props.issue.severity}` : undefined}
         value={props.value ?? ''}
         placeholder="—"
         onChange={(e) =>
           props.onChange(e.target.value === '' ? null : Number(e.target.value))
         }
       />
+      {props.issue && (
+        <em className={`field-issue ${props.issue.severity}`}>
+          {t(props.issue.key, props.issue.params)}
+        </em>
+      )}
     </label>
   )
 }
@@ -65,13 +84,23 @@ export function InputForm() {
 
   const worksheetTotal = WORKSHEET_KEYS.reduce((s, k) => s + (worksheet[k] || 0), 0)
 
+  const issues = useMemo(() => validateInputs(inputs), [inputs])
+  // errors outrank warnings when a field has both
+  const issueFor = (field: string) =>
+    issues.find((i) => i.field === field && i.severity === 'error') ??
+    issues.find((i) => i.field === field)
+  const errorCount = issues.filter((i) => i.severity === 'error').length
+
   return (
     <form className="input-form" onSubmit={(e) => e.preventDefault()}>
+      {errorCount > 0 && (
+        <p className="validation-banner">{t('valBanner', { count: errorCount })}</p>
+      )}
       <fieldset>
         <legend>{t('profile')}</legend>
-        <Num label={t('currentAge')} value={inputs.currentAge} onChange={(v) => set({ currentAge: v })} />
-        <Num label={t('fireAge')} value={inputs.fireAge} onChange={(v) => set({ fireAge: v })} />
-        <Num label={t('lifeExpectancy')} value={inputs.lifeExpectancy} onChange={(v) => set({ lifeExpectancy: v })} />
+        <Num label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
+        <Num label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
+        <Num label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
         <label className="field">
           <span><Jargon text={t('province')} /></span>
           <select
@@ -83,8 +112,8 @@ export function InputForm() {
             ))}
           </select>
         </label>
-        <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} onChange={(v) => set({ annualSavings: v })} />
-        <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} onChange={(v) => set({ retirementSpending: v })} />
+        <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
+        <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
         <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
           onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
         <label className="field">
@@ -135,7 +164,7 @@ export function InputForm() {
         </label>
         {inputs.partner && (
           <>
-            <Num label={t('partnerAge')} value={inputs.partner.currentAge}
+            <Num label={t('partnerAge')} value={inputs.partner.currentAge} issue={issueFor('partner.currentAge')}
               onChange={(v) => set({ partner: { ...inputs.partner!, currentAge: v } })} />
             <p className="hint"><Jargon text={t('coupleNote')} /></p>
           </>
@@ -165,10 +194,11 @@ export function InputForm() {
             label={t(a)}
             value={inputs.balances[a]}
             step={5000}
+            issue={issueFor(`balances.${a}`)}
             onChange={(v) => set({ balances: { ...inputs.balances, [a]: v } })}
           />
         ))}
-        <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onChange={(v) => set({ nonRegBook: v })} />
+        <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
 
         <details>
           <summary><Jargon text={t('nonRegTaxTitle')} /></summary>
@@ -207,8 +237,13 @@ export function InputForm() {
           <summary>{t('savingsSplit')}</summary>
           {ACCOUNTS.map((a) => (
             <Num key={a} label={t(a)} value={Math.round(inputs.savingsSplit[a] * 100)}
-              onChange={(v) => set({ savingsSplit: { ...inputs.savingsSplit, [a]: v / 100 } })} />
+              onChange={(v) => set({ savingsSplit: { ...inputs.savingsSplit, [a]: Math.max(0, v) / 100 } })} />
           ))}
+          {issueFor('savingsSplit') && (
+            <em className="field-issue warning">
+              {t(issueFor('savingsSplit')!.key, issueFor('savingsSplit')!.params)}
+            </em>
+          )}
         </details>
       </fieldset>
 

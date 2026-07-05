@@ -292,5 +292,19 @@
   "mcFailStats": "倒霉剧本解剖：{{count}} 次模拟失败（{{pct}}%）——最惨的一次钱在 {{earliest}} 岁耗尽，失败剧本的典型耗尽年龄是 {{median}} 岁。",
   "mcFailWhy": "失败组 FIRE 后前 5 年的平均年收益是 {{failed}}%，而成功组是 {{succeeded}}%——倒霉的方式几乎总是同一种：刚退休就撞上熊市，被迫在低点卖资产维持支出，本金受损后再也翻不了身（收益顺序风险）。后期的熊市反而伤不到什么。",
   "mcNoFail": "{{n}} 次模拟全部撑到预期寿命，没有失败剧本。",
-  "createdBy": "作者："
+  "createdBy": "作者：",
+  "valBanner": "有 {{count}} 处输入错误——修正前下方结果不可信",
+  "valAgeRange": "须在 {{min}}–{{max}} 之间",
+  "valFireBeforeCurrent": "FIRE 年龄不能小于当前年龄",
+  "valLifeBeforeFire": "预期寿命不能小于 FIRE 年龄",
+  "valNegative": "不能为负数",
+  "valCppWindow": "开领年龄须在 {{min}}–{{max}} 之间",
+  "valOasWindow": "开领年龄须在 {{min}}–{{max}} 之间",
+  "valCppMax": "超过官方最高年金 ${{max}}",
+  "valOasMax": "超过 65 岁官方全额 ${{max}}",
+  "valSplitSum": "三账户占比合计 {{sum}}%，应为 100%",
+  "valBookExceeds": "成本基础大于非注册余额（引擎将按余额封顶）",
+  "valAcbAboveValue": "ACB 大于市值——增值为负时按零计税",
+  "valSellBeforeFire": "早于 FIRE 年龄的出售会被推迟到 FIRE 当年",
+  "valSellInPast": "出售年龄早于当前年龄，将视为立即出售"
 }

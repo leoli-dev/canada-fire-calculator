@@ -10,6 +10,7 @@ export {
   OAS_FULL_AT_65,
 } from './benefits'
 export { rrifMinFactor } from './rrif'
+export { validateInputs, type ValidationIssue, type Severity } from './validate'
 export { pensionStartAge, runProjection, type ReturnSampler } from './projection'
 export {
   compareStrategies,
