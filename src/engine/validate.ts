@@ -94,14 +94,16 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     if (pr.sellAtAge !== null && pr.sellAtAge < inputs.currentAge)
       warn('principalResidence.sellAtAge', 'valSellInPast')
   }
-  const ip = inputs.investmentProperty
-  if (ip) {
-    if (ip.value < 0) err('investmentProperty.value', 'valNegative')
-    if (ip.acb < 0) err('investmentProperty.acb', 'valNegative')
-    if (ip.acb > ip.value) warn('investmentProperty.acb', 'valAcbAboveValue')
+  const ips = inputs.investmentProperties ?? []
+  ips.forEach((ip, i) => {
+    const at = (f: string) => `investmentProperties.${i}.${f}`
+    if (ip.value < 0) err(at('value'), 'valNegative')
+    if (ip.acb < 0) err(at('acb'), 'valNegative')
+    if ((ip.annualRent ?? 0) < 0) err(at('annualRent'), 'valNegative')
+    if (ip.acb > ip.value) warn(at('acb'), 'valAcbAboveValue')
     if (ip.sellAtAge !== null && ip.sellAtAge < inputs.fireAge)
-      warn('investmentProperty.sellAtAge', 'valSellBeforeFire')
-  }
+      warn(at('sellAtAge'), 'valSellBeforeFire')
+  })
 
   return issues
 }

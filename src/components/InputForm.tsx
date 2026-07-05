@@ -1,6 +1,12 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DEFAULT_PARTNER, MIX_PRESETS, useStore, WORKSHEET_KEYS } from '../store'
+import {
+  DEFAULT_INVESTMENT_PROPERTY,
+  DEFAULT_PARTNER,
+  MIX_PRESETS,
+  useStore,
+  WORKSHEET_KEYS,
+} from '../store'
 import {
   STRATEGIES,
   validateInputs,
@@ -275,32 +281,63 @@ export function InputForm() {
           </>
         )}
 
-        <label className="field">
-          <span><Jargon text={t('investmentProperty')} /></span>
-          <input
-            type="checkbox"
-            checked={!!inputs.investmentProperty}
-            onChange={(e) =>
-              set({
-                investmentProperty: e.target.checked
-                  ? { value: 500000, acb: 400000, appreciation: 0.02, sellAtAge: null }
-                  : null,
-              })
-            }
-          />
-        </label>
-        {inputs.investmentProperty && (
-          <>
-            <Num label={t('propValue')} value={inputs.investmentProperty.value} step={25000}
-              onChange={(v) => set({ investmentProperty: { ...inputs.investmentProperty!, value: v } })} />
-            <Num label={t('propAcb')} value={inputs.investmentProperty.acb} step={25000}
-              onChange={(v) => set({ investmentProperty: { ...inputs.investmentProperty!, acb: v } })} />
-            <Num label={t('propAppreciation')} value={inputs.investmentProperty.appreciation * 100} step={0.5}
-              onChange={(v) => set({ investmentProperty: { ...inputs.investmentProperty!, appreciation: v / 100 } })} />
-            <OptionalAge label={t('propSellAt')} value={inputs.investmentProperty.sellAtAge}
-              onChange={(v) => set({ investmentProperty: { ...inputs.investmentProperty!, sellAtAge: v } })} />
-            <p className="hint"><Jargon text={t('ipNote')} /></p>
-          </>
+        {(inputs.investmentProperties ?? []).map((ip, i) => {
+          const patch = (part: Partial<typeof ip>) => {
+            const next = [...(inputs.investmentProperties ?? [])]
+            next[i] = { ...ip, ...part }
+            set({ investmentProperties: next })
+          }
+          return (
+            <div className="property-card" key={i}>
+              <p className="subhead property-head">
+                <Jargon text={t('investmentProperty')} /> #{i + 1}
+                <button
+                  type="button"
+                  className="remove-item"
+                  onClick={() =>
+                    set({
+                      investmentProperties: (inputs.investmentProperties ?? []).filter(
+                        (_, j) => j !== i,
+                      ),
+                    })
+                  }
+                >
+                  {t('removeItem')}
+                </button>
+              </p>
+              <Num label={t('propValue')} value={ip.value} step={25000}
+                issue={issueFor(`investmentProperties.${i}.value`)}
+                onChange={(v) => patch({ value: v })} />
+              <Num label={t('propAcb')} value={ip.acb} step={25000}
+                issue={issueFor(`investmentProperties.${i}.acb`)}
+                onChange={(v) => patch({ acb: v })} />
+              <Num label={t('propAppreciation')} value={ip.appreciation * 100} step={0.5}
+                onChange={(v) => patch({ appreciation: v / 100 })} />
+              <Num label={t('propRent')} value={ip.annualRent ?? 0} step={1000}
+                issue={issueFor(`investmentProperties.${i}.annualRent`)}
+                onChange={(v) => patch({ annualRent: v })} />
+              <OptionalAge label={t('propSellAt')} value={ip.sellAtAge}
+                issue={issueFor(`investmentProperties.${i}.sellAtAge`)}
+                onChange={(v) => patch({ sellAtAge: v })} />
+            </div>
+          )
+        })}
+        <button
+          type="button"
+          className="add-item"
+          onClick={() =>
+            set({
+              investmentProperties: [
+                ...(inputs.investmentProperties ?? []),
+                { ...DEFAULT_INVESTMENT_PROPERTY },
+              ],
+            })
+          }
+        >
+          {t('addProperty')}
+        </button>
+        {(inputs.investmentProperties?.length ?? 0) > 0 && (
+          <p className="hint"><Jargon text={t('ipNote')} /></p>
         )}
       </fieldset>
 

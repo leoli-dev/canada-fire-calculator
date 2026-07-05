@@ -124,11 +124,16 @@ export interface TargetReport {
 export function targetReport(inputs: Inputs, target: number): TargetReport {
   const bal = { ...inputs.balances }
   const pr = inputs.principalResidence
-  const ip = inputs.investmentProperty
   let prValue = pr?.value ?? 0
-  let ipValue = ip?.value ?? 0
-  const ipAcb = ip ? Math.min(ip.acb, ipValue) : 0
+  const ips = (inputs.investmentProperties ?? []).map((p) => ({
+    value: p.value,
+    acb: Math.min(p.acb, p.value),
+    appreciation: p.appreciation,
+    sellAtAge: p.sellAtAge,
+    rent: p.annualRent ?? 0,
+  }))
   const persons = inputs.partner ? 2 : 1
+  const marginal = inputs.accumulationMarginalRate ?? 0.35
 
   let total = bal.tfsa + bal.rrsp + bal.nonReg
   let assetsAtFire = total
@@ -139,23 +144,26 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
       bal.nonReg += prValue
       prValue = 0
     }
-    if (ip && ip.sellAtAge !== null && age >= Math.max(ip.sellAtAge, inputs.fireAge) && ipValue > 0) {
-      const gainTax =
-        incomeTax((Math.max(0, ipValue - ipAcb) * 0.5) / persons, inputs.province) * persons
-      bal.nonReg += ipValue - gainTax
-      ipValue = 0
+    for (const p of ips) {
+      if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
+        const gainTax =
+          incomeTax((Math.max(0, p.value - p.acb) * 0.5) / persons, inputs.province) * persons
+        bal.nonReg += p.value - gainTax
+        p.value = 0
+      }
     }
-    // mirror the projection's accumulation-phase tax drag on distributions
-    bal.nonReg -=
-      bal.nonReg *
-      (inputs.nonRegDistributionYield ?? 0) *
-      (inputs.accumulationMarginalRate ?? 0.35)
+    // mirror the projection's accumulation-phase tax drag on distributions,
+    // and save the after-tax rent from properties still held
+    bal.nonReg -= bal.nonReg * (inputs.nonRegDistributionYield ?? 0) * marginal
+    bal.nonReg += ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0) * (1 - marginal)
     for (const t of ACCOUNT_TYPES) {
       bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
-    if (ipValue > 0 && ip) ipValue *= 1 + ip.appreciation
+    for (const p of ips) {
+      if (p.value > 0) p.value *= 1 + p.appreciation
+    }
 
     total = bal.tfsa + bal.rrsp + bal.nonReg
     if (age === inputs.fireAge) assetsAtFire = total

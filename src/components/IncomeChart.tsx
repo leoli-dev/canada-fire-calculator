@@ -21,6 +21,7 @@ const COLORS = {
   cpp: '#6a1b9a',
   oas: '#ad1457',
   gis: '#00838f',
+  rent: '#5d4037',
 }
 
 export function IncomeChart(props: {
@@ -42,14 +43,17 @@ export function IncomeChart(props: {
       cpp: Math.round(r.cpp * k(r.age)),
       oas: Math.round(r.oas * k(r.age)),
       gis: Math.round(r.gis * k(r.age)),
+      rent: Math.round(r.rent * k(r.age)),
       tax: Math.round(r.tax * k(r.age)),
       total: Math.round(
-        (r.withdrawals.tfsa + r.withdrawals.rrsp + r.withdrawals.nonReg + r.cpp + r.oas + r.gis) *
+        (r.withdrawals.tfsa + r.withdrawals.rrsp + r.withdrawals.nonReg +
+          r.cpp + r.oas + r.gis + r.rent) *
           k(r.age),
       ),
     }))
 
   const hasGis = data.some((d) => d.gis > 0)
+  const hasRent = data.some((d) => d.rent > 0)
 
   if (data.length === 0) return null
 
@@ -74,6 +78,9 @@ export function IncomeChart(props: {
           <Area dataKey="oas" stackId="1" name={t('oasLabel')} stroke={COLORS.oas} fill={COLORS.oas} fillOpacity={0.55} />
           {hasGis && (
             <Area dataKey="gis" stackId="1" name={t('gisLabel')} stroke={COLORS.gis} fill={COLORS.gis} fillOpacity={0.55} />
+          )}
+          {hasRent && (
+            <Area dataKey="rent" stackId="1" name={t('rentLabel')} stroke={COLORS.rent} fill={COLORS.rent} fillOpacity={0.55} />
           )}
           <Line dataKey="tax" name={t('taxLabel')} stroke="#37474f" strokeWidth={2} strokeDasharray="5 3" dot={false} />
         </ComposedChart>

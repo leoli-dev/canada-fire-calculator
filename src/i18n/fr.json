@@ -57,7 +57,7 @@
   "propAppreciation": "Appréciation réelle (%/an)",
   "propSellAt": "Vendre à l'âge (vide = garder)",
   "prNote": "Vente libre d'impôt (exemption pour résidence principale); le produit devient investissable.",
-  "ipNote": "La moitié du gain au-delà du PBR est imposée à la vente; vente au plus tôt à l'âge FIRE.",
+  "ipNote": "À la vente, la moitié du gain au-dessus du PBR est imposée ; jamais avant FIRE. Le loyer net est imposé comme revenu ordinaire et cesse l’année de la vente ; ne le comptez pas en double dans « l’épargne annuelle ».",
   "propertyLabel": "Immobilier",
   "worksheetTitle": "Feuille de dépenses de retraite",
   "wsHousing": "Logement (taxes, frais de copropriété, entretien)",
@@ -253,6 +253,10 @@
     "surtax": {
       "title": "Surtaxe et prime-santé de l'Ontario",
       "body": "Deux suppléments discrets de l'Ontario : (1) la surtaxe - dès que l'impôt provincial dépasse ~5 800 $, il est majoré de 20 %, puis de 36 % au-delà de ~7 400 $, multipliant les taux marginaux provinciaux élevés par 1,2 à 1,56; (2) la prime-santé de l'Ontario - jusqu'à 900 $ par personne par an, par paliers de revenu imposable. Les deux se règlent à la déclaration. Le calculateur les applique automatiquement aux résidents de l'Ontario."
+    },
+    "rent": {
+      "title": "Revenu locatif (imposition)",
+      "body": "Quand un immeuble locatif est conservé pour ses flux plutôt que vendu, le loyer net (loyer moins taxes foncières, assurance, entretien, gestion et autres frais d’exploitation) est imposable à 100 % comme revenu ordinaire — pas de rabais de 50 % des gains en capital, pas de crédit pour dividendes. Entrez ici le montant net : en accumulation il est imposé à votre taux marginal de travail puis épargné dans le compte non enregistré ; à la retraite il s’ajoute au revenu imposable et compte pour les paliers d’impôt, la récupération de la SV et le test de revenu du SRG. L’arbitrage vendre ou garder : garder conserve l’appréciation mais le revenu est lourdement imposé et le gain accumulé reste imposé au décès ; vendre cristallise le gain une seule fois (moitié imposable) contre des actifs financiers rééquilibrables."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",
@@ -306,5 +310,9 @@
   "valBookExceeds": "Le prix de base dépasse le solde non enregistré (plafonné par le moteur)",
   "valAcbAboveValue": "PBR supérieur à la valeur marchande — un gain négatif est imposé à zéro",
   "valSellBeforeFire": "Une vente avant l’âge FIRE est reportée à l’année FIRE",
-  "valSellInPast": "L’âge de vente est passé ; traité comme une vente immédiate"
+  "valSellInPast": "L’âge de vente est passé ; traité comme une vente immédiate",
+  "propRent": "Loyer net ($/an)",
+  "addProperty": "+ Ajouter un immeuble locatif",
+  "removeItem": "Retirer",
+  "rentLabel": "Loyer"
 }

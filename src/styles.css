@@ -97,6 +97,24 @@ legend {
   font-size: 0.82rem; padding: 9px 12px; margin: 0 0 12px;
 }
 
+.property-card {
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px 10px 8px; margin: 10px 0;
+}
+.property-head { display: flex; justify-content: space-between; align-items: center; }
+.remove-item {
+  background: none; border: none; color: var(--ink-faint);
+  font-size: 0.75rem; cursor: pointer; padding: 0;
+  text-transform: none; letter-spacing: 0;
+}
+.remove-item:hover { color: var(--red); }
+.add-item {
+  background: none; border: 1px dashed var(--line-strong); border-radius: 8px;
+  color: var(--ink-soft); font-size: 0.82rem; cursor: pointer;
+  padding: 7px 12px; width: 100%; margin-top: 8px;
+}
+.add-item:hover { border-color: var(--blue); color: var(--blue); }
+
 details { margin: 10px 0 2px; }
 details summary {
   cursor: pointer; font-size: 0.86rem; color: var(--ink-soft);

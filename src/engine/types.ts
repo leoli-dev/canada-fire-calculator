@@ -53,6 +53,11 @@ export interface InvestmentProperty {
   appreciation: number
   /** engine clamps the sale to no earlier than fireAge; null = never sell */
   sellAtAge: number | null
+  /**
+   * Net annual rent while the property is held (rent minus operating costs,
+   * today's dollars). Taxed as ordinary income; stops when the property sells.
+   */
+  annualRent?: number
 }
 
 export interface Inputs {
@@ -106,7 +111,8 @@ export interface Inputs {
   /** annual return standard deviation per account, used by Monte Carlo */
   volatilities?: Record<AccountType, number>
   principalResidence?: PrincipalResidence | null
-  investmentProperty?: InvestmentProperty | null
+  /** rental/investment properties; store migrates the old singular field */
+  investmentProperties?: InvestmentProperty[]
 }
 
 export interface YearRow {
@@ -120,6 +126,8 @@ export interface YearRow {
   oas: number
   /** GIS received — tax-free, requires OAS, income-tested (TFSA invisible) */
   gis: number
+  /** net rent received from unsold investment properties (taxable) */
+  rent: number
   tax: number
   /** after-tax cash available this year */
   netCash: number

@@ -64,6 +64,7 @@ function evaluate(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
+  cashIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
@@ -84,8 +85,11 @@ function evaluate(
   }
 
   const persons = oasGrossPerPerson.length
+  // extraTaxable is taxable but not cash-in-hand (reinvested distributions,
+  // sale gains whose proceeds land in non-registered); cashIncome is both
+  // taxable and spendable (rent, part-time income)
   const baseTaxable =
-    cpp + extraTaxable + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
+    cpp + extraTaxable + cashIncome + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
   const share = baseTaxable / persons
   let oasNet = 0
   let tax = 0
@@ -105,7 +109,7 @@ function evaluate(
     oasGrossPerPerson.map((o) => o > 0),
     baseTaxable,
   )
-  const netCash = cpp + oasNet + gis + w.tfsa + w.rrsp + w.nonReg - tax
+  const netCash = cpp + oasNet + gis + cashIncome + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = baseTaxable + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   const taxablePerPerson = totalTaxable / persons
@@ -122,12 +126,13 @@ function solveWithdrawals(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
+  cashIncome: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, cashIncome, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -169,8 +174,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let rrspTaxTotal = 0
 
   let prValue = inputs.principalResidence?.value ?? 0
-  let ipValue = inputs.investmentProperty?.value ?? 0
-  let ipAcb = inputs.investmentProperty ? Math.min(inputs.investmentProperty.acb, ipValue) : 0
+  const ips = (inputs.investmentProperties ?? []).map((p) => ({
+    value: p.value,
+    acb: Math.min(p.acb, p.value),
+    appreciation: p.appreciation,
+    sellAtAge: p.sellAtAge,
+    rent: p.annualRent ?? 0,
+  }))
 
   for (let age = inputs.currentAge; age <= inputs.lifeExpectancy; age++) {
     const phase: Phase =
@@ -193,14 +203,17 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       nonRegBook += prValue
       prValue = 0
     }
-    // investment property sale: gain is 50% taxable; clamped to retirement
-    const ip = inputs.investmentProperty
-    if (ip && ip.sellAtAge !== null && age >= Math.max(ip.sellAtAge, inputs.fireAge) && ipValue > 0) {
-      extraTaxable = Math.max(0, ipValue - ipAcb) * CAPITAL_GAINS_INCLUSION
-      bal.nonReg += ipValue
-      nonRegBook += ipValue
-      ipValue = 0
+    // investment property sales: gain is 50% taxable; clamped to retirement
+    for (const p of ips) {
+      if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
+        extraTaxable += Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
+        bal.nonReg += p.value
+        nonRegBook += p.value
+        p.value = 0
+      }
     }
+    // net rent from properties still held (stops the year a property sells)
+    const rent = ips.reduce((s, p) => s + (p.value > 0 ? p.rent : 0), 0)
 
     // non-registered tax drag: yearly distributions are taxable when paid,
     // then reinvest (raising the ACB so they aren't taxed again at sale)
@@ -217,7 +230,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const dragTax = dist * (inputs.accumulationMarginalRate ?? 0.35)
       bal.nonReg -= dragTax
       nonRegBook += dist - dragTax
-      tax = dragTax
+      // net rent, taxed at the same marginal rate, is saved on top of
+      // annualSavings (whose hint tells the user to exclude rent)
+      const rentTax = rent * (inputs.accumulationMarginalRate ?? 0.35)
+      bal.nonReg += rent - rentTax
+      nonRegBook += rent - rentTax
+      tax = dragTax + rentTax
     } else {
       extraTaxable += dist
       const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
@@ -273,7 +291,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         )
         const persons = partner ? 2 : 1
         const committedTaxable =
-          cpp + extraTaxable + oasGrossPerPerson.reduce((s, x) => s + x, 0)
+          cpp + extraTaxable + rent + oasGrossPerPerson.reduce((s, x) => s + x, 0)
         const rrspCap = Math.max(rrifMin, bracketTop * persons - committedTaxable)
         steps = [
           { account: 'rrsp', cap: rrspCap },
@@ -288,7 +306,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
 
       const out = solveWithdrawals(
         inputs.retirementSpending, bal, forcedRrsp, gainFraction, cpp,
-        oasGrossPerPerson, agesPerPerson, extraTaxable, steps, inputs,
+        oasGrossPerPerson, agesPerPerson, extraTaxable, rent, steps, inputs,
       )
       withdrawals = out.withdrawals
       tax = out.tax
@@ -323,23 +341,27 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       bal[t] *= 1 + (sample ? sample(age, t) : inputs.returns[t]) - (inputs.fees ?? 0)
     }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
-    if (ipValue > 0 && ip) ipValue *= 1 + ip.appreciation
+    for (const p of ips) {
+      if (p.value > 0) p.value *= 1 + p.appreciation
+    }
+    const ipTotal = ips.reduce((s, p) => s + p.value, 0)
 
     rows.push({
       age, phase,
       balances: { ...bal },
-      withdrawals, cpp, oas, gis, tax, netCash, shortfall,
-      propertyValue: prValue + ipValue,
+      withdrawals, cpp, oas, gis, rent, tax, netCash, shortfall,
+      propertyValue: prValue + ipTotal,
       taxablePerPerson,
     })
   }
 
-  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipValue
+  const ipTotal = ips.reduce((s, p) => s + p.value, 0)
+  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipTotal
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
   const persons = partner ? 2 : 1
   const nonRegGain = Math.max(0, bal.nonReg - nonRegBook)
-  const ipGain = ipValue > 0 ? Math.max(0, ipValue - ipAcb) : 0
+  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? Math.max(0, p.value - p.acb) : 0), 0)
   const deemedTaxable =
     (bal.rrsp + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)) / persons
   const estateTax = incomeTax(deemedTaxable, inputs.province) * persons

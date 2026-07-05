@@ -100,11 +100,13 @@ describe('validateInputs', () => {
     const bad = {
       ...base,
       principalResidence: { value: 800000, appreciation: 0.02, sellAtAge: 30 },
-      investmentProperty: { value: 400000, acb: 500000, appreciation: 0.02, sellAtAge: 40 },
+      investmentProperties: [
+        { value: 400000, acb: 500000, appreciation: 0.02, sellAtAge: 40 },
+      ],
     }
     const w = fields(bad, 'warning')
     expect(w).toContain('principalResidence.sellAtAge')
-    expect(w).toContain('investmentProperty.acb')
-    expect(w).toContain('investmentProperty.sellAtAge')
+    expect(w).toContain('investmentProperties.0.acb')
+    expect(w).toContain('investmentProperties.0.sellAtAge')
   })
 })

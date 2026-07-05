@@ -210,4 +210,96 @@ describe('runProjection', () => {
     expect(bridgeRow.tax).toBe(0)
     expect(bridgeRow.withdrawals.tfsa).toBeCloseTo(base.retirementSpending, 0)
   })
+
+  it('handles multiple investment properties selling at different ages', () => {
+    const r = runProjection({
+      ...base,
+      investmentProperties: [
+        { value: 400000, acb: 300000, appreciation: 0, sellAtAge: 50 },
+        { value: 600000, acb: 200000, appreciation: 0, sellAtAge: 60 },
+      ],
+    })
+    const at49 = r.rows.find((x) => x.age === 49)!
+    const at50 = r.rows.find((x) => x.age === 50)!
+    const at60 = r.rows.find((x) => x.age === 60)!
+    expect(at49.propertyValue).toBeCloseTo(1000000, 0)
+    expect(at50.propertyValue).toBeCloseTo(600000, 0)
+    expect(at60.propertyValue).toBe(0)
+    const noProps = runProjection(base)
+    expect(r.finalNetWorth).toBeGreaterThan(noProps.finalNetWorth + 800000)
+  })
+
+  it('rent flows in while held and stops the year the property sells', () => {
+    const r = runProjection({
+      ...base,
+      investmentProperties: [
+        { value: 500000, acb: 400000, appreciation: 0, sellAtAge: 60, annualRent: 24000 },
+      ],
+    })
+    expect(r.rows.find((x) => x.age === 55)!.rent).toBe(24000)
+    expect(r.rows.find((x) => x.age === 60)!.rent).toBe(0)
+  })
+
+  it('rent reduces the portfolio withdrawals needed in retirement', () => {
+    const withRent = runProjection({
+      ...base,
+      investmentProperties: [
+        { value: 500000, acb: 400000, appreciation: 0, sellAtAge: null, annualRent: 30000 },
+      ],
+    })
+    const without = runProjection(base)
+    const wr = withRent.rows.find((x) => x.age === 50)!
+    const wo = without.rows.find((x) => x.age === 50)!
+    const total = (row: typeof wr) =>
+      row.withdrawals.tfsa + row.withdrawals.rrsp + row.withdrawals.nonReg
+    expect(total(wr)).toBeLessThan(total(wo))
+    // rent is taxable: spending target is still met after tax
+    expect(wr.netCash).toBeGreaterThanOrEqual(base.retirementSpending - 0.01)
+    expect(wr.tax).toBeGreaterThan(0)
+  })
+
+  it('rent during accumulation is saved after tax at the working marginal rate', () => {
+    const inputs = {
+      ...base,
+      annualSavings: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      accumulationMarginalRate: 0.4,
+      investmentProperties: [
+        { value: 500000, acb: 400000, appreciation: 0, sellAtAge: null, annualRent: 10000 },
+      ],
+    }
+    const r = runProjection(inputs)
+    const firstYear = r.rows[0]
+    expect(firstYear.balances.nonReg).toBeCloseTo(10000 * 0.6, 0)
+    expect(firstYear.tax).toBeCloseTo(10000 * 0.4, 0)
+  })
+
+  it('rent counts against the GIS income test', () => {
+    const gisBase = {
+      ...base,
+      currentAge: 64,
+      fireAge: 64,
+      lifeExpectancy: 70,
+      cppStartAge: 70,
+      oasStartAge: 65,
+      cppAnnualAt65: 0,
+      retirementSpending: 30000,
+      strategy: 'tfsaFirst' as const,
+      balances: { tfsa: 1000000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+    }
+    const noRent = runProjection(gisBase)
+    const withRent = runProjection({
+      ...gisBase,
+      investmentProperties: [
+        { value: 300000, acb: 300000, appreciation: 0, sellAtAge: null, annualRent: 12000 },
+      ],
+    })
+    const gisAt66 = (r: ReturnType<typeof runProjection>) =>
+      r.rows.find((x) => x.age === 66)!.gis
+    expect(gisAt66(noRent)).toBeGreaterThan(0)
+    expect(gisAt66(withRent)).toBeLessThan(gisAt66(noRent))
+  })
 })

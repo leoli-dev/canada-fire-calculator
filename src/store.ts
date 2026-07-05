@@ -44,7 +44,15 @@ export const DEFAULT_INPUTS: Inputs = {
   fireTargetAssets: 1000000,
   partner: null,
   principalResidence: null,
-  investmentProperty: null,
+  investmentProperties: [],
+}
+
+export const DEFAULT_INVESTMENT_PROPERTY = {
+  value: 500000,
+  acb: 400000,
+  appreciation: 0.02,
+  sellAtAge: null,
+  annualRent: 0,
 }
 
 export const WORKSHEET_KEYS = [
@@ -118,30 +126,44 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'fire-inputs',
-      // v4: fees (MER) input added; defaults fill in via merge
-      version: 4,
+      // v5: singular investmentProperty became investmentProperties[]
+      version: 5,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state) => state as Store,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Store> & {
           inputs?: Partial<Inputs> & { withdrawalOrder?: string[] }
+          scenarioA?: Inputs | null
         }
-        // v2 → v3: withdrawalOrder array became a named strategy
-        const legacy = p.inputs?.withdrawalOrder
-        const migratedStrategy =
-          p.inputs?.strategy ??
-          (legacy?.[0] === 'rrsp'
-            ? 'meltdownPaced'
-            : legacy?.[0] === 'tfsa'
-              ? 'tfsaFirst'
-              : legacy?.[0] === 'nonReg'
-                ? 'nonRegFirst'
-                : DEFAULT_INPUTS.strategy)
+        type LegacyInputs = Partial<Inputs> & {
+          withdrawalOrder?: string[]
+          investmentProperty?: (typeof DEFAULT_INVESTMENT_PROPERTY) | null
+        }
+        const upgrade = (raw: LegacyInputs | null | undefined): Inputs | null => {
+          if (!raw) return null
+          // v2 → v3: withdrawalOrder array became a named strategy
+          const legacy = raw.withdrawalOrder
+          const strategy =
+            raw.strategy ??
+            (legacy?.[0] === 'rrsp'
+              ? 'meltdownPaced'
+              : legacy?.[0] === 'tfsa'
+                ? 'tfsaFirst'
+                : legacy?.[0] === 'nonReg'
+                  ? 'nonRegFirst'
+                  : DEFAULT_INPUTS.strategy)
+          // v4 → v5: singular investment property becomes a list
+          const investmentProperties =
+            raw.investmentProperties ??
+            (raw.investmentProperty ? [{ ...raw.investmentProperty }] : [])
+          return { ...DEFAULT_INPUTS, ...raw, strategy, investmentProperties }
+        }
         return {
           ...current,
           ...p,
-          inputs: { ...DEFAULT_INPUTS, ...(p.inputs ?? {}), strategy: migratedStrategy },
+          inputs: upgrade(p.inputs) ?? DEFAULT_INPUTS,
+          scenarioA: upgrade(p.scenarioA as LegacyInputs | null),
           worksheet: { ...DEFAULT_WORKSHEET, ...(p.worksheet ?? {}) },
           mixPresets: { ...current.mixPresets, ...(p.mixPresets ?? {}) },
         }

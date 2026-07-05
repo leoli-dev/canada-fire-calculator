@@ -208,7 +208,9 @@ describe('targetReport', () => {
     const ipSale = targetReport(
       {
         ...base,
-        investmentProperty: { value: 900000, acb: 300000, appreciation: 0, sellAtAge: base.fireAge },
+        investmentProperties: [
+          { value: 900000, acb: 300000, appreciation: 0, sellAtAge: base.fireAge },
+        ],
       },
       99_999_999,
     )
@@ -240,7 +242,7 @@ describe('property events', () => {
   it('investment property sale is taxed on half the gain', () => {
     const taxedSale = runProjection({
       ...base,
-      investmentProperty: { value: 500000, acb: 200000, appreciation: 0, sellAtAge: 50 },
+      investmentProperties: [{ value: 500000, acb: 200000, appreciation: 0, sellAtAge: 50 }],
     })
     const freeSale = runProjection({
       ...base,

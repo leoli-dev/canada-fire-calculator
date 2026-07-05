@@ -57,7 +57,7 @@
   "propAppreciation": "Real appreciation (%/yr)",
   "propSellAt": "Sell at age (blank = keep)",
   "prNote": "Sale is tax-free (principal residence exemption); proceeds become investable.",
-  "ipNote": "Half the gain over ACB is taxed at sale; sale no earlier than FIRE.",
+  "ipNote": "On sale, half the gain above the ACB is taxed; sales never happen before FIRE. Net rent is taxed as ordinary income and stops the year the property sells; don’t double-count rent inside \"annual savings\".",
   "propertyLabel": "Real estate",
   "worksheetTitle": "Retirement spending worksheet",
   "wsHousing": "Housing (tax, condo fees, maintenance)",
@@ -253,6 +253,10 @@
     "surtax": {
       "title": "Ontario surtax & health premium",
       "body": "Ontario's two stealth add-ons: (1) the surtax - once provincial tax itself passes ~$5,800 it is increased by 20%, and by a further 36% past ~$7,400, effectively multiplying high-income provincial marginal rates by 1.2-1.56x; (2) the Ontario Health Premium - up to $900 per person per year, tiered on taxable income. Both settle on the tax return; they are why Ontario feels more expensive than its bracket table suggests. The calculator applies both automatically for ON residents."
+    },
+    "rent": {
+      "title": "Rental income (taxation)",
+      "body": "When an investment property is kept for its cash flow instead of sold, the net rent (rent minus property tax, insurance, maintenance, management and other operating costs) is 100% taxable as ordinary income — no 50% capital-gains discount, no dividend credit. Enter the net figure here: during accumulation it is taxed at your working marginal rate and saved into the non-registered account; in retirement it joins taxable income and counts against tax brackets, the OAS clawback and the GIS income test. The sell-vs-hold trade-off: holding keeps the appreciation but the income is heavily taxed and the accrued gain is still taxed at death; selling crystallizes the gain once (half taxable) in exchange for rebalanceable financial assets."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",
@@ -306,5 +310,9 @@
   "valBookExceeds": "Book value exceeds the non-registered balance (engine caps it)",
   "valAcbAboveValue": "ACB above market value — a negative gain is taxed as zero",
   "valSellBeforeFire": "A sale before the FIRE age is deferred to the FIRE year",
-  "valSellInPast": "Sale age is in the past; treated as an immediate sale"
+  "valSellInPast": "Sale age is in the past; treated as an immediate sale",
+  "propRent": "Net rent ($/yr)",
+  "addProperty": "+ Add investment property",
+  "removeItem": "Remove",
+  "rentLabel": "Rent"
 }
