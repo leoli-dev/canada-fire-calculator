@@ -367,7 +367,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     } else {
       extraTaxable += dist
 
-      const rrifMin = bal.rrsp * rrifMinFactor(age)
+      // spousal age election: RRIF minimums may be computed from the younger
+      // spouse's age — always optimal (lower forced withdrawals, more tax
+      // deferral), so auto-applied rather than exposed as an input
+      const rrifAge = Math.min(...agesPerPerson)
+      const rrifMin = bal.rrsp * rrifMinFactor(rrifAge)
       const forcedRrsp = Math.min(bal.rrsp, rrifMin)
       // bracket-capped meltdown: the RRSP funds spending first, but only as
       // much as spending needs and never beyond the room left in the chosen

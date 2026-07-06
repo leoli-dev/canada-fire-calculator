@@ -37,7 +37,9 @@ number in the UI comes from a deterministic, unit-tested year-by-year simulation
    withdrawals following your strategy; each year the engine solves (binary search)
    for the gross withdrawal that nets your after-tax spending target.
 3. **Pension** (CPP/OAS → life expectancy): government benefits arrive; from age 72
-   RRIF minimum withdrawals are forced whether you need them or not.
+   RRIF minimum withdrawals are forced whether you need them or not — for couples,
+   the minimum is computed from the younger spouse's age (the spousal age election),
+   auto-applied since it's always the better choice.
 
 **The tax engine** applies real federal + provincial marginal brackets (all 13
 provinces and territories, 2026 figures, data-driven and updated yearly), the basic

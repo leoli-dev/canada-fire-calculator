@@ -158,7 +158,11 @@
     },
     "rrif": {
       "title": "RRIF - Registered Retirement Income Fund",
-      "body": "The RRSP's exit form: by the end of age 71 the RRSP must convert to a RRIF (the conversion itself is tax-free). From the next year, age-based minimum withdrawals are mandatory (5.4% at 72, rising to 20% at 95), each taxed as income. An oversized RRSP forces big taxable withdrawals - the core reason to meltdown early."
+      "body": "The RRSP's exit form: the RRSP must convert to a RRIF by the end of age 71 (the conversion itself is tax-free) - but 71 is only the deadline; you can convert earlier to match your retirement timeline, or convert only part of it. From the next year, age-based minimum withdrawals are mandatory (about 5.28% the year you turn 72, rising to 20% at 95): each withdrawal is added to that year's taxable income, and the mandatory minimum is usually exempt from withholding tax - but exempt from withholding isn't the same as tax-free, so this calculator computes the actual tax owed directly regardless of what's withheld. Anything pulled beyond that year's spending is reinvested after tax in a non-registered account. Couples can elect at RRIF setup to use the younger spouse's age for the minimum calculation, deferring tax further (the election is irrevocable) - this calculator applies it automatically, always using the younger spouse's age. An oversized RRSP forces big taxable withdrawals - the core reason to meltdown early."
+    },
+    "withholding": {
+      "title": "Withholding tax",
+      "body": "A lump-sum RRSP withdrawal has income tax withheld at source in tiers (outside Quebec: 10% up to $5,000, 20% from $5,001-15,000, 30% above $15,000; Quebec adds its own provincial withholding on top of the federal one). This is only a prepayment, not the final bill - at tax time the withdrawal is added to that year's total income and taxed at your marginal rate, with the withheld amount credited against it. A RRIF's mandatory minimum withdrawal is usually exempt from withholding, but it's still fully taxable income. This calculator doesn't model withholding timing at all - it computes the actual tax owed for the year directly, regardless of what was withheld."
     },
     "tfsa": {
       "title": "TFSA - Tax-Free Savings Account",
@@ -234,7 +238,7 @@
     },
     "splitting": {
       "title": "Income splitting (couples)",
-      "body": "Canada taxes individuals, so under progressive rates the same household income split across two returns pays far less than piled on one (two personal amounts, two runs up the low brackets). Couple mode assumes an ideal 50/50 split. Reality check: before 65, RRSP withdrawals are taxed to the account owner only and cannot be split - an even split during the bridge requires both spouses to hold comparable RRSP balances, which unbalanced couples should fix in advance with spousal RRSP contributions."
+      "body": "Canada taxes individuals, so under progressive rates the same household income split across two returns pays far less than piled on one (two personal amounts, two runs up the low brackets). Couple mode assumes an ideal 50/50 split. Reality check: before 65, RRSP withdrawals are taxed to the account owner only and cannot be split - an even split during the bridge requires both spouses to hold comparable RRSP balances, which unbalanced couples should fix in advance with spousal RRSP contributions. After 65, the real pension income splitting rule only covers RRIF-type eligible pension income and caps at 50% to a spouse - this calculator treats all taxable income (CPP, rent, non-registered gains, etc.) as ideally splittable, which is more optimistic than the real rules."
     },
     "marginalrate": {
       "title": "Marginal tax rate",

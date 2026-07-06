@@ -42,7 +42,9 @@ l'inflation) :
    financées par les retraits selon votre stratégie; chaque année le moteur résout
    par recherche binaire le retrait brut qui produit net vos dépenses cibles.
 3. **Pension** (RPC/SV → espérance de vie) : les prestations arrivent; dès 72 ans
-   les minimums FERR sont forcés, besoin ou pas.
+   les minimums FERR sont forcés, besoin ou pas — pour un couple, le minimum est
+   calculé sur l'âge du conjoint le plus jeune (choix de l'âge du conjoint),
+   appliqué automatiquement car toujours plus avantageux.
 
 **Le moteur fiscal** : vrais paliers marginaux fédéral + provincial (les 13
 provinces et territoires, chiffres 2026, mis à jour annuellement), montants

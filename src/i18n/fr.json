@@ -158,7 +158,11 @@
     },
     "rrif": {
       "title": "FERR - Fonds enregistré de revenu de retraite",
-      "body": "La forme de sortie du REER : conversion obligatoire avant la fin des 71 ans (sans impôt). Dès l’année suivante, retraits minimums obligatoires selon l’âge (5,4 % à 72 ans, jusqu’à 20 % à 95 ans), imposés comme revenu. Un REER trop gros force de gros retraits imposables - la raison du meltdown."
+      "body": "La forme de sortie du REER : conversion obligatoire avant la fin des 71 ans (sans impôt) - mais 71 ans n’est qu’une date limite, on peut convertir plus tôt selon son calendrier de retraite, ou ne convertir qu’une partie. Dès l’année suivante, retraits minimums obligatoires selon l’âge (environ 5,28 % l’année des 72 ans, jusqu’à 20 % à 95 ans) : chaque retrait s’ajoute au revenu imposable de l’année, et le minimum légal échappe généralement à la retenue à la source - mais échapper à la retenue n’est pas la même chose qu’être libre d’impôt, ce calculateur calcule directement l’impôt réellement dû, peu importe ce qui est retenu. Ce qui dépasse les dépenses de l’année est réinvesti après impôt dans un compte non enregistré. Les couples peuvent, à l’ouverture du FERR, choisir l’âge du conjoint le plus jeune pour calculer le minimum et reporter l’impôt (choix irrévocable) - ce calculateur l’applique automatiquement selon le conjoint le plus jeune. Un REER trop gros force de gros retraits imposables - la raison du meltdown."
+    },
+    "withholding": {
+      "title": "Retenue à la source",
+      "body": "Un retrait forfaitaire du REER subit une retenue d’impôt à la source par paliers (hors Québec : 10 % jusqu’à 5 000 $, 20 % de 5 001 à 15 000 $, 30 % au-delà ; le Québec ajoute sa propre retenue provinciale). Ce n’est qu’un acompte, pas l’impôt final - à la déclaration, le retrait s’ajoute au revenu total de l’année et est imposé au taux marginal, la retenue étant simplement créditée. Le retrait minimum obligatoire d’un FERR échappe généralement à la retenue, mais reste pleinement imposable. Ce calculateur ne modélise pas le moment de la retenue - il calcule directement l’impôt réellement dû pour l’année."
     },
     "tfsa": {
       "title": "CELI - Compte d’épargne libre d’impôt",
@@ -234,7 +238,7 @@
     },
     "splitting": {
       "title": "Fractionnement de revenu (couples)",
-      "body": "Le Canada impose les personnes : le même revenu de ménage réparti sur deux déclarations paie bien moins d'impôt que concentré sur une seule. Le mode couple suppose un partage idéal 50/50. Attention : avant 65 ans, les retraits REER sont imposés au seul titulaire - un partage égal pendant le pont exige des soldes REER comparables, à préparer d'avance via un REER de conjoint."
+      "body": "Le Canada impose les personnes : le même revenu de ménage réparti sur deux déclarations paie bien moins d'impôt que concentré sur une seule. Le mode couple suppose un partage idéal 50/50. Attention : avant 65 ans, les retraits REER sont imposés au seul titulaire - un partage égal pendant le pont exige des soldes REER comparables, à préparer d'avance via un REER de conjoint. Après 65 ans, le vrai fractionnement du revenu de pension ne couvre que le revenu de pension admissible (type FERR) et plafonne à 50 % vers le conjoint - ce calculateur traite tout revenu imposable (RPC, loyer, gains non enregistrés, etc.) comme partageable idéalement, ce qui est plus optimiste que les règles réelles."
     },
     "marginalrate": {
       "title": "Taux marginal d'imposition",

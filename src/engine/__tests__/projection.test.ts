@@ -99,6 +99,34 @@ describe('runProjection', () => {
     expect(row75.withdrawals.rrsp).toBeGreaterThan(0)
   })
 
+  it("spousal age election: a younger partner lowers the RRIF forced minimum", () => {
+    const scenario = (partnerCurrentAge: number) =>
+      runProjection({
+        ...base,
+        currentAge: 77,
+        fireAge: 77,
+        lifeExpectancy: 77,
+        strategy: 'tfsaFirst' as const,
+        balances: { tfsa: 5000000, rrsp: 1000000, nonReg: 5000000 },
+        nonRegBook: 5000000,
+        cppAnnualAt65: 0,
+        oasAnnualAt65: 0,
+        partner: {
+          currentAge: partnerCurrentAge,
+          cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0,
+        },
+      })
+    // primary is 77 throughout; partner's current age doubles as their age in
+    // this single-row projection, so this isolates rrifAge = min(agesPerPerson)
+    const younger = scenario(72) // 5 years younger -> rrifAge 72, factor 0.0528
+    const sameAge = scenario(77) // same age -> rrifAge 77, factor 0.0598 (unchanged formula)
+    const older = scenario(82) // 5 years older -> no benefit, still uses primary's age 77
+    expect(younger.rows[0].withdrawals.rrsp).toBeCloseTo(1000000 * 0.0528, 0)
+    expect(sameAge.rows[0].withdrawals.rrsp).toBeCloseTo(1000000 * 0.0598, 0)
+    expect(older.rows[0].withdrawals.rrsp).toBeCloseTo(sameAge.rows[0].withdrawals.rrsp, 0)
+    expect(younger.rows[0].withdrawals.rrsp).toBeLessThan(sameAge.rows[0].withdrawals.rrsp)
+  })
+
   it('couple mode pays less tax than single for the same household withdrawals', () => {
     const single = runProjection(base)
     const couple = runProjection({

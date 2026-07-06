@@ -12,6 +12,7 @@ export interface TermDef {
 export const TERMS: TermDef[] = [
   { id: 'rrsp', patterns: ['RRSP', 'REER'] },
   { id: 'rrif', patterns: ['RRIF', 'FERR'] },
+  { id: 'withholding', patterns: ['预扣税', 'withholding tax', 'Withholding tax', 'withholding', 'Withholding', 'retenue à la source', 'Retenue à la source'] },
   { id: 'tfsa', patterns: ['TFSA', 'CELI'] },
   { id: 'nonreg', patterns: ['非注册', 'Non-registered', 'non-registered', 'Non enregistré', 'non enregistré'] },
   { id: 'acb', patterns: ['ACB', 'PBR', '成本基础'] },
