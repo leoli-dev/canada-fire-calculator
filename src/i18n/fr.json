@@ -332,6 +332,7 @@
   "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis - le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
   "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie - aucun scénario d'échec.",
   "createdBy": "Créé par",
+  "privacyNote": "Toutes vos données financières restent dans votre navigateur et ne sont jamais téléversées. Des statistiques d'utilisation anonymes (pages vues, clics sur les fonctionnalités) sont recueillies via Google Analytics.",
   "valBanner": "{{count}} erreur(s) de saisie — les résultats ci-dessous ne sont pas fiables avant correction",
   "valAgeRange": "Doit être entre {{min}} et {{max}}",
   "valFireBeforeCurrent": "L’âge FIRE ne peut pas être inférieur à l’âge actuel",

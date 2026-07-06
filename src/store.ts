@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AccountType, AssetMix, Inputs, Partner } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
+import { trackOnce } from './analytics'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -96,7 +97,10 @@ export const useStore = create<Store>()(
       mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
       worksheet: DEFAULT_WORKSHEET,
       scenarioA: null,
-      set: (patch) => set((s) => ({ inputs: { ...s.inputs, ...patch } })),
+      set: (patch) => {
+        trackOnce('adjust_inputs')
+        set((s) => ({ inputs: { ...s.inputs, ...patch } }))
+      },
       setDisplayMode: (m) => set({ displayMode: m }),
       applyMixPreset: (account, preset) =>
         set((s) => {

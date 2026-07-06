@@ -111,6 +111,7 @@ export default function App() {
             Leo Li
           </a>
         </p>
+        <p className="privacy-note">{t('privacyNote')}</p>
       </footer>
       <GlossaryDrawer />
     </div>

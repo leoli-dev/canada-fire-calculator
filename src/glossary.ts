@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { track } from './analytics'
 
 /**
  * Glossary terms and the surface forms (per language) that become clickable.
@@ -71,6 +72,7 @@ export const useGlossary = create<GlossaryState>((set) => ({
   open: (id) =>
     set((s) => {
       if (s.history[s.history.length - 1] === id) return s
+      track('glossary_open', { term: id })
       const history = [...s.history, id]
       return { history, term: id }
     }),

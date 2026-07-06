@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { runProjection, type ProjectionResult } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 function Cell(props: { r: ProjectionResult; life: number }) {
@@ -35,7 +36,14 @@ export function ScenarioCard() {
       <summary><h3>{t('scenarioTitle')}</h3></summary>
       <div className="card-head">
         <div>
-          <button onClick={saveScenarioA}>{t('scenarioSave')}</button>
+          <button
+            onClick={() => {
+              saveScenarioA()
+              track('scenario_save')
+            }}
+          >
+            {t('scenarioSave')}
+          </button>
           {scenarioA && (
             <>
               <button className="subtle" onClick={restoreScenarioA}>

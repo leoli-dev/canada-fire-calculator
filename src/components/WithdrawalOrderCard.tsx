@@ -7,6 +7,7 @@ import {
   type Strategy,
 } from '../engine'
 import { useStore } from '../store'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 export function WithdrawalOrderCard(props: { inputs: Inputs }) {
@@ -20,7 +21,10 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
         <span><Jargon text={t('withdrawalOrder')} /></span>
         <select
           value={inputs.strategy}
-          onChange={(e) => set({ strategy: e.target.value as Strategy })}
+          onChange={(e) => {
+            set({ strategy: e.target.value as Strategy })
+            track('strategy_change', { strategy: e.target.value })
+          }}
         >
           {STRATEGIES.map((s) => (
             <option key={s} value={s}>{t(`strat_${s}`)}</option>

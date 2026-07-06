@@ -14,6 +14,7 @@ import {
 import type { Inputs } from '../engine'
 import type { MonteCarloResult } from '../engine/monteCarlo'
 import { useCad, useCadCompact } from '../format'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) => number }) {
@@ -29,6 +30,7 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
   useEffect(() => () => workerRef.current?.terminate(), [])
 
   const run = () => {
+    track('monte_carlo_run')
     setRunning(true)
     if (!workerRef.current) {
       workerRef.current = new Worker(new URL('../mc.worker.ts', import.meta.url), {

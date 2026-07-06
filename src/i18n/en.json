@@ -332,6 +332,7 @@
   "mcFailWhy": "Failed runs averaged {{failed}}%/yr over the first 5 post-FIRE years, versus {{succeeded}}% for successful runs - the unlucky script is almost always the same one: a bear market right after retiring forces selling at the bottom to fund spending, and the damaged principal never recovers (sequence-of-returns risk). Late bear markets barely hurt.",
   "mcNoFail": "All {{n}} runs lasted to life expectancy - no failing scripts.",
   "createdBy": "Created by",
+  "privacyNote": "All financial inputs stay in your browser and are never uploaded. Anonymous usage statistics (page views, feature clicks) are collected via Google Analytics.",
   "valBanner": "{{count}} input error(s) — results below can’t be trusted until fixed",
   "valAgeRange": "Must be between {{min}} and {{max}}",
   "valFireBeforeCurrent": "FIRE age can’t be below your current age",
