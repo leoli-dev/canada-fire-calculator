@@ -48,6 +48,7 @@
   "savingsSplit": "Savings allocation (%)",
   "mixLabel": "Asset mix per account",
   "mixNote": "Presets set a real return and volatility from FP Canada-style assumptions.",
+  "mixWhyConservative": "These aren't a pessimistic guess: they're FP Canada's Projection Assumption Guidelines, the same forward-looking standard used by professional planning software like Snap Projections. They look conservative next to history and next to well-known stock-pickers on purpose. A diversified equity index actually returned roughly 6-7% real over the last century, but forward-looking guidelines assume less because today's valuations are higher than the historical average - that's the whole point of forecasting instead of extrapolating the past. A stock-picker's track record (Warren Buffett's included) is alpha from selection and leverage, not a market return, so it isn't a fair comparison for a passive portfolio. The GIC assumption is a decades-long forward rate, not today's 1-year rate: it will look low while rates are elevated and look right again once they normalize.",
   "feesLabel": "Investment fees (MER, %/yr)",
   "feesHint": "Every account's return is reduced by this rate. FP Canada assumptions are gross of fees - net returns require subtracting them: broad index ETFs run ~0.2%, bank mutual funds often 2%+, and a 2% MER can turn a 4% withdrawal rate into a 2% one.",
   "mix_allStocks": "100% stocks (~4.3% real)",
