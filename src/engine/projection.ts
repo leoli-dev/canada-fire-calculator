@@ -2,6 +2,7 @@ import {
   ACCOUNT_TYPES,
   type AccountType,
   type Inputs,
+  type Pension,
   type Phase,
   type ProjectionResult,
   type Strategy,
@@ -24,6 +25,26 @@ import { buildDebtStream } from './debts'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
 export type ReturnSampler = (age: number, account: AccountType) => number
+
+/**
+ * Employer pension paid at a given age: the lifetime annuity plus the bridge
+ * benefit (which ends at 65), in today's dollars. A partially-indexed pension
+ * loses real value every payment year: its nominal amount grows at only
+ * indexation × CPI, so in this real-dollar frame it shrinks by the gap.
+ */
+export function pensionPaid(
+  p: Pension | null | undefined,
+  personAge: number,
+  inflation: number,
+): number {
+  if (!p || personAge < p.startAge) return 0
+  const erosion = Math.pow(
+    (1 + inflation * p.indexation) / (1 + inflation),
+    personAge - p.startAge,
+  )
+  const bridge = personAge < 65 ? p.bridgeAnnual : 0
+  return (p.annualAmount + bridge) * erosion
+}
 
 /** Fallback funding order once the strategy's planned RRSP draw is taken. */
 const STRATEGY_ORDER: Record<Strategy, AccountType[]> = {
@@ -65,6 +86,7 @@ function evaluate(
   forcedRrsp: number,
   gainFraction: number,
   cpp: number,
+  pension: number,
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
@@ -96,8 +118,11 @@ function evaluate(
   // (Barista/side income) cannot: employment-type income is taxed entirely
   // on whoever earned it — pension splitting and spousal RRSPs don't apply
   // to it — so it's attributed in full to person 0 instead of pooled.
+  // employer pension pools like the rest: RPP annuities are splittable at
+  // any age federally (Quebec's provincial 65+ rule is a known simplification)
   const pooledTaxable =
-    cpp + extraTaxable + rent + w.rrsp + w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
+    cpp + pension + extraTaxable + rent + w.rrsp +
+    w.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
   const share = pooledTaxable / persons
   let oasNet = 0
   let tax = 0
@@ -106,8 +131,10 @@ function evaluate(
     const personTaxable = share + personExtra
     const personOas = oasAfterClawback(oasGrossPerPerson[i], personTaxable)
     oasNet += personOas
-    // RRIF withdrawals at 65+ qualify as eligible pension income
-    const pensionIncome = agesPerPerson[i] >= 65 ? w.rrsp / persons : 0
+    // eligible pension income: employer RPP annuities at any age; RRIF
+    // withdrawals only at 65+
+    const pensionIncome =
+      pension / persons + (agesPerPerson[i] >= 65 ? w.rrsp / persons : 0)
     tax += incomeTax(personTaxable + personOas, inputs.province, {
       age: agesPerPerson[i],
       pensionIncome,
@@ -122,7 +149,8 @@ function evaluate(
   const gis =
     gisAnnual(receivingOas, gisIncome, extraIncome) +
     allowanceAnnual(receivingOas, agesPerPerson, gisIncome)
-  const netCash = cpp + oasNet + gis + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
+  const netCash =
+    cpp + pension + oasNet + gis + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   const taxablePerPerson = totalTaxable / persons
@@ -136,6 +164,7 @@ function solveWithdrawals(
   forcedRrsp: number,
   gainFraction: number,
   cpp: number,
+  pension: number,
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
@@ -146,7 +175,7 @@ function solveWithdrawals(
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -228,8 +257,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let extraTaxable = 0
     let saleGainsTaxable = 0
     let taxablePerPerson = 0
-    let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0 }
-    let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0 }
+    let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
+    let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     const yearIdx = age - inputs.currentAge
 
     // principal residence sale: tax-free; any linked mortgage is discharged
@@ -310,6 +339,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge, cppMaxAge) * relief
     }
 
+    // employer pension runs on each person's own timeline, like CPP/OAS
+    const pension =
+      pensionPaid(inputs.pension, age, inflation) +
+      (partner ? pensionPaid(partner.pension, partnerAge!, inflation) : 0)
+
     // OAS rises 10% automatically at 75
     const oasGrossPerPerson = [
       age >= inputs.oasStartAge
@@ -349,20 +383,21 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       // income is unknown, so this leans simple; high earners drawing OAS
       // while working would really face the recovery tax)
       const oasGross = oasGrossPerPerson.reduce((s, x) => s + x, 0)
-      const benefitBase = cpp + oasGross
+      const benefitBase = cpp + oasGross + pension
       const benefitTax = benefitBase * marginal
-      bal.nonReg += cpp + oasGross - benefitTax
-      nonRegBook += cpp + oasGross - benefitTax
+      bal.nonReg += benefitBase - benefitTax
+      nonRegBook += benefitBase - benefitTax
       oas = oasGross
       tax = dragTax + rentTax + benefitTax
       const cppTax = benefitBase > 0 ? benefitTax * (cpp / benefitBase) : 0
+      const pensionTax = benefitBase > 0 ? benefitTax * (pension / benefitBase) : 0
       taxBySource = {
-        rrsp: 0, nonReg: dragTax, cpp: cppTax, oas: benefitTax - cppTax,
-        property: rentTax, extraIncome: 0,
+        rrsp: 0, nonReg: dragTax, cpp: cppTax, oas: benefitTax - cppTax - pensionTax,
+        property: rentTax, extraIncome: 0, pension: pensionTax,
       }
       taxableBySource = {
         rrsp: 0, nonReg: dist, cpp, oas: oasGross,
-        property: rent - rentMortgageInterest, extraIncome: 0,
+        property: rent - rentMortgageInterest, extraIncome: 0, pension,
       }
     } else {
       extraTaxable += dist
@@ -391,7 +426,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
             : Math.min(FEDERAL.brackets[bIdx].upTo, PROVINCIAL[inputs.province].brackets[bIdx].upTo)
         const persons = partner ? 2 : 1
         const committedTaxable =
-          cpp + extraTaxable + rent + extraIncome + oasGrossPerPerson.reduce((s, x) => s + x, 0)
+          cpp + pension + extraTaxable + rent + extraIncome +
+          oasGrossPerPerson.reduce((s, x) => s + x, 0)
         const rrspCap = Math.max(rrifMin, bracketTop * persons - committedTaxable)
         steps = [
           { account: 'rrsp', cap: rrspCap },
@@ -407,7 +443,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       // debt payments come on top of living expenses until paid off
       const spendTarget = inputs.retirementSpending + debtPayment
       const out = solveWithdrawals(
-        spendTarget, bal, forcedRrsp, gainFraction, cpp,
+        spendTarget, bal, forcedRrsp, gainFraction, cpp, pension,
         oasGrossPerPerson, agesPerPerson, extraTaxable, rent,
         extraIncome, steps, inputs,
       )
@@ -434,6 +470,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         oas: taxShare(oas),
         property: taxShare(propertyTaxable),
         extraIncome: taxShare(extraIncome),
+        pension: taxShare(pension),
       }
       taxableBySource = {
         rrsp: withdrawals.rrsp,
@@ -442,6 +479,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         oas,
         property: propertyTaxable,
         extraIncome,
+        pension,
       }
 
       if (netCash < spendTarget - 0.01) {
@@ -479,6 +517,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       balances: { ...bal },
       withdrawals, cpp, oas, gis, rent,
       extraIncome: phase === 'accumulation' ? 0 : extraIncome,
+      pension,
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
       debtPayment, debtBalance,

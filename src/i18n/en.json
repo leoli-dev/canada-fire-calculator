@@ -17,7 +17,8 @@
   "estCppTitle": "Not sure? Estimate from work history",
   "estOasTitle": "Not sure? Estimate from residence years",
   "estStartWorkAge": "Age full-time work began",
-  "estRatio": "Average earnings as % of the YMPE cap (2026: ~$74,600)",
+  "estRatio": "Average earnings while working, as % of the YMPE cap (2026: ~$74,600)",
+  "cppEstUsesFireAge": "Uses the FIRE age you entered above ({{age}}) — contributions stop that year.",
   "estResidence": "Years lived in Canada by 65 (from age 18)",
   "estResult": "Estimate",
   "estApply": "Apply",
@@ -25,6 +26,17 @@
   "oasEstNote": "OAS is residence-based, not work-based: 40 years in Canada after age 18 gives the full amount, fewer years are prorated (common for immigrants).",
   "coupleNote": "Accounts and spending are household totals; tax assumes ideal income splitting between spouses.",
   "accounts": "Accounts",
+  "accountsHint": "Enter today's balances, not the balances you expect at FIRE — the projection grows them from your current age.",
+  "pensionToggle": "Employer pension (DB)",
+  "pensionAnnual": "Annual pension at start age ($/yr, today's dollars, before tax)",
+  "pensionStartAge": "Pension start age",
+  "pensionIndexation": "Inflation indexing (% of CPI)",
+  "pensionBridge": "Bridge benefit until 65 ($/yr, 0 = none)",
+  "pensionNote": "Enter the lifetime annual amount from your pension statement (already reduced for an early start, if that applies). Have a defined-contribution (DC) plan or a LIRA instead? Add its balance to the RRSP/RRIF field — it projects the same way here. Payments are taxed as eligible pension income: splittable with a spouse and earning the pension income credit at any age. Not modelled: survivor percentages and Quebec's 65+ provincial splitting restriction.",
+  "pensionLabel": "Employer pension",
+  "valPensionWindow": "Pension start age should be between {{min}} and {{max}}",
+  "valPensionIndexation": "Indexing must be between 0% and 100%",
+  "valBridgeAfter65": "The bridge benefit ends at 65 — starting at 65 or later means it never pays out",
   "tfsa": "TFSA",
   "rrsp": "RRSP / RRIF",
   "nonReg": "Non-registered",
@@ -262,7 +274,7 @@
     },
     "pensioncredit": {
       "title": "Pension income credit",
-      "body": "The first $2,000 of eligible pension income each year earns a federal credit (provinces add their own amounts). From age 65, RRIF withdrawals qualify - which is why planners suggest drawing at least $2,000 a year from a RRIF after 65: that slice is nearly tax-free. RRSP withdrawals never qualify at any age. The calculator applies the credit to RRSP/RRIF draws from 65 automatically."
+      "body": "The first $2,000 of eligible pension income each year earns a federal credit (provinces add their own amounts). Employer pension annuities qualify at any age; RRIF withdrawals only from 65 — which is why planners suggest drawing at least $2,000 a year from a RRIF after 65: that slice is nearly tax-free. RRSP withdrawals never qualify at any age. The calculator applies the credit automatically: employer pensions at any age, RRSP/RRIF draws from 65."
     },
     "gis": {
       "title": "GIS - Guaranteed Income Supplement",
@@ -290,7 +302,15 @@
     },
     "simplifications": {
       "title": "What this calculator simplifies",
-      "body": "To keep the math tractable and auditable, this calculator makes a number of simplifications; the results are a directionally honest approximation, not a guarantee of your actual future tax outcome. Couple mode assumes CPP, RRSP withdrawals, rental income and investment income can all be split 50/50 — in reality, RRSP withdrawals before 65 are taxed only to the account owner (unless you've set up a spousal RRSP ahead of time), Barista FIRE side income can't legally be split with a spouse (the calculator already handles this case separately), and the estate tax bill is estimated as an even split between spouses rather than the survivor's own single-filer bracket (usually heavier). Non-registered distributions and net rent are taxed as ordinary income every year (no dividend gross-up/credit, no rental CCA depreciation modelled); GIS and the 60-64 spousal Allowance use a linear approximation of the official tables; TFSA/RRSP contribution room isn't checked and RRSP refunds aren't automatically reinvested; CPP enhancement (post-2019 contributions) isn't modelled, understating younger users' benefits (a conservative direction); debts and mortgages are treated as fixed nominal payments with no refinancing or variable rates; Monte Carlo draws one shared market outcome per year across all accounts (full correlation), when real-world correlation is somewhat lower (also conservative); large one-off costs like long-term care aren't modelled; and some Quebec RAMQ/FSS figures and provincial probate-fee rates are approximated from secondary sources rather than official year-by-year data, since the official sites block automated fetching."
+      "body": "To keep the math tractable and auditable, this calculator makes a number of simplifications; the results are a directionally honest approximation, not a guarantee of your actual future tax outcome. Couple mode assumes CPP, RRSP withdrawals, rental income and investment income can all be split 50/50 — in reality, RRSP withdrawals before 65 are taxed only to the account owner (unless you've set up a spousal RRSP ahead of time), Barista FIRE side income can't legally be split with a spouse (the calculator already handles this case separately), and the estate tax bill is estimated as an even split between spouses rather than the survivor's own single-filer bracket (usually heavier). Non-registered distributions and net rent are taxed as ordinary income every year (no dividend gross-up/credit, no rental CCA depreciation modelled); GIS and the 60-64 spousal Allowance use a linear approximation of the official tables; TFSA/RRSP contribution room isn't checked and RRSP refunds aren't automatically reinvested; CPP enhancement (post-2019 contributions) isn't modelled, understating younger users' benefits (a conservative direction); debts and mortgages are treated as fixed nominal payments with no refinancing or variable rates; Monte Carlo draws one shared market outcome per year across all accounts (full correlation), when real-world correlation is somewhat lower (also conservative); large one-off costs like long-term care aren't modelled; and some Quebec RAMQ/FSS figures and provincial probate-fee rates are approximated from secondary sources rather than official year-by-year data, since the official sites block automated fetching. Employer pensions add their own simplifications: survivor percentages aren't modelled (both spouses are assumed to reach the shared life expectancy), Quebec's provincial rule that pension splitting requires age 65+ is ignored (splitting stays idealized at any age), a partially-indexed pension only erodes from its start age (deferral-period erosion isn't modelled), and DC/LIRA balances entered in the RRSP field ignore LIF withdrawal caps."
+    },
+    "dbpension": {
+      "title": "Employer pension (DB/DC)",
+      "body": "Workplace registered pension plans come in two kinds. Defined benefit (DB): a formula — often 2% × years of service × best-5-year average salary — pays a lifetime annuity, sometimes indexed to CPI, sometimes with a bridge benefit to 65. Defined contribution (DC): an investment account; enter its balance in the RRSP/RRIF field instead of here. Leaving long before retirement (the FIRE case) usually offers a choice between a deferred pension and transferring the commuted value into a locked-in account (LIRA) — tax law caps the sheltered transfer, and the excess is paid out as taxable cash. Pension payments are fully taxable, count toward the OAS clawback and the GIS income test, but are 'eligible pension income' at any age: splittable 50/50 with a spouse and earning the pension income credit."
+    },
+    "bridgebenefit": {
+      "title": "Bridge benefit",
+      "body": "A temporary top-up many DB pensions pay from the pension start age until 65, roughly standing in for the CPP/OAS you can't collect yet. It stops at 65 regardless of when your CPP actually starts — plan for the income step-down. Not to be confused with the bridge period (the FIRE-to-government-benefits years)."
     }
   },
   "targetReachedEarly": "On track: the {{target}} target is first reached at age {{age}}; by {{fireAge}} (FIRE) you hold about {{amount}}.",

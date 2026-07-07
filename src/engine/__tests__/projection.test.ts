@@ -598,3 +598,104 @@ describe('allowanceAnnual', () => {
     expect(gisAt67(r)).toBeGreaterThan(gisAt67(withoutPartner))
   })
 })
+
+describe('employer pension', () => {
+  const pension = { annualAmount: 30000, startAge: 60, indexation: 1, bridgeAnnual: 0 }
+
+  it('pays nothing before startAge and the full amount from startAge (fully indexed)', () => {
+    const r = runProjection({ ...base, pension })
+    expect(r.rows.find((x) => x.age === 59)!.pension).toBe(0)
+    expect(r.rows.find((x) => x.age === 60)!.pension).toBeCloseTo(30000, 5)
+    expect(r.rows.find((x) => x.age === 85)!.pension).toBeCloseTo(30000, 5)
+  })
+
+  it('bridge benefit pays from startAge and stops at 65', () => {
+    const r = runProjection({ ...base, pension: { ...pension, bridgeAnnual: 8000 } })
+    expect(r.rows.find((x) => x.age === 60)!.pension).toBeCloseTo(38000, 5)
+    expect(r.rows.find((x) => x.age === 64)!.pension).toBeCloseTo(38000, 5)
+    expect(r.rows.find((x) => x.age === 65)!.pension).toBeCloseTo(30000, 5)
+  })
+
+  it('a non-indexed pension erodes in real terms from its start age', () => {
+    const r = runProjection({ ...base, pension: { ...pension, indexation: 0 }, inflation: 0.021 })
+    const at60 = r.rows.find((x) => x.age === 60)!.pension
+    const at80 = r.rows.find((x) => x.age === 80)!.pension
+    expect(at60).toBeCloseTo(30000, 5)
+    expect(at80).toBeCloseTo(30000 / Math.pow(1.021, 20), 3)
+  })
+
+  it('pension income reduces the withdrawals needed to fund spending', () => {
+    const without = runProjection(base)
+    const withPn = runProjection({ ...base, pension })
+    const wSum = (r: typeof without, age: number) => {
+      const row = r.rows.find((x) => x.age === age)!
+      return row.withdrawals.tfsa + row.withdrawals.rrsp + row.withdrawals.nonReg
+    }
+    expect(wSum(withPn, 70)).toBeLessThan(wSum(without, 70))
+    expect(withPn.finalNetWorth).toBeGreaterThan(without.finalNetWorth)
+  })
+
+  it('pension is taxable: appears in taxBySource/taxableBySource and slices sum to the tax line', () => {
+    const r = runProjection({ ...base, pension })
+    const row = r.rows.find((x) => x.age === 70)!
+    expect(row.taxableBySource.pension).toBeCloseTo(row.pension, 5)
+    expect(row.taxBySource.pension).toBeGreaterThan(0)
+    const sliceSum = Object.values(row.taxBySource).reduce((s, x) => s + x, 0)
+    expect(sliceSum).toBeCloseTo(row.tax, 4)
+  })
+
+  it('pension collected before FIRE is saved after tax at the working marginal rate', () => {
+    const r = runProjection({
+      ...base,
+      currentAge: 55,
+      fireAge: 62,
+      pension: { ...pension, startAge: 58 },
+    })
+    const row = r.rows.find((x) => x.age === 58)!
+    expect(row.phase).toBe('accumulation')
+    expect(row.pension).toBeCloseTo(30000, 5)
+    expect(row.taxBySource.pension).toBeCloseTo(30000 * 0.35, 5)
+  })
+
+  it('pension counts against the GIS income test (no work exemption)', () => {
+    const poor: Inputs = {
+      ...base,
+      balances: { tfsa: 150000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0,
+      annualSavings: 0,
+      retirementSpending: 18000,
+      cppAnnualAt65: 3000,
+    }
+    const without = runProjection(poor)
+    const withPn = runProjection({ ...poor, pension: { ...pension, annualAmount: 12000, startAge: 65 } })
+    const gis = (r: typeof without, age: number) => r.rows.find((x) => x.age === age)!.gis
+    expect(gis(without, 70)).toBeGreaterThan(0)
+    expect(gis(withPn, 70)).toBeLessThan(gis(without, 70))
+  })
+
+  it("partner pension runs on the partner's own age timeline", () => {
+    const r = runProjection({
+      ...base,
+      partner: {
+        currentAge: 30, // 5 years younger
+        cppStartAge: 65,
+        cppAnnualAt65: 8000,
+        oasStartAge: 65,
+        oasAnnualAt65: 8700,
+        pension,
+      },
+    })
+    // partner turns 60 when the primary is 65
+    expect(r.rows.find((x) => x.age === 64)!.pension).toBe(0)
+    expect(r.rows.find((x) => x.age === 65)!.pension).toBeCloseTo(30000, 5)
+  })
+
+  it('employer pension earns the pension credit below 65 (cheaper than the same side income)', () => {
+    const asPension = incomeTax(40000, 'ON', { age: 60, pensionIncome: 30000 })
+    const noPension = incomeTax(40000, 'ON', { age: 60, pensionIncome: 0 })
+    expect(asPension).toBeLessThan(noPension)
+    // the gap is roughly the federal + Ontario credit on $2,000
+    expect(noPension - asPension).toBeGreaterThan(250)
+    expect(noPension - asPension).toBeLessThan(500)
+  })
+})

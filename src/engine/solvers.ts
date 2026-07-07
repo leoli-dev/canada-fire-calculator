@@ -1,4 +1,4 @@
-import { runProjection } from './projection'
+import { pensionPaid, runProjection } from './projection'
 import { buildDebtStream, rollDebtsForward } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
@@ -214,7 +214,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     bal.nonReg += rent - (rent - rentInterest) * marginal
     // ...and benefits already being collected while still working
     const cppMaxAge = inputs.province === 'QC' ? 72 : 70
-    let benefits = 0
+    let benefits = pensionPaid(inputs.pension, age, inflation)
     if (age >= inputs.cppStartAge) {
       const relief = inputs.cppWork
         ? earlyClaimDilutionRelief(
@@ -228,6 +228,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     const p2 = inputs.partner
     if (p2) {
       const pAge = p2.currentAge + (age - inputs.currentAge)
+      benefits += pensionPaid(p2.pension, pAge, inflation)
       if (pAge >= p2.cppStartAge) {
         const relief = p2.cppWork
           ? earlyClaimDilutionRelief(p2.cppWork.startWorkAge, p2.cppWork.retireAge, p2.cppStartAge)

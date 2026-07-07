@@ -88,6 +88,20 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       warn('partner.oasAnnualAt65', 'valOasMax', { max: OAS_FULL_AT_65 })
   }
 
+  const checkPension = (pn: NonNullable<Inputs['pension']> , prefix: string) => {
+    const at = (f: string) => `${prefix}.${f}`
+    if (pn.annualAmount < 0) err(at('annualAmount'), 'valNegative')
+    if (pn.bridgeAnnual < 0) err(at('bridgeAnnual'), 'valNegative')
+    if (pn.startAge < 45 || pn.startAge > 72)
+      err(at('startAge'), 'valPensionWindow', { min: 45, max: 72 })
+    if (pn.indexation < 0 || pn.indexation > 1)
+      err(at('indexation'), 'valPensionIndexation')
+    if (pn.bridgeAnnual > 0 && pn.startAge >= 65)
+      warn(at('bridgeAnnual'), 'valBridgeAfter65')
+  }
+  if (inputs.pension) checkPension(inputs.pension, 'pension')
+  if (p?.pension) checkPension(p.pension, 'partner.pension')
+
   const debts = inputs.debts ?? []
   debts.forEach((d, i) => {
     const at = (f: string) => `debts.${i}.${f}`

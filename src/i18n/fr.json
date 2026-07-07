@@ -17,7 +17,8 @@
   "estCppTitle": "Pas certain ? Estimer selon l'historique de travail",
   "estOasTitle": "Pas certain ? Estimer selon les années de résidence",
   "estStartWorkAge": "Âge de début du travail à temps plein",
-  "estRatio": "Revenu moyen en % du plafond MGA (2026 : ~74 600 $)",
+  "estRatio": "Revenu moyen pendant vos années de travail, en % du plafond MGA (2026 : ~74 600 $)",
+  "cppEstUsesFireAge": "Utilise l'âge FIRE saisi plus haut ({{age}} ans) — les cotisations cessent cette année-là.",
   "estResidence": "Années vécues au Canada avant 65 ans (dès 18 ans)",
   "estResult": "Estimation",
   "estApply": "Appliquer",
@@ -25,6 +26,17 @@
   "oasEstNote": "La SV dépend de la résidence, pas du travail : 40 ans au Canada après 18 ans donnent le plein montant, sinon au prorata (fréquent chez les immigrants).",
   "coupleNote": "Comptes et dépenses sont des totaux du ménage; l'impôt suppose un fractionnement de revenu idéal.",
   "accounts": "Comptes",
+  "accountsHint": "Entrez les soldes d'aujourd'hui, pas ceux prévus au moment FIRE — la projection les fait croître à partir de votre âge actuel.",
+  "pensionToggle": "Régime de retraite d'employeur (PD)",
+  "pensionAnnual": "Rente annuelle à l'âge de début ($/an, dollars d'aujourd'hui, avant impôt)",
+  "pensionStartAge": "Âge de début de la rente",
+  "pensionIndexation": "Indexation à l'inflation (% de l'IPC)",
+  "pensionBridge": "Prestation de raccordement jusqu'à 65 ans ($/an, 0 = aucune)",
+  "pensionNote": "Entrez le montant annuel viager de votre relevé de retraite (déjà réduit si vous commencez tôt). Régime à cotisations déterminées (CD) ou CRI ? Ajoutez plutôt son solde au champ REER/FERR — la projection est identique. Les paiements sont imposés comme revenu de pension admissible : fractionnables avec le conjoint et donnant droit au crédit pour revenu de pension à tout âge. Non modélisé : la rente au survivant et la règle québécoise exigeant 65 ans pour le fractionnement provincial.",
+  "pensionLabel": "Rente d'employeur",
+  "valPensionWindow": "L'âge de début doit être entre {{min}} et {{max}}",
+  "valPensionIndexation": "L'indexation doit être entre 0 % et 100 %",
+  "valBridgeAfter65": "La prestation de raccordement cesse à 65 ans — commencer à 65 ans ou plus ne verse jamais rien",
   "tfsa": "CELI",
   "rrsp": "REER / FERR",
   "nonReg": "Non enregistré",
@@ -262,7 +274,7 @@
     },
     "pensioncredit": {
       "title": "Crédit pour revenu de pension",
-      "body": "Les premiers 2 000 $ de revenu de pension admissible par année donnent un crédit fédéral (les provinces ajoutent le leur). Dès 65 ans, les retraits FERR sont admissibles - d'où le conseil classique de retirer au moins 2 000 $ par an d'un FERR après 65 ans : cette tranche est presque libre d'impôt. Les retraits REER directs ne sont jamais admissibles. Le calculateur applique le crédit aux retraits REER/FERR dès 65 ans."
+      "body": "Les premiers 2 000 $ de revenu de pension admissible par année donnent un crédit fédéral (les provinces ajoutent le leur). Les rentes d'employeur sont admissibles à tout âge; les retraits FERR seulement dès 65 ans - d'où le conseil classique de retirer au moins 2 000 $ par an d'un FERR après 65 ans : cette tranche est presque libre d'impôt. Les retraits REER directs ne sont jamais admissibles. Le calculateur applique le crédit automatiquement : rentes d'employeur à tout âge, retraits REER/FERR dès 65 ans."
     },
     "gis": {
       "title": "SRG - Supplément de revenu garanti",
@@ -290,7 +302,15 @@
     },
     "simplifications": {
       "title": "Ce que ce calculateur simplifie",
-      "body": "Pour garder le calcul maîtrisable et vérifiable, ce calculateur fait un certain nombre de simplifications; les résultats sont une approximation honnête dans sa direction, pas une garantie de votre résultat fiscal réel futur. Le mode couple suppose que le RPC, les retraits REER, le revenu locatif et le revenu de placement peuvent tous être fractionnés 50/50 — en réalité, les retraits REER avant 65 ans sont imposés uniquement au titulaire du compte (sauf REER de conjoint mis en place à l'avance), le revenu d'appoint Barista FIRE ne peut légalement pas être partagé avec un conjoint (le calculateur le traite déjà séparément), et l'impôt successoral est estimé comme un partage égal entre conjoints plutôt que selon le barème du survivant seul (habituellement plus lourd). Les distributions non enregistrées et le loyer net sont imposés chaque année comme revenu ordinaire (pas de majoration/crédit de dividendes, pas de DPA locative modélisée); le SRG et l'Allocation pour le conjoint de 60 à 64 ans utilisent une approximation linéaire des tables officielles; les plafonds de cotisation CELI/REER ne sont pas vérifiés et les remboursements REER ne sont pas réinvestis automatiquement; la bonification du RPC (cotisations postérieures à 2019) n'est pas modélisée, ce qui sous-estime les prestations des utilisateurs plus jeunes (direction prudente); les dettes et hypothèques sont traitées comme des paiements nominaux fixes, sans refinancement ni taux variable; Monte-Carlo tire un seul résultat de marché par année pour tous les comptes (corrélation complète), alors que la corrélation réelle est un peu plus faible (également prudent); les coûts ponctuels importants comme les soins de longue durée ne sont pas modélisés; et certains chiffres RAMQ/FSS du Québec ainsi que les taux d'homologation provinciaux sont approximés à partir de sources secondaires plutôt que de données officielles année par année, les sites officiels bloquant la récupération automatisée."
+      "body": "Pour garder le calcul maîtrisable et vérifiable, ce calculateur fait un certain nombre de simplifications; les résultats sont une approximation honnête dans sa direction, pas une garantie de votre résultat fiscal réel futur. Le mode couple suppose que le RPC, les retraits REER, le revenu locatif et le revenu de placement peuvent tous être fractionnés 50/50 — en réalité, les retraits REER avant 65 ans sont imposés uniquement au titulaire du compte (sauf REER de conjoint mis en place à l'avance), le revenu d'appoint Barista FIRE ne peut légalement pas être partagé avec un conjoint (le calculateur le traite déjà séparément), et l'impôt successoral est estimé comme un partage égal entre conjoints plutôt que selon le barème du survivant seul (habituellement plus lourd). Les distributions non enregistrées et le loyer net sont imposés chaque année comme revenu ordinaire (pas de majoration/crédit de dividendes, pas de DPA locative modélisée); le SRG et l'Allocation pour le conjoint de 60 à 64 ans utilisent une approximation linéaire des tables officielles; les plafonds de cotisation CELI/REER ne sont pas vérifiés et les remboursements REER ne sont pas réinvestis automatiquement; la bonification du RPC (cotisations postérieures à 2019) n'est pas modélisée, ce qui sous-estime les prestations des utilisateurs plus jeunes (direction prudente); les dettes et hypothèques sont traitées comme des paiements nominaux fixes, sans refinancement ni taux variable; Monte-Carlo tire un seul résultat de marché par année pour tous les comptes (corrélation complète), alors que la corrélation réelle est un peu plus faible (également prudent); les coûts ponctuels importants comme les soins de longue durée ne sont pas modélisés; et certains chiffres RAMQ/FSS du Québec ainsi que les taux d'homologation provinciaux sont approximés à partir de sources secondaires plutôt que de données officielles année par année, les sites officiels bloquant la récupération automatisée. Les régimes d'employeur ajoutent leurs propres simplifications : la rente au survivant n'est pas modélisée (les deux conjoints sont supposés atteindre l'espérance de vie commune), la règle québécoise exigeant 65 ans pour le fractionnement provincial est ignorée (fractionnement idéalisé à tout âge), une rente partiellement indexée ne s'érode qu'à partir de l'âge de début (pas pendant les années de report), et les soldes CD/CRI entrés dans le champ REER ignorent les plafonds de retrait des FRV."
+    },
+    "dbpension": {
+      "title": "Régime de retraite d'employeur (PD/CD)",
+      "body": "Les régimes de retraite d'employeur sont de deux types. Prestations déterminées (PD) : une formule — souvent 2 % × années de service × moyenne des 5 meilleures années de salaire — verse une rente viagère, parfois indexée à l'IPC, parfois avec une prestation de raccordement jusqu'à 65 ans. Cotisations déterminées (CD) : un compte de placement; entrez plutôt son solde dans le champ REER/FERR. Quitter longtemps avant la retraite (le cas FIRE) offre généralement le choix entre une rente différée et le transfert de la valeur de rachat dans un compte immobilisé (CRI) — la loi fiscale plafonne le transfert à l'abri, l'excédent est versé en argent imposable. La rente est pleinement imposable, compte pour la récupération de la SV et le test de revenu du SRG, mais constitue un revenu de pension admissible à tout âge : fractionnable 50/50 avec le conjoint et donnant droit au crédit pour revenu de pension."
+    },
+    "bridgebenefit": {
+      "title": "Prestation de raccordement",
+      "body": "Un supplément temporaire que versent bien des régimes PD de l'âge de début de la rente jusqu'à 65 ans, en remplacement approximatif du RPC/SV que vous ne pouvez pas encore toucher. Elle cesse à 65 ans quel que soit le début réel de votre RPC — prévoyez la baisse de revenu. À ne pas confondre avec la période-pont (les années entre FIRE et les prestations gouvernementales)."
     }
   },
   "targetReachedEarly": "En bonne voie : la cible de {{target}} est atteinte dès {{age}} ans; à {{fireAge}} ans (FIRE) vous détenez environ {{amount}}.",

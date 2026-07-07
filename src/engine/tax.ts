@@ -17,7 +17,12 @@ import type { Province } from './types'
 export interface PersonCredits {
   /** the taxpayer's age — 65+ unlocks the age amount */
   age?: number
-  /** eligible pension income (RRIF withdrawals at 65+) for the pension credit */
+  /**
+   * Eligible pension income for the pension income amount. Callers gate by
+   * type: employer RPP annuities qualify at any age; RRIF/LIF withdrawals
+   * only at 65+. (Quebec folds its equivalent into the family-income-tested
+   * senior credit, so under-65 RPP income gets the federal amount only.)
+   */
   pensionIncome?: number
 }
 
@@ -58,13 +63,15 @@ export function incomeTax(
   const pensionInc = credits?.pensionIncome ?? 0
 
   let fedCredit = federalBpa(taxable) * FEDERAL.brackets[0].rate
+  // the pension income amount has no age test of its own — eligibility by
+  // income type is the caller's job (see PersonCredits.pensionIncome)
+  fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * FEDERAL.brackets[0].rate
   if (senior) {
     const ageAmt = Math.max(
       0,
       FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold),
     )
     fedCredit += ageAmt * FEDERAL.brackets[0].rate
-    fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * FEDERAL.brackets[0].rate
   }
   let fed = Math.max(0, bracketTax(taxable, FEDERAL.brackets) - fedCredit)
   if (province === 'QC') fed *= 1 - QC_ABATEMENT
@@ -79,6 +86,12 @@ export function incomeTax(
     provBpa = p.bpa - (p.bpa - min) * phase
   }
   let provCredit = provBpa * lowRate
+  // provincial pension amounts (outside QC) have no age test either; QC's
+  // equivalent stays inside the senior block below, folded into its combined
+  // family-income-tested credit
+  if (province !== 'QC') {
+    provCredit += Math.min(PROV_AGE_PENSION[province].pension, pensionInc) * lowRate
+  }
   if (senior) {
     const ap = PROV_AGE_PENSION[province]
     provCredit += (ap.seniorSupplement ?? 0) * lowRate
@@ -93,7 +106,7 @@ export function incomeTax(
         0,
         ap.ageMax - ap.ageRate * Math.max(0, taxable - ap.ageThreshold),
       )
-      provCredit += (ageAmt + Math.min(ap.pension, pensionInc)) * lowRate
+      provCredit += ageAmt * lowRate
     }
   }
   let prov = Math.max(0, bracketTax(taxable, p.brackets) - provCredit)

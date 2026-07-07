@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { estimateCppAt65, estimateOasAt65 } from '../engine'
 import { useCad } from '../format'
 import { Jargon } from './Jargon'
+import { NumberInput } from './NumberInput'
 
 function Row(props: {
   label: string
@@ -12,10 +13,9 @@ function Row(props: {
   return (
     <label className="field">
       <span><Jargon text={props.label} /></span>
-      <input
-        type="number"
+      <NumberInput
         value={props.value}
-        onChange={(e) => props.onChange(Number(e.target.value))}
+        onChange={(v) => props.onChange(v ?? 0)}
       />
     </label>
   )
@@ -37,6 +37,7 @@ export function CppEstimator(props: {
       <summary>{t('estCppTitle')}</summary>
       <Row label={t('estStartWorkAge')} value={startWorkAge} onChange={setStartWorkAge} />
       <Row label={t('estRatio')} value={ratio} onChange={setRatio} />
+      <p className="hint">{t('cppEstUsesFireAge', { age: props.retireAge })}</p>
       <div className="ws-total">
         <span>
           {t('estResult')}: <strong>{cad(estimate)}</strong>

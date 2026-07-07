@@ -54,6 +54,31 @@ export interface ExtraIncome {
   toAge: number
 }
 
+/**
+ * Employer DB pension (v1): a lifetime annuity from startAge, plus an
+ * optional bridge benefit that ends at 65. Amounts are today's dollars,
+ * pre-tax. DC pensions aren't a separate thing here — their balance belongs
+ * in the RRSP field (a LIRA/locked-in account behaves the same for
+ * projection purposes; LIF withdrawal caps aren't modelled).
+ *
+ * Not modelled (disclosed simplifications): survivor benefits (the engine
+ * has no one-spouse-dies-early scenario) and Quebec's provincial-only rule
+ * that income splitting requires age 65+ even for RPP annuities.
+ */
+export interface Pension {
+  /** annual lifetime pension at startAge (excluding any bridge) */
+  annualAmount: number
+  startAge: number
+  /**
+   * 0–1: how much of CPI the payments keep up with (1 = fully indexed,
+   * 0 = fixed nominal). Erosion is applied from startAge on; a non-indexed
+   * pension also losing value during the deferral years isn't modelled.
+   */
+  indexation: number
+  /** temporary bridge paid from startAge until 65 (0 = none) */
+  bridgeAnnual: number
+}
+
 export interface Partner {
   currentAge: number
   cppStartAge: number
@@ -61,6 +86,7 @@ export interface Partner {
   oasStartAge: number
   oasAnnualAt65: number
   cppWork?: CppWork | null
+  pension?: Pension | null
 }
 
 export type DebtKind = 'mortgage' | 'carLoan' | 'other'
@@ -167,6 +193,8 @@ export interface Inputs {
   inflation?: number
   /** target investable assets at FIRE, for the goal-check question mode */
   fireTargetAssets?: number | null
+  /** employer DB pension (annuity mode); DC balances go in the RRSP field */
+  pension?: Pension | null
   /** spouse/partner for household mode; accounts are household totals */
   partner?: Partner | null
   /** expected post-FIRE side income (Barista FIRE) */
@@ -195,6 +223,8 @@ export interface TaxBySource {
   /** net rent plus 50%-taxable investment-property sale gains */
   property: number
   extraIncome: number
+  /** employer pension annuity (including any bridge benefit) */
+  pension: number
 }
 
 export interface YearRow {
@@ -212,6 +242,8 @@ export interface YearRow {
   rent: number
   /** post-FIRE side income received this year (taxable) */
   extraIncome: number
+  /** employer pension received this year, bridge included (taxable) */
+  pension: number
   tax: number
   /** after-tax cash available this year */
   netCash: number

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_INVESTMENT_PROPERTY,
   DEFAULT_PARTNER,
+  DEFAULT_PENSION,
   MIX_PRESETS,
   useStore,
   WORKSHEET_KEYS,
@@ -19,6 +20,7 @@ import {
 import { useCad } from '../format'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { Jargon } from './Jargon'
+import { NumberInput } from './NumberInput'
 
 const PROVINCES: Province[] = [
   'ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU',
@@ -36,12 +38,11 @@ function Num(props: {
   return (
     <label className="field">
       <span><Jargon text={props.label} /></span>
-      <input
-        type="number"
+      <NumberInput
         className={props.issue ? `invalid-${props.issue.severity}` : undefined}
         value={props.value}
         step={props.step ?? 1}
-        onChange={(e) => props.onChange(Number(e.target.value))}
+        onChange={(v) => props.onChange(v ?? 0)}
       />
       {props.issue && (
         <em className={`field-issue ${props.issue.severity}`}>
@@ -62,14 +63,11 @@ function OptionalAge(props: {
   return (
     <label className="field">
       <span><Jargon text={props.label} /></span>
-      <input
-        type="number"
+      <NumberInput
         className={props.issue ? `invalid-${props.issue.severity}` : undefined}
-        value={props.value ?? ''}
+        value={props.value}
         placeholder="—"
-        onChange={(e) =>
-          props.onChange(e.target.value === '' ? null : Number(e.target.value))
-        }
+        onChange={props.onChange}
       />
       {props.issue && (
         <em className={`field-issue ${props.issue.severity}`}>
@@ -225,6 +223,7 @@ export function InputForm() {
 
       <fieldset>
         <legend>{t('accounts')}</legend>
+        <p className="hint">{t('accountsHint')}</p>
         {ACCOUNTS.map((a) => (
           <Num
             key={a}
@@ -519,6 +518,32 @@ export function InputForm() {
         <Num label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} step={100} onChange={(v) => set({ oasAnnualAt65: v })} />
         <OasEstimator onApply={(v) => set({ oasAnnualAt65: v })} />
 
+        <label className="field">
+          <span><Jargon text={t('pensionToggle')} /></span>
+          <input
+            type="checkbox"
+            checked={!!inputs.pension}
+            onChange={(e) => set({ pension: e.target.checked ? DEFAULT_PENSION : null })}
+          />
+        </label>
+        {inputs.pension && (
+          <>
+            <Num label={t('pensionAnnual')} value={inputs.pension.annualAmount} step={1000}
+              issue={issueFor('pension.annualAmount')}
+              onChange={(v) => set({ pension: { ...inputs.pension!, annualAmount: v } })} />
+            <Num label={t('pensionStartAge')} value={inputs.pension.startAge}
+              issue={issueFor('pension.startAge')}
+              onChange={(v) => set({ pension: { ...inputs.pension!, startAge: v } })} />
+            <Num label={t('pensionIndexation')} value={Math.round(inputs.pension.indexation * 100)} step={25}
+              issue={issueFor('pension.indexation')}
+              onChange={(v) => set({ pension: { ...inputs.pension!, indexation: Math.max(0, Math.min(100, v)) / 100 } })} />
+            <Num label={t('pensionBridge')} value={inputs.pension.bridgeAnnual} step={1000}
+              issue={issueFor('pension.bridgeAnnual')}
+              onChange={(v) => set({ pension: { ...inputs.pension!, bridgeAnnual: v } })} />
+            <p className="hint"><Jargon text={t('pensionNote')} /></p>
+          </>
+        )}
+
         {inputs.partner && (
           <>
             <p className="subhead">{t('partnerSection')}</p>
@@ -538,6 +563,38 @@ export function InputForm() {
             <OasEstimator
               onApply={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: v } })}
             />
+            <label className="field">
+              <span><Jargon text={t('pensionToggle')} /></span>
+              <input
+                type="checkbox"
+                checked={!!inputs.partner.pension}
+                onChange={(e) =>
+                  set({
+                    partner: {
+                      ...inputs.partner!,
+                      pension: e.target.checked ? DEFAULT_PENSION : null,
+                    },
+                  })
+                }
+              />
+            </label>
+            {inputs.partner.pension && (
+              <>
+                <Num label={t('pensionAnnual')} value={inputs.partner.pension.annualAmount} step={1000}
+                  issue={issueFor('partner.pension.annualAmount')}
+                  onChange={(v) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, annualAmount: v } } })} />
+                <Num label={t('pensionStartAge')} value={inputs.partner.pension.startAge}
+                  issue={issueFor('partner.pension.startAge')}
+                  onChange={(v) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, startAge: v } } })} />
+                <Num label={t('pensionIndexation')} value={Math.round(inputs.partner.pension.indexation * 100)} step={25}
+                  issue={issueFor('partner.pension.indexation')}
+                  onChange={(v) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, indexation: Math.max(0, Math.min(100, v)) / 100 } } })} />
+                <Num label={t('pensionBridge')} value={inputs.partner.pension.bridgeAnnual} step={1000}
+                  issue={issueFor('partner.pension.bridgeAnnual')}
+                  onChange={(v) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, bridgeAnnual: v } } })} />
+                <p className="hint"><Jargon text={t('pensionNote')} /></p>
+              </>
+            )}
           </>
         )}
 

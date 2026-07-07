@@ -20,9 +20,10 @@ const COLORS = {
   oas: '#ad1457',
   property: '#5d4037',
   extraIncome: '#7cb342',
+  pension: '#f9a825',
 }
 
-const SOURCE_KEYS = ['rrsp', 'nonReg', 'cpp', 'oas', 'property', 'extraIncome'] as const
+const SOURCE_KEYS = ['rrsp', 'nonReg', 'cpp', 'oas', 'property', 'extraIncome', 'pension'] as const
 type SourceKey = (typeof SOURCE_KEYS)[number]
 
 interface TaxChartRow {
@@ -37,12 +38,14 @@ interface TaxChartRow {
   oas: number
   property: number
   extraIncome: number
+  pension: number
   taxableRrsp: number
   taxableNonReg: number
   taxableCpp: number
   taxableOas: number
   taxableProperty: number
   taxableExtraIncome: number
+  taxablePension: number
 }
 
 const TAXABLE_KEY: Record<SourceKey, keyof TaxChartRow> = {
@@ -52,6 +55,7 @@ const TAXABLE_KEY: Record<SourceKey, keyof TaxChartRow> = {
   oas: 'taxableOas',
   property: 'taxableProperty',
   extraIncome: 'taxableExtraIncome',
+  pension: 'taxablePension',
 }
 
 /**
@@ -87,12 +91,14 @@ export function TaxChart(props: {
         oas: Math.round(s.oas * k(r.age)),
         property: Math.round(s.property * k(r.age)),
         extraIncome: Math.round(s.extraIncome * k(r.age)),
+        pension: Math.round(s.pension * k(r.age)),
         taxableRrsp: Math.round(ti.rrsp * k(r.age)),
         taxableNonReg: Math.round(ti.nonReg * k(r.age)),
         taxableCpp: Math.round(ti.cpp * k(r.age)),
         taxableOas: Math.round(ti.oas * k(r.age)),
         taxableProperty: Math.round(ti.property * k(r.age)),
         taxableExtraIncome: Math.round(ti.extraIncome * k(r.age)),
+        taxablePension: Math.round(ti.pension * k(r.age)),
         total: Math.round(r.tax * k(r.age)),
         // household total (not per-person) so it's directly comparable to
         // the household tax total in the same tooltip
@@ -104,6 +110,7 @@ export function TaxChart(props: {
 
   const hasProperty = data.some((d) => d.property > 0 || d.taxableProperty > 0)
   const hasExtra = data.some((d) => d.extraIncome > 0 || d.taxableExtraIncome > 0)
+  const hasPension = data.some((d) => d.pension > 0 || d.taxablePension > 0)
 
   if (data.length === 0) return null
 
@@ -114,11 +121,13 @@ export function TaxChart(props: {
     oas: t('oasLabel'),
     property: t('taxSrcProperty'),
     extraIncome: t('extraIncomeLabel'),
+    pension: t('pensionLabel'),
   }
   const visibleSources: SourceKey[] = [
     'rrsp', 'nonReg', 'cpp', 'oas',
     ...(hasProperty ? (['property'] as const) : []),
     ...(hasExtra ? (['extraIncome'] as const) : []),
+    ...(hasPension ? (['pension'] as const) : []),
   ]
 
   function ChartTooltip(tprops: { active?: boolean; payload?: { payload?: TaxChartRow }[]; label?: number }) {
@@ -164,6 +173,9 @@ export function TaxChart(props: {
           )}
           {hasExtra && (
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
+          )}
+          {hasPension && (
+            <Area dataKey="pension" stackId="1" name={t('pensionLabel')} stroke={COLORS.pension} fill={COLORS.pension} fillOpacity={0.55} />
           )}
         </ComposedChart>
       </ResponsiveContainer>

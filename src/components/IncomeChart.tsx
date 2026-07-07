@@ -23,6 +23,7 @@ const COLORS = {
   gis: '#00838f',
   rent: '#5d4037',
   extraIncome: '#7cb342',
+  pension: '#f9a825',
 }
 
 export function IncomeChart(props: {
@@ -46,10 +47,11 @@ export function IncomeChart(props: {
       gis: Math.round(r.gis * k(r.age)),
       rent: Math.round(r.rent * k(r.age)),
       extraIncome: Math.round(r.extraIncome * k(r.age)),
+      pension: Math.round(r.pension * k(r.age)),
       tax: Math.round(r.tax * k(r.age)),
       total: Math.round(
         (r.withdrawals.tfsa + r.withdrawals.rrsp + r.withdrawals.nonReg +
-          r.cpp + r.oas + r.gis + r.rent + r.extraIncome) *
+          r.cpp + r.oas + r.gis + r.rent + r.extraIncome + r.pension) *
           k(r.age),
       ),
     }))
@@ -57,6 +59,7 @@ export function IncomeChart(props: {
   const hasGis = data.some((d) => d.gis > 0)
   const hasRent = data.some((d) => d.rent > 0)
   const hasExtra = data.some((d) => d.extraIncome > 0)
+  const hasPension = data.some((d) => d.pension > 0)
 
   if (data.length === 0) return null
 
@@ -77,6 +80,9 @@ export function IncomeChart(props: {
           <Area dataKey="rrsp" stackId="1" name={t('rrsp')} stroke={COLORS.rrsp} fill={COLORS.rrsp} fillOpacity={0.55} />
           <Area dataKey="nonReg" stackId="1" name={t('nonReg')} stroke={COLORS.nonReg} fill={COLORS.nonReg} fillOpacity={0.55} />
           <Area dataKey="tfsa" stackId="1" name={t('tfsa')} stroke={COLORS.tfsa} fill={COLORS.tfsa} fillOpacity={0.55} />
+          {hasPension && (
+            <Area dataKey="pension" stackId="1" name={t('pensionLabel')} stroke={COLORS.pension} fill={COLORS.pension} fillOpacity={0.55} />
+          )}
           <Area dataKey="cpp" stackId="1" name={t('cppLabel')} stroke={COLORS.cpp} fill={COLORS.cpp} fillOpacity={0.55} />
           <Area dataKey="oas" stackId="1" name={t('oasLabel')} stroke={COLORS.oas} fill={COLORS.oas} fillOpacity={0.55} />
           {hasGis && (

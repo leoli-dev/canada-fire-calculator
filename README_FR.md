@@ -50,8 +50,9 @@ l'inflation) :
 provinces et territoires, chiffres 2026, mis à jour annuellement), montants
 personnels de base (avec la réduction à revenu élevé au fédéral, au Manitoba et au
 Yukon), abattement québécois, surtaxe et prime-santé de l'Ontario, prime RAMQ et
-cotisation au FSS au Québec, montant en raison de l'âge et crédit pour revenu de
-pension dès 65 ans (y compris le
+cotisation au FSS au Québec, montant en raison de l'âge dès 65 ans et crédit
+pour revenu de pension (les rentes d'employeur y donnent droit à tout âge, les
+retraits FERR dès 65 ans — y compris le
 supplément pour aînés de la Saskatchewan), inclusion de 50 % des gains en capital
 suivie par le PBR, frein fiscal annuel sur les distributions non enregistrées,
 récupération de la SV par personne (taux 75+ inclus), SRG pour les retraités à
@@ -81,7 +82,12 @@ provinciaux/territoriaux sont intégrés — les comptes avec bénéficiaire dé
 impôt** — ou, sous l'objectif **Die with Zero**, par les dépenses annuelles
 soutenables maximales.
 
-**Également modélisés** : vente de la résidence principale (libre d'impôt),
+**Également modélisés** : une **rente d'employeur à prestations déterminées (PD)**
+par conjoint (rente viagère à un âge de début choisi, indexation partielle à
+l'IPC, et une prestation de raccordement qui cesse à 65 ans — imposée comme
+revenu de pension, fractionnable à tout âge, visible pour la récupération de la
+SV et le SRG; les régimes CD et les CRI se saisissent plutôt comme soldes de
+comptes), vente de la résidence principale (libre d'impôt),
 n'importe quel nombre d'immeubles locatifs — chacun vendable à son propre âge
 (gain imposé) ou conservé pour son **revenu locatif net** (imposé comme revenu
 ordinaire, visible pour la récupération de la SV et le SRG) — avec en option une
@@ -129,6 +135,11 @@ langage clair (voir le tiroir-glossaire ci-dessous).
 - **Prestations gouvernementales** — âges de début et montants à 65 ans RPC/RRQ
   et SV, par conjoint, avec estimateurs intégrés (historique de travail pour le
   RPC, années de résidence pour la SV).
+- **Rente d'employeur** — optionnelle, par conjoint : le montant annuel viager
+  indiqué sur votre relevé de retraite (déjà réduit pour un début anticipé),
+  l'âge de début, le pourcentage d'indexation à l'IPC, et toute prestation de
+  raccordement (versée jusqu'à 65 ans). Un régime CD ou un CRI ? Ajoutez plutôt
+  son solde au champ REER/FERR — il se projette de la même façon.
 
 ## Comment lire les résultats
 
@@ -214,6 +225,13 @@ langues.
   immeuble précis plutôt qu'à la liste générale de dettes — elle est alors
   remboursée en priorité sur le produit de la vente, et ses intérêts sont
   déductibles du loyer de cet immeuble tant qu'il est détenu.
+- Les rentes d'employeur sont simplifiées : les pourcentages de rente au
+  survivant ne sont pas modélisés (les deux conjoints sont supposés atteindre
+  l'espérance de vie commune), la règle québécoise exigeant 65 ans pour le
+  fractionnement du revenu de pension est ignorée (le fractionnement reste
+  idéalisé à tout âge), une rente partiellement indexée ne s'érode qu'à partir
+  de son âge de début (pas d'érosion pendant la période de report), et les
+  soldes CD/CRI saisis comme REER ignorent les plafonds de retrait du FRV.
 - Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
   du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
   chocs de soins de longue durée.

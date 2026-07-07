@@ -45,8 +45,9 @@ number in the UI comes from a deterministic, unit-tested year-by-year simulation
 provinces and territories, 2026 figures, data-driven and updated yearly), the basic
 personal amounts (with the federal, Manitoba and Yukon high-income phase-outs),
 Quebec's federal abatement, Ontario's surtax and health premium, Quebec's RAMQ
-prescription-drug premium and FSS contribution, the age amount and pension income
-credit from 65 (including Saskatchewan's senior supplement), 50% capital-gains
+prescription-drug premium and FSS contribution, the age amount from 65 and the
+pension income credit (employer pension annuities qualify at any age, RRIF
+withdrawals from 65 — including Saskatchewan's senior supplement), 50% capital-gains
 inclusion tracked against your ACB, annual tax drag on non-registered distributions,
 per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees
 (with the employment-income exemption and the Allowance for a 60-64 spouse),
@@ -73,7 +74,11 @@ accounts bypass it via named beneficiary). Strategies are therefore ranked by
 **after-tax estate value** — or, under the **Die-with-Zero** goal, by the
 maximum sustainable annual spending.
 
-**Also modelled**: principal-residence sale (tax-free, e.g. downsizing at a chosen
+**Also modelled**: an **employer DB pension** per spouse (lifetime annuity at a
+chosen start age, partial-CPI indexing, and a bridge benefit that ends at 65 —
+taxed as pension income, splittable at any age, visible to the OAS clawback and
+GIS; DC plans and LIRAs are entered as account balances instead),
+principal-residence sale (tax-free, e.g. downsizing at a chosen
 age), any number of investment properties — each sellable at its own age (gain
 taxed) or kept for **net rental income** (taxed as ordinary income, visible to the
 OAS clawback and GIS) — optionally leveraged with a **mortgage tied to that specific
@@ -124,6 +129,11 @@ Work down the left column; every underlined term opens a plain-language explanat
   spouse. Not sure of the amounts? Use the built-in estimators (work history for
   CPP, residence years for OAS) or copy the exact figures from My Service Canada
   Account.
+- **Employer pension** — optional, per spouse: the lifetime annual amount from
+  your pension statement (already reduced for an early start), start age, CPI
+  indexing percentage, and any bridge benefit (paid until 65). Have a DC plan or
+  a LIRA? Add its balance to the RRSP/RRIF field instead — it projects the same
+  way.
 
 ## How to read the outputs
 
@@ -208,6 +218,12 @@ explanations are clickable too. 33 entries in all three languages.
   can be attached to a specific property instead of the general debt list — it's
   then discharged from the sale proceeds and its interest (not principal) is
   deductible against that property's rent, rather than continuing forever.
+- Employer pensions are simplified: survivor percentages aren't modelled (both
+  spouses are assumed to reach the shared life expectancy), Quebec's provincial
+  rule requiring age 65+ for pension splitting is ignored (splitting stays
+  idealized at any age), a partially-indexed pension erodes only from its start
+  age (deferral-period erosion isn't modelled), and DC/LIRA balances entered as
+  RRSP ignore LIF withdrawal caps.
 - Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
   enhancement (post-2019 contributions — estimates lean conservative for younger
   users), long-term-care cost shocks.

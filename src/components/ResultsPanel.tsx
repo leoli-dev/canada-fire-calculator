@@ -12,6 +12,7 @@ import {
 import { useCad } from '../format'
 import { useStore } from '../store'
 import { Jargon } from './Jargon'
+import { NumberInput } from './NumberInput'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 
@@ -161,13 +162,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
         <>
           <label className="field target-field">
             <span><Jargon text={t('targetInputLabel')} /></span>
-            <input
-              type="number"
+            <NumberInput
               step={50000}
-              value={inputs.fireTargetAssets ?? ''}
-              onChange={(e) =>
-                set({ fireTargetAssets: e.target.value === '' ? null : Number(e.target.value) })
-              }
+              value={inputs.fireTargetAssets ?? null}
+              onChange={(v) => set({ fireTargetAssets: v })}
             />
           </label>
           {goal && (

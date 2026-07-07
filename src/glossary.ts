@@ -40,6 +40,8 @@ export const TERMS: TermDef[] = [
   { id: 'taxdrag', patterns: ['税拖累', 'tax drag', 'Tax drag', 'frein fiscal', 'Frein fiscal'] },
   { id: 'agecredit', patterns: ['年龄额度', 'age amount', 'Age amount', "montant en raison de l'âge", "Montant en raison de l'âge"] },
   { id: 'pensioncredit', patterns: ['养老金收入抵免', 'pension income credit', 'Pension income credit', 'crédit pour revenu de pension', 'Crédit pour revenu de pension'] },
+  { id: 'dbpension', patterns: ['雇主养老金', 'Employer pension', 'employer pension', "Régime de retraite d'employeur", "régime de retraite d'employeur", "Rente d'employeur", "rente d'employeur", 'pension statement', 'DB pension'] },
+  { id: 'bridgebenefit', patterns: ['过桥金', 'Bridge benefit', 'bridge benefit', 'Prestation de raccordement', 'prestation de raccordement'] },
   { id: 'surtax', patterns: ['surtax', 'Surtax', '附加税', 'surtaxe', 'Surtaxe'] },
   { id: 'rent', patterns: ['净租金', '租金', 'Net rent', 'net rent', 'Rent', 'rent', 'Loyer net', 'loyer net', 'Loyer', 'loyer', 'revenu locatif', 'Revenu locatif'] },
   { id: 'baristafire', patterns: ['Barista FIRE', 'barista FIRE', '额外收入', 'Side income', 'side income', 'revenu d’appoint', 'Revenu d’appoint', "revenu d'appoint", "Revenu d'appoint"] },

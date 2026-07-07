@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountType, AssetMix, Inputs, Partner } from './engine'
+import type { AccountType, AssetMix, Inputs, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
 import { trackOnce } from './analytics'
 
@@ -10,6 +10,13 @@ export const DEFAULT_PARTNER: Partner = {
   cppAnnualAt65: 10000,
   oasStartAge: 65,
   oasAnnualAt65: 8700,
+}
+
+export const DEFAULT_PENSION: Pension = {
+  annualAmount: 30000,
+  startAge: 60,
+  indexation: 1,
+  bridgeAnnual: 0,
 }
 
 export const MIX_PRESETS: Record<string, AssetMix> = {
