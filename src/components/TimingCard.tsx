@@ -9,6 +9,7 @@ import {
 } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 const CPP_AGES = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70]
@@ -130,17 +131,24 @@ export function TimingCard(props: { inputs: Inputs }) {
   const bestIsCurrent = best.cpp === inputs.cppStartAge && best.oas === inputs.oasStartAge
 
   return (
-    <details className="chart-card collapsible">
+    <details className="chart-card collapsible"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'timing_comparison' })}>
       <summary><h3>{t('timingTitle')}</h3></summary>
       <p className="hint">
         <Jargon text={t('timingWhy', { life: inputs.lifeExpectancy })} />
       </p>
 
       <h4 className="table-title">{t('timingCppTitle')}</h4>
-      {renderTable(cppRows, inputs.cppStartAge, currentCpp, (age) => set({ cppStartAge: age }))}
+      {renderTable(cppRows, inputs.cppStartAge, currentCpp, (age) => {
+        set({ cppStartAge: age })
+        track('timing_apply', { which: 'cpp' })
+      })}
 
       <h4 className="table-title">{t('timingOasTitle')}</h4>
-      {renderTable(oasRows, inputs.oasStartAge, currentOas, (age) => set({ oasStartAge: age }))}
+      {renderTable(oasRows, inputs.oasStartAge, currentOas, (age) => {
+        set({ oasStartAge: age })
+        track('timing_apply', { which: 'oas' })
+      })}
 
       <div className="card-head" style={{ marginTop: 14 }}>
         <p className="combo">
@@ -159,7 +167,10 @@ export function TimingCard(props: { inputs: Inputs }) {
           <button
             type="button"
             className="use-strategy"
-            onClick={() => set({ cppStartAge: best.cpp, oasStartAge: best.oas })}
+            onClick={() => {
+              set({ cppStartAge: best.cpp, oasStartAge: best.oas })
+              track('timing_apply', { which: 'combo' })
+            }}
           >
             {t('useStrategy')}
           </button>

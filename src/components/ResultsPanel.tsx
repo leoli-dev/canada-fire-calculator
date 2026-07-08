@@ -11,6 +11,7 @@ import {
 } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 
@@ -78,7 +79,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             role="tab"
             aria-selected={mode === m}
             className={mode === m ? 'active' : ''}
-            onClick={() => setMode(m)}
+            onClick={() => {
+              setMode(m)
+              track('question_mode_change', { mode: m })
+            }}
           >
             {t(`mode_${m}`)}
           </button>

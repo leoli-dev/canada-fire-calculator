@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { marginalRate, type Inputs, type ProjectionResult } from '../engine'
 import { useCad } from '../format'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 /**
@@ -18,7 +19,8 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   const hasDebt = rows.some((r) => r.debtPayment > 0 || r.debtBalance > 0)
 
   return (
-    <details className="chart-card collapsible">
+    <details className="chart-card collapsible"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'year_table' })}>
       <summary><h3>{t('yearTableTitle')}</h3></summary>
       <p className="hint"><Jargon text={t('yearTableNote')} /></p>
       <div className="table-scroll">

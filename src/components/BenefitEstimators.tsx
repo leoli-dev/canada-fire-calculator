@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { estimateCppAt65, estimateOasAt65 } from '../engine'
 import { useCad } from '../format'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 
@@ -33,7 +34,8 @@ export function CppEstimator(props: {
   const estimate = estimateCppAt65(startWorkAge, props.retireAge, ratio / 100)
 
   return (
-    <details className="estimator">
+    <details className="estimator"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'cpp_estimator' })}>
       <summary>{t('estCppTitle')}</summary>
       <Row label={t('estStartWorkAge')} value={startWorkAge} onChange={setStartWorkAge} />
       <Row label={t('estRatio')} value={ratio} onChange={setRatio} />
@@ -44,9 +46,10 @@ export function CppEstimator(props: {
         </span>
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            track('estimator_apply', { which: 'cpp' })
             props.onApply(Math.round(estimate), { startWorkAge, retireAge: props.retireAge })
-          }
+          }}
         >
           {t('estApply')}
         </button>
@@ -64,14 +67,21 @@ export function OasEstimator(props: { onApply: (v: number) => void }) {
   const estimate = estimateOasAt65(residence)
 
   return (
-    <details className="estimator">
+    <details className="estimator"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'oas_estimator' })}>
       <summary>{t('estOasTitle')}</summary>
       <Row label={t('estResidence')} value={residence} onChange={setResidence} />
       <div className="ws-total">
         <span>
           {t('estResult')}: <strong>{cad(estimate)}</strong>
         </span>
-        <button type="button" onClick={() => props.onApply(Math.round(estimate))}>
+        <button
+          type="button"
+          onClick={() => {
+            track('estimator_apply', { which: 'oas' })
+            props.onApply(Math.round(estimate))
+          }}
+        >
           {t('estApply')}
         </button>
       </div>

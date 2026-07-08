@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { compareStrategies, type Inputs } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
+import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
 export function StrategyCard(props: { inputs: Inputs }) {
@@ -23,7 +24,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
   )
 
   return (
-    <details className="chart-card collapsible">
+    <details className="chart-card collapsible"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'strategy_comparison' })}>
       <summary><h3>{t('strategyTitle')}</h3></summary>
       <div className="table-scroll">
       <table className="compare-table">
@@ -63,7 +65,10 @@ export function StrategyCard(props: { inputs: Inputs }) {
                     <button
                       type="button"
                       className="use-strategy"
-                      onClick={() => set({ strategy: r.strategy })}
+                      onClick={() => {
+                        set({ strategy: r.strategy })
+                        track('strategy_change', { strategy: r.strategy, source: 'comparison_table' })
+                      }}
                     >
                       {t('useStrategy')}
                     </button>

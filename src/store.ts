@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AccountType, AssetMix, Fhsa, Inputs, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
-import { trackOnce } from './analytics'
+import { track, trackOnce } from './analytics'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -115,8 +115,12 @@ export const useStore = create<Store>()(
         trackOnce('adjust_inputs')
         set((s) => ({ inputs: { ...s.inputs, ...patch } }))
       },
-      setDisplayMode: (m) => set({ displayMode: m }),
-      applyMixPreset: (account, preset) =>
+      setDisplayMode: (m) => {
+        track('display_mode_change', { mode: m })
+        set({ displayMode: m })
+      },
+      applyMixPreset: (account, preset) => {
+        track('asset_mix_change', { account, preset })
         set((s) => {
           const mix = MIX_PRESETS[preset]
           if (!mix) return { mixPresets: { ...s.mixPresets, [account]: preset } }
@@ -131,19 +135,30 @@ export const useStore = create<Store>()(
               },
             },
           }
-        }),
+        })
+      },
       setWorksheet: (key, value) =>
         set((s) => ({ worksheet: { ...s.worksheet, [key]: value } })),
-      saveScenarioA: () => set((s) => ({ scenarioA: structuredClone(s.inputs) })),
-      restoreScenarioA: () =>
-        set((s) => (s.scenarioA ? { inputs: structuredClone(s.scenarioA) } : {})),
-      clearScenarioA: () => set({ scenarioA: null }),
-      reset: () =>
+      saveScenarioA: () => {
+        track('scenario_save')
+        set((s) => ({ scenarioA: structuredClone(s.inputs) }))
+      },
+      restoreScenarioA: () => {
+        track('scenario_restore')
+        set((s) => (s.scenarioA ? { inputs: structuredClone(s.scenarioA) } : {}))
+      },
+      clearScenarioA: () => {
+        track('scenario_clear')
+        set({ scenarioA: null })
+      },
+      reset: () => {
+        track('reset_inputs')
         set({
           inputs: DEFAULT_INPUTS,
           worksheet: DEFAULT_WORKSHEET,
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
-        }),
+        })
+      },
     }),
     {
       name: 'fire-inputs',

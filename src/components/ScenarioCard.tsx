@@ -32,16 +32,12 @@ export function ScenarioCard() {
   const resultNow = useMemo(() => runProjection(inputs), [inputs])
 
   return (
-    <details className="chart-card collapsible">
+    <details className="chart-card collapsible"
+      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
       <div className="card-head">
         <div>
-          <button
-            onClick={() => {
-              saveScenarioA()
-              track('scenario_save')
-            }}
-          >
+          <button onClick={saveScenarioA}>
             {t('scenarioSave')}
           </button>
           {scenarioA && (

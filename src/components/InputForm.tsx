@@ -19,6 +19,7 @@ import {
   type ValidationIssue,
 } from '../engine'
 import { useCad } from '../format'
+import { track } from '../analytics'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
@@ -118,7 +119,10 @@ export function InputForm() {
           <span><Jargon text={t('province')} /></span>
           <select
             value={inputs.province}
-            onChange={(e) => set({ province: e.target.value as Province })}
+            onChange={(e) => {
+              set({ province: e.target.value as Province })
+              track('province_change', { province: e.target.value })
+            }}
           >
             {PROVINCES.map((p) => (
               <option key={p} value={p}>{p} — {t(`prov_${p}`)}</option>
@@ -127,7 +131,7 @@ export function InputForm() {
         </label>
         <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
         <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
-        <details>
+        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
           <summary>{t('worksheetTitle')}</summary>
           {WORKSHEET_KEYS.map((k) => (
             <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
@@ -136,7 +140,10 @@ export function InputForm() {
           <div className="ws-total">
             <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
             <button type="button" disabled={worksheetTotal <= 0}
-              onClick={() => set({ retirementSpending: worksheetTotal })}>
+              onClick={() => {
+                set({ retirementSpending: worksheetTotal })
+                track('worksheet_apply')
+              }}>
               {t('wsApply')}
             </button>
           </div>
@@ -147,7 +154,10 @@ export function InputForm() {
           <span><Jargon text={t('goal')} /></span>
           <select
             value={inputs.goal ?? 'legacy'}
-            onChange={(e) => set({ goal: e.target.value as Goal })}
+            onChange={(e) => {
+              set({ goal: e.target.value as Goal })
+              track('goal_change', { goal: e.target.value })
+            }}
           >
             <option value="legacy">{t('goal_legacy')}</option>
             <option value="dieWithZero">{t('goal_dieWithZero')}</option>
@@ -160,7 +170,10 @@ export function InputForm() {
           <span>{t('inflationLabel')}</span>
           <select
             value={String(inputs.inflation ?? 0.021)}
-            onChange={(e) => set({ inflation: Number(e.target.value) })}
+            onChange={(e) => {
+              set({ inflation: Number(e.target.value) })
+              track('inflation_change', { value: e.target.value })
+            }}
           >
             <option value="0.015">{t('infl_low')}</option>
             <option value="0.021">{t('infl_mid')}</option>
@@ -182,9 +195,10 @@ export function InputForm() {
           <span><Jargon text={t('household')} /></span>
           <select
             value={inputs.partner ? 'couple' : 'single'}
-            onChange={(e) =>
+            onChange={(e) => {
               set({ partner: e.target.value === 'couple' ? DEFAULT_PARTNER : null })
-            }
+              track('household_change', { mode: e.target.value })
+            }}
           >
             <option value="single">{t('single')}</option>
             <option value="couple">{t('couple')}</option>
@@ -203,13 +217,14 @@ export function InputForm() {
           <input
             type="checkbox"
             checked={!!inputs.extraIncome}
-            onChange={(e) =>
+            onChange={(e) => {
               set({
                 extraIncome: e.target.checked
                   ? { annual: 20000, fromAge: inputs.fireAge, toAge: inputs.fireAge + 10 }
                   : null,
               })
-            }
+              track('barista_fire_toggle', { enabled: e.target.checked })
+            }}
           />
         </label>
         {inputs.extraIncome && (
@@ -244,7 +259,7 @@ export function InputForm() {
         <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
         <p className="hint"><Jargon text={t('nonRegBookHint')} /></p>
 
-        <details>
+        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'tax_drag' })}>
           <summary><Jargon text={t('nonRegTaxTitle')} /></summary>
           <p className="hint"><Jargon text={t('nonRegYieldHint')} /></p>
           <Num label={t('nonRegYieldLabel')} value={(inputs.nonRegDistributionYield ?? 0) * 100} step={0.5}
@@ -253,7 +268,7 @@ export function InputForm() {
             onChange={(v) => set({ accumulationMarginalRate: Math.max(0, Math.min(60, v)) / 100 })} />
         </details>
 
-        <details>
+        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'asset_mix' })}>
           <summary>{t('mixLabel')}</summary>
           <p className="hint"><Jargon text={t('mixNote')} /></p>
           {ACCOUNTS.map((a) => (
@@ -278,7 +293,7 @@ export function InputForm() {
           <p className="hint"><Jargon text={t('feesHint')} /></p>
         </details>
 
-        <details>
+        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'savings_split' })}>
           <summary>{t('savingsSplit')}</summary>
           {ACCOUNTS.map((a) => (
             <Num key={a} label={t(a)} value={Math.round(inputs.savingsSplit[a] * 100)}
@@ -299,7 +314,10 @@ export function InputForm() {
           <input
             type="checkbox"
             checked={!!inputs.fhsa}
-            onChange={(e) => set({ fhsa: e.target.checked ? { ...DEFAULT_FHSA } : null })}
+            onChange={(e) => {
+              set({ fhsa: e.target.checked ? { ...DEFAULT_FHSA } : null })
+              track('fhsa_toggle', { enabled: e.target.checked })
+            }}
           />
         </label>
         {inputs.fhsa && (
@@ -339,7 +357,10 @@ export function InputForm() {
               <button
                 type="button"
                 className="remove-item"
-                onClick={() => set({ principalResidence: null })}
+                onClick={() => {
+                  set({ principalResidence: null })
+                  track('remove_principal_residence')
+                }}
               >
                 {t('removeItem')}
               </button>
@@ -348,26 +369,32 @@ export function InputForm() {
             <div className="mode-toggle">
               <label>
                 <input type="radio" name="prMode" checked={pr.mode !== 'planned'}
-                  onChange={() => set({
-                    principalResidence: { mode: 'owned', value: 800000, appreciation: 0.02, sellAtAge: null },
-                  })} />
+                  onChange={() => {
+                    set({
+                      principalResidence: { mode: 'owned', value: 800000, appreciation: 0.02, sellAtAge: null },
+                    })
+                    track('pr_mode_change', { mode: 'owned' })
+                  }} />
                 {t('prModeOwned')}
               </label>
               <label>
                 <input type="radio" name="prMode" checked={pr.mode === 'planned'}
-                  onChange={() => set({
-                    principalResidence: {
-                      mode: 'planned',
-                      buyAtAge: inputs.currentAge + 5,
-                      price: 800000,
-                      downPayment: 200000,
-                      appreciation: 0.02,
-                      annualMortgagePayment: 42000,
-                      mortgageYears: 25,
-                      netHoldingCostChange: 0,
-                      sellAtAge: null,
-                    },
-                  })} />
+                  onChange={() => {
+                    set({
+                      principalResidence: {
+                        mode: 'planned',
+                        buyAtAge: inputs.currentAge + 5,
+                        price: 800000,
+                        downPayment: 200000,
+                        appreciation: 0.02,
+                        annualMortgagePayment: 42000,
+                        mortgageYears: 25,
+                        netHoldingCostChange: 0,
+                        sellAtAge: null,
+                      },
+                    })
+                    track('pr_mode_change', { mode: 'planned' })
+                  }} />
                 {t('prModePlanned')}
               </label>
             </div>
@@ -415,7 +442,7 @@ export function InputForm() {
                   <input
                     type="checkbox"
                     checked={!!pr.mortgage}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       set({
                         principalResidence: {
                           ...pr,
@@ -424,7 +451,8 @@ export function InputForm() {
                             : undefined,
                         },
                       })
-                    }
+                      track('pr_mortgage_toggle', { enabled: e.target.checked })
+                    }}
                   />
                 </label>
                 {pr.mortgage && (
@@ -464,13 +492,14 @@ export function InputForm() {
                 <button
                   type="button"
                   className="remove-item"
-                  onClick={() =>
+                  onClick={() => {
                     set({
                       investmentProperties: (inputs.investmentProperties ?? []).filter(
                         (_, j) => j !== i,
                       ),
                     })
-                  }
+                    track('remove_investment_property')
+                  }}
                 >
                   {t('removeItem')}
                 </button>
@@ -496,13 +525,14 @@ export function InputForm() {
                 <input
                   type="checkbox"
                   checked={!!ip.mortgage}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     patch({
                       mortgage: e.target.checked
                         ? { balance: 300000, annualPayment: 24000, yearsRemaining: 20 }
                         : undefined,
                     })
-                  }
+                    track('ip_mortgage_toggle', { enabled: e.target.checked })
+                  }}
                 />
               </label>
               {ip.mortgage && (
@@ -527,11 +557,12 @@ export function InputForm() {
             <button
               type="button"
               className="add-item"
-              onClick={() =>
+              onClick={() => {
                 set({
                   principalResidence: { value: 800000, appreciation: 0.02, sellAtAge: null },
                 })
-              }
+                track('add_principal_residence')
+              }}
             >
               {t('addPrincipalResidence')}
             </button>
@@ -539,14 +570,15 @@ export function InputForm() {
           <button
             type="button"
             className="add-item"
-            onClick={() =>
+            onClick={() => {
               set({
                 investmentProperties: [
                   ...(inputs.investmentProperties ?? []),
                   { ...DEFAULT_INVESTMENT_PROPERTY },
                 ],
               })
-            }
+              track('add_investment_property')
+            }}
           >
             {t('addProperty')}
           </button>
@@ -571,16 +603,20 @@ export function InputForm() {
                 <button
                   type="button"
                   className="remove-item"
-                  onClick={() =>
+                  onClick={() => {
                     set({ debts: (inputs.debts ?? []).filter((_, j) => j !== i) })
-                  }
+                    track('remove_debt')
+                  }}
                 >
                   {t('removeItem')}
                 </button>
               </p>
               <label className="field">
                 <span>{t('debtKind')}</span>
-                <select value={d.kind} onChange={(e) => patch({ kind: e.target.value as DebtKind })}>
+                <select value={d.kind} onChange={(e) => {
+                  patch({ kind: e.target.value as DebtKind })
+                  track('debt_kind_change', { kind: e.target.value })
+                }}>
                   {DEBT_KINDS.map((k) => (
                     <option key={k} value={k}>{t(`debt_${k}`)}</option>
                   ))}
@@ -601,14 +637,15 @@ export function InputForm() {
         <button
           type="button"
           className="add-item"
-          onClick={() =>
+          onClick={() => {
             set({
               debts: [
                 ...(inputs.debts ?? []),
                 { kind: 'mortgage', balance: 300000, annualPayment: 24000, yearsRemaining: 20 },
               ],
             })
-          }
+            track('add_debt')
+          }}
         >
           {t('addDebt')}
         </button>
@@ -633,7 +670,10 @@ export function InputForm() {
           <input
             type="checkbox"
             checked={!!inputs.pension}
-            onChange={(e) => set({ pension: e.target.checked ? DEFAULT_PENSION : null })}
+            onChange={(e) => {
+              set({ pension: e.target.checked ? DEFAULT_PENSION : null })
+              track('pension_toggle', { enabled: e.target.checked, who: 'self' })
+            }}
           />
         </label>
         {inputs.pension && (
@@ -678,14 +718,15 @@ export function InputForm() {
               <input
                 type="checkbox"
                 checked={!!inputs.partner.pension}
-                onChange={(e) =>
+                onChange={(e) => {
                   set({
                     partner: {
                       ...inputs.partner!,
                       pension: e.target.checked ? DEFAULT_PENSION : null,
                     },
                   })
-                }
+                  track('pension_toggle', { enabled: e.target.checked, who: 'partner' })
+                }}
               />
             </label>
             {inputs.partner.pension && (

@@ -23,7 +23,7 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
           value={inputs.strategy}
           onChange={(e) => {
             set({ strategy: e.target.value as Strategy })
-            track('strategy_change', { strategy: e.target.value })
+            track('strategy_change', { strategy: e.target.value, source: 'dropdown' })
           }}
         >
           {STRATEGIES.map((s) => (
@@ -38,7 +38,10 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
             <span><Jargon text={t('meltdownCapLabel')} /></span>
             <select
               value={inputs.meltdownBracketCap ?? 'bracket1'}
-              onChange={(e) => set({ meltdownBracketCap: e.target.value as MeltdownCap })}
+              onChange={(e) => {
+                set({ meltdownBracketCap: e.target.value as MeltdownCap })
+                track('meltdown_cap_change', { cap: e.target.value })
+              }}
             >
               {MELTDOWN_CAPS.map((c) => (
                 <option key={c} value={c}>{t(`meltdownCap_${c}`)}</option>
