@@ -699,3 +699,183 @@ describe('employer pension', () => {
     expect(noPension - asPension).toBeLessThan(500)
   })
 })
+
+describe('FHSA', () => {
+  it('carves the contribution out of annualSavings before the savingsSplit', () => {
+    const without = runProjection(base)
+    const withFhsa = runProjection({
+      ...base,
+      fhsa: { balance: 0, annualContribution: 8000, openedYearsAgo: 0 },
+    })
+    const rrspAt36 = (r: typeof without) => r.rows.find((x) => x.age === 36)!.balances.rrsp
+    expect(rrspAt36(withFhsa)).toBeLessThan(rrspAt36(without))
+    expect(withFhsa.rows.find((x) => x.age === 35)!.fhsaBalance).toBeCloseTo(8000 * 1.05, 5)
+  })
+
+  it('grows using the RRSP return assumption, not TFSA/non-reg', () => {
+    const r = runProjection({
+      ...base,
+      returns: { tfsa: 0.03, rrsp: 0.07, nonReg: 0.03 },
+      fhsa: { balance: 10000, annualContribution: 0, openedYearsAgo: 0 },
+    })
+    expect(r.rows.find((x) => x.age === 35)!.fhsaBalance).toBeCloseTo(10000 * 1.07, 5)
+  })
+
+  it('matures into the RRSP after 15 years since opening', () => {
+    const r = runProjection({
+      ...base,
+      fhsa: { balance: 50000, annualContribution: 0, openedYearsAgo: 0 },
+    })
+    expect(r.rows.find((x) => x.age === 49)!.fhsaBalance).toBeGreaterThan(0)
+    expect(r.rows.find((x) => x.age === 50)!.fhsaBalance).toBe(0)
+  })
+
+  it('openedYearsAgo shifts the 15-year clock forward', () => {
+    const r = runProjection({
+      ...base,
+      fhsa: { balance: 50000, annualContribution: 0, openedYearsAgo: 10 },
+    })
+    expect(r.rows.find((x) => x.age === 39)!.fhsaBalance).toBeGreaterThan(0)
+    expect(r.rows.find((x) => x.age === 40)!.fhsaBalance).toBe(0)
+  })
+
+  it('matures at age 71 if the 15-year clock has not yet elapsed', () => {
+    const r = runProjection({
+      ...base,
+      currentAge: 60,
+      fireAge: 65,
+      fhsa: { balance: 50000, annualContribution: 0, openedYearsAgo: 0 },
+    })
+    expect(r.rows.find((x) => x.age === 70)!.fhsaBalance).toBeGreaterThan(0)
+    expect(r.rows.find((x) => x.age === 71)!.fhsaBalance).toBe(0)
+  })
+
+  it('contributions stop at FIRE age even before the 15-year/71 clock', () => {
+    const r = runProjection({
+      ...base,
+      fhsa: { balance: 0, annualContribution: 8000, openedYearsAgo: 0 },
+    })
+    const at44 = r.rows.find((x) => x.age === 44)!.fhsaBalance
+    const at45 = r.rows.find((x) => x.age === 45)!.fhsaBalance
+    expect(at45).toBeCloseTo(at44 * 1.05, 5)
+  })
+
+  it('never contributes more than annualSavings has left', () => {
+    const r = runProjection({
+      ...base,
+      annualSavings: 5000,
+      fhsa: { balance: 0, annualContribution: 8000, openedYearsAgo: 0 },
+    })
+    expect(r.rows.find((x) => x.age === 35)!.fhsaBalance).toBeCloseTo(5000 * 1.05, 5)
+  })
+
+  it('an unmatured FHSA balance still counts in finalNetWorth', () => {
+    const r = runProjection({
+      ...base,
+      currentAge: 60,
+      fireAge: 63,
+      lifeExpectancy: 65,
+      fhsa: { balance: 50000, annualContribution: 0, openedYearsAgo: 0 },
+    })
+    const last = r.rows.at(-1)!
+    expect(last.fhsaBalance).toBeGreaterThan(0)
+    expect(r.finalNetWorth).toBeGreaterThan(
+      last.balances.tfsa + last.balances.rrsp + last.balances.nonReg,
+    )
+  })
+})
+
+describe('planned home purchase', () => {
+  const planned = {
+    mode: 'planned' as const,
+    buyAtAge: 40,
+    price: 500000,
+    downPayment: 100000,
+    appreciation: 0.02,
+    annualMortgagePayment: 24000,
+    mortgageYears: 20,
+    netHoldingCostChange: 0,
+    sellAtAge: null,
+  }
+
+  it('the property has no value before buyAtAge and appears at price (plus that year\'s appreciation) on purchase', () => {
+    const r = runProjection({ ...base, principalResidence: planned })
+    expect(r.rows.find((x) => x.age === 39)!.propertyValue).toBe(0)
+    // same convention as every other balance in the engine: growth is applied
+    // within the same year a value first appears
+    expect(r.rows.find((x) => x.age === 40)!.propertyValue).toBeCloseTo(500000 * 1.02, 5)
+  })
+
+  it('a mortgage originates at buyAtAge for price minus downPayment, not before', () => {
+    const r = runProjection({ ...base, principalResidence: planned })
+    expect(r.rows.find((x) => x.age === 39)!.debtBalance).toBe(0)
+    const at40 = r.rows.find((x) => x.age === 40)!
+    expect(at40.debtBalance).toBeGreaterThan(0)
+    expect(at40.debtBalance).toBeLessThanOrEqual(400000)
+    // one year of inflation decay already applied, same convention as an
+    // existing mortgage's first recorded payment
+    expect(at40.debtPayment).toBeCloseTo(24000 / 1.021, 0)
+  })
+
+  it('funds the down payment from TFSA before touching non-registered/RRSP', () => {
+    const withoutPurchase = runProjection(base)
+    const withPurchase = runProjection({ ...base, principalResidence: planned })
+    const tfsaAt40 = (r: typeof withoutPurchase) => r.rows.find((x) => x.age === 40)!.balances.tfsa
+    expect(tfsaAt40(withPurchase)).toBeLessThan(tfsaAt40(withoutPurchase))
+  })
+
+  it('FHSA collapses fully into the down payment at the purchase year, not the RRSP', () => {
+    const r = runProjection({
+      ...base,
+      principalResidence: planned,
+      fhsa: { balance: 30000, annualContribution: 0, openedYearsAgo: 0 },
+    })
+    const at40 = r.rows.find((x) => x.age === 40)!
+    expect(at40.fhsaBalance).toBe(0)
+    // the FHSA money reduced how much TFSA/nonReg/RRSP funded the down payment
+    const withoutFhsa = runProjection({ ...base, principalResidence: planned })
+    expect(at40.balances.tfsa).toBeGreaterThan(
+      withoutFhsa.rows.find((x) => x.age === 40)!.balances.tfsa,
+    )
+  })
+
+  it('a down payment beyond FHSA+TFSA draws from non-registered/RRSP and is taxed pre-FIRE', () => {
+    const bigDownPayment = { ...planned, downPayment: 3000000 }
+    const r = runProjection({ ...base, principalResidence: bigDownPayment })
+    const at39 = r.rows.find((x) => x.age === 39)!.balances.rrsp
+    const at40 = r.rows.find((x) => x.age === 40)!.balances.rrsp
+    expect(at40).toBeLessThan(at39)
+  })
+
+  it('the down payment residual during retirement is funded and taxed via the normal solver', () => {
+    const r = runProjection({
+      ...base,
+      fireAge: 40,
+      principalResidence: { ...planned, downPayment: 3000000 },
+    })
+    const at40 = r.rows.find((x) => x.age === 40)!
+    expect(at40.tax).toBeGreaterThan(0)
+  })
+
+  it('net holding cost change reduces available savings pre-FIRE and increases spendTarget post-FIRE', () => {
+    const costly = { ...planned, netHoldingCostChange: 6000 }
+    const withoutCost = runProjection({ ...base, principalResidence: planned })
+    const withCost = runProjection({ ...base, principalResidence: costly })
+    const rrspAt41 = (r: typeof withoutCost) => r.rows.find((x) => x.age === 41)!.balances.rrsp
+    expect(rrspAt41(withCost)).toBeLessThan(rrspAt41(withoutCost))
+  })
+
+  it('can still be sold later, tax-free, after a planned purchase', () => {
+    const r = runProjection({ ...base, principalResidence: { ...planned, sellAtAge: 50 } })
+    expect(r.rows.find((x) => x.age === 49)!.propertyValue).toBeGreaterThan(0)
+    expect(r.rows.find((x) => x.age === 50)!.propertyValue).toBe(0)
+  })
+
+  it('never buys before currentAge (clamped)', () => {
+    const r = runProjection({
+      ...base,
+      principalResidence: { ...planned, buyAtAge: base.currentAge - 5 },
+    })
+    expect(r.rows.find((x) => x.age === base.currentAge)!.propertyValue).toBeCloseTo(500000 * 1.02, 5)
+  })
+})

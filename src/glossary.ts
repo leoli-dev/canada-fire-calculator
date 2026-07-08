@@ -47,6 +47,8 @@ export const TERMS: TermDef[] = [
   { id: 'baristafire', patterns: ['Barista FIRE', 'barista FIRE', '额外收入', 'Side income', 'side income', 'revenu d’appoint', 'Revenu d’appoint', "revenu d'appoint", "Revenu d'appoint"] },
   { id: 'debt', patterns: ['负债', '房贷', '还贷', 'Debts', 'debts', 'Debt', 'debt', 'Mortgage', 'mortgage', 'Dettes', 'dettes', 'Dette', 'dette', 'Hypothèque', 'hypothèque'] },
   { id: 'qclevies', patterns: ['RAMQ', 'FSS', 'Fonds des services de santé', 'régime d’assurance médicaments', "régime d'assurance médicaments"] },
+  { id: 'fhsa', patterns: ['FHSA', 'CELIAPP', '首套房储蓄账户'] },
+  { id: 'hbp', patterns: ['HBP', 'RAP', '购房计划', "Home Buyers' Plan", "home buyers' plan", "Régime d'accession à la propriété", "régime d'accession à la propriété"] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

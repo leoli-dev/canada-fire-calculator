@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
   DEFAULT_PARTNER,
   DEFAULT_PENSION,
@@ -96,6 +97,12 @@ export function InputForm() {
     issues.find((i) => i.field === field && i.severity === 'error') ??
     issues.find((i) => i.field === field)
   const errorCount = issues.filter((i) => i.severity === 'error').length
+
+  const fhsaMaturityAge = inputs.fhsa
+    ? Math.min(inputs.currentAge + Math.max(0, 15 - inputs.fhsa.openedYearsAgo), 71)
+    : inputs.currentAge
+
+  const pr = inputs.principalResidence
 
   return (
     <form className="input-form" onSubmit={(e) => e.preventDefault()}>
@@ -235,6 +242,7 @@ export function InputForm() {
           />
         ))}
         <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
+        <p className="hint"><Jargon text={t('nonRegBookHint')} /></p>
 
         <details>
           <summary><Jargon text={t('nonRegTaxTitle')} /></summary>
@@ -285,78 +293,162 @@ export function InputForm() {
       </fieldset>
 
       <fieldset>
-        <legend>{t('propertySection')}</legend>
+        <legend><Jargon text={t('fhsaSection')} /></legend>
         <label className="field">
-          <span><Jargon text={t('principalResidence')} /></span>
+          <span>{t('fhsaToggle')}</span>
           <input
             type="checkbox"
-            checked={!!inputs.principalResidence}
-            onChange={(e) =>
-              set({
-                principalResidence: e.target.checked
-                  ? { value: 800000, appreciation: 0.02, sellAtAge: null }
-                  : null,
-              })
-            }
+            checked={!!inputs.fhsa}
+            onChange={(e) => set({ fhsa: e.target.checked ? { ...DEFAULT_FHSA } : null })}
           />
         </label>
-        {inputs.principalResidence && (
+        {inputs.fhsa && (
           <>
-            <Num label={t('propValue')} value={inputs.principalResidence.value} step={25000}
-              issue={issueFor('principalResidence.value')}
-              onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, value: v } })} />
-            <Num label={t('propAppreciation')} value={inputs.principalResidence.appreciation * 100} step={0.5}
-              onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, appreciation: v / 100 } })} />
-            <OptionalAge label={t('propSellAt')} value={inputs.principalResidence.sellAtAge}
-              issue={issueFor('principalResidence.sellAtAge')}
-              onChange={(v) => set({ principalResidence: { ...inputs.principalResidence!, sellAtAge: v } })} />
-            <p className="hint"><Jargon text={t('prNote')} /></p>
-            <label className="field">
-              <span>{t('hasMortgage')}</span>
-              <input
-                type="checkbox"
-                checked={!!inputs.principalResidence.mortgage}
-                onChange={(e) =>
-                  set({
+            <p className="hint"><Jargon text={t('fhsaNote')} /></p>
+            <Num label={t('fhsaBalance')} value={inputs.fhsa.balance} step={2000}
+              issue={issueFor('fhsa.balance')}
+              onChange={(v) => set({ fhsa: { ...inputs.fhsa!, balance: v } })} />
+            <Num label={t('fhsaContribution')} value={inputs.fhsa.annualContribution} step={500}
+              issue={issueFor('fhsa.annualContribution')}
+              onChange={(v) => set({ fhsa: { ...inputs.fhsa!, annualContribution: v } })} />
+            <p className="hint"><Jargon text={t('fhsaContributionHint')} /></p>
+            <Num label={t('fhsaOpenedYearsAgo')} value={inputs.fhsa.openedYearsAgo}
+              issue={issueFor('fhsa.openedYearsAgo')}
+              onChange={(v) => set({ fhsa: { ...inputs.fhsa!, openedYearsAgo: v } })} />
+            <p className="hint"><Jargon text={t('fhsaOpenedYearsAgoHint')} /></p>
+            <p className="hint">
+              {pr?.mode === 'planned' && pr.buyAtAge < fhsaMaturityAge
+                ? t('fhsaTerminalPurchase', { age: pr.buyAtAge })
+                : t('fhsaTerminalRrsp', {
+                    n: inputs.fhsa.openedYearsAgo,
+                    year: new Date().getFullYear() + (fhsaMaturityAge - inputs.currentAge),
+                    age: fhsaMaturityAge,
+                  })}
+            </p>
+          </>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>{t('propertySection')}</legend>
+
+        {pr && (
+          <div className="property-card">
+            <p className="subhead property-head">
+              🏠 <Jargon text={t('principalResidence')} />
+              <button
+                type="button"
+                className="remove-item"
+                onClick={() => set({ principalResidence: null })}
+              >
+                {t('removeItem')}
+              </button>
+            </p>
+            <p className="hint"><Jargon text={t('prCardNote')} /></p>
+            <div className="mode-toggle">
+              <label>
+                <input type="radio" name="prMode" checked={pr.mode !== 'planned'}
+                  onChange={() => set({
+                    principalResidence: { mode: 'owned', value: 800000, appreciation: 0.02, sellAtAge: null },
+                  })} />
+                {t('prModeOwned')}
+              </label>
+              <label>
+                <input type="radio" name="prMode" checked={pr.mode === 'planned'}
+                  onChange={() => set({
                     principalResidence: {
-                      ...inputs.principalResidence!,
-                      mortgage: e.target.checked
-                        ? { balance: 300000, annualPayment: 24000, yearsRemaining: 20 }
-                        : undefined,
+                      mode: 'planned',
+                      buyAtAge: inputs.currentAge + 5,
+                      price: 800000,
+                      downPayment: 200000,
+                      appreciation: 0.02,
+                      annualMortgagePayment: 42000,
+                      mortgageYears: 25,
+                      netHoldingCostChange: 0,
+                      sellAtAge: null,
                     },
-                  })
-                }
-              />
-            </label>
-            {inputs.principalResidence.mortgage && (
+                  })} />
+                {t('prModePlanned')}
+              </label>
+            </div>
+
+            {pr.mode === 'planned' ? (
               <>
-                <Num label={t('debtBalance')} value={inputs.principalResidence.mortgage.balance} step={10000}
-                  issue={issueFor('principalResidence.mortgage.balance')}
-                  onChange={(v) => set({
-                    principalResidence: {
-                      ...inputs.principalResidence!,
-                      mortgage: { ...inputs.principalResidence!.mortgage!, balance: v },
-                    },
-                  })} />
-                <Num label={t('debtPaymentLabel')} value={inputs.principalResidence.mortgage.annualPayment} step={1000}
-                  issue={issueFor('principalResidence.mortgage.annualPayment')}
-                  onChange={(v) => set({
-                    principalResidence: {
-                      ...inputs.principalResidence!,
-                      mortgage: { ...inputs.principalResidence!.mortgage!, annualPayment: v },
-                    },
-                  })} />
-                <Num label={t('debtYears')} value={inputs.principalResidence.mortgage.yearsRemaining}
-                  issue={issueFor('principalResidence.mortgage.yearsRemaining')}
-                  onChange={(v) => set({
-                    principalResidence: {
-                      ...inputs.principalResidence!,
-                      mortgage: { ...inputs.principalResidence!.mortgage!, yearsRemaining: v },
-                    },
-                  })} />
+                <Num label={t('prBuyAtAge')} value={pr.buyAtAge}
+                  issue={issueFor('principalResidence.buyAtAge')}
+                  onChange={(v) => set({ principalResidence: { ...pr, buyAtAge: v } })} />
+                <Num label={t('prPrice')} value={pr.price} step={25000}
+                  issue={issueFor('principalResidence.price')}
+                  onChange={(v) => set({ principalResidence: { ...pr, price: v } })} />
+                <Num label={t('prDownPayment')} value={pr.downPayment} step={10000}
+                  issue={issueFor('principalResidence.downPayment')}
+                  onChange={(v) => set({ principalResidence: { ...pr, downPayment: v } })} />
+                <p className="hint"><Jargon text={t('prFundingOrderHint')} /></p>
+                <Num label={t('propAppreciation')} value={pr.appreciation * 100} step={0.5}
+                  onChange={(v) => set({ principalResidence: { ...pr, appreciation: v / 100 } })} />
+                <Num label={t('debtPaymentLabel')} value={pr.annualMortgagePayment ?? 0} step={1000}
+                  issue={issueFor('principalResidence.annualMortgagePayment')}
+                  onChange={(v) => set({ principalResidence: { ...pr, annualMortgagePayment: v } })} />
+                <Num label={t('debtYears')} value={pr.mortgageYears ?? 0}
+                  onChange={(v) => set({ principalResidence: { ...pr, mortgageYears: v } })} />
+                <Num label={t('prNetHoldingCost')} value={pr.netHoldingCostChange} step={500}
+                  issue={issueFor('principalResidence.netHoldingCostChange')}
+                  onChange={(v) => set({ principalResidence: { ...pr, netHoldingCostChange: v } })} />
+                <p className="hint"><Jargon text={t('prNetHoldingCostHint')} /></p>
+                <OptionalAge label={t('propSellAt')} value={pr.sellAtAge}
+                  issue={issueFor('principalResidence.sellAtAge')}
+                  onChange={(v) => set({ principalResidence: { ...pr, sellAtAge: v } })} />
+              </>
+            ) : (
+              <>
+                <Num label={t('propValue')} value={pr.value} step={25000}
+                  issue={issueFor('principalResidence.value')}
+                  onChange={(v) => set({ principalResidence: { ...pr, value: v } })} />
+                <Num label={t('propAppreciation')} value={pr.appreciation * 100} step={0.5}
+                  onChange={(v) => set({ principalResidence: { ...pr, appreciation: v / 100 } })} />
+                <OptionalAge label={t('propSellAt')} value={pr.sellAtAge}
+                  issue={issueFor('principalResidence.sellAtAge')}
+                  onChange={(v) => set({ principalResidence: { ...pr, sellAtAge: v } })} />
+                <p className="hint"><Jargon text={t('prNote')} /></p>
+                <label className="field">
+                  <span>{t('hasMortgage')}</span>
+                  <input
+                    type="checkbox"
+                    checked={!!pr.mortgage}
+                    onChange={(e) =>
+                      set({
+                        principalResidence: {
+                          ...pr,
+                          mortgage: e.target.checked
+                            ? { balance: 300000, annualPayment: 24000, yearsRemaining: 20 }
+                            : undefined,
+                        },
+                      })
+                    }
+                  />
+                </label>
+                {pr.mortgage && (
+                  <>
+                    <Num label={t('debtBalance')} value={pr.mortgage.balance} step={10000}
+                      issue={issueFor('principalResidence.mortgage.balance')}
+                      onChange={(v) => set({
+                        principalResidence: { ...pr, mortgage: { ...pr.mortgage!, balance: v } },
+                      })} />
+                    <Num label={t('debtPaymentLabel')} value={pr.mortgage.annualPayment} step={1000}
+                      issue={issueFor('principalResidence.mortgage.annualPayment')}
+                      onChange={(v) => set({
+                        principalResidence: { ...pr, mortgage: { ...pr.mortgage!, annualPayment: v } },
+                      })} />
+                    <Num label={t('debtYears')} value={pr.mortgage.yearsRemaining}
+                      issue={issueFor('principalResidence.mortgage.yearsRemaining')}
+                      onChange={(v) => set({
+                        principalResidence: { ...pr, mortgage: { ...pr.mortgage!, yearsRemaining: v } },
+                      })} />
+                  </>
+                )}
               </>
             )}
-          </>
+          </div>
         )}
 
         {(inputs.investmentProperties ?? []).map((ip, i) => {
@@ -368,7 +460,7 @@ export function InputForm() {
           return (
             <div className="property-card" key={i}>
               <p className="subhead property-head">
-                <Jargon text={t('investmentProperty')} /> #{i + 1}
+                🏢 <Jargon text={t('investmentProperty')} /> #{i + 1}
                 <button
                   type="button"
                   className="remove-item"
@@ -383,6 +475,7 @@ export function InputForm() {
                   {t('removeItem')}
                 </button>
               </p>
+              <p className="hint"><Jargon text={t('ipCardNote')} /></p>
               <Num label={t('propValue')} value={ip.value} step={25000}
                 issue={issueFor(`investmentProperties.${i}.value`)}
                 onChange={(v) => patch({ value: v })} />
@@ -429,20 +522,35 @@ export function InputForm() {
             </div>
           )
         })}
-        <button
-          type="button"
-          className="add-item"
-          onClick={() =>
-            set({
-              investmentProperties: [
-                ...(inputs.investmentProperties ?? []),
-                { ...DEFAULT_INVESTMENT_PROPERTY },
-              ],
-            })
-          }
-        >
-          {t('addProperty')}
-        </button>
+        <div className="add-buttons">
+          {!inputs.principalResidence && (
+            <button
+              type="button"
+              className="add-item"
+              onClick={() =>
+                set({
+                  principalResidence: { value: 800000, appreciation: 0.02, sellAtAge: null },
+                })
+              }
+            >
+              {t('addPrincipalResidence')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="add-item"
+            onClick={() =>
+              set({
+                investmentProperties: [
+                  ...(inputs.investmentProperties ?? []),
+                  { ...DEFAULT_INVESTMENT_PROPERTY },
+                ],
+              })
+            }
+          >
+            {t('addProperty')}
+          </button>
+        </div>
         {(inputs.investmentProperties?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('ipNote')} /></p>
         )}

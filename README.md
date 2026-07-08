@@ -77,9 +77,14 @@ maximum sustainable annual spending.
 **Also modelled**: an **employer DB pension** per spouse (lifetime annuity at a
 chosen start age, partial-CPI indexing, and a bridge benefit that ends at 65 —
 taxed as pension income, splittable at any age, visible to the OAS clawback and
-GIS; DC plans and LIRAs are entered as account balances instead),
-principal-residence sale (tax-free, e.g. downsizing at a chosen
-age), any number of investment properties — each sellable at its own age (gain
+GIS; DC plans and LIRAs are entered as account balances instead), an **FHSA**
+household side account (contributions carved out of annual savings, growth
+tracks the RRSP assumption, and it rolls tax-free — either into a home purchase
+or, failing that, into the RRSP at 15 years/age 71, whichever comes first),
+principal-residence sale (tax-free, e.g. downsizing at a chosen age) **or a
+planned future purchase** (down payment funded FHSA → TFSA → non-registered →
+RRSP, a fixed order; a mortgage for the rest amortizes from the purchase year),
+any number of investment properties — each sellable at its own age (gain
 taxed) or kept for **net rental income** (taxed as ordinary income, visible to the
 OAS clawback and GIS) — optionally leveraged with a **mortgage tied to that specific
 property**, discharged from the sale proceeds and with its interest (not principal)
@@ -115,10 +120,20 @@ Work down the left column; every underlined term opens a plain-language explanat
   enter the **ACB** (your broker calls it *book cost*): tax applies only to the gain
   above it, so leaving it at 0 badly overstates tax. Asset-mix presets set realistic
   real returns and volatilities per account.
-- **Real estate** — optional principal residence plus any number of investment
-  properties, each with an optional sale age and an optional net annual rent
-  (rent minus operating costs; it stops the year the property sells). A
-  principal-residence sale is tax-free and becomes investable capital the same year.
+- **FHSA** — a household-combined bucket (enter the couple's total, not per spouse):
+  today's balance, annual contribution (carved out of annual savings before it's
+  split across TFSA/RRSP/non-registered), and years since the account was opened
+  (contribution room only starts building that year, unlike a TFSA). It ends at the
+  earliest of a qualifying home purchase, 15 years, or age 71.
+- **Real estate** — a principal-residence card in one of two modes — **already
+  own** (current value, appreciation, optional sale age) or **planned purchase**
+  (purchase age, price and down payment in today's dollars, an auto-derived
+  mortgage from payment + years, and a net $/year holding-cost change) — plus any
+  number of investment properties, each with an optional sale age and an optional
+  net annual rent (rent minus operating costs; it stops the year the property
+  sells). A principal-residence sale is tax-free and becomes investable capital
+  the same year; a planned purchase's down payment is funded FHSA → TFSA →
+  non-registered → RRSP, a fixed order that isn't configurable.
 - **Debts** — mortgage, car loan or other, each as (balance, annual payment, years
   remaining). Enter your annual savings as what you actually save *after* debt
   payments; the engine adds the payments to retirement spending until each loan
@@ -218,6 +233,16 @@ explanations are clickable too. 33 entries in all three languages.
   can be attached to a specific property instead of the general debt list — it's
   then discharged from the sale proceeds and its interest (not principal) is
   deductible against that property's rent, rather than continuing forever.
+- The FHSA's contribution deduction isn't modelled as a separate refund, consistent
+  with "the RRSP refund isn't recycled automatically" above; the CRA's Home Buyers'
+  Plan (HBP) isn't modelled either — the FHSA already covers most of a typical down
+  payment, and tracking a 15-year HBP repayment schedule on top adds complexity for
+  little extra accuracy. A planned purchase's down payment is always funded
+  FHSA → TFSA → non-registered → RRSP, in that order — this isn't configurable, even
+  if a different order would be more tax-efficient for a given household. The net
+  holding-cost-change field is whatever you say it is (e.g. property tax and
+  maintenance minus rent saved) — it excludes the mortgage payment, which is
+  handled like any other mortgage.
 - Employer pensions are simplified: survivor percentages aren't modelled (both
   spouses are assumed to reach the shared life expectancy), Quebec's provincial
   rule requiring age 65+ for pension splitting is ignored (splitting stays

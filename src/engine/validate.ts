@@ -130,12 +130,47 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
   }
 
   const pr = inputs.principalResidence
-  if (pr) {
+  if (pr && pr.mode === 'planned') {
+    if (pr.buyAtAge < inputs.currentAge) err('principalResidence.buyAtAge', 'valBuyBeforeCurrent')
+    if (pr.price < 0) err('principalResidence.price', 'valNegative')
+    if (pr.downPayment < 0) err('principalResidence.downPayment', 'valNegative')
+    if (pr.downPayment > pr.price) warn('principalResidence.downPayment', 'valDownPaymentAbovePrice')
+    if (pr.sellAtAge !== null && pr.sellAtAge <= pr.buyAtAge)
+      warn('principalResidence.sellAtAge', 'valSellBeforeBuy')
+    const principal = pr.price - pr.downPayment
+    const payment = pr.annualMortgagePayment ?? 0
+    const mortgageYears = pr.mortgageYears ?? 0
+    if (principal > 0 && payment > 0 && payment * mortgageYears < principal)
+      err('principalResidence.annualMortgagePayment', 'valDebtUnpayable')
+    // rough heuristic: today's liquid assets vs. the down payment — a real
+    // check would need to project growth to the purchase year, but this
+    // flags the common case (not enough saved up at all) cheaply
+    const liquidAssets =
+      inputs.balances.tfsa + inputs.balances.rrsp + inputs.balances.nonReg + (inputs.fhsa?.balance ?? 0)
+    if (pr.downPayment > liquidAssets)
+      warn('principalResidence.downPayment', 'valDownPaymentExceedsAssets')
+    if (Math.abs(pr.netHoldingCostChange) > 50000)
+      warn('principalResidence.netHoldingCostChange', 'valHoldingCostImplausible')
+  } else if (pr) {
     if (pr.value < 0) err('principalResidence.value', 'valNegative')
     if (pr.sellAtAge !== null && pr.sellAtAge < inputs.currentAge)
       warn('principalResidence.sellAtAge', 'valSellInPast')
     checkMortgage(pr.mortgage, 'principalResidence.mortgage')
   }
+  const fhsa = inputs.fhsa
+  if (fhsa) {
+    const persons = inputs.partner ? 2 : 1
+    if (fhsa.balance < 0) err('fhsa.balance', 'valNegative')
+    if (fhsa.annualContribution < 0) err('fhsa.annualContribution', 'valNegative')
+    if (fhsa.openedYearsAgo < 0) err('fhsa.openedYearsAgo', 'valNegative')
+    else if (fhsa.openedYearsAgo >= 15) err('fhsa.openedYearsAgo', 'valFhsaExpired')
+    const fhsaLimit = 8000 * persons
+    if (fhsa.annualContribution > fhsaLimit)
+      warn('fhsa.annualContribution', 'valFhsaContribHigh', { max: fhsaLimit })
+    if (fhsa.annualContribution > 0 && inputs.annualSavings < fhsa.annualContribution)
+      err('fhsa.annualContribution', 'valFhsaExceedsSavings')
+  }
+
   const ips = inputs.investmentProperties ?? []
   ips.forEach((ip, i) => {
     const at = (f: string) => `investmentProperties.${i}.${f}`

@@ -48,9 +48,12 @@ export function requiredFireAssets(inputs: Inputs): number {
   // a principal residence sold BEFORE the FIRE age is already cash inside the
   // investable balances the user compares this number against — passing it
   // through would count the house twice (IP sales are clamped to FIRE, so
-  // they can't double up the same way)
+  // they can't double up the same way). A planned future purchase isn't
+  // modelled by this quick estimator (it needs the funding/mortgage-origin
+  // logic in the full projection) — excluded here, a conservative omission.
   const pr =
     inputs.principalResidence &&
+    inputs.principalResidence.mode !== 'planned' &&
     (inputs.principalResidence.sellAtAge === null ||
       inputs.principalResidence.sellAtAge >= inputs.fireAge)
       ? inputs.principalResidence
@@ -158,7 +161,10 @@ export interface TargetReport {
  */
 export function targetReport(inputs: Inputs, target: number): TargetReport {
   const bal = { ...inputs.balances }
-  const pr = inputs.principalResidence
+  // a planned future purchase isn't modelled by this quick estimator
+  const pr = inputs.principalResidence && inputs.principalResidence.mode !== 'planned'
+    ? inputs.principalResidence
+    : null
   let prValue = pr?.value ?? 0
   const horizon = 100 - inputs.currentAge + 1
   const inflation = inputs.inflation ?? 0.021

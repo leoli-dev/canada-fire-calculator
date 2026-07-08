@@ -118,6 +118,10 @@ legend {
   padding: 7px 12px; width: 100%; margin-top: 8px;
 }
 .add-item:hover { border-color: var(--blue); color: var(--blue); }
+.add-buttons { display: flex; gap: 8px; }
+.add-buttons .add-item { width: auto; flex: 1; }
+.mode-toggle { display: flex; gap: 16px; margin: 6px 0 10px; font-size: 0.86rem; }
+.mode-toggle label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
 details { margin: 10px 0 2px; }
 details summary {

@@ -15,7 +15,7 @@ import {
 import type { ProjectionResult } from '../engine'
 import { useCad, useCadCompact } from '../format'
 
-const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', property: '#8d6e63' }
+const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', fhsa: '#00897b', property: '#8d6e63' }
 
 export function ProjectionChart(props: {
   result: ProjectionResult
@@ -34,19 +34,25 @@ export function ProjectionChart(props: {
     tfsa: Math.round(r.balances.tfsa * k(r.age)),
     rrsp: Math.round(r.balances.rrsp * k(r.age)),
     nonReg: Math.round(r.balances.nonReg * k(r.age)),
+    fhsa: Math.round(r.fhsaBalance * k(r.age)),
     property: Math.round(r.propertyValue * k(r.age)),
     debt: Math.round(r.debtBalance * k(r.age)),
-    investable: Math.round((r.balances.tfsa + r.balances.rrsp + r.balances.nonReg) * k(r.age)),
+    investable: Math.round(
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance) * k(r.age),
+    ),
     total: Math.round(
-      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.propertyValue) * k(r.age),
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.propertyValue) *
+        k(r.age),
     ),
     netWorth: Math.round(
-      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.propertyValue - r.debtBalance) *
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.propertyValue -
+        r.debtBalance) *
         k(r.age),
     ),
   }))
   const hasProperty = data.some((d) => d.property > 0)
   const hasDebt = data.some((d) => d.debt > 0)
+  const hasFhsa = data.some((d) => d.fhsa > 0)
 
   // transient invalid inputs (life expectancy typed below the current age)
   // can produce zero rows — never crash the page over it
@@ -90,6 +96,10 @@ export function ProjectionChart(props: {
             stroke={COLORS.rrsp} fill={COLORS.rrsp} fillOpacity={0.55} />
           <Area type="monotone" dataKey="nonReg" stackId="1" name={t('nonReg')}
             stroke={COLORS.nonReg} fill={COLORS.nonReg} fillOpacity={0.55} />
+          {hasFhsa && (
+            <Area type="monotone" dataKey="fhsa" stackId="1" name={t('fhsaLabel')}
+              stroke={COLORS.fhsa} fill={COLORS.fhsa} fillOpacity={0.55} />
+          )}
           {hasProperty && (
             <Area type="monotone" dataKey="property" stackId="1" name={t('propertyLabel')}
               stroke={COLORS.property} fill={COLORS.property} fillOpacity={0.45} />

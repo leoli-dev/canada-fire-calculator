@@ -224,14 +224,50 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   const inflation = inputs.inflation ?? 0.021
   const debtStream = buildDebtStream(inputs.debts ?? [], years, inflation)
 
-  // a property-linked mortgage amortizes on its own precomputed stream (same
-  // math as the household debts array) so it can be discharged in full from
-  // sale proceeds instead of continuing forever
-  const prMortgage = inputs.principalResidence?.mortgage
-    ? buildDebtStream([{ kind: 'mortgage', ...inputs.principalResidence.mortgage }], years, inflation)
+  const pr = inputs.principalResidence
+  const plannedPurchase = pr && pr.mode === 'planned' ? pr : null
+  // clamp for safety; validation flags a buy age before currentAge
+  const buyYearIdx = plannedPurchase
+    ? Math.max(0, plannedPurchase.buyAtAge - inputs.currentAge)
     : null
 
-  let prValue = inputs.principalResidence?.value ?? 0
+  // a property-linked mortgage amortizes on its own precomputed stream (same
+  // math as the household debts array) so it can be discharged in full from
+  // sale proceeds instead of continuing forever. A future purchase's mortgage
+  // is built the same way but starting from buyYearIdx: since the engine
+  // works entirely in today's-dollar real terms, a fixed real payment at a
+  // future origination decays from *that* year exactly like an existing
+  // mortgage decays from year 0 — so the stream is just time-shifted, no
+  // extra deflation math needed. Zero-padding the front makes every existing
+  // per-year access (`prMortgage?.balances[yearIdx]`) work unchanged.
+  const prMortgage = (() => {
+    if (plannedPurchase) {
+      const principal = plannedPurchase.price - plannedPurchase.downPayment
+      const payment = plannedPurchase.annualMortgagePayment ?? 0
+      if (principal <= 0 || payment <= 0 || !plannedPurchase.mortgageYears) return null
+      const startIdx = buyYearIdx!
+      const stream = buildDebtStream(
+        [{ kind: 'mortgage', balance: principal, annualPayment: payment, yearsRemaining: plannedPurchase.mortgageYears }],
+        Math.max(0, years - startIdx),
+        inflation,
+      )
+      const zeros = new Array(Math.min(startIdx, years)).fill(0)
+      return {
+        payments: [...zeros, ...stream.payments].slice(0, years),
+        balances: [...zeros, ...stream.balances].slice(0, years),
+        interest: [...zeros, ...stream.interest].slice(0, years),
+      }
+    }
+    return pr && pr.mode !== 'planned' && pr.mortgage
+      ? buildDebtStream([{ kind: 'mortgage', ...pr.mortgage }], years, inflation)
+      : null
+  })()
+
+  let fhsaBal = inputs.fhsa?.balance ?? 0
+  let fhsaActive = !!inputs.fhsa
+
+  // a planned purchase doesn't exist until buyAtAge
+  let prValue = plannedPurchase ? 0 : pr && pr.mode !== 'planned' ? pr.value : 0
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
     acb: Math.min(p.acb, p.value),
@@ -259,12 +295,68 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let taxablePerPerson = 0
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
+    let downPaymentSpend = 0
+    let dpAccumTax = 0
+    let dpAccumTaxable = 0
     const yearIdx = age - inputs.currentAge
+
+    // future home purchase: the down payment is funded FHSA → TFSA →
+    // non-registered → RRSP (fixed order, not configurable). FHSA collapses
+    // in full (a qualifying withdrawal); any leftover funding need is taxed
+    // at the working marginal rate pre-FIRE (no withdrawal solver runs yet),
+    // or folded into this year's spendTarget so the normal solver — and its
+    // strategy-driven account order — funds and taxes it precisely, exactly
+    // like any other one-off retirement expense.
+    if (plannedPurchase && yearIdx === buyYearIdx) {
+      let remaining = plannedPurchase.downPayment
+      if (fhsaActive) {
+        const used = Math.min(fhsaBal, remaining)
+        remaining -= used
+        const excess = fhsaBal - used
+        bal.nonReg += excess
+        nonRegBook += excess
+        fhsaBal = 0
+        fhsaActive = false
+      }
+      const fromTfsa = Math.min(remaining, bal.tfsa)
+      bal.tfsa -= fromTfsa
+      remaining -= fromTfsa
+      if (remaining > 0.01) {
+        if (phase === 'accumulation') {
+          const fromNonReg = Math.min(remaining, bal.nonReg)
+          const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBook) / bal.nonReg) : 0
+          const nonRegGainTaxable = fromNonReg * gainFraction * CAPITAL_GAINS_INCLUSION
+          if (bal.nonReg > 0) nonRegBook -= (fromNonReg / bal.nonReg) * nonRegBook
+          bal.nonReg -= fromNonReg
+          remaining -= fromNonReg
+          const fromRrsp = Math.min(remaining, bal.rrsp)
+          bal.rrsp -= fromRrsp
+          remaining -= fromRrsp
+          dpAccumTaxable = nonRegGainTaxable + fromRrsp
+          dpAccumTax = dpAccumTaxable * (inputs.accumulationMarginalRate ?? 0.35)
+          bal.nonReg -= dpAccumTax
+        } else {
+          downPaymentSpend = remaining
+        }
+      }
+      prValue = plannedPurchase.price
+    }
+
+    // FHSA matures into the RRSP (tax-free, no room impact) the moment it
+    // hits its 15-year clock or age 71, whichever comes first — from then on
+    // it's ordinary RRSP money, so no separate withdrawal/tax path is needed.
+    if (fhsaActive && inputs.fhsa) {
+      const yearsOpen = inputs.fhsa.openedYearsAgo + yearIdx
+      if (yearsOpen >= 15 || age >= 71) {
+        bal.rrsp += fhsaBal
+        fhsaBal = 0
+        fhsaActive = false
+      }
+    }
 
     // principal residence sale: tax-free; any linked mortgage is discharged
     // from the proceeds (a plain cash-flow cost until then — its interest
     // isn't deductible, unlike a rental's)
-    const pr = inputs.principalResidence
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
       const owed = prMortgage?.balances[yearIdx] ?? 0
       bal.nonReg += prValue - owed
@@ -307,6 +399,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       (debtStream.balances[yearIdx] ?? 0) +
       (prValue > 0 ? prMortgage?.balances[yearIdx] ?? 0 : 0) +
       ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[yearIdx] ?? 0 : 0), 0)
+    // net change in living costs from a future purchase (rent saved, property
+    // tax/insurance/maintenance added, etc. — excludes the mortgage payment
+    // itself, already in debtPayment above); stops once sold like the mortgage
+    const netHoldingCost = plannedPurchase && prValue > 0 ? plannedPurchase.netHoldingCostChange : 0
     // Barista FIRE: side income between fromAge (no earlier than FIRE) and toAge
     const ei = inputs.extraIncome
     const extraIncome =
@@ -361,8 +457,19 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     }
 
     if (phase === 'accumulation') {
+      // FHSA contribution is carved out of annualSavings before the
+      // remainder is split across the three accounts
+      const fhsaContribution =
+        fhsaActive && inputs.fhsa ? Math.min(inputs.annualSavings, inputs.fhsa.annualContribution) : 0
+      fhsaBal += fhsaContribution
+      // a future mortgage/holding-cost change isn't already netted out of
+      // annualSavings the way existing debts are assumed to be (the user set
+      // that figure before this purchase existed)
+      const futureMortgagePayment = plannedPurchase ? prMortgage?.payments[yearIdx] ?? 0 : 0
+      const remainingSavings =
+        inputs.annualSavings - fhsaContribution - futureMortgagePayment - netHoldingCost
       for (const t of ACCOUNT_TYPES) {
-        const c = inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
+        const c = remainingSavings * (inputs.savingsSplit[t] ?? 0)
         bal[t] += c
         if (t === 'nonReg') nonRegBook += c
       }
@@ -388,16 +495,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       bal.nonReg += benefitBase - benefitTax
       nonRegBook += benefitBase - benefitTax
       oas = oasGross
-      tax = dragTax + rentTax + benefitTax
+      tax = dragTax + rentTax + benefitTax + dpAccumTax
       const cppTax = benefitBase > 0 ? benefitTax * (cpp / benefitBase) : 0
       const pensionTax = benefitBase > 0 ? benefitTax * (pension / benefitBase) : 0
       taxBySource = {
         rrsp: 0, nonReg: dragTax, cpp: cppTax, oas: benefitTax - cppTax - pensionTax,
-        property: rentTax, extraIncome: 0, pension: pensionTax,
+        property: rentTax + dpAccumTax, extraIncome: 0, pension: pensionTax,
       }
       taxableBySource = {
         rrsp: 0, nonReg: dist, cpp, oas: oasGross,
-        property: rent - rentMortgageInterest, extraIncome: 0, pension,
+        property: rent - rentMortgageInterest + dpAccumTaxable, extraIncome: 0, pension,
       }
     } else {
       extraTaxable += dist
@@ -440,8 +547,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       }
       const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBook) / bal.nonReg) : 0
 
-      // debt payments come on top of living expenses until paid off
-      const spendTarget = inputs.retirementSpending + debtPayment
+      // debt payments come on top of living expenses until paid off; a
+      // future purchase's down payment (net of FHSA/TFSA) and net holding
+      // cost change are one-off/ongoing additions the solver funds like any
+      // other spending, taxing whatever it draws per the chosen strategy
+      const spendTarget = inputs.retirementSpending + debtPayment + downPaymentSpend + netHoldingCost
       const out = solveWithdrawals(
         spendTarget, bal, forcedRrsp, gainFraction, cpp, pension,
         oasGrossPerPerson, agesPerPerson, extraTaxable, rent,
@@ -506,6 +616,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     for (const t of ACCOUNT_TYPES) {
       bal[t] *= 1 + (sample ? sample(age, t) : inputs.returns[t]) - (inputs.fees ?? 0)
     }
+    // FHSA piggybacks on the RRSP return/volatility assumption (same asset mix)
+    if (fhsaActive) {
+      fhsaBal *= 1 + (sample ? sample(age, 'rrsp') : inputs.returns.rrsp) - (inputs.fees ?? 0)
+    }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation
@@ -520,6 +634,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       pension,
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
+      fhsaBalance: fhsaBal,
       debtPayment, debtBalance,
       taxablePerPerson, taxBySource, taxableBySource,
     })
@@ -535,7 +650,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     (prValue > 0 ? prMortgage?.balances[lastYearIdx] ?? 0 : 0) +
     ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[lastYearIdx] ?? 0 : 0), 0)
   const finalDebt = (debtStream.balances[lastYearIdx] ?? 0) + finalPropertyDebt
-  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + prValue + ipTotal - finalDebt
+  // in the rare case life expectancy is reached before the FHSA's 15-year
+  // clock or age 71 (it must mature by one of those), its balance is still
+  // tax-free like an on-time rollover would have been
+  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
   const persons = partner ? 2 : 1

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountType, AssetMix, Inputs, Partner, Pension } from './engine'
+import type { AccountType, AssetMix, Fhsa, Inputs, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
 import { trackOnce } from './analytics'
 
@@ -53,6 +53,7 @@ export const DEFAULT_INPUTS: Inputs = {
   partner: null,
   principalResidence: null,
   investmentProperties: [],
+  fhsa: null,
 }
 
 export const DEFAULT_INVESTMENT_PROPERTY = {
@@ -61,6 +62,12 @@ export const DEFAULT_INVESTMENT_PROPERTY = {
   appreciation: 0.02,
   sellAtAge: null,
   annualRent: 0,
+}
+
+export const DEFAULT_FHSA: Fhsa = {
+  balance: 0,
+  annualContribution: 8000,
+  openedYearsAgo: 0,
 }
 
 export const WORKSHEET_KEYS = [

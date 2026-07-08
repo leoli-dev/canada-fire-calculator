@@ -116,7 +116,8 @@ export interface Mortgage {
   yearsRemaining: number
 }
 
-export interface PrincipalResidence {
+export interface OwnedResidence {
+  mode?: 'owned'
   value: number
   /** real annual appreciation */
   appreciation: number
@@ -126,6 +127,55 @@ export interface PrincipalResidence {
    * cost until then (mortgage interest on a principal residence isn't
    * deductible, so there's no tax interaction, unlike a rental's mortgage) */
   mortgage?: Mortgage
+}
+
+/**
+ * A future first-home purchase, mirroring the existing sale event: the home
+ * doesn't exist until buyAtAge, at which point the down payment is funded
+ * (FHSA, then TFSA, then non-registered, then RRSP — fixed, not
+ * configurable) and a mortgage for the remainder amortizes from that year on.
+ */
+export interface PlannedResidence {
+  mode: 'planned'
+  /** clamped to no earlier than currentAge */
+  buyAtAge: number
+  /** purchase price, today's purchasing power */
+  price: number
+  downPayment: number
+  /** real annual appreciation, same convention as OwnedResidence */
+  appreciation: number
+  /** fixed nominal payment (today's-dollar equivalent) on the auto-derived
+   * mortgage (balance = price − downPayment); 0/undefined = paid in cash */
+  annualMortgagePayment?: number
+  mortgageYears?: number
+  /** net $/year change in living costs once owned (can be negative if it's
+   * cheaper than whatever housing cost — e.g. rent — it replaces); excludes
+   * the mortgage payment itself, which is handled like any other mortgage */
+  netHoldingCostChange: number
+  /** can still sell later; sale is tax-free like an owned residence */
+  sellAtAge: number | null
+}
+
+export type PrincipalResidence = OwnedResidence | PlannedResidence
+
+/**
+ * FHSA (First Home Savings Account) — a household-combined bucket, not a
+ * fourth AccountType: contributions piggyback on the RRSP return/volatility
+ * assumption, and the balance never enters the withdrawal machinery on its
+ * own. It has exactly one of two exits, both tax-free: a qualifying
+ * first-home purchase, or — failing that — automatic rollover into the
+ * RRSP (no room impact either way) at the earliest of 15 years after
+ * opening or age 71. Deduction-on-contribution and the room tracking CRA
+ * layers on top aren't modelled (same simplification as "RRSP refunds
+ * aren't reinvested").
+ */
+export interface Fhsa {
+  /** today's combined balance (both spouses, one household bucket) */
+  balance: number
+  /** combined annual contribution; carved out of annualSavings before savingsSplit */
+  annualContribution: number
+  /** years since the account was opened (earliest spouse); drives the 15-year clock */
+  openedYearsAgo: number
 }
 
 export interface InvestmentProperty {
@@ -206,6 +256,8 @@ export interface Inputs {
   investmentProperties?: InvestmentProperty[]
   /** outstanding loans; payments add to retirement spending until paid off */
   debts?: Debt[]
+  /** FHSA lightweight side account; null/undefined = not using one */
+  fhsa?: Fhsa | null
 }
 
 /**
@@ -251,6 +303,8 @@ export interface YearRow {
   shortfall: number
   /** unsold real estate value at end of year */
   propertyValue: number
+  /** end-of-year FHSA balance; 0 once it has matured into the RRSP or been spent on a home */
+  fhsaBalance: number
   /** real (today's-dollar) debt payments made this year */
   debtPayment: number
   /** real end-of-year debt balance outstanding */

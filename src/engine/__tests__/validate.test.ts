@@ -109,4 +109,67 @@ describe('validateInputs', () => {
     expect(w).toContain('investmentProperties.0.acb')
     expect(w).toContain('investmentProperties.0.sellAtAge')
   })
+
+  it('flags FHSA inconsistencies', () => {
+    const expired = { ...base, fhsa: { balance: 10000, annualContribution: 0, openedYearsAgo: 15 } }
+    expect(fields(expired, 'error')).toContain('fhsa.openedYearsAgo')
+
+    const negative = { ...base, fhsa: { balance: -1, annualContribution: -1, openedYearsAgo: -1 } }
+    const negErrors = fields(negative, 'error')
+    expect(negErrors).toContain('fhsa.balance')
+    expect(negErrors).toContain('fhsa.annualContribution')
+    expect(negErrors).toContain('fhsa.openedYearsAgo')
+
+    const overSavings = {
+      ...base,
+      annualSavings: 5000,
+      fhsa: { balance: 0, annualContribution: 8000, openedYearsAgo: 0 },
+    }
+    expect(fields(overSavings, 'error')).toContain('fhsa.annualContribution')
+
+    const overLimit = { ...base, fhsa: { balance: 0, annualContribution: 20000, openedYearsAgo: 0 } }
+    expect(fields(overLimit, 'warning')).toContain('fhsa.annualContribution')
+
+    const ok = { ...base, fhsa: { balance: 10000, annualContribution: 8000, openedYearsAgo: 3 } }
+    expect(validateInputs(ok)).toEqual([])
+  })
+
+  it('flags planned-home-purchase inconsistencies', () => {
+    const planned = {
+      mode: 'planned' as const,
+      buyAtAge: 30,
+      price: 500000,
+      downPayment: 100000,
+      appreciation: 0.02,
+      annualMortgagePayment: 24000,
+      mortgageYears: 20,
+      netHoldingCostChange: 0,
+      sellAtAge: null,
+    }
+
+    expect(fields({ ...base, principalResidence: { ...planned, buyAtAge: 30 } }, 'error')).toContain(
+      'principalResidence.buyAtAge',
+    )
+    expect(
+      fields({ ...base, principalResidence: { ...planned, downPayment: 600000 } }, 'warning'),
+    ).toContain('principalResidence.downPayment')
+    expect(
+      fields({ ...base, principalResidence: { ...planned, buyAtAge: 40, sellAtAge: 35 } }, 'warning'),
+    ).toContain('principalResidence.sellAtAge')
+    expect(
+      fields(
+        { ...base, principalResidence: { ...planned, buyAtAge: 40, downPayment: 490000, annualMortgagePayment: 100 } },
+        'error',
+      ),
+    ).toContain('principalResidence.annualMortgagePayment')
+    expect(
+      fields({ ...base, principalResidence: { ...planned, buyAtAge: 40, downPayment: 999999 } }, 'warning'),
+    ).toContain('principalResidence.downPayment')
+    expect(
+      fields({ ...base, principalResidence: { ...planned, buyAtAge: 40, netHoldingCostChange: 100000 } }, 'warning'),
+    ).toContain('principalResidence.netHoldingCostChange')
+
+    const ok = { ...base, principalResidence: { ...planned, buyAtAge: 40 } }
+    expect(validateInputs(ok)).toEqual([])
+  })
 })
