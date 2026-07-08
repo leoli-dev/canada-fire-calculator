@@ -369,6 +369,7 @@
   "valSellBeforeFire": "A sale before the FIRE age is deferred to the FIRE year",
   "valSellInPast": "Sale age is in the past; treated as an immediate sale",
   "propRent": "Net rent ($/yr)",
+  "propRentHint": "Enter net operating rent only: gross rent minus property tax, condo fees, maintenance and insurance. Don't subtract the mortgage payment or its interest here — if this property has a mortgage, add it below via \"Has a linked mortgage\" and the calculator handles the interest deduction and cash payment automatically.",
   "addProperty": "+ Add investment property",
   "removeItem": "Remove",
   "rentLabel": "Rent",

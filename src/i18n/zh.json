@@ -369,6 +369,7 @@
   "valSellBeforeFire": "早于 FIRE 年龄的出售会被推迟到 FIRE 当年",
   "valSellInPast": "出售年龄早于当前年龄，将视为立即出售",
   "propRent": "净租金（$/年）",
+  "propRentHint": "只填运营净额：毛租金减地税、物业费、维护、保险这些真实运营成本。这里不要再减贷款月供或利息——如果这套房有贷款，请用下面的「有关联房贷」单独填，计算器会自动处理利息抵税和现金支出。",
   "addProperty": "+ 添加投资房",
   "removeItem": "移除",
   "rentLabel": "租金",

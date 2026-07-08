@@ -394,6 +394,7 @@ export function InputForm() {
               <Num label={t('propRent')} value={ip.annualRent ?? 0} step={1000}
                 issue={issueFor(`investmentProperties.${i}.annualRent`)}
                 onChange={(v) => patch({ annualRent: v })} />
+              <p className="hint"><Jargon text={t('propRentHint')} /></p>
               <OptionalAge label={t('propSellAt')} value={ip.sellAtAge}
                 issue={issueFor(`investmentProperties.${i}.sellAtAge`)}
                 onChange={(v) => patch({ sellAtAge: v })} />

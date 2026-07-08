@@ -369,6 +369,7 @@
   "valSellBeforeFire": "Une vente avant l’âge FIRE est reportée à l’année FIRE",
   "valSellInPast": "L’âge de vente est passé ; traité comme une vente immédiate",
   "propRent": "Loyer net ($/an)",
+  "propRentHint": "N'entrez que le loyer net d'exploitation : le loyer brut moins les taxes foncières, frais de copropriété, entretien et assurance. Ne soustrayez pas ici le versement hypothécaire ni ses intérêts — si cet immeuble a une hypothèque, ajoutez-la plus bas via « Hypothèque liée », et le calculateur gère automatiquement la déduction des intérêts et le paiement en argent.",
   "addProperty": "+ Ajouter un immeuble locatif",
   "removeItem": "Retirer",
   "rentLabel": "Loyer",
