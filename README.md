@@ -11,7 +11,9 @@ what happens to an RRSP at death. This calculator models all of it.
 **Live demo: <https://leoli-dev.github.io/canada-fire-calculator/>**
 
 **Privacy-first: a pure frontend app.** No backend, no account, no AI — your numbers
-never leave the browser (they persist to `localStorage`). English / Français / 中文.
+never leave the browser (they persist to `localStorage`); only anonymous usage
+analytics (page views, feature clicks — never your inputs) go to Google Analytics.
+English / Français / 中文.
 
 ![Overview](docs/screenshots/hero.png)
 
@@ -209,7 +211,7 @@ of the percentile bands.
 
 **The glossary drawer** — every underlined term on the page (RRSP, ACB, meltdown,
 clawback, marginal rate, …) opens a plain-language explanation; terms inside
-explanations are clickable too. 33 entries in all three languages.
+explanations are clickable too. 39 entries in all three languages.
 
 ![Glossary](docs/screenshots/glossary-drawer.png)
 

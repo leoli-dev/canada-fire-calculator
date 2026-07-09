@@ -10,7 +10,8 @@ CPP/QPP 与 OAS 的开领时机、RRIF 强制最低取款、OAS 回收税（claw
 **在线使用：<https://leoli-dev.github.io/canada-fire-calculator/>**
 
 **隐私优先的纯前端应用**：无后端、无账号、无 AI——你的数字永远不离开浏览器
-（保存在 localStorage）。支持英语 / 法语 / 中文。
+（保存在 localStorage）；仅通过 Google Analytics 收集匿名使用统计（页面访问、
+功能点击——绝不包含你的输入数据）。支持英语 / 法语 / 中文。
 
 ![总览](docs/screenshots/hero.png)
 
@@ -163,7 +164,7 @@ RRSP 提款、非注册账户利得/分配、CPP/QPP、OAS、租金/房产出售
 ![蒙特卡洛](docs/screenshots/monte-carlo.png)
 
 **术语抽屉**——页面上所有下划线术语（RRSP、ACB、meltdown、clawback、边际税率……）
-点开就是通俗解释，解释里的术语还能继续点。33 个词条，三语齐全。
+点开就是通俗解释，解释里的术语还能继续点。39 个词条，三语齐全。
 
 ![术语抽屉](docs/screenshots/glossary-drawer.png)
 

@@ -14,7 +14,9 @@ tout cela.
 
 **Application 100 % frontale, axée sur la vie privée** : pas de serveur, pas de
 compte, pas d'IA — vos chiffres ne quittent jamais le navigateur (persistés en
-`localStorage`). Anglais / Français / 中文.
+`localStorage`); seules des statistiques d'utilisation anonymes (pages vues, clics
+sur les fonctionnalités — jamais vos données saisies) sont envoyées à Google
+Analytics. Anglais / Français / 中文.
 
 ![Vue d'ensemble](docs/screenshots/hero.png)
 
@@ -217,7 +219,7 @@ séquence des rendements), et le graphique superpose la trajectoire du pire scé
 ![Monte-Carlo](docs/screenshots/monte-carlo.png)
 
 **Le tiroir-glossaire** — chaque terme souligné (REER, PBR, meltdown,
-récupération, taux marginal…) ouvre une explication claire; 33 entrées, trois
+récupération, taux marginal…) ouvre une explication claire; 39 entrées, trois
 langues.
 
 ![Glossaire](docs/screenshots/glossary-drawer.png)
