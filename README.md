@@ -94,7 +94,10 @@ deductible against the rent, **debts** (mortgage / car loan / other: the engine
 back-solves each loan's implied rate and lets inflation erode the fixed nominal
 payments — payments join retirement spending until paid off, balances reduce net
 worth and the estate), **Barista-FIRE side income** over a chosen age range (with
-the official GIS work exemption), CPP/QPP estimation from work history
+the official GIS work exemption), the **Canada Child Benefit (CCB)** for households
+with children — tax-free, income-tested like GIS (but the household income measure
+includes OAS, unlike GIS), computed only from FIRE age on, since pre-FIRE CCB is
+assumed already folded into annual savings — CPP/QPP estimation from work history
 (best-39-years rule with the claim-age dropout divisor — early retirement dilutes
 your average, and claiming early dilutes it less than you'd think), OAS from
 residence years and its automatic +10% at 75, CPP 60–70 (QPP to 72) / OAS 65–70
@@ -142,6 +145,10 @@ Work down the left column; every underlined term opens a plain-language explanat
   is gone.
 - **Side income** — optional post-FIRE income (Barista FIRE) with an age range;
   don't subtract it from retirement spending yourself.
+- **Children** — optional, one row per child with their current age; enables the
+  Canada Child Benefit (CCB) from FIRE age on. The CCB you already collect while
+  working is assumed to already be part of annual savings, so nothing is
+  double-counted.
 - **Government benefits** — CPP/QPP and OAS start ages and age-65 amounts, per
   spouse. Not sure of the amounts? Use the built-in estimators (work history for
   CPP, residence years for OAS) or copy the exact figures from My Service Canada
@@ -254,6 +261,13 @@ explanations are clickable too. 39 entries in all three languages.
 - Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
   enhancement (post-2019 contributions — estimates lean conservative for younger
   users), long-term-care cost shocks.
+- The CCB is only calculated from FIRE age on (pre-FIRE CCB is assumed already
+  folded into annual savings); federal only, with no provincial top-ups (e.g.
+  Quebec's Family Allowance) and no Child Disability Benefit; no shared-custody
+  50% split (halve the result yourself if custody is shared); only already-born
+  children can be entered; and — like GIS — it uses this same year's household
+  income with no one-year lag, and the reduction is a continuous formula rather
+  than CRA's rounded flat deduction (within $1 of the official figures).
 - Monte Carlo draws one market shock per year shared by all accounts (accounts are
   fully correlated; what differs is each account's volatility). Success rates are
   sensitive to the return assumption — read them as "odds of never needing to

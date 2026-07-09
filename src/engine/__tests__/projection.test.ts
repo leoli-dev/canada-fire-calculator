@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { incomeTax } from '../tax'
-import { allowanceAnnual } from '../benefits'
+import { allowanceAnnual, ccbAnnual } from '../benefits'
 import type { Inputs } from '../types'
 
 const base: Inputs = {
@@ -877,5 +877,103 @@ describe('planned home purchase', () => {
       principalResidence: { ...planned, buyAtAge: base.currentAge - 5 },
     })
     expect(r.rows.find((x) => x.age === base.currentAge)!.propertyValue).toBeCloseTo(500000 * 1.02, 5)
+  })
+})
+
+describe('ccbAnnual', () => {
+  // CRA's own worked examples (2026-07 to 2027-06 benefit year); the
+  // continuous reduction formula differs from CRA's rounded flat deduction
+  // by less than $1
+  it('matches CRA\'s Martha example: one child under 6', () => {
+    expect(ccbAnnual(1, 0, 45000)).toBeCloseTo(7683.59, 1)
+    const diff = Math.abs(ccbAnnual(1, 0, 100000) - 4485.11)
+    expect(diff).toBeLessThan(1)
+  })
+
+  it('matches CRA\'s Fatima example: two children under 6', () => {
+    expect(ccbAnnual(2, 0, 60000)).toBeCloseTo(13376, 1)
+    const diff = Math.abs(ccbAnnual(2, 0, 125000) - 7889.28)
+    expect(diff).toBeLessThan(1)
+  })
+
+  it('matches CRA\'s Julie example: three children 6-17', () => {
+    expect(ccbAnnual(0, 3, 50000)).toBeCloseTo(18414.03, 1)
+    const diff = Math.abs(ccbAnnual(0, 3, 150000) - 6800.76)
+    expect(diff).toBeLessThan(1)
+  })
+
+  it('matches CRA\'s Kira example: four children 6-17', () => {
+    expect(ccbAnnual(0, 4, 45000)).toBeCloseTo(25976.51, 1)
+    const diff = Math.abs(ccbAnnual(0, 4, 200000) - 6142.47)
+    expect(diff).toBeLessThan(1)
+  })
+
+  it('pays the maximum below the first threshold', () => {
+    expect(ccbAnnual(1, 1, 38237)).toBeCloseTo(8157 + 6883, 2)
+    expect(ccbAnnual(1, 1, 0)).toBeCloseTo(8157 + 6883, 2)
+  })
+
+  it('is zero with no children, and never negative at extreme income', () => {
+    expect(ccbAnnual(0, 0, 0)).toBe(0)
+    expect(ccbAnnual(1, 0, 10_000_000)).toBe(0)
+  })
+
+  it('a child exactly 6 counts as 6-17, not under 6', () => {
+    expect(ccbAnnual(0, 1, 0)).toBeCloseTo(6883, 2)
+  })
+})
+
+describe('CCB (Canada Child Benefit) in runProjection', () => {
+  it('is zero during accumulation regardless of children', () => {
+    const r = runProjection({ ...base, children: [{ age: 5 }] })
+    const accRow = r.rows.find((x) => x.phase === 'accumulation')!
+    expect(accRow.ccb).toBe(0)
+  })
+
+  it('is zero with no children entered', () => {
+    const r = runProjection({ ...base, fireAge: base.currentAge, children: null })
+    expect(r.rows.every((x) => x.ccb === 0)).toBe(true)
+  })
+
+  it('pays a tax-free CCB during the bridge for a low-taxable-income household with a young child', () => {
+    const r = runProjection({
+      ...base,
+      fireAge: 45,
+      retirementSpending: 40000,
+      strategy: 'tfsaFirst',
+      balances: { tfsa: 800000, rrsp: 50000, nonReg: 50000 },
+      children: [{ age: 5 }],
+    })
+    const bridgeRow = r.rows.find((x) => x.age === 46)!
+    expect(bridgeRow.ccb).toBeGreaterThan(0)
+    // CCB is tax-free: shouldn't show up in the tax bill's taxable base
+    expect(bridgeRow.taxablePerPerson).toBeLessThan(bridgeRow.ccb)
+  })
+
+  it('stops the year a child turns 18', () => {
+    const r = runProjection({
+      ...base,
+      fireAge: 45,
+      retirementSpending: 40000,
+      strategy: 'tfsaFirst',
+      balances: { tfsa: 800000, rrsp: 50000, nonReg: 50000 },
+      children: [{ age: 5 }], // turns 18 at age 48 (currentAge 35 + 13)
+    })
+    expect(r.rows.find((x) => x.age === 47)!.ccb).toBeGreaterThan(0)
+    expect(r.rows.find((x) => x.age === 48)!.ccb).toBe(0)
+  })
+
+  it('shrinks as the withdrawal strategy raises taxable income (clawback interacts with strategy)', () => {
+    const withChild = {
+      ...base,
+      fireAge: 45,
+      retirementSpending: 70000,
+      balances: { tfsa: 100000, rrsp: 300000, nonReg: 100000 },
+      children: [{ age: 5 }],
+    }
+    const lowIncome = runProjection({ ...withChild, strategy: 'tfsaFirst' })
+    const highIncome = runProjection({ ...withChild, strategy: 'rrspFirst' })
+    const ccbAt = (r: typeof lowIncome) => r.rows.find((x) => x.age === 46)!.ccb
+    expect(ccbAt(lowIncome)).toBeGreaterThan(ccbAt(highIncome))
   })
 })

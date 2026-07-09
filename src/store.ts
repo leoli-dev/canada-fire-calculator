@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountType, AssetMix, Fhsa, Inputs, Partner, Pension } from './engine'
+import type { AccountType, AssetMix, Child, Fhsa, Inputs, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
 import { track, trackOnce } from './analytics'
 
@@ -69,6 +69,8 @@ export const DEFAULT_FHSA: Fhsa = {
   annualContribution: 8000,
   openedYearsAgo: 0,
 }
+
+export const DEFAULT_CHILD: Child = { age: 5 }
 
 export const WORKSHEET_KEYS = [
   'wsHousing',

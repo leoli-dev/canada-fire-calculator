@@ -172,4 +172,23 @@ describe('validateInputs', () => {
     const ok = { ...base, principalResidence: { ...planned, buyAtAge: 40 } }
     expect(validateInputs(ok)).toEqual([])
   })
+
+  it('flags an empty children list when toggled on', () => {
+    expect(fields({ ...base, children: [] }, 'error')).toContain('children')
+  })
+
+  it('flags more than 8 children', () => {
+    const many = Array.from({ length: 9 }, () => ({ age: 5 }))
+    expect(fields({ ...base, children: many }, 'error')).toContain('children')
+  })
+
+  it('flags a non-integer or out-of-range child age', () => {
+    expect(fields({ ...base, children: [{ age: 5.5 }] }, 'error')).toContain('children.0.age')
+    expect(fields({ ...base, children: [{ age: -1 }] }, 'error')).toContain('children.0.age')
+    expect(fields({ ...base, children: [{ age: 18 }] }, 'error')).toContain('children.0.age')
+  })
+
+  it('accepts a well-formed children list', () => {
+    expect(validateInputs({ ...base, children: [{ age: 5 }, { age: 10 }] })).toEqual([])
+  })
 })

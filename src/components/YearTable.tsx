@@ -14,6 +14,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   const rows = props.result.rows.filter((r) => r.phase !== 'accumulation')
   if (rows.length === 0) return null
   const hasGis = rows.some((r) => r.gis > 0)
+  const hasCcb = rows.some((r) => r.ccb > 0)
   const hasRent = rows.some((r) => r.rent > 0)
   const hasExtra = rows.some((r) => r.extraIncome > 0)
   const hasDebt = rows.some((r) => r.debtPayment > 0 || r.debtBalance > 0)
@@ -34,6 +35,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
               <th>{t('cppLabel')}</th>
               <th>{t('oasLabel')}</th>
               {hasGis && <th><Jargon text={t('gisLabel')} /></th>}
+              {hasCcb && <th><Jargon text={t('ccbLabel')} /></th>}
               {hasRent && <th><Jargon text={t('rentLabel')} /></th>}
               {hasExtra && <th><Jargon text={t('extraIncomeLabel')} /></th>}
               <th>{t('colGross')}</th>
@@ -48,7 +50,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
             {rows.map((r) => {
               const gross =
                 r.withdrawals.rrsp + r.withdrawals.nonReg + r.withdrawals.tfsa +
-                r.cpp + r.oas + r.gis + r.rent + r.extraIncome
+                r.cpp + r.oas + r.gis + r.ccb + r.rent + r.extraIncome
               const rate = marginalRate(r.taxablePerPerson, props.inputs.province)
               return (
                 <tr key={r.age} className={r.phase === 'pension' ? '' : 'bridge-row'}>
@@ -62,6 +64,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
                   <td className="num">{cad(r.cpp)}</td>
                   <td className="num">{cad(r.oas)}</td>
                   {hasGis && <td className="num">{cad(r.gis)}</td>}
+                  {hasCcb && <td className="num">{cad(r.ccb)}</td>}
                   {hasRent && <td className="num">{cad(r.rent)}</td>}
                   {hasExtra && <td className="num">{cad(r.extraIncome)}</td>}
                   <td className="num strong">{cad(gross)}</td>

@@ -178,6 +178,19 @@ export interface Fhsa {
   openedYearsAgo: number
 }
 
+/**
+ * A child for Canada Child Benefit purposes.
+ *
+ * Not modelled (disclosed simplifications): CCB during the accumulation
+ * years (assumed already folded into `annualSavings`, so it's only computed
+ * from FIRE age on), provincial top-ups (e.g. Quebec's Family Allowance),
+ * the Child Disability Benefit, and shared-custody 50% splitting.
+ */
+export interface Child {
+  /** current age in years, 0-17 (unborn/future children aren't modelled) */
+  age: number
+}
+
 export interface InvestmentProperty {
   value: number
   /** adjusted cost base; gain above it is 50% taxable at sale */
@@ -258,6 +271,8 @@ export interface Inputs {
   debts?: Debt[]
   /** FHSA lightweight side account; null/undefined = not using one */
   fhsa?: Fhsa | null
+  /** children for CCB purposes; only pays out from FIRE age on (see Child) */
+  children?: Child[] | null
 }
 
 /**
@@ -290,6 +305,9 @@ export interface YearRow {
   oas: number
   /** GIS received — tax-free, requires OAS, income-tested (TFSA invisible) */
   gis: number
+  /** CCB received this year — tax-free; 0 during accumulation (assumed
+   * already folded into annualSavings) and once all children turn 18 */
+  ccb: number
   /** net rent received from unsold investment properties (taxable) */
   rent: number
   /** post-FIRE side income received this year (taxable) */

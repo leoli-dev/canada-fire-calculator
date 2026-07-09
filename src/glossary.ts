@@ -49,6 +49,7 @@ export const TERMS: TermDef[] = [
   { id: 'qclevies', patterns: ['RAMQ', 'FSS', 'Fonds des services de santé', 'régime d’assurance médicaments', "régime d'assurance médicaments"] },
   { id: 'fhsa', patterns: ['FHSA', 'CELIAPP', '首套房储蓄账户'] },
   { id: 'hbp', patterns: ['HBP', 'RAP', '购房计划', "Home Buyers' Plan", "home buyers' plan", "Régime d'accession à la propriété", "régime d'accession à la propriété"] },
+  { id: 'ccb', patterns: ['CCB', 'ACE', '牛奶金', 'Canada Child Benefit', 'canada child benefit', "Allocation canadienne pour enfants", "allocation canadienne pour enfants"] },
 ]
 
 const ALL = TERMS.flatMap((t) => t.patterns.map((p) => ({ p, id: t.id }))).sort(

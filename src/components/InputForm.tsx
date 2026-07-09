@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  DEFAULT_CHILD,
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
   DEFAULT_PARTNER,
@@ -239,6 +240,57 @@ export function InputForm() {
               issue={issueFor('extraIncome.toAge')}
               onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, toAge: v } })} />
             <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
+          </>
+        )}
+
+        <label className="field">
+          <span><Jargon text={t('childrenToggle')} /></span>
+          <input
+            type="checkbox"
+            checked={!!inputs.children}
+            onChange={(e) => {
+              set({ children: e.target.checked ? [{ ...DEFAULT_CHILD }] : null })
+              track('children_toggle', { enabled: e.target.checked })
+            }}
+          />
+        </label>
+        {inputs.children && (
+          <>
+            {inputs.children.map((c, i) => (
+              <div className="property-card" key={i}>
+                <p className="subhead property-head">
+                  {t('childCard', { n: i + 1 })}
+                  <button
+                    type="button"
+                    className="remove-item"
+                    onClick={() => {
+                      set({ children: inputs.children!.filter((_, j) => j !== i) })
+                      track('remove_child')
+                    }}
+                  >
+                    {t('removeItem')}
+                  </button>
+                </p>
+                <Num label={t('childAge')} value={c.age}
+                  issue={issueFor(`children.${i}.age`)}
+                  onChange={(v) => {
+                    const next = [...inputs.children!]
+                    next[i] = { age: v }
+                    set({ children: next })
+                  }} />
+              </div>
+            ))}
+            <button
+              type="button"
+              className="add-item"
+              onClick={() => {
+                set({ children: [...inputs.children!, { ...DEFAULT_CHILD }] })
+                track('add_child')
+              }}
+            >
+              {t('addChild')}
+            </button>
+            <p className="hint"><Jargon text={t('childrenNote')} /></p>
           </>
         )}
       </fieldset>

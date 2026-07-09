@@ -8,11 +8,13 @@ export {
   estimateOasAt65,
   allowanceAnnual,
   gisAnnual,
+  ccbAnnual,
   CPP_MAX_AT_65,
   OAS_FULL_AT_65,
   GIS_SINGLE,
   GIS_COUPLE,
   ALLOWANCE,
+  CCB,
 } from './benefits'
 export { rrifMinFactor } from './rrif'
 export { validateInputs, type ValidationIssue, type Severity } from './validate'

@@ -171,6 +171,16 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       err('fhsa.annualContribution', 'valFhsaExceedsSavings')
   }
 
+  const children = inputs.children
+  if (children) {
+    if (children.length === 0) err('children', 'valChildrenEmpty')
+    if (children.length > 8) err('children', 'valChildrenMax', { max: 8 })
+    children.forEach((c, i) => {
+      if (!Number.isInteger(c.age) || c.age < 0 || c.age > 17)
+        err(`children.${i}.age`, 'valChildAgeRange')
+    })
+  }
+
   const ips = inputs.investmentProperties ?? []
   ips.forEach((ip, i) => {
     const at = (f: string) => `investmentProperties.${i}.${f}`

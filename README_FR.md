@@ -106,7 +106,11 @@ prêt et laisse l'inflation éroder les paiements nominaux fixes — les paiemen
 s'ajoutent aux dépenses de retraite jusqu'au remboursement, les soldes réduisent
 la valeur nette et la succession), **revenu d'appoint Barista-FIRE** sur une
 plage d'âges choisie (avec l'exemption officielle du SRG pour revenu de travail),
-estimation RPC/RRQ selon l'historique de travail (règle des 39 meilleures années
+l'**Allocation canadienne pour enfants (ACE)** pour les ménages avec enfants —
+non imposable, testée selon le revenu comme le SRG (mais la mesure du revenu
+inclut la SV, contrairement au SRG), calculée seulement à partir de l'âge FIRE,
+puisque l'ACE reçue avant FIRE est supposée déjà incluse dans les économies
+annuelles, estimation RPC/RRQ selon l'historique de travail (règle des 39 meilleures années
 avec diviseur ajusté à l'âge de demande), SV selon les années de résidence et son
 +10 % automatique à 75 ans, tableaux complets des âges de début RPC 60-70 (RRQ
 jusqu'à 72) / SV 65-70, frais de placement (RFG), et simulation Monte-Carlo
@@ -153,6 +157,10 @@ langage clair (voir le tiroir-glossaire ci-dessous).
   paiements aux dépenses de retraite jusqu'au remboursement de chaque prêt.
 - **Revenu d'appoint** — revenu post-FIRE optionnel (Barista FIRE) avec une
   plage d'âges; ne le soustrayez pas vous-même des dépenses de retraite.
+- **Enfants** — optionnel, une ligne par enfant avec son âge actuel; active
+  l'Allocation canadienne pour enfants (ACE) à partir de l'âge FIRE. L'ACE déjà
+  reçue en travaillant est supposée déjà incluse dans les économies annuelles,
+  donc rien n'est compté deux fois.
 - **Prestations gouvernementales** — âges de début et montants à 65 ans RPC/RRQ
   et SV, par conjoint, avec estimateurs intégrés (historique de travail pour le
   RPC, années de résidence pour la SV).
@@ -268,6 +276,15 @@ langues.
 - Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
   du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
   chocs de soins de longue durée.
+- L'ACE n'est calculée qu'à partir de l'âge FIRE (l'ACE reçue avant FIRE est
+  supposée déjà incluse dans les économies annuelles); fédérale seulement, sans
+  compléments provinciaux (p. ex. l'Allocation famille du Québec) ni Prestation
+  pour enfants handicapés; pas de partage 50/50 en garde partagée (divisez le
+  résultat vous-même le cas échéant); seuls les enfants déjà nés peuvent être
+  saisis; et comme le SRG, elle utilise le revenu du ménage de l'année même sans
+  décalage d'un an, avec une réduction calculée par une formule continue plutôt
+  que la déduction forfaitaire arrondie de l'ARC (à moins de 1 $ des chiffres
+  officiels).
 - Monte-Carlo tire un choc de marché par année, partagé par tous les comptes
   (corrélation complète). Le taux de réussite est sensible à l'hypothèse de
   rendement — lisez-le comme « probabilité de ne jamais devoir s'ajuster ».

@@ -138,6 +138,44 @@ export function gisAnnual(
   return Math.max(0, GIS_SINGLE.max * (1 - income / GIS_SINGLE.cutoff))
 }
 
+/**
+ * Canada Child Benefit, July 2026-June 2027 benefit year (based on 2025
+ * AFNI) — update annually. Tax-free; reduces from the maximum as adjusted
+ * family net income (AFNI) rises past `th1`, then again past `th2`, at
+ * rates that depend on the number of eligible children (index 0 = one
+ * child, ... index 3 = four or more). `rate1`/`rate2` are a continuous
+ * two-segment line replacing CRA's rounded flat deduction at th2 (differs
+ * from the official figure by at most $1 — verified against all four of
+ * CRA's own worked examples).
+ *
+ * AFNI here is approximated by the engine's household taxable income
+ * (`totalTaxable`, includes OAS unlike the GIS income test; excludes TFSA
+ * withdrawals) for the *same* year — no one-year lag like the real CRA
+ * benefit-year mechanics (same simplification as GIS). Federal only: no
+ * provincial top-ups (e.g. Quebec's Family Allowance), no Child Disability
+ * Benefit, no shared-custody 50% split, no eligibility/residency checks.
+ */
+export const CCB = {
+  maxUnder6: 8157,
+  max6to17: 6883,
+  th1: 38237,
+  th2: 82847,
+  rate1: [0.07, 0.135, 0.19, 0.23],
+  rate2: [0.032, 0.057, 0.08, 0.095],
+}
+
+/** Annual household CCB for the given child counts and AFNI approximation. */
+export function ccbAnnual(nUnder6: number, n6to17: number, afni: number): number {
+  const n = nUnder6 + n6to17
+  if (n <= 0) return 0
+  const idx = Math.min(n, 4) - 1
+  const max = nUnder6 * CCB.maxUnder6 + n6to17 * CCB.max6to17
+  const band1 = Math.max(0, Math.min(afni, CCB.th2) - CCB.th1)
+  const band2 = Math.max(0, afni - CCB.th2)
+  const reduction = CCB.rate1[idx] * band1 + CCB.rate2[idx] * band2
+  return Math.max(0, max - reduction)
+}
+
 export const OAS_CLAWBACK_THRESHOLD = 95323
 export const OAS_CLAWBACK_RATE = 0.15
 

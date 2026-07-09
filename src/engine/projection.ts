@@ -14,6 +14,7 @@ import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import {
   OAS_CLAWBACK_THRESHOLD,
   allowanceAnnual,
+  ccbAnnual,
   cppAnnual,
   earlyClaimDilutionRelief,
   gisAnnual,
@@ -63,6 +64,8 @@ interface WithdrawalOutcome {
   oasNet: number
   /** GIS received (tax-free, income-tested on taxable income excl. OAS) */
   gis: number
+  /** CCB received (tax-free, income-tested on taxable income incl. OAS) */
+  ccb: number
   netCash: number
 }
 
@@ -92,6 +95,8 @@ function evaluate(
   extraTaxable: number,
   rent: number,
   extraIncome: number,
+  nUnder6: number,
+  n6to17: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
@@ -149,12 +154,14 @@ function evaluate(
   const gis =
     gisAnnual(receivingOas, gisIncome, extraIncome) +
     allowanceAnnual(receivingOas, agesPerPerson, gisIncome)
-  const netCash =
-    cpp + pension + oasNet + gis + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
+  // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
+  const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
+  const netCash =
+    cpp + pension + oasNet + gis + ccb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   const taxablePerPerson = totalTaxable / persons
-  return { withdrawals: w, tax, rrspTax, oasNet, gis, netCash, taxablePerPerson }
+  return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson }
 }
 
 /** Binary-search the gross withdrawal needed to hit the spending target. */
@@ -170,12 +177,14 @@ function solveWithdrawals(
   extraTaxable: number,
   rent: number,
   extraIncome: number,
+  nUnder6: number,
+  n6to17: number,
   steps: Step[],
   inputs: Inputs,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, steps, inputs)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, nUnder6, n6to17, steps, inputs)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -287,6 +296,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let cpp = 0
     let oas = 0
     let gis = 0
+    let ccb = 0
     let tax = 0
     let netCash = 0
     let shortfall = 0
@@ -299,6 +309,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let dpAccumTax = 0
     let dpAccumTaxable = 0
     const yearIdx = age - inputs.currentAge
+
+    // CCB-eligible children this year (see Child); only used in the
+    // retirement branch below — accumulation-year CCB is assumed already
+    // folded into annualSavings
+    const childAges = (inputs.children ?? [])
+      .map((c) => c.age + yearIdx)
+      .filter((a) => a >= 0 && a < 18)
+    const nUnder6 = childAges.filter((a) => a < 6).length
+    const n6to17 = childAges.length - nUnder6
 
     // future home purchase: the down payment is funded FHSA → TFSA →
     // non-registered → RRSP (fixed order, not configurable). FHSA collapses
@@ -555,13 +574,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const out = solveWithdrawals(
         spendTarget, bal, forcedRrsp, gainFraction, cpp, pension,
         oasGrossPerPerson, agesPerPerson, extraTaxable, rent,
-        extraIncome, steps, inputs,
+        extraIncome, nUnder6, n6to17, steps, inputs,
       )
       withdrawals = out.withdrawals
       tax = out.tax
       rrspTaxTotal += out.rrspTax
       oas = out.oasNet
       gis = out.gis
+      ccb = out.ccb
       netCash = out.netCash
       taxablePerPerson = out.taxablePerPerson ?? 0
 
@@ -629,7 +649,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     rows.push({
       age, phase,
       balances: { ...bal },
-      withdrawals, cpp, oas, gis, rent,
+      withdrawals, cpp, oas, gis, ccb, rent,
       extraIncome: phase === 'accumulation' ? 0 : extraIncome,
       pension,
       tax, netCash, shortfall,
