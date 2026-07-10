@@ -268,6 +268,10 @@ explanations are clickable too. 39 entries in all three languages.
   children can be entered; and — like GIS — it uses this same year's household
   income with no one-year lag, and the reduction is a continuous formula rather
   than CRA's rounded flat deduction (within $1 of the official figures).
+- **RESPs aren't modelled at all.** The money belongs to the child's education,
+  not your retirement, so it's out of scope rather than folded into an account.
+  If you have RESP savings, don't add the balance to TFSA/non-registered/RRSP —
+  doing so would inflate your projected retirement assets.
 - Monte Carlo draws one market shock per year shared by all accounts (accounts are
   fully correlated; what differs is each account's volatility). Success rates are
   sensitive to the return assumption — read them as "odds of never needing to

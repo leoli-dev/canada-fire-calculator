@@ -285,6 +285,11 @@ langues.
   décalage d'un an, avec une réduction calculée par une formule continue plutôt
   que la déduction forfaitaire arrondie de l'ARC (à moins de 1 $ des chiffres
   officiels).
+- **Le REEE n'est pas modélisé du tout.** Cet argent est destiné aux études de
+  l'enfant, pas à votre retraite — il est donc hors périmètre plutôt que
+  rattaché à un compte existant. Si vous avez un solde REEE, ne l'ajoutez pas à
+  votre CELI/non enregistré/REER : cela gonflerait artificiellement vos actifs
+  de retraite projetés.
 - Monte-Carlo tire un choc de marché par année, partagé par tous les comptes
   (corrélation complète). Le taux de réussite est sensible à l'hypothèse de
   rendement — lisez-le comme « probabilité de ne jamais devoir s'ajuster ».
