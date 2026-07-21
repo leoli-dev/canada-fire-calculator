@@ -22,16 +22,18 @@ export function findEarliestFireAge(inputs: Inputs): number | null {
 
 /**
  * Mode "what's my FIRE number": total portfolio needed at the FIRE age
- * (allocated in the same proportions as today's balances) for the plan to
+ * (allocated in the same proportions as today's balances, including an
+ * optional locked DC/LIRA side account) for the plan to
  * succeed with no further savings.
  */
 export function requiredFireAssets(inputs: Inputs): number {
   const b = inputs.balances
-  const total = b.tfsa + b.rrsp + b.nonReg
+  const lockedBalance = inputs.lockedRetirement?.balance ?? 0
+  const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
   const prop =
     total > 0
-      ? { tfsa: b.tfsa / total, rrsp: b.rrsp / total, nonReg: b.nonReg / total }
-      : { tfsa: 1 / 3, rrsp: 1 / 3, nonReg: 1 / 3 }
+      ? { tfsa: b.tfsa / total, rrsp: b.rrsp / total, nonReg: b.nonReg / total, locked: lockedBalance / total }
+      : { tfsa: 1 / 3, rrsp: 1 / 3, nonReg: 1 / 3, locked: 0 }
   const bookRatio = b.nonReg > 0 ? inputs.nonRegBook / b.nonReg : 1
   const yearsToFire = inputs.fireAge - inputs.currentAge
 
@@ -66,6 +68,9 @@ export function requiredFireAssets(inputs: Inputs): number {
       annualSavings: 0,
       balances: { tfsa: T * prop.tfsa, rrsp: T * prop.rrsp, nonReg: T * prop.nonReg },
       nonRegBook: T * prop.nonReg * bookRatio,
+      lockedRetirement: inputs.lockedRetirement
+        ? { ...inputs.lockedRetirement, balance: T * prop.locked, employeeContribution: 0, employerContribution: 0 }
+        : null,
       partner: inputs.partner
         ? { ...inputs.partner, currentAge: inputs.partner.currentAge + yearsToFire }
         : inputs.partner,
@@ -184,7 +189,8 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
   const persons = inputs.partner ? 2 : 1
   const marginal = inputs.accumulationMarginalRate ?? 0.35
 
-  let total = bal.tfsa + bal.rrsp + bal.nonReg
+  let lockedBal = inputs.lockedRetirement?.balance ?? 0
+  let total = bal.tfsa + bal.rrsp + bal.nonReg + lockedBal
   let assetsAtFire = total
   let reachedAge: number | null = total >= target ? inputs.currentAge : null
 
@@ -207,7 +213,11 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     // assets entering FIRE plus any sale landing that year — snapshot before
     // this iteration adds a further year of savings and growth (recording at
     // year-end wrongly credited a whole extra working year)
-    if (age === inputs.fireAge) assetsAtFire = bal.tfsa + bal.rrsp + bal.nonReg
+    if (inputs.lockedRetirement && lockedBal > 0 && age >= inputs.lockedRetirement.accessibleAge) {
+      bal.rrsp += lockedBal
+      lockedBal = 0
+    }
+    if (age === inputs.fireAge) assetsAtFire = bal.tfsa + bal.rrsp + bal.nonReg + lockedBal
     // mirror the projection's accumulation-phase tax drag on distributions,
     // and save the after-tax rent from properties still held (a linked
     // mortgage's interest, capped at the rent, is deductible against it)
@@ -249,12 +259,17 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
       bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
+    if (lockedBal > 0) {
+      lockedBal += inputs.lockedRetirement?.employeeContribution ?? 0
+      lockedBal += inputs.lockedRetirement?.employerContribution ?? 0
+      lockedBal *= 1 + inputs.returns.rrsp - (inputs.fees ?? 0)
+    }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation
     }
 
-    total = bal.tfsa + bal.rrsp + bal.nonReg
+    total = bal.tfsa + bal.rrsp + bal.nonReg + lockedBal
     if (reachedAge === null && total >= target) reachedAge = age
     if (age >= inputs.fireAge && reachedAge !== null) break
   }

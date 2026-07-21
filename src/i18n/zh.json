@@ -32,13 +32,26 @@
   "pensionStartAge": "养老金起领年龄",
   "pensionIndexation": "通胀指数化比例（%）",
   "pensionBridge": "过桥金，付到 65 岁止（$/年，0 = 无）",
-  "pensionNote": "填 pension statement 上的终身年领取额（若提前开领，填折减后的金额）。持有 DC（固定缴款）计划或 LIRA？把余额加进 RRSP/RRIF 栏即可——投影方式相同。养老金按合格养老金收入计税：任何年龄都可与配偶收入分割、并享受养老金收入抵免。未建模：遗属比例，以及魁省省税要求 65 岁后才能分割的限制。",
+  "pensionNote": "填 pension statement 上的终身年领取额（若提前开领，填折减后的金额）。DC（固定缴款）或 LIRA 余额请填到独立的 Locked DC/LIRA 账户，不要混入 RRSP/RRIF。养老金按合格养老金收入计税：任何年龄都可与配偶收入分割、并享受养老金收入抵免。未建模：遗属比例，以及魁省省税要求 65 岁后才能分割的限制。",
   "pensionLabel": "雇主养老金",
   "valPensionWindow": "起领年龄应在 {{min}}–{{max}} 之间",
   "valPensionIndexation": "指数化比例应在 0–100% 之间",
   "valBridgeAfter65": "过桥金只付到 65 岁——65 岁及以后起领则永远不会发放",
   "tfsa": "TFSA 免税账户",
   "rrsp": "RRSP / RRIF",
+  "lockedRetirementToggle": "使用锁定的 DC 养老金 / LIRA 账户",
+  "lockedRetirementBalance": "当前锁定余额",
+  "lockedRetirementEmployee": "本人年度缴款（从年度储蓄中扣除）",
+  "lockedRetirementEmployer": "雇主年度缴款 / match（年度储蓄以外）",
+  "lockedRetirementAge": "计划规定的最早提款年龄",
+  "lockedRetirementJurisdiction": "原养老金适用辖区（为后续规则保留）",
+  "lockedRetirementOwner": "账户持有人",
+  "lockedJur_federal": "联邦",
+  "lockedRetirementNote": "到达上述年龄前，余额会继续增长但绝不能用于支出；从该年龄起，v1 按普通全额应税注册账户处理。此处保存辖区，但 v1 不建模 LIF 年度最低/最高提款、特殊解锁或一次性 50% 解锁。",
+  "lockedRetirementLabel": "锁定 DC / LIRA",
+  "valLockedAccessAge": "最早提款年龄须在 {{min}}–{{max}} 之间",
+  "valLockedPartnerMissing": "未开启配偶模式前，账户持有人只能选本人",
+  "valLockedEmployeeExceedsSavings": "本人 DC 缴款不能高于年度储蓄",
   "nonReg": "非注册账户",
   "nonRegBook": "非注册账户成本基础（ACB）",
   "nonRegBookHint": "券商对账单上叫 book cost / book value；实在查不到可先按余额的 80% 估算，差异只影响非注册取款的利得税精度。",
@@ -342,7 +355,11 @@
     },
     "dbpension": {
       "title": "雇主养老金（DB/DC）",
-      "body": "雇主注册养老金分两类。DB（固定收益）：按公式给付终身年金——常见为 2% × 服务年数 × 最高五年平均工资——可能按 CPI 指数化，可能带付到 65 岁的过桥金。DC（固定缴款）：本质是投资账户，请把余额填进 RRSP/RRIF 栏而不是这里。远早于退休离职（FIRE 场景）通常二选一：递延养老金，或把折算现值（commuted value）转入锁定账户（LIRA）——税法对免税转移设上限，超出部分按应税现金发放。养老金全额应税、计入 OAS clawback 和 GIS 收入测试，但任何年龄都算'合格养老金收入'：可与配偶 50/50 分割，并享受养老金收入抵免。"
+      "body": "雇主注册养老金分两类。DB（固定收益）：按公式给付终身年金——常见为 2% × 服务年数 × 最高五年平均工资——可能按 CPI 指数化，可能带付到 65 岁的过桥金。DC（固定缴款）是投资账户，离职后通常会锁定为 LIRA；请把余额填入独立的锁定 DC/LIRA 账户，而非 RRSP/RRIF。v1 在计划规定的最早提款年龄前只让它增长、不能用于支出；之后按普通全额应税注册资金处理。LIF 年度最低/最高提款与特殊解锁未建模。"
+    },
+    "lockedretirement": {
+      "title": "锁定 DC 养老金 / LIRA",
+      "body": "DC 养老金或 LIRA 是税延退休资金，通常不能像 RRSP 一样自由动用。本计算器 v1 使用 plan statement 上的最早提款年龄：之前余额可增长但提款能力为零；到龄后才进入普通全额应税注册账户的提款路径。原养老金适用辖区会保存，为以后 LIF 模型预留；本版刻意不建模各辖区年度最低/最高提款、困难或小余额解锁，以及一次性 50% 解锁。"
     },
     "bridgebenefit": {
       "title": "过桥金（Bridge benefit）",

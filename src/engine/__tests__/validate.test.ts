@@ -53,6 +53,17 @@ describe('validateInputs', () => {
     expect(f).toContain('nonRegBook')
   })
 
+  it('validates locked DC/LIRA access age, owner and employee contribution', () => {
+    const issues = validateInputs({
+      ...base,
+      lockedRetirement: { balance: 1, employeeContribution: base.annualSavings + 1, employerContribution: 0,
+        accessibleAge: base.currentAge - 1, jurisdiction: 'ON', owner: 'partner' },
+    })
+    expect(issues.map((i) => i.key)).toEqual(expect.arrayContaining([
+      'valLockedAccessAge', 'valLockedPartnerMissing', 'valLockedEmployeeExceedsSavings',
+    ]))
+  })
+
   it('enforces CPP claim window, honouring the QPP 72 cap', () => {
     expect(fields({ ...base, cppStartAge: 59 }, 'error')).toContain('cppStartAge')
     expect(fields({ ...base, cppStartAge: 71 }, 'error')).toContain('cppStartAge')

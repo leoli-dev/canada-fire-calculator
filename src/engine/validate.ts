@@ -46,6 +46,9 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     ['cppAnnualAt65', inputs.cppAnnualAt65],
     ['oasAnnualAt65', inputs.oasAnnualAt65],
     ['fireTargetAssets', inputs.fireTargetAssets],
+    ['lockedRetirement.balance', inputs.lockedRetirement?.balance],
+    ['lockedRetirement.employeeContribution', inputs.lockedRetirement?.employeeContribution],
+    ['lockedRetirement.employerContribution', inputs.lockedRetirement?.employerContribution],
   ]
   for (const [field, v] of nonNegative) {
     if (v != null && v < 0) err(field, 'valNegative')
@@ -101,6 +104,15 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
   }
   if (inputs.pension) checkPension(inputs.pension, 'pension')
   if (p?.pension) checkPension(p.pension, 'partner.pension')
+
+  const locked = inputs.lockedRetirement
+  if (locked) {
+    if (locked.owner === 'partner' && !p) err('lockedRetirement.owner', 'valLockedPartnerMissing')
+    if (locked.accessibleAge < inputs.currentAge || locked.accessibleAge > AGE_MAX)
+      err('lockedRetirement.accessibleAge', 'valLockedAccessAge', { min: inputs.currentAge, max: AGE_MAX })
+    if (locked.employeeContribution > inputs.annualSavings)
+      err('lockedRetirement.employeeContribution', 'valLockedEmployeeExceedsSavings')
+  }
 
   const debts = inputs.debts ?? []
   debts.forEach((d, i) => {

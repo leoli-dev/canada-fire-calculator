@@ -32,13 +32,26 @@
   "pensionStartAge": "Pension start age",
   "pensionIndexation": "Inflation indexing (% of CPI)",
   "pensionBridge": "Bridge benefit until 65 ($/yr, 0 = none)",
-  "pensionNote": "Enter the lifetime annual amount from your pension statement (already reduced for an early start, if that applies). Have a defined-contribution (DC) plan or a LIRA instead? Add its balance to the RRSP/RRIF field — it projects the same way here. Payments are taxed as eligible pension income: splittable with a spouse and earning the pension income credit at any age. Not modelled: survivor percentages and Quebec's 65+ provincial splitting restriction.",
+  "pensionNote": "Enter the lifetime annual amount from your pension statement (already reduced for an early start, if that applies). DC/LIRA money belongs in the separate Locked DC/LIRA account, not RRSP/RRIF. Payments are taxed as eligible pension income: splittable with a spouse and earning the pension income credit at any age. Not modelled: survivor percentages and Quebec's 65+ provincial splitting restriction.",
   "pensionLabel": "Employer pension",
   "valPensionWindow": "Pension start age should be between {{min}} and {{max}}",
   "valPensionIndexation": "Indexing must be between 0% and 100%",
   "valBridgeAfter65": "The bridge benefit ends at 65 — starting at 65 or later means it never pays out",
   "tfsa": "TFSA",
   "rrsp": "RRSP / RRIF",
+  "lockedRetirementToggle": "Use a locked DC pension / LIRA account",
+  "lockedRetirementBalance": "Current locked balance",
+  "lockedRetirementEmployee": "Your annual contribution (carved out of annual savings)",
+  "lockedRetirementEmployer": "Employer annual contribution / match (extra to annual savings)",
+  "lockedRetirementAge": "Earliest withdrawal age from your plan",
+  "lockedRetirementJurisdiction": "Original pension jurisdiction (saved for future rules)",
+  "lockedRetirementOwner": "Account owner",
+  "lockedJur_federal": "Federal",
+  "lockedRetirementNote": "Before the age above, this balance grows but cannot fund spending. From that age, v1 treats it like an ordinary taxable registered account. The selected jurisdiction is retained, but v1 does not model LIF annual minimums/maximums, special unlocking, or the 50% unlocking option.",
+  "lockedRetirementLabel": "Locked DC / LIRA",
+  "valLockedAccessAge": "Earliest withdrawal age must be between {{min}} and {{max}}",
+  "valLockedPartnerMissing": "Choose yourself as owner until partner mode is enabled",
+  "valLockedEmployeeExceedsSavings": "Your DC contribution cannot exceed annual savings",
   "nonReg": "Non-registered",
   "nonRegBook": "Non-registered cost base (ACB)",
   "nonRegBookHint": "Called \"book cost\" or \"book value\" on your brokerage statement. Can't find it? Estimate 80% of the current balance as a starting point - it only affects the precision of capital-gains tax on non-registered withdrawals.",
@@ -342,7 +355,11 @@
     },
     "dbpension": {
       "title": "Employer pension (DB/DC)",
-      "body": "Workplace registered pension plans come in two kinds. Defined benefit (DB): a formula — often 2% × years of service × best-5-year average salary — pays a lifetime annuity, sometimes indexed to CPI, sometimes with a bridge benefit to 65. Defined contribution (DC): an investment account; enter its balance in the RRSP/RRIF field instead of here. Leaving long before retirement (the FIRE case) usually offers a choice between a deferred pension and transferring the commuted value into a locked-in account (LIRA) — tax law caps the sheltered transfer, and the excess is paid out as taxable cash. Pension payments are fully taxable, count toward the OAS clawback and the GIS income test, but are 'eligible pension income' at any age: splittable 50/50 with a spouse and earning the pension income credit."
+      "body": "Workplace registered pension plans come in two kinds. Defined benefit (DB): a formula — often 2% × years of service × best-5-year average salary — pays a lifetime annuity, sometimes indexed to CPI, sometimes with a bridge benefit to 65. Defined contribution (DC): an investment account that is often locked in on leaving employment, for example as a LIRA. Enter that balance in the separate Locked DC/LIRA account, not RRSP/RRIF. In v1 it grows but cannot fund spending before the plan's stated earliest withdrawal age; afterwards it is treated as ordinary taxable registered money. LIF annual minimums/maximums and special unlocking are not modelled."
+    },
+    "lockedretirement": {
+      "title": "Locked DC pension / LIRA",
+      "body": "A DC pension or Locked-in Retirement Account (LIRA) is tax-deferred retirement money that generally cannot be freely spent like an RRSP. This calculator's v1 boundary model uses the earliest withdrawal age on your plan statement: before that age, the balance can grow but has zero withdrawal capacity; from that age onward it enters the ordinary taxable registered withdrawal path. The original pension jurisdiction is stored for a later LIF model, but v1 deliberately does not model jurisdictional annual minimums/maximums, hardship or small-balance unlocking, or one-time 50% unlocking."
     },
     "bridgebenefit": {
       "title": "Bridge benefit",

@@ -88,8 +88,8 @@ soutenables maximales.
 par conjoint (rente viagère à un âge de début choisi, indexation partielle à
 l'IPC, et une prestation de raccordement qui cesse à 65 ans — imposée comme
 revenu de pension, fractionnable à tout âge, visible pour la récupération de la
-SV et le SRG; les régimes CD et les CRI se saisissent plutôt comme soldes de
-comptes), un compte **CELIAPP** combiné du ménage (les cotisations sont
+SV et le SRG; un compte distinct **CD/CRI bloqué** exclut l'argent immobilisé
+du pont jusqu'à l'âge de retrait du régime), un compte **CELIAPP** combiné du ménage (les cotisations sont
 prélevées sur l'épargne annuelle, la croissance suit l'hypothèse REER, et il se
 transfère toujours libre d'impôt — soit vers l'achat d'une maison, soit, à
 défaut, vers le REER au plus tôt de 15 ans après l'ouverture ou 71 ans), vente
@@ -167,8 +167,8 @@ langage clair (voir le tiroir-glossaire ci-dessous).
 - **Rente d'employeur** — optionnelle, par conjoint : le montant annuel viager
   indiqué sur votre relevé de retraite (déjà réduit pour un début anticipé),
   l'âge de début, le pourcentage d'indexation à l'IPC, et toute prestation de
-  raccordement (versée jusqu'à 65 ans). Un régime CD ou un CRI ? Ajoutez plutôt
-  son solde au champ REER/FERR — il se projette de la même façon.
+  raccordement (versée jusqu'à 65 ans). Un régime CD ou un CRI ? Utilisez plutôt
+  le compte CD/CRI bloqué; il reste indisponible jusqu'à l'âge minimal saisi.
 
 ## Comment lire les résultats
 

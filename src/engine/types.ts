@@ -179,6 +179,27 @@ export interface Fhsa {
 }
 
 /**
+ * A DC pension balance that is, or will become, locked in (for example in a
+ * LIRA).  It deliberately remains outside the ordinary RRSP bucket until the
+ * plan's stated earliest withdrawal age.  v1 does not attempt LIF minimums,
+ * maximums, or statutory unlocking rules; `jurisdiction` is retained for that
+ * future extension.
+ */
+export interface LockedRetirement {
+  balance: number
+  /** employee contribution, carved out of annualSavings while still working */
+  employeeContribution: number
+  /** employer match/DC contribution, additional to annualSavings */
+  employerContribution: number
+  /** earliest age at which this plan can be used for spending */
+  accessibleAge: number
+  /** retained for future jurisdictional LIF rules; not used by v1 */
+  jurisdiction: 'federal' | Province
+  /** who owns it; v1 household tax splitting remains the app-wide approximation */
+  owner: 'self' | 'partner'
+}
+
+/**
  * A child for Canada Child Benefit purposes.
  *
  * Not modelled (disclosed simplifications): CCB during the accumulation
@@ -271,6 +292,8 @@ export interface Inputs {
   debts?: Debt[]
   /** FHSA lightweight side account; null/undefined = not using one */
   fhsa?: Fhsa | null
+  /** DC/LIRA side account; unavailable until accessibleAge, then RRSP-like */
+  lockedRetirement?: LockedRetirement | null
   /** children for CCB purposes; only pays out from FIRE age on (see Child) */
   children?: Child[] | null
 }
@@ -323,6 +346,8 @@ export interface YearRow {
   propertyValue: number
   /** end-of-year FHSA balance; 0 once it has matured into the RRSP or been spent on a home */
   fhsaBalance: number
+  /** end-of-year locked DC/LIRA balance; becomes 0 once it reaches accessibleAge */
+  lockedRetirementBalance: number
   /** real (today's-dollar) debt payments made this year */
   debtPayment: number
   /** real end-of-year debt balance outstanding */

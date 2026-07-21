@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountType, AssetMix, Child, Fhsa, Inputs, Partner, Pension } from './engine'
+import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
 import { track, trackOnce } from './analytics'
 
@@ -68,6 +68,15 @@ export const DEFAULT_FHSA: Fhsa = {
   balance: 0,
   annualContribution: 8000,
   openedYearsAgo: 0,
+}
+
+export const DEFAULT_LOCKED_RETIREMENT: LockedRetirement = {
+  balance: 0,
+  employeeContribution: 0,
+  employerContribution: 0,
+  accessibleAge: 55,
+  jurisdiction: 'ON',
+  owner: 'self',
 }
 
 export const DEFAULT_CHILD: Child = { age: 5 }
@@ -164,8 +173,8 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'fire-inputs',
-      // v5: singular investmentProperty became investmentProperties[]
-      version: 5,
+      // v6: adds the optional locked DC/LIRA side account
+      version: 6,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state) => state as Store,

@@ -274,6 +274,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
 
   let fhsaBal = inputs.fhsa?.balance ?? 0
   let fhsaActive = !!inputs.fhsa
+  let lockedBal = inputs.lockedRetirement?.balance ?? 0
 
   // a planned purchase doesn't exist until buyAtAge
   let prValue = plannedPurchase ? 0 : pr && pr.mode !== 'planned' ? pr.value : 0
@@ -309,6 +310,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let dpAccumTax = 0
     let dpAccumTaxable = 0
     const yearIdx = age - inputs.currentAge
+
+    // v1 boundary model: the balance keeps compounding while locked, then
+    // joins the ordinary taxable registered bucket at the user-supplied age.
+    // This occurs before the year's withdrawal solve, so that age is usable.
+    if (inputs.lockedRetirement && lockedBal > 0 && age >= inputs.lockedRetirement.accessibleAge) {
+      bal.rrsp += lockedBal
+      lockedBal = 0
+    }
 
     // CCB-eligible children this year (see Child); only used in the
     // retirement branch below — accumulation-year CCB is assumed already
@@ -481,12 +490,18 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const fhsaContribution =
         fhsaActive && inputs.fhsa ? Math.min(inputs.annualSavings, inputs.fhsa.annualContribution) : 0
       fhsaBal += fhsaContribution
+      const lockedEmployee = inputs.lockedRetirement?.employeeContribution ?? 0
+      const lockedEmployer = inputs.lockedRetirement?.employerContribution ?? 0
+      if (inputs.lockedRetirement && age >= inputs.lockedRetirement.accessibleAge)
+        bal.rrsp += lockedEmployee + lockedEmployer
+      else
+        lockedBal += lockedEmployee + lockedEmployer
       // a future mortgage/holding-cost change isn't already netted out of
       // annualSavings the way existing debts are assumed to be (the user set
       // that figure before this purchase existed)
       const futureMortgagePayment = plannedPurchase ? prMortgage?.payments[yearIdx] ?? 0 : 0
       const remainingSavings =
-        inputs.annualSavings - fhsaContribution - futureMortgagePayment - netHoldingCost
+        inputs.annualSavings - fhsaContribution - lockedEmployee - futureMortgagePayment - netHoldingCost
       for (const t of ACCOUNT_TYPES) {
         const c = remainingSavings * (inputs.savingsSplit[t] ?? 0)
         bal[t] += c
@@ -640,6 +655,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     if (fhsaActive) {
       fhsaBal *= 1 + (sample ? sample(age, 'rrsp') : inputs.returns.rrsp) - (inputs.fees ?? 0)
     }
+    if (lockedBal > 0) {
+      lockedBal *= 1 + (sample ? sample(age, 'rrsp') : inputs.returns.rrsp) - (inputs.fees ?? 0)
+    }
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation
@@ -655,6 +673,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       tax, netCash, shortfall,
       propertyValue: prValue + ipTotal,
       fhsaBalance: fhsaBal,
+      lockedRetirementBalance: lockedBal,
       debtPayment, debtBalance,
       taxablePerPerson, taxBySource, taxableBySource,
     })
@@ -673,17 +692,17 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   // in the rare case life expectancy is reached before the FHSA's 15-year
   // clock or age 71 (it must mature by one of those), its balance is still
   // tax-free like an on-time rollover would have been
-  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + prValue + ipTotal - finalDebt
+  const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + lockedBal + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
   const persons = partner ? 2 : 1
   const nonRegGain = Math.max(0, bal.nonReg - nonRegBook)
   const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? Math.max(0, p.value - p.acb) : 0), 0)
   const deemedTaxable =
-    (bal.rrsp + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)) / persons
+    (bal.rrsp + lockedBal + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)) / persons
   const estateTax = incomeTax(deemedTaxable, inputs.province) * persons
-  const deemedTotal = bal.rrsp + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)
-  const rrspEstateTax = deemedTotal > 0 ? estateTax * (bal.rrsp / deemedTotal) : 0
+  const deemedTotal = bal.rrsp + lockedBal + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)
+  const rrspEstateTax = deemedTotal > 0 ? estateTax * ((bal.rrsp + lockedBal) / deemedTotal) : 0
   // probate applies to the net value of non-registered holdings and unsold
   // real estate (a registered mortgage against the property reduces the
   // probatable estate); RRSP/RRIF/TFSA bypass it via named beneficiaries

@@ -32,13 +32,26 @@
   "pensionStartAge": "Âge de début de la rente",
   "pensionIndexation": "Indexation à l'inflation (% de l'IPC)",
   "pensionBridge": "Prestation de raccordement jusqu'à 65 ans ($/an, 0 = aucune)",
-  "pensionNote": "Entrez le montant annuel viager de votre relevé de retraite (déjà réduit si vous commencez tôt). Régime à cotisations déterminées (CD) ou CRI ? Ajoutez plutôt son solde au champ REER/FERR — la projection est identique. Les paiements sont imposés comme revenu de pension admissible : fractionnables avec le conjoint et donnant droit au crédit pour revenu de pension à tout âge. Non modélisé : la rente au survivant et la règle québécoise exigeant 65 ans pour le fractionnement provincial.",
+  "pensionNote": "Entrez le montant annuel viager de votre relevé de retraite (déjà réduit si vous commencez tôt). Un régime à cotisations déterminées (CD) ou un CRI va dans le compte distinct CD/CRI bloqué, pas dans le REER/FERR. Les paiements sont imposés comme revenu de pension admissible : fractionnables avec le conjoint et donnant droit au crédit pour revenu de pension à tout âge. Non modélisé : la rente au survivant et la règle québécoise exigeant 65 ans pour le fractionnement provincial.",
   "pensionLabel": "Rente d'employeur",
   "valPensionWindow": "L'âge de début doit être entre {{min}} et {{max}}",
   "valPensionIndexation": "L'indexation doit être entre 0 % et 100 %",
   "valBridgeAfter65": "La prestation de raccordement cesse à 65 ans — commencer à 65 ans ou plus ne verse jamais rien",
   "tfsa": "CELI",
   "rrsp": "REER / FERR",
+  "lockedRetirementToggle": "Utiliser un compte CD / CRI bloqué",
+  "lockedRetirementBalance": "Solde bloqué actuel",
+  "lockedRetirementEmployee": "Votre cotisation annuelle (prélevée sur l'épargne annuelle)",
+  "lockedRetirementEmployer": "Cotisation annuelle / abondement de l'employeur (en plus de l'épargne)",
+  "lockedRetirementAge": "Âge minimal de retrait selon votre régime",
+  "lockedRetirementJurisdiction": "Compétence d'origine du régime (conservée pour de futures règles)",
+  "lockedRetirementOwner": "Titulaire du compte",
+  "lockedJur_federal": "Fédéral",
+  "lockedRetirementNote": "Avant cet âge, le solde croît mais ne peut pas financer les dépenses. À partir de cet âge, v1 le traite comme un compte enregistré imposable ordinaire. La compétence est conservée, mais v1 ne modélise ni minimum/maximum annuel de FRV, ni déblocage spécial, ni l'option de 50 %.",
+  "lockedRetirementLabel": "CD / CRI bloqué",
+  "valLockedAccessAge": "L'âge minimal de retrait doit être entre {{min}} et {{max}}",
+  "valLockedPartnerMissing": "Choisissez vous-même comme titulaire avant d'activer le mode conjoint",
+  "valLockedEmployeeExceedsSavings": "Votre cotisation CD ne peut pas dépasser l'épargne annuelle",
   "nonReg": "Non enregistré",
   "nonRegBook": "Prix de base rajusté (PBR) du non enregistré",
   "nonRegBookHint": "Indiqué comme « book cost » ou « book value » sur votre relevé de courtage. Introuvable? Estimez 80 % du solde actuel comme point de départ - cela n'affecte que la précision de l'impôt sur les gains en capital lors des retraits du non enregistré.",
@@ -342,7 +355,11 @@
     },
     "dbpension": {
       "title": "Régime de retraite d'employeur (PD/CD)",
-      "body": "Les régimes de retraite d'employeur sont de deux types. Prestations déterminées (PD) : une formule — souvent 2 % × années de service × moyenne des 5 meilleures années de salaire — verse une rente viagère, parfois indexée à l'IPC, parfois avec une prestation de raccordement jusqu'à 65 ans. Cotisations déterminées (CD) : un compte de placement; entrez plutôt son solde dans le champ REER/FERR. Quitter longtemps avant la retraite (le cas FIRE) offre généralement le choix entre une rente différée et le transfert de la valeur de rachat dans un compte immobilisé (CRI) — la loi fiscale plafonne le transfert à l'abri, l'excédent est versé en argent imposable. La rente est pleinement imposable, compte pour la récupération de la SV et le test de revenu du SRG, mais constitue un revenu de pension admissible à tout âge : fractionnable 50/50 avec le conjoint et donnant droit au crédit pour revenu de pension."
+      "body": "Les régimes de retraite d'employeur sont de deux types. Prestations déterminées (PD) : une formule — souvent 2 % × années de service × moyenne des 5 meilleures années de salaire — verse une rente viagère, parfois indexée à l'IPC, parfois avec une prestation de raccordement jusqu'à 65 ans. Cotisations déterminées (CD) : un compte de placement souvent immobilisé au départ, par exemple dans un CRI. Entrez ce solde dans le compte distinct CD/CRI bloqué, pas dans le REER/FERR. En v1, il croît mais ne finance aucune dépense avant l'âge minimal prévu au régime; ensuite il est traité comme un compte enregistré imposable ordinaire. Les minimums/maxima annuels de FRV et les déblocages spéciaux ne sont pas modélisés."
+    },
+    "lockedretirement": {
+      "title": "CD / CRI bloqué",
+      "body": "Un régime CD ou compte de retraite immobilisé (CRI) est de l'épargne-retraite à imposition différée qui ne se dépense généralement pas librement comme un REER. Le modèle de frontière v1 utilise l'âge minimal de retrait de votre relevé : avant cet âge, le solde croît mais sa capacité de retrait est nulle; à partir de cet âge, il suit le chemin ordinaire des retraits enregistrés imposables. La compétence d'origine est conservée pour un futur modèle de FRV, mais v1 ne modélise volontairement ni minimums/maxima annuels, ni déblocage pour difficulté/petit solde, ni déblocage unique de 50 %."
     },
     "bridgebenefit": {
       "title": "Prestation de raccordement",

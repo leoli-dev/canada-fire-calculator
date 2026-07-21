@@ -4,6 +4,7 @@ import {
   DEFAULT_CHILD,
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
+  DEFAULT_LOCKED_RETIREMENT,
   DEFAULT_PARTNER,
   DEFAULT_PENSION,
   MIX_PRESETS,
@@ -308,6 +309,50 @@ export function InputForm() {
             onChange={(v) => set({ balances: { ...inputs.balances, [a]: v } })}
           />
         ))}
+        <label className="field">
+          <span><Jargon text={t('lockedRetirementToggle')} /></span>
+          <input
+            type="checkbox"
+            checked={!!inputs.lockedRetirement}
+            onChange={(e) => {
+              set({ lockedRetirement: e.target.checked ? { ...DEFAULT_LOCKED_RETIREMENT } : null })
+              track('locked_retirement_toggle', { enabled: e.target.checked })
+            }}
+          />
+        </label>
+        {inputs.lockedRetirement && (
+          <>
+            <Num label={t('lockedRetirementBalance')} value={inputs.lockedRetirement.balance} step={5000}
+              issue={issueFor('lockedRetirement.balance')}
+              onChange={(v) => set({ lockedRetirement: { ...inputs.lockedRetirement!, balance: v } })} />
+            <Num label={t('lockedRetirementEmployee')} value={inputs.lockedRetirement.employeeContribution} step={500}
+              issue={issueFor('lockedRetirement.employeeContribution')}
+              onChange={(v) => set({ lockedRetirement: { ...inputs.lockedRetirement!, employeeContribution: v } })} />
+            <Num label={t('lockedRetirementEmployer')} value={inputs.lockedRetirement.employerContribution} step={500}
+              issue={issueFor('lockedRetirement.employerContribution')}
+              onChange={(v) => set({ lockedRetirement: { ...inputs.lockedRetirement!, employerContribution: v } })} />
+            <Num label={t('lockedRetirementAge')} value={inputs.lockedRetirement.accessibleAge}
+              issue={issueFor('lockedRetirement.accessibleAge')}
+              onChange={(v) => set({ lockedRetirement: { ...inputs.lockedRetirement!, accessibleAge: v } })} />
+            <label className="field">
+              <span>{t('lockedRetirementJurisdiction')}</span>
+              <select value={inputs.lockedRetirement.jurisdiction}
+                onChange={(e) => set({ lockedRetirement: { ...inputs.lockedRetirement!, jurisdiction: e.target.value as Province | 'federal' } })}>
+                <option value="federal">{t('lockedJur_federal')}</option>
+                {PROVINCES.map((p) => <option key={p} value={p}>{p} — {t(`prov_${p}`)}</option>)}
+              </select>
+            </label>
+            {inputs.partner && <label className="field">
+              <span>{t('lockedRetirementOwner')}</span>
+              <select value={inputs.lockedRetirement.owner}
+                onChange={(e) => set({ lockedRetirement: { ...inputs.lockedRetirement!, owner: e.target.value as 'self' | 'partner' } })}>
+                <option value="self">{t('benefitsSelf')}</option>
+                <option value="partner">{t('partnerSection')}</option>
+              </select>
+            </label>}
+            <p className="hint"><Jargon text={t('lockedRetirementNote')} /></p>
+          </>
+        )}
         <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
         <p className="hint"><Jargon text={t('nonRegBookHint')} /></p>
 

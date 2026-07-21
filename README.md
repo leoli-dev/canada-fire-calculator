@@ -79,7 +79,8 @@ maximum sustainable annual spending.
 **Also modelled**: an **employer DB pension** per spouse (lifetime annuity at a
 chosen start age, partial-CPI indexing, and a bridge benefit that ends at 65 —
 taxed as pension income, splittable at any age, visible to the OAS clawback and
-GIS; DC plans and LIRAs are entered as account balances instead), an **FHSA**
+GIS; a separate **Locked DC/LIRA** account keeps restricted pension money out of
+the bridge until its plan-specific withdrawal age), an **FHSA**
 household side account (contributions carved out of annual savings, growth
 tracks the RRSP assumption, and it rolls tax-free — either into a home purchase
 or, failing that, into the RRSP at 15 years/age 71, whichever comes first),
@@ -156,8 +157,8 @@ Work down the left column; every underlined term opens a plain-language explanat
 - **Employer pension** — optional, per spouse: the lifetime annual amount from
   your pension statement (already reduced for an early start), start age, CPI
   indexing percentage, and any bridge benefit (paid until 65). Have a DC plan or
-  a LIRA? Add its balance to the RRSP/RRIF field instead — it projects the same
-  way.
+  a LIRA? Use the separate Locked DC/LIRA account instead. It remains unavailable
+  until the earliest withdrawal age you enter.
 
 ## How to read the outputs
 
@@ -256,8 +257,11 @@ explanations are clickable too. 39 entries in all three languages.
   spouses are assumed to reach the shared life expectancy), Quebec's provincial
   rule requiring age 65+ for pension splitting is ignored (splitting stays
   idealized at any age), a partially-indexed pension erodes only from its start
-  age (deferral-period erosion isn't modelled), and DC/LIRA balances entered as
-  RRSP ignore LIF withdrawal caps.
+  age (deferral-period erosion isn't modelled). A locked DC/LIRA side account
+  grows but is completely unavailable until the user-entered earliest withdrawal
+  age; after that v1 treats it as a normal taxable registered account. Its
+  jurisdiction is retained for a future LIF model, but v1 does **not** model LIF
+  annual minimums/maximums, special unlocking, or 50% unlocking.
 - Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
   enhancement (post-2019 contributions — estimates lean conservative for younger
   users), long-term-care cost shocks.

@@ -71,6 +71,48 @@ describe('runProjection', () => {
     }
   })
 
+  it('keeps locked DC/LIRA money out of the bridge, then makes it RRSP-like at its stated age', () => {
+    const locked = runProjection({
+      ...base, currentAge: 50, fireAge: 50, lifeExpectancy: 57, annualSavings: 0,
+      retirementSpending: 50_000, returns: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0,
+      lockedRetirement: { balance: 200_000, employeeContribution: 0, employerContribution: 0,
+        accessibleAge: 55, jurisdiction: 'ON', owner: 'self' },
+    })
+    const at54 = locked.rows.find((r) => r.age === 54)!
+    const at55 = locked.rows.find((r) => r.age === 55)!
+    expect(at54.lockedRetirementBalance).toBeCloseTo(200_000)
+    expect(at54.withdrawals.rrsp).toBe(0)
+    expect(at54.shortfall).toBeGreaterThan(49_000)
+    expect(at55.lockedRetirementBalance).toBe(0)
+    expect(at55.withdrawals.rrsp).toBeGreaterThan(50_000)
+  })
+
+  it('carves employee DC contributions from savings and adds employer contributions on top', () => {
+    const r = runProjection({
+      ...base, currentAge: 40, fireAge: 42, lifeExpectancy: 42, annualSavings: 10_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      lockedRetirement: { balance: 0, employeeContribution: 3_000, employerContribution: 2_000,
+        accessibleAge: 55, jurisdiction: 'federal', owner: 'self' },
+    })
+    expect(r.rows[0].balances.tfsa).toBeCloseTo(7_000)
+    expect(r.rows[0].lockedRetirementBalance).toBeCloseTo(5_000)
+  })
+
+  it('includes an inaccessible locked balance in the registered estate tax base', () => {
+    const r = runProjection({
+      ...base, currentAge: 50, fireAge: 50, lifeExpectancy: 50, annualSavings: 0, retirementSpending: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      lockedRetirement: { balance: 100_000, employeeContribution: 0, employerContribution: 0,
+        accessibleAge: 60, jurisdiction: 'QC', owner: 'self' },
+    })
+    expect(r.finalNetWorth).toBeCloseTo(100_000)
+    expect(r.estateTax).toBeGreaterThan(0)
+  })
+
   it('meets the spending target after tax in funded years', () => {
     const r = runProjection(base)
     for (const row of r.rows) {

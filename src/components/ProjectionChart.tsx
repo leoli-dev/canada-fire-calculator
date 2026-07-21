@@ -15,7 +15,7 @@ import {
 import type { ProjectionResult } from '../engine'
 import { useCad, useCadCompact } from '../format'
 
-const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', fhsa: '#00897b', property: '#8d6e63' }
+const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', fhsa: '#00897b', locked: '#6a1b9a', property: '#8d6e63' }
 
 export function ProjectionChart(props: {
   result: ProjectionResult
@@ -35,17 +35,18 @@ export function ProjectionChart(props: {
     rrsp: Math.round(r.balances.rrsp * k(r.age)),
     nonReg: Math.round(r.balances.nonReg * k(r.age)),
     fhsa: Math.round(r.fhsaBalance * k(r.age)),
+    locked: Math.round(r.lockedRetirementBalance * k(r.age)),
     property: Math.round(r.propertyValue * k(r.age)),
     debt: Math.round(r.debtBalance * k(r.age)),
     investable: Math.round(
-      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance) * k(r.age),
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.lockedRetirementBalance) * k(r.age),
     ),
     total: Math.round(
-      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.propertyValue) *
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.lockedRetirementBalance + r.propertyValue) *
         k(r.age),
     ),
     netWorth: Math.round(
-      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.propertyValue -
+      (r.balances.tfsa + r.balances.rrsp + r.balances.nonReg + r.fhsaBalance + r.lockedRetirementBalance + r.propertyValue -
         r.debtBalance) *
         k(r.age),
     ),
@@ -53,6 +54,7 @@ export function ProjectionChart(props: {
   const hasProperty = data.some((d) => d.property > 0)
   const hasDebt = data.some((d) => d.debt > 0)
   const hasFhsa = data.some((d) => d.fhsa > 0)
+  const hasLocked = data.some((d) => d.locked > 0)
 
   // transient invalid inputs (life expectancy typed below the current age)
   // can produce zero rows — never crash the page over it
@@ -99,6 +101,10 @@ export function ProjectionChart(props: {
           {hasFhsa && (
             <Area type="monotone" dataKey="fhsa" stackId="1" name={t('fhsaLabel')}
               stroke={COLORS.fhsa} fill={COLORS.fhsa} fillOpacity={0.55} />
+          )}
+          {hasLocked && (
+            <Area type="monotone" dataKey="locked" stackId="1" name={t('lockedRetirementLabel')}
+              stroke={COLORS.locked} fill={COLORS.locked} fillOpacity={0.55} />
           )}
           {hasProperty && (
             <Area type="monotone" dataKey="property" stackId="1" name={t('propertyLabel')}
