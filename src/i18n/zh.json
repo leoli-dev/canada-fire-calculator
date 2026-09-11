@@ -482,5 +482,27 @@
   "meltdownCap_bracket2": "第二税阶",
   "meltdownCap_oasClawback": "OAS clawback 门槛",
   "hasMortgage": "有关联房贷",
-  "mortgageInterestNote": "这笔房贷卖房时会从卖房款里直接清偿；持有期间，利息部分（不含本金）可从租金收入里抵扣计税。房贷供款照样计入支出目标，不要和上面\"负债\"里的房贷重复填。"
+  "mortgageInterestNote": "这笔房贷卖房时会从卖房款里直接清偿；持有期间，利息部分（不含本金）可从租金收入里抵扣计税。房贷供款照样计入支出目标，不要和上面\"负债\"里的房贷重复填。",
+  "entryModeLabel": "填写模式",
+  "guidedMode": "引导模式",
+  "professionalMode": "专业模式",
+  "guidedProgress": "引导填写进度",
+  "guidedStepCount": "第 {{step}} 步，共 {{total}} 步",
+  "guidedBack": "返回",
+  "guidedNext": "下一步",
+  "guidedReview": "核对计划",
+  "guidedEdit": "编辑",
+  "guidedFixErrors": "请先修正 {{count}} 个必填错误。",
+  "guidedReviewTitle": "核对你的计划",
+  "guidedReviewIssues": "有 {{count}} 项需要确认",
+  "guidedResultsBelow": "投影结果显示在核对区旁边。你可以返回任一已访问步骤，数据不会丢失。",
+  "guided": { "steps": {
+    "household": { "short": "家庭", "title": "家庭与目标", "help": "先填写年龄、省份、家庭成员和目标。退休年龄和开始领取政府福利的年龄不是一回事。" },
+    "income": { "short": "收入", "title": "收入与储蓄", "help": "填写扣除税和日常开支后每年真正能投入的金额。只有预计退休后仍持续的兼职收入才需要单列。" },
+    "accounts": { "short": "账户", "title": "账户与供款", "help": "填写今天的账户余额。余额看银行或券商账单；注册账户额度以 CRA My Account 为准。" },
+    "housing": { "short": "房产", "title": "房产与负债", "help": "只加入会影响退休现金流的房产和贷款。与房产关联的房贷不要重复填写。" },
+    "spending": { "short": "支出", "title": "退休生活费", "help": "用今天的购买力估算退休后一年的税后开支。可用明细表把每月费用换算为全年金额。" },
+    "benefits": { "short": "福利", "title": "福利与假设", "help": "逐人填写 CPP/QPP、OAS 和养老金，并核对收益率、费用和通胀等高级假设。" },
+    "review": { "short": "核对", "title": "核对并阅读结果", "help": "先检查核心输入和警告，再读计划结论，然后查看完整图表和情景。" }
+  }}
 }

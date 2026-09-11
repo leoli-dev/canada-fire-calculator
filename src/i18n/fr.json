@@ -482,5 +482,27 @@
   "meltdownCap_bracket2": "Deuxième palier",
   "meltdownCap_oasClawback": "Seuil de récupération de la SV",
   "hasMortgage": "Hypothèque liée",
-  "mortgageInterestNote": "Cette hypothèque est remboursée directement sur le produit de la vente à la vente de l'immeuble; tant qu'il est détenu, la portion d'intérêt (pas le capital) est déductible du revenu locatif. Le versement compte toujours dans la cible de dépenses — ne saisissez pas aussi ce prêt dans « Dettes » ci-dessus."
+  "mortgageInterestNote": "Cette hypothèque est remboursée directement sur le produit de la vente à la vente de l'immeuble; tant qu'il est détenu, la portion d'intérêt (pas le capital) est déductible du revenu locatif. Le versement compte toujours dans la cible de dépenses — ne saisissez pas aussi ce prêt dans « Dettes » ci-dessus.",
+  "entryModeLabel": "Mode de saisie",
+  "guidedMode": "Guidé",
+  "professionalMode": "Professionnel",
+  "guidedProgress": "Progression de la configuration guidée",
+  "guidedStepCount": "Étape {{step}} sur {{total}}",
+  "guidedBack": "Retour",
+  "guidedNext": "Suivant",
+  "guidedReview": "Vérifier le plan",
+  "guidedEdit": "Modifier",
+  "guidedFixErrors": "Corrigez {{count}} champ obligatoire avant de continuer.",
+  "guidedReviewTitle": "Vérifiez votre plan",
+  "guidedReviewIssues": "{{count}} élément(s) à vérifier",
+  "guidedResultsBelow": "Votre projection apparaît à côté de ce résumé. Vous pouvez revenir à toute étape visitée sans perdre vos données.",
+  "guided": { "steps": {
+    "household": { "short": "Foyer", "title": "Foyer et objectif", "help": "Commencez par les âges, la province, les membres du foyer et votre objectif. L'âge de retraite est distinct de l'âge de début des prestations." },
+    "income": { "short": "Revenu", "title": "Revenu et épargne", "help": "Indiquez le montant annuel investi après impôts et dépenses. Ajoutez un revenu de retraite à temps partiel seulement s'il devrait continuer." },
+    "accounts": { "short": "Comptes", "title": "Comptes et cotisations", "help": "Utilisez les soldes d'aujourd'hui. Les relevés donnent les soldes; Mon dossier ARC indique les droits de cotisation." },
+    "housing": { "short": "Logement", "title": "Propriétés et dettes", "help": "Ajoutez les propriétés et prêts qui influencent la retraite. Ne saisissez pas deux fois une hypothèque liée à un immeuble." },
+    "spending": { "short": "Dépenses", "title": "Dépenses de retraite", "help": "Estimez une année de dépenses après impôt en dollars d'aujourd'hui. La feuille aide à annualiser les coûts mensuels." },
+    "benefits": { "short": "Prestations", "title": "Prestations et hypothèses", "help": "Ajoutez le RPC/RRQ, la SV et les pensions de chaque personne. Vérifiez aussi les hypothèses avancées de rendement et d'inflation." },
+    "review": { "short": "Vérifier", "title": "Vérifier et lire les résultats", "help": "Contrôlez les données et avertissements, puis lisez la conclusion avant les graphiques détaillés." }
+  }}
 }

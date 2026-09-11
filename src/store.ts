@@ -97,15 +97,21 @@ const DEFAULT_WORKSHEET: Record<string, number> = Object.fromEntries(
 )
 
 export type DisplayMode = 'real' | 'nominal'
+export type EntryMode = 'guided' | 'professional'
 
 interface Store {
   inputs: Inputs
   displayMode: DisplayMode
+  entryMode: EntryMode
+  activeStep: number
+  visitedSteps: number[]
   mixPresets: Record<AccountType, string>
   worksheet: Record<string, number>
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
   setDisplayMode: (m: DisplayMode) => void
+  setEntryMode: (m: EntryMode) => void
+  setActiveStep: (step: number) => void
   applyMixPreset: (account: AccountType, preset: string) => void
   setWorksheet: (key: string, value: number) => void
   saveScenarioA: () => void
@@ -119,6 +125,9 @@ export const useStore = create<Store>()(
     (set) => ({
       inputs: DEFAULT_INPUTS,
       displayMode: 'real',
+      entryMode: 'guided',
+      activeStep: 1,
+      visitedSteps: [1],
       mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
       worksheet: DEFAULT_WORKSHEET,
       scenarioA: null,
@@ -130,6 +139,17 @@ export const useStore = create<Store>()(
         track('display_mode_change', { mode: m })
         set({ displayMode: m })
       },
+      setEntryMode: (m) => {
+        track('mode_change', { mode: m })
+        set({ entryMode: m })
+      },
+      setActiveStep: (step) =>
+        set((s) => ({
+          activeStep: Math.max(1, Math.min(7, step)),
+          visitedSteps: s.visitedSteps.includes(step)
+            ? s.visitedSteps
+            : [...s.visitedSteps, step],
+        })),
       applyMixPreset: (account, preset) => {
         track('asset_mix_change', { account, preset })
         set((s) => {
@@ -168,16 +188,26 @@ export const useStore = create<Store>()(
           inputs: DEFAULT_INPUTS,
           worksheet: DEFAULT_WORKSHEET,
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
+          activeStep: 1,
+          visitedSteps: [1],
         })
       },
     }),
     {
       name: 'fire-inputs',
-      // v6: adds the optional locked DC/LIRA side account
-      version: 6,
+      // v7: persists guided/professional entry mode and guided progress
+      version: 7,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
-      migrate: (state) => state as Store,
+      migrate: (state, version) => {
+        const previous = state as Partial<Store>
+        // Existing users retain the dense form they already know. Fresh stores
+        // use the guided default declared above.
+        if (version < 7) {
+          return { ...previous, entryMode: 'professional', activeStep: 1, visitedSteps: [1] } as Store
+        }
+        return state as Store
+      },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Store> & {
           inputs?: Partial<Inputs> & { withdrawalOrder?: string[] }
@@ -215,6 +245,9 @@ export const useStore = create<Store>()(
           scenarioA: upgrade(p.scenarioA as LegacyInputs | null),
           worksheet: { ...DEFAULT_WORKSHEET, ...(p.worksheet ?? {}) },
           mixPresets: { ...current.mixPresets, ...(p.mixPresets ?? {}) },
+          entryMode: p.entryMode ?? current.entryMode,
+          activeStep: Math.max(1, Math.min(7, p.activeStep ?? current.activeStep)),
+          visitedSteps: p.visitedSteps ?? current.visitedSteps,
         }
       },
     },

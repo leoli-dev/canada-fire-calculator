@@ -482,5 +482,27 @@
   "meltdownCap_bracket2": "Second bracket",
   "meltdownCap_oasClawback": "OAS clawback threshold",
   "hasMortgage": "Has a linked mortgage",
-  "mortgageInterestNote": "This mortgage is discharged straight from the sale proceeds when the property sells; while held, its interest portion (not principal) is deductible against the rental income. The payment still counts toward the spending target — don't also enter this loan under \"Debts\" above."
+  "mortgageInterestNote": "This mortgage is discharged straight from the sale proceeds when the property sells; while held, its interest portion (not principal) is deductible against the rental income. The payment still counts toward the spending target — don't also enter this loan under \"Debts\" above.",
+  "entryModeLabel": "Data entry mode",
+  "guidedMode": "Guided",
+  "professionalMode": "Professional",
+  "guidedProgress": "Guided setup progress",
+  "guidedStepCount": "Step {{step}} of {{total}}",
+  "guidedBack": "Back",
+  "guidedNext": "Next",
+  "guidedReview": "Review plan",
+  "guidedEdit": "Edit",
+  "guidedFixErrors": "Fix {{count}} required field before continuing.",
+  "guidedReviewTitle": "Check your plan",
+  "guidedReviewIssues": "{{count}} item(s) need attention",
+  "guidedResultsBelow": "Your projection appears beside this review. You can return to any visited step without losing data.",
+  "guided": { "steps": {
+    "household": { "short": "Household", "title": "Household and goal", "help": "Start with ages, province, household members and the outcome you want. Retirement age is separate from the age when government benefits begin." },
+    "income": { "short": "Income", "title": "Income and savings", "help": "Enter the amount you can invest each year after tax and living costs. Include part-time retirement income only if you expect it to continue." },
+    "accounts": { "short": "Accounts", "title": "Accounts and contributions", "help": "Use today's balances. Statements show account balances; CRA My Account is the best source for registered-account room." },
+    "housing": { "short": "Housing", "title": "Property and debt", "help": "Add homes, rentals and loans only when they affect retirement cash flow. Avoid entering a property-linked mortgage twice." },
+    "spending": { "short": "Spending", "title": "Retirement spending", "help": "Estimate one year of after-tax retirement spending in today's dollars. The worksheet can help convert monthly costs into an annual total." },
+    "benefits": { "short": "Benefits", "title": "Benefits and assumptions", "help": "Add CPP/QPP, OAS and pensions for each person. Advanced return and inflation assumptions remain visible so you can verify them." },
+    "review": { "short": "Review", "title": "Review and read results", "help": "Check the core inputs and any warnings, then read the plan conclusion before exploring detailed charts and scenarios." }
+  }}
 }

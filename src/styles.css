@@ -56,9 +56,63 @@ header h1 {
 
 /* ---------- layout ---------- */
 main { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 24px; align-items: start; }
+main.guided-only { grid-template-columns: minmax(0, 720px); justify-content: center; }
 @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- form ---------- */
+.entry-mode {
+  display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 14px;
+  padding: 3px; border: 1px solid var(--line-strong); border-radius: 10px;
+  background: #e9edf1;
+}
+.entry-mode button {
+  border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft);
+  padding: 8px 10px; font-weight: 600; cursor: pointer;
+}
+.entry-mode button.active { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+
+.step-list {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 8px;
+  scrollbar-width: thin;
+}
+.step-list button {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+  color: var(--ink-soft); padding: 5px 9px; font-size: 0.74rem; cursor: pointer;
+}
+.step-list button span {
+  display: grid; place-items: center; width: 18px; height: 18px;
+  border-radius: 50%; background: #edf2f7; font-variant-numeric: tabular-nums;
+}
+.step-list button[aria-current='step'] { border-color: var(--blue); color: var(--blue); }
+.step-list button[aria-current='step'] span { background: var(--blue); color: #fff; }
+.step-list button:disabled { cursor: default; opacity: 0.45; }
+.guided-head { margin: 8px 2px 14px; }
+.guided-head > p:first-child { margin: 0; color: var(--blue); font-size: 0.76rem; font-weight: 650; }
+.guided-head h2 { margin: 3px 0 4px; font-size: 1.18rem; outline: none; }
+.guided-head h2:focus-visible { outline: 2px solid rgba(21, 101, 192, 0.35); border-radius: 4px; }
+.guided-head > p:last-child { margin: 0; color: var(--ink-soft); font-size: 0.86rem; }
+.guided-actions { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0 12px; }
+.guided-actions button { min-width: 96px; }
+.guided-actions button:disabled { opacity: 0.45; cursor: default; }
+.guided-next {
+  border: 1px solid var(--blue); background: var(--blue); color: #fff;
+  border-radius: 8px; padding: 8px 16px; font-size: 0.85rem; cursor: pointer;
+}
+.guided-next:hover { background: #115096; }
+.review-card {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
+  box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px;
+}
+.review-card h3 { margin: 0 0 10px; }
+.review-card dl { margin: 0; }
+.review-card dl div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.review-card dt { color: var(--ink-soft); font-size: 0.84rem; }
+.review-card dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.review-issues { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #fff8ee; color: var(--amber); font-size: 0.8rem; }
+.review-issues ul { margin: 6px 0 0; padding-left: 18px; }
+.review-issues button { border: 0; background: none; color: var(--blue); cursor: pointer; text-decoration: underline; }
+
 fieldset {
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--card); box-shadow: var(--shadow);
@@ -350,6 +404,8 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
   .tagline { font-size: 0.82rem; }
   .langs { align-self: flex-end; }
   .langs button { padding: 5px 10px; }
+  .step-list button { font-size: 0; padding: 5px; }
+  .step-list button span { font-size: 0.74rem; }
 
   main { gap: 14px; }
   fieldset { padding: 12px 12px 14px; }

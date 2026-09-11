@@ -5,6 +5,7 @@ import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
 import { useStore } from './store'
 import { InputForm } from './components/InputForm'
+import { GuidedFlow } from './components/GuidedFlow'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
@@ -29,6 +30,9 @@ export default function App() {
   const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
   const displayMode = useStore((s) => s.displayMode)
+  const entryMode = useStore((s) => s.entryMode)
+  const setEntryMode = useStore((s) => s.setEntryMode)
+  const activeStep = useStore((s) => s.activeStep)
   const result = useMemo(() => runProjection(inputs), [inputs])
   const pensionAge = pensionStartAge(inputs)
   const inflation = inputs.inflation ?? 0.021
@@ -70,11 +74,19 @@ export default function App() {
         </nav>
       </header>
 
-      <main>
+      <main className={entryMode === 'guided' && activeStep < 7 ? 'guided-only' : undefined}>
         <aside>
-          <InputForm />
+          <div className="entry-mode" aria-label={t('entryModeLabel')}>
+            <button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
+              {t('guidedMode')}
+            </button>
+            <button type="button" className={entryMode === 'professional' ? 'active' : ''} onClick={() => setEntryMode('professional')}>
+              {t('professionalMode')}
+            </button>
+          </div>
+          {entryMode === 'guided' ? <GuidedFlow /> : <InputForm />}
         </aside>
-        <section>
+        {(entryMode === 'professional' || activeStep === 7) && <section className="results-column">
           <ResultsPanel inputs={inputs} result={result} />
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
@@ -101,7 +113,7 @@ export default function App() {
           <TimingCard inputs={inputs} />
           <MonteCarloCard inputs={inputs} scale={scale} />
           <ScenarioCard />
-        </section>
+        </section>}
       </main>
 
       <footer>

@@ -82,7 +82,7 @@ function OptionalAge(props: {
   )
 }
 
-export function InputForm() {
+export function InputForm({ guidedStep }: { guidedStep?: number } = {}) {
   const { t } = useTranslation()
   const cad = useCad()
   const {
@@ -109,11 +109,12 @@ export function InputForm() {
 
   return (
     <form className="input-form" onSubmit={(e) => e.preventDefault()}>
-      {errorCount > 0 && (
+      {errorCount > 0 && guidedStep == null && (
         <p className="validation-banner">{t('valBanner', { count: errorCount })}</p>
       )}
-      <fieldset>
+      {(guidedStep == null || guidedStep === 1 || guidedStep === 2 || guidedStep === 5 || guidedStep === 6) && <fieldset>
         <legend>{t('profile')}</legend>
+        {(guidedStep == null || guidedStep === 1) && <>
         <Num label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
         <Num label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
@@ -131,7 +132,9 @@ export function InputForm() {
             ))}
           </select>
         </label>
-        <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
+        </>}
+        {(guidedStep == null || guidedStep === 2) && <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />}
+        {(guidedStep == null || guidedStep === 5) && <>
         <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
         <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
           <summary>{t('worksheetTitle')}</summary>
@@ -150,6 +153,8 @@ export function InputForm() {
             </button>
           </div>
         </details>
+        </>}
+        {(guidedStep == null || guidedStep === 1) && <>
         <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
           onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
         <label className="field">
@@ -168,6 +173,8 @@ export function InputForm() {
         {(inputs.goal ?? 'legacy') === 'dieWithZero' && (
           <p className="hint"><Jargon text={t('dwzGoalNote')} /></p>
         )}
+        </>}
+        {(guidedStep == null || guidedStep === 6) && <>
         <label className="field">
           <span>{t('inflationLabel')}</span>
           <select
@@ -193,6 +200,8 @@ export function InputForm() {
           </select>
         </label>
         <p className="hint"><Jargon text={t('displayModeNote')} /></p>
+        </>}
+        {(guidedStep == null || guidedStep === 1) && <>
         <label className="field">
           <span><Jargon text={t('household')} /></span>
           <select
@@ -213,7 +222,9 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('coupleNote')} /></p>
           </>
         )}
+        </>}
 
+        {(guidedStep == null || guidedStep === 2) && <>
         <label className="field">
           <span><Jargon text={t('extraIncomeToggle')} /></span>
           <input
@@ -243,7 +254,9 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
           </>
         )}
+        </>}
 
+        {(guidedStep == null || guidedStep === 1) && <>
         <label className="field">
           <span><Jargon text={t('childrenToggle')} /></span>
           <input
@@ -294,9 +307,10 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('childrenNote')} /></p>
           </>
         )}
-      </fieldset>
+        </>}
+      </fieldset>}
 
-      <fieldset>
+      {(guidedStep == null || guidedStep === 3) && <fieldset>
         <legend>{t('accounts')}</legend>
         <p className="hint">{t('accountsHint')}</p>
         {ACCOUNTS.map((a) => (
@@ -402,9 +416,9 @@ export function InputForm() {
             </em>
           )}
         </details>
-      </fieldset>
+      </fieldset>}
 
-      <fieldset>
+      {(guidedStep == null || guidedStep === 3) && <fieldset>
         <legend><Jargon text={t('fhsaSection')} /></legend>
         <label className="field">
           <span>{t('fhsaToggle')}</span>
@@ -442,9 +456,9 @@ export function InputForm() {
             </p>
           </>
         )}
-      </fieldset>
+      </fieldset>}
 
-      <fieldset>
+      {(guidedStep == null || guidedStep === 4) && <fieldset>
         <legend>{t('propertySection')}</legend>
 
         {pr && (
@@ -683,9 +697,9 @@ export function InputForm() {
         {(inputs.investmentProperties?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('ipNote')} /></p>
         )}
-      </fieldset>
+      </fieldset>}
 
-      <fieldset>
+      {(guidedStep == null || guidedStep === 4) && <fieldset>
         <legend><Jargon text={t('debtsSection')} /></legend>
         {(inputs.debts ?? []).map((d, i) => {
           const patch = (part: Partial<typeof d>) => {
@@ -749,9 +763,9 @@ export function InputForm() {
         {(inputs.debts?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('debtNote')} /></p>
         )}
-      </fieldset>
+      </fieldset>}
 
-      <fieldset>
+      {(guidedStep == null || guidedStep === 6) && <fieldset>
         <legend>{t('benefits')}</legend>
         {inputs.partner && <p className="subhead">{t('benefitsSelf')}</p>}
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
@@ -846,9 +860,9 @@ export function InputForm() {
           </>
         )}
 
-      </fieldset>
+      </fieldset>}
 
-      <button type="button" className="reset" onClick={reset}>{t('reset')}</button>
+      {guidedStep == null && <button type="button" className="reset" onClick={reset}>{t('reset')}</button>}
     </form>
   )
 }
