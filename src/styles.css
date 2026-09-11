@@ -92,6 +92,66 @@ main.guided-only { grid-template-columns: minmax(0, 720px); justify-content: cen
 .guided-head h2 { margin: 3px 0 4px; font-size: 1.18rem; outline: none; }
 .guided-head h2:focus-visible { outline: 2px solid rgba(21, 101, 192, 0.35); border-radius: 4px; }
 .guided-head > p:last-child { margin: 0; color: var(--ink-soft); font-size: 0.86rem; }
+.question-card { max-width: 720px; }
+.concept-panel {
+  border-left: 4px solid var(--blue); background: #edf4fb;
+  padding: 14px 18px; margin: 0 0 16px; border-radius: 0 10px 10px 0;
+}
+.concept-panel h3 { margin: 0 0 6px; font-size: 1rem; }
+.concept-panel p { margin: 5px 0; color: var(--ink-soft); font-size: 0.84rem; max-width: 68ch; }
+.concept-panel .fictional-example { color: #556b4f; background: #f2f7ef; padding: 7px 9px; border-radius: 6px; }
+.guided-field {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 3px 14px; margin: 12px 0;
+}
+.guided-field > span:first-child { color: var(--ink-soft); font-size: 0.87rem; }
+.guided-field > input, .guided-field > select, .guided-input-wrap input {
+  width: 180px; padding: 8px 10px; border: 1px solid var(--line-strong);
+  border-radius: 8px; background: var(--card); color: var(--ink); font-size: 0.9rem;
+}
+.guided-input-wrap { display: flex; align-items: center; gap: 6px; }
+.guided-input-wrap small { color: var(--ink-faint); }
+.answer-meta {
+  display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 999px;
+  background: #edf1f5; color: var(--ink-faint); font-size: 0.66rem; font-weight: 600;
+}
+.answer-meta.confirmed { background: #e7f4e8; color: var(--green); }
+.answer-meta.estimated, .answer-meta.legacy { background: #fff1dc; color: var(--amber); }
+.answer-meta.unknown { background: #fae8e8; color: var(--red); }
+.unknown-answer {
+  grid-column: 2; justify-self: end; border: 0; background: none; color: var(--blue);
+  cursor: pointer; padding: 0; font-size: 0.72rem;
+}
+.toggle-row input { width: 18px; height: 18px; accent-color: var(--blue); }
+.guided-feedback {
+  margin: 7px 0 12px; padding: 8px 10px; border-radius: 7px;
+  background: #f4f7f9; color: var(--ink-soft); font-size: 0.79rem;
+}
+.story-strip {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 8px 0 12px; padding: 10px 12px; border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); font-size: 0.86rem;
+}
+.story-strip strong { color: var(--blue); }
+.guided-forward-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.estimate-values, .return-review {
+  border: 1px solid var(--line-strong); background: var(--card); color: var(--ink-soft);
+  border-radius: 8px; padding: 8px 11px; cursor: pointer; font-size: 0.78rem;
+}
+.review-chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.review-chapters article { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.review-chapters article > div { display: flex; justify-content: space-between; gap: 8px; }
+.review-chapters article p { margin: 4px 0 0; color: var(--ink-soft); font-size: 0.78rem; }
+.review-chapters button { border: 0; background: none; color: var(--blue); padding: 0; cursor: pointer; }
+.account-breakdown { margin-top: 12px !important; }
+.guided-result-story { margin-top: 12px; padding: 11px 12px; border-radius: 8px; background: #edf7ee; }
+.guided-result-story.poor { background: #fbebeb; }
+.guided-result-story p { margin: 4px 0 0; color: var(--ink-soft); }
+.review-incomplete {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+  background: #fff8ee; color: var(--amber); font-size: 0.8rem;
+}
 .guided-actions { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0 12px; }
 .guided-actions button { min-width: 96px; }
 .guided-actions button:disabled { opacity: 0.45; cursor: default; }
@@ -406,6 +466,11 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
   .langs button { padding: 5px 10px; }
   .step-list button { font-size: 0; padding: 5px; }
   .step-list button span { font-size: 0.74rem; }
+  .guided-field { grid-template-columns: minmax(0, 1fr); }
+  .guided-field > input, .guided-field > select, .guided-input-wrap, .guided-input-wrap input { width: 100%; }
+  .unknown-answer { grid-column: 1; justify-self: start; }
+  .review-chapters { grid-template-columns: 1fr; }
+  .guided-actions { align-items: flex-start; }
 
   main { gap: 14px; }
   fieldset { padding: 12px 12px 14px; }

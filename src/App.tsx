@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { pensionStartAge, runProjection } from './engine'
+import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
 import { useStore } from './store'
 import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
+import { guidedPlanReady } from './guidedReview'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
@@ -33,7 +34,13 @@ export default function App() {
   const entryMode = useStore((s) => s.entryMode)
   const setEntryMode = useStore((s) => s.setEntryMode)
   const activeStep = useStore((s) => s.activeStep)
+  const answerMeta = useStore((s) => s.answerMeta)
   const result = useMemo(() => runProjection(inputs), [inputs])
+  const hasBlockingIssues = useMemo(
+    () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
+    [inputs],
+  )
+  const guidedReady = guidedPlanReady(answerMeta, inputs)
   const pensionAge = pensionStartAge(inputs)
   const inflation = inputs.inflation ?? 0.021
   const scale = useMemo(
@@ -74,7 +81,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main className={entryMode === 'guided' && activeStep < 7 ? 'guided-only' : undefined}>
+      <main className={entryMode === 'guided' && (activeStep < 7 || hasBlockingIssues || !guidedReady) ? 'guided-only' : undefined}>
         <aside>
           <div className="entry-mode" aria-label={t('entryModeLabel')}>
             <button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
@@ -84,9 +91,9 @@ export default function App() {
               {t('professionalMode')}
             </button>
           </div>
-          {entryMode === 'guided' ? <GuidedFlow /> : <InputForm />}
+          {entryMode === 'guided' ? <GuidedFlow result={result} /> : <InputForm />}
         </aside>
-        {(entryMode === 'professional' || activeStep === 7) && <section className="results-column">
+        {(entryMode === 'professional' || (activeStep === 7 && !hasBlockingIssues && guidedReady)) && <section className="results-column">
           <ResultsPanel inputs={inputs} result={result} />
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart

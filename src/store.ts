@@ -98,6 +98,29 @@ const DEFAULT_WORKSHEET: Record<string, number> = Object.fromEntries(
 
 export type DisplayMode = 'real' | 'nominal'
 export type EntryMode = 'guided' | 'professional'
+export type AnswerStatus = 'confirmed' | 'estimated' | 'unknown' | 'notApplicable'
+export type AnswerOrigin = 'user' | 'default' | 'legacy' | 'example'
+export interface AnswerMeta {
+  status: AnswerStatus
+  origin: AnswerOrigin
+  updatedAt: string
+  assumptionValue?: number
+}
+
+const LEGACY_META_FIELDS = [
+  'goal', 'currentAge', 'fireAge', 'lifeExpectancy', 'province', 'household', 'annualSavings',
+  'retirementSpending', 'balances.tfsa', 'balances.rrsp', 'balances.nonReg',
+  'nonRegBook', 'housingMode', 'cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65',
+]
+
+function legacyAnswerMeta(): Record<string, AnswerMeta> {
+  const updatedAt = new Date().toISOString()
+  return Object.fromEntries(LEGACY_META_FIELDS.map((field) => [field, {
+    status: 'estimated' as const,
+    origin: 'legacy' as const,
+    updatedAt,
+  }]))
+}
 
 interface Store {
   inputs: Inputs
@@ -105,6 +128,8 @@ interface Store {
   entryMode: EntryMode
   activeStep: number
   visitedSteps: number[]
+  answerMeta: Record<string, AnswerMeta>
+  scenarioAAnswerMeta: Record<string, AnswerMeta> | null
   mixPresets: Record<AccountType, string>
   worksheet: Record<string, number>
   scenarioA: Inputs | null
@@ -112,6 +137,7 @@ interface Store {
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
   setActiveStep: (step: number) => void
+  markAnswers: (fields: string[], status: AnswerStatus, origin?: AnswerOrigin) => void
   applyMixPreset: (account: AccountType, preset: string) => void
   setWorksheet: (key: string, value: number) => void
   saveScenarioA: () => void
@@ -128,6 +154,8 @@ export const useStore = create<Store>()(
       entryMode: 'guided',
       activeStep: 1,
       visitedSteps: [1],
+      answerMeta: {},
+      scenarioAAnswerMeta: null,
       mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
       worksheet: DEFAULT_WORKSHEET,
       scenarioA: null,
@@ -150,6 +178,15 @@ export const useStore = create<Store>()(
             ? s.visitedSteps
             : [...s.visitedSteps, step],
         })),
+      markAnswers: (fields, status, origin = 'user') =>
+        set((s) => {
+          const updatedAt = new Date().toISOString()
+          const answerMeta = { ...s.answerMeta }
+          fields.forEach((field) => {
+            answerMeta[field] = { status, origin, updatedAt }
+          })
+          return { answerMeta }
+        }),
       applyMixPreset: (account, preset) => {
         track('asset_mix_change', { account, preset })
         set((s) => {
@@ -172,15 +209,21 @@ export const useStore = create<Store>()(
         set((s) => ({ worksheet: { ...s.worksheet, [key]: value } })),
       saveScenarioA: () => {
         track('scenario_save')
-        set((s) => ({ scenarioA: structuredClone(s.inputs) }))
+        set((s) => ({
+          scenarioA: structuredClone(s.inputs),
+          scenarioAAnswerMeta: structuredClone(s.answerMeta),
+        }))
       },
       restoreScenarioA: () => {
         track('scenario_restore')
-        set((s) => (s.scenarioA ? { inputs: structuredClone(s.scenarioA) } : {}))
+        set((s) => (s.scenarioA ? {
+          inputs: structuredClone(s.scenarioA),
+          answerMeta: structuredClone(s.scenarioAAnswerMeta ?? legacyAnswerMeta()),
+        } : {}))
       },
       clearScenarioA: () => {
         track('scenario_clear')
-        set({ scenarioA: null })
+        set({ scenarioA: null, scenarioAAnswerMeta: null })
       },
       reset: () => {
         track('reset_inputs')
@@ -190,21 +233,30 @@ export const useStore = create<Store>()(
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
           activeStep: 1,
           visitedSteps: [1],
+          answerMeta: {},
         })
       },
     }),
     {
       name: 'fire-inputs',
-      // v7: persists guided/professional entry mode and guided progress
-      version: 7,
+      // v9: adds answer provenance and scenario-specific answer metadata;
+      // legacy values remain visibly estimated rather than falsely confirmed.
+      version: 9,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state, version) => {
         const previous = state as Partial<Store>
         // Existing users retain the dense form they already know. Fresh stores
         // use the guided default declared above.
-        if (version < 7) {
-          return { ...previous, entryMode: 'professional', activeStep: 1, visitedSteps: [1] } as Store
+        if (version < 9) {
+          return {
+            ...previous,
+            entryMode: version < 7 ? 'professional' : previous.entryMode,
+            activeStep: previous.activeStep ?? 1,
+            visitedSteps: previous.visitedSteps ?? [1],
+            answerMeta: legacyAnswerMeta(),
+            scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
+          } as Store
         }
         return state as Store
       },
@@ -248,6 +300,8 @@ export const useStore = create<Store>()(
           entryMode: p.entryMode ?? current.entryMode,
           activeStep: Math.max(1, Math.min(7, p.activeStep ?? current.activeStep)),
           visitedSteps: p.visitedSteps ?? current.visitedSteps,
+          answerMeta: p.answerMeta ?? current.answerMeta,
+          scenarioAAnswerMeta: p.scenarioAAnswerMeta ?? current.scenarioAAnswerMeta,
         }
       },
     },
