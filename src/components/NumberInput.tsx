@@ -53,6 +53,7 @@ export function NumberInput(props: {
   step?: number
   className?: string
   placeholder?: string
+  id?: string
 }) {
   const { i18n } = useTranslation()
   const lang = i18n.language
@@ -97,6 +98,7 @@ export function NumberInput(props: {
   return (
     <input
       ref={ref}
+      id={props.id}
       type="text"
       inputMode="decimal"
       autoComplete="off"

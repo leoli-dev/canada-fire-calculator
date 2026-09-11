@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
@@ -6,39 +6,96 @@ test.beforeEach(async ({ page }) => {
   await page.reload()
 })
 
-async function acceptEstimateAndContinue(page: import('@playwright/test').Page) {
-  const estimate = page.getByRole('button', { name: 'Use shown values as estimates' })
-  if (await estimate.isVisible()) await estimate.click()
-  const next = page.getByRole('button', { name: /^(Next|Review plan)$/ })
-  await next.click()
+async function confirmVisibleNumbers(page: Page) {
+  const inputs = page.locator('.question-page .question-number:visible')
+  for (let index = 0; index < await inputs.count(); index++) {
+    const input = inputs.nth(index)
+    const value = await input.inputValue()
+    await input.fill('')
+    await input.fill(value)
+  }
 }
 
-test('fresh users complete seven steps without changing calculation data', async ({ page }) => {
-  await expect(page.getByRole('button', { name: 'Guided', exact: true })).toHaveClass(/active/)
-  await expect(page.getByRole('heading', { name: 'Household and goal' })).toBeVisible()
-  await expect(page.locator('.results-column')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Next' }).click()
-  await expect(page.getByRole('heading', { name: 'Household and goal' })).toBeVisible()
-  await expect(page.getByText(/Review these 6 sample value/)).toBeVisible()
+async function answerCurrentPage(page: Page, pageId: string) {
+  if (pageId === 'family.people') await page.getByRole('radio', { name: /Plan for me/ }).check()
+  else if (pageId === 'family.children') await page.getByRole('radio', { name: /No children/ }).check()
+  else if (pageId === 'family.province') await page.getByLabel('Province').selectOption('BC')
+  else if (pageId === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+  else if (pageId === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
+  else if (pageId === 'assets.identify') {
+    await page.getByRole('checkbox', { name: 'TFSA' }).check()
+    await page.getByRole('checkbox', { name: 'RRSP' }).check()
+    await page.getByRole('checkbox', { name: /Non-registered/ }).check()
+  } else if (pageId === 'home.situation') await page.getByRole('radio', { name: 'Rent' }).check()
+  else if (pageId === 'housing.other') {
+    await page.getByRole('radio', { name: 'No rental property' }).check()
+    await page.getByRole('radio', { name: 'No other loans' }).check()
+  } else if (pageId === 'spending.method') await page.getByRole('radio', { name: /overall budget/ }).check()
+  else if (pageId === 'pension.self') await page.getByRole('radio', { name: 'No employer pension' }).check()
+  else if (pageId === 'intent.legacy') await page.getByRole('radio', { name: /do not need to reserve/ }).check()
+  else if (pageId === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
+  else if (pageId === 'intent.confirm') await page.getByRole('button', { name: /compare in this direction/ }).click()
+  else if (pageId === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
+  else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Bracket-capped/ }).check()
+  else if (pageId === 'assumptions.review') await page.getByRole('button', { name: /Use these disclosed assumptions/ }).click()
+  else await confirmVisibleNumbers(page)
+}
 
-  for (const heading of [
-    'Income and savings',
-    'Accounts and contributions',
-    'Property and debt',
-    'Retirement spending',
-    'Benefits and assumptions',
-  ]) {
-    await acceptEstimateAndContinue(page)
-    await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+async function completeGuidedQuestionnaire(page: Page) {
+  const visited = new Set<string>()
+  while (true) {
+    const article = page.locator('.question-page')
+    await expect(article).toBeVisible()
+    const pageId = await article.getAttribute('data-page-id')
+    if (!pageId) throw new Error('Question page is missing its stable ID')
+    if (visited.has(pageId)) throw new Error(`Questionnaire loop detected at ${pageId}`)
+    visited.add(pageId)
+    await answerCurrentPage(page, pageId)
+    const next = page.locator('.question-pager button').last()
+    if (await next.isDisabled()) break
+    await next.click()
   }
+  expect(visited.size).toBeGreaterThan(20)
 
-  await acceptEstimateAndContinue(page)
-  await expect(page.getByRole('heading', { name: 'Review and read results' })).toBeVisible()
-  await expect(page.locator('.review-card')).toBeVisible()
+  const mobileDirectory = page.getByRole('button', { name: /Questionnaire directory/ })
+  if (await mobileDirectory.isVisible()) await mobileDirectory.click()
+  await page.getByRole('button', { name: 'Review answers' }).click()
+}
+
+test('guided mode completes a full UI flow and invalidates a stale result', async ({ page }) => {
+  test.setTimeout(60_000)
+  await expect(page.getByRole('button', { name: 'Guided', exact: true })).toHaveClass(/active/)
+  await expect(page.locator('.results-column')).toHaveCount(0)
+  await completeGuidedQuestionnaire(page)
+  await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
+  await expect(page.locator('.results-column')).toHaveCount(0)
+  const generate = page.getByRole('button', { name: 'Generate my results' })
+  if (await generate.isDisabled()) throw new Error(await page.locator('.review-blockers').innerText())
+  await expect(generate).toBeEnabled()
+  await generate.click()
+  await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
 
-  await page.reload()
-  await expect(page.getByRole('heading', { name: 'Review and read results' })).toBeVisible()
+  await page.getByRole('button', { name: 'Modify answers' }).click()
+  await page.goto('/#/guided/family/family.ages')
+  const age = page.getByLabel('Current age')
+  await age.fill('36')
+  await expect(page.locator('.results-column')).toHaveCount(0)
+  await page.goto('/#/guided/results')
+  await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
+  await expect(page.locator('.results-column')).toHaveCount(0)
+})
+
+test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.locator('.input-form fieldset')).toHaveCount(6)
+  const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input, select').first()
+  await field('Current age').fill('40')
+  await field('Target FIRE age').fill('55')
+  await field('Desired after-tax annual spending in retirement').fill('60000')
+  await expect(page.locator('.results-column')).toBeVisible()
+  await expect(page.locator('.results-column .summary')).toBeVisible()
+  await expect(page.locator('.recharts-responsive-container').first()).toBeVisible()
 })
 
 test('legacy v6 stores retain professional mode', async ({ page }) => {
@@ -54,43 +111,12 @@ test('legacy v6 stores retain professional mode', async ({ page }) => {
     localStorage.setItem('fire-inputs', JSON.stringify(saved))
   })
   await page.reload()
-
   await expect(page.getByRole('button', { name: 'Professional', exact: true })).toHaveClass(/active/)
-  await expect(page.locator('.input-form fieldset')).toHaveCount(6)
   await expect(page.locator('.results-column')).toBeVisible()
-})
-
-test('partner benefit errors stay on Benefits and can be corrected', async ({ page }) => {
-  await page.getByLabel('Household').selectOption('couple')
-  for (let step = 1; step <= 5; step++) await acceptEstimateAndContinue(page)
-
-  const cppAges = page.getByLabel(/CPP.*start age/)
-  await cppAges.nth(1).fill('59')
-  await acceptEstimateAndContinue(page)
-  await expect(page.getByRole('heading', { name: 'Benefits and assumptions' })).toBeVisible()
-  await expect(page.getByText(/Fix 1 required field/)).toBeVisible()
-
-  await cppAges.nth(1).fill('65')
-  await page.getByRole('button', { name: 'Review plan' }).click()
-  await expect(page.getByRole('heading', { name: 'Review and read results' })).toBeVisible()
-})
-
-test('invalidating a visited chapter hides deterministic results', async ({ page }) => {
-  for (let step = 1; step <= 6; step++) await acceptEstimateAndContinue(page)
-  await expect(page.locator('.results-column')).toBeVisible()
-
-  await page.getByRole('button', { name: 'Edit' }).first().click()
-  await page.getByLabel('Target FIRE age').fill('20')
-  await page.getByRole('button', { name: 'Return to review' }).click()
-  await expect(page.locator('.results-column')).toHaveCount(0)
-  await expect(page.getByText(/item.*need attention/i)).toBeVisible()
 })
 
 test('guided flow does not overflow at 320px', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-320')
-  const widths = await page.evaluate(() => ({
-    viewport: window.innerWidth,
-    document: document.documentElement.scrollWidth,
-  }))
+  const widths = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
   expect(widths.document).toBeLessThanOrEqual(widths.viewport)
 })

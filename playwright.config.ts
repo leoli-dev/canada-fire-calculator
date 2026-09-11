@@ -7,11 +7,10 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    channel: 'chrome',
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop', use: { viewport: { width: 1440, height: 1000 } } },
     { name: 'mobile-320', use: { viewport: { width: 320, height: 740 } } },
   ],
   webServer: {

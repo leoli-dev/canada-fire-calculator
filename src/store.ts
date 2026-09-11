@@ -98,6 +98,16 @@ const DEFAULT_WORKSHEET: Record<string, number> = Object.fromEntries(
 
 export type DisplayMode = 'real' | 'nominal'
 export type EntryMode = 'guided' | 'professional'
+export type GuidedView = 'questionnaire' | 'review' | 'results'
+export type LegacyPreference = 'undecided' | 'none' | 'maxRemaining' | 'minimumAmount' | 'lifetimeGifts'
+export type SpendingPreference = 'undecided' | 'maintain' | 'exploreCeiling'
+export interface PlanningIntent {
+  beneficiaries: string[]
+  legacyPreference: LegacyPreference
+  spendingPreference: SpendingPreference
+  understandingAcknowledged: boolean
+  confirmedIntentRevision: number | null
+}
 export type AnswerStatus = 'confirmed' | 'estimated' | 'unknown' | 'notApplicable'
 export type AnswerOrigin = 'user' | 'default' | 'legacy' | 'example'
 export interface AnswerMeta {
@@ -128,6 +138,12 @@ interface Store {
   entryMode: EntryMode
   activeStep: number
   visitedSteps: number[]
+  activePageId: string
+  guidedView: GuidedView
+  questionAnswers: Record<string, string | boolean | string[]>
+  planningIntent: PlanningIntent
+  inputRevision: number
+  resultRevision: number | null
   answerMeta: Record<string, AnswerMeta>
   scenarioAAnswerMeta: Record<string, AnswerMeta> | null
   mixPresets: Record<AccountType, string>
@@ -137,6 +153,11 @@ interface Store {
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
   setActiveStep: (step: number) => void
+  setActivePage: (pageId: string) => void
+  setGuidedView: (view: GuidedView) => void
+  setQuestionAnswer: (questionId: string, value: string | boolean | string[]) => void
+  setPlanningIntent: (patch: Partial<PlanningIntent>) => void
+  generateGuidedResults: () => void
   markAnswers: (fields: string[], status: AnswerStatus, origin?: AnswerOrigin) => void
   applyMixPreset: (account: AccountType, preset: string) => void
   setWorksheet: (key: string, value: number) => void
@@ -154,6 +175,18 @@ export const useStore = create<Store>()(
       entryMode: 'guided',
       activeStep: 1,
       visitedSteps: [1],
+      activePageId: 'family.people',
+      guidedView: 'questionnaire',
+      questionAnswers: {},
+      planningIntent: {
+        beneficiaries: ['self'],
+        legacyPreference: 'undecided',
+        spendingPreference: 'undecided',
+        understandingAcknowledged: false,
+        confirmedIntentRevision: null,
+      },
+      inputRevision: 0,
+      resultRevision: null,
       answerMeta: {},
       scenarioAAnswerMeta: null,
       mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
@@ -161,7 +194,11 @@ export const useStore = create<Store>()(
       scenarioA: null,
       set: (patch) => {
         trackOnce('adjust_inputs')
-        set((s) => ({ inputs: { ...s.inputs, ...patch } }))
+        set((s) => ({
+          inputs: { ...s.inputs, ...patch },
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
+        }))
       },
       setDisplayMode: (m) => {
         track('display_mode_change', { mode: m })
@@ -178,6 +215,21 @@ export const useStore = create<Store>()(
             ? s.visitedSteps
             : [...s.visitedSteps, step],
         })),
+      setActivePage: (activePageId) => set({ activePageId, guidedView: 'questionnaire' }),
+      setGuidedView: (guidedView) => set({ guidedView }),
+      setQuestionAnswer: (questionId, value) =>
+        set((s) => ({ questionAnswers: { ...s.questionAnswers, [questionId]: value } })),
+      setPlanningIntent: (patch) =>
+        set((s) => ({
+          planningIntent: {
+            ...s.planningIntent,
+            ...patch,
+            understandingAcknowledged: patch.understandingAcknowledged ?? false,
+            confirmedIntentRevision: patch.confirmedIntentRevision ?? null,
+          },
+          resultRevision: null,
+        })),
+      generateGuidedResults: () => set((s) => ({ guidedView: 'results', resultRevision: s.inputRevision })),
       markAnswers: (fields, status, origin = 'user') =>
         set((s) => {
           const updatedAt = new Date().toISOString()
@@ -202,11 +254,17 @@ export const useStore = create<Store>()(
                 [account]: blendedVolatility(mix),
               },
             },
+            inputRevision: s.inputRevision + 1,
+            resultRevision: null,
           }
         })
       },
       setWorksheet: (key, value) =>
-        set((s) => ({ worksheet: { ...s.worksheet, [key]: value } })),
+        set((s) => ({
+          worksheet: { ...s.worksheet, [key]: value },
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
+        })),
       saveScenarioA: () => {
         track('scenario_save')
         set((s) => ({
@@ -219,6 +277,8 @@ export const useStore = create<Store>()(
         set((s) => (s.scenarioA ? {
           inputs: structuredClone(s.scenarioA),
           answerMeta: structuredClone(s.scenarioAAnswerMeta ?? legacyAnswerMeta()),
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
         } : {}))
       },
       clearScenarioA: () => {
@@ -233,27 +293,48 @@ export const useStore = create<Store>()(
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
           activeStep: 1,
           visitedSteps: [1],
+          activePageId: 'family.people',
+          guidedView: 'questionnaire',
+          questionAnswers: {},
+          inputRevision: 0,
+          resultRevision: null,
           answerMeta: {},
         })
       },
     }),
     {
       name: 'fire-inputs',
-      // v9: adds answer provenance and scenario-specific answer metadata;
-      // legacy values remain visibly estimated rather than falsely confirmed.
-      version: 9,
+      // v10: stable questionnaire page IDs, independent review/results state,
+      // planning intent, and revision-bound result snapshots.
+      version: 10,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state, version) => {
         const previous = state as Partial<Store>
         // Existing users retain the dense form they already know. Fresh stores
         // use the guided default declared above.
-        if (version < 9) {
+        if (version < 10) {
+          const legacyPageByStep = [
+            'family.people', 'saving.amount', 'assets.identify', 'home.situation',
+            'spending.total', 'benefits.self', 'intent.legacy',
+          ]
           return {
             ...previous,
             entryMode: version < 7 ? 'professional' : previous.entryMode,
             activeStep: previous.activeStep ?? 1,
             visitedSteps: previous.visitedSteps ?? [1],
+            activePageId: legacyPageByStep[(previous.activeStep ?? 1) - 1] ?? 'family.people',
+            guidedView: previous.activeStep === 7 ? 'review' : 'questionnaire',
+            questionAnswers: {},
+            planningIntent: {
+              beneficiaries: ['self'],
+              legacyPreference: 'undecided',
+              spendingPreference: 'undecided',
+              understandingAcknowledged: false,
+              confirmedIntentRevision: null,
+            },
+            inputRevision: 0,
+            resultRevision: null,
             answerMeta: legacyAnswerMeta(),
             scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
           } as Store
@@ -300,6 +381,12 @@ export const useStore = create<Store>()(
           entryMode: p.entryMode ?? current.entryMode,
           activeStep: Math.max(1, Math.min(7, p.activeStep ?? current.activeStep)),
           visitedSteps: p.visitedSteps ?? current.visitedSteps,
+          activePageId: p.activePageId ?? current.activePageId,
+          guidedView: p.guidedView ?? current.guidedView,
+          questionAnswers: p.questionAnswers ?? current.questionAnswers,
+          planningIntent: p.planningIntent ?? current.planningIntent,
+          inputRevision: p.inputRevision ?? current.inputRevision,
+          resultRevision: p.resultRevision ?? current.resultRevision,
           answerMeta: p.answerMeta ?? current.answerMeta,
           scenarioAAnswerMeta: p.scenarioAAnswerMeta ?? current.scenarioAAnswerMeta,
         }
