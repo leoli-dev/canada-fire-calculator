@@ -178,13 +178,13 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       })}</div>
       break
     }
-    case 'account.tfsa.balance': case 'account.rrsp.balance': case 'account.nonReg.balance': {
-      const account = definition.id.split('.')[1] as 'tfsa' | 'rrsp' | 'nonReg'
+    case 'account.tfsa.balance': case 'account.rrsp.balance': {
+      const account = definition.id.split('.')[1] as 'tfsa' | 'rrsp'
       control = <FactNumber field={`balances.${account}`} label={t(account)} value={inputs.balances[account]} step={5000} onValue={(value) => set({ balances: { ...inputs.balances, [account]: value } })} />
       break
     }
-    case 'assets.cost':
-      control = <><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} onValue={(nonRegBook) => set({ nonRegBook })} /><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(Math.max(0, inputs.balances.nonReg - inputs.nonRegBook)) })}</p></>
+    case 'account.nonReg.balance':
+      control = <><div className="question-pair"><FactNumber field="balances.nonReg" label={t('nonReg')} value={inputs.balances.nonReg} step={5000} onValue={(nonReg) => set({ balances: { ...inputs.balances, nonReg } })} /><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onValue={(nonRegBook) => set({ nonRegBook })} /></div><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(Math.max(0, inputs.balances.nonReg - inputs.nonRegBook)) })}</p></>
       break
     case 'allocation.tfsa': {
       const accounts = ['tfsa', 'rrsp', 'nonReg'] as const

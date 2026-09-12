@@ -142,6 +142,22 @@ test('future savings allocation is one page with a live 100 percent total', asyn
   await expect(page.locator('.allocation-total')).toHaveClass(/complete/)
 })
 
+test('non-registered value and cost base share one page', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/assets/assets.identify')
+  await page.getByRole('checkbox', { name: 'Non-registered account', exact: true }).check()
+  await page.goto('/#/guided/assets/account.nonReg.balance')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  await expect(page.getByRole('heading', { name: '非注册投资现在值多少，成本基础是多少？' })).toBeVisible()
+  await expect(page.locator('[data-field="balances.nonReg"]')).toBeVisible()
+  await expect(page.locator('[data-field="nonRegBook"]')).toBeVisible()
+  await page.locator('[data-field="balances.nonReg"] input').fill('100000')
+  await page.locator('[data-field="nonRegBook"] input').fill('80000')
+  await expect(page.locator('.answer-feedback')).toContainText('账面增值为 CA$20,000')
+  await expect(page.locator('.answer-feedback')).toContainText('这不是税额')
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)

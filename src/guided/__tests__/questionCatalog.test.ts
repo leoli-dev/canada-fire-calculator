@@ -25,6 +25,13 @@ describe('question catalog', () => {
     expect(pageById('allocation.nonReg')?.id).toBe('allocation.tfsa')
   })
 
+  it('keeps non-registered market value and cost base on one page', () => {
+    const page = pageById('account.nonReg.balance')
+    expect(page?.fieldBindings).toEqual(['balances.nonReg', 'nonRegBook'])
+    expect(pageById('assets.cost')?.id).toBe('account.nonReg.balance')
+    expect(QUESTION_CATALOG.some((definition) => definition.id === 'assets.cost')).toBe(false)
+  })
+
   it('provides distinct page-level guidance in every supported language', () => {
     const languages: GuidanceLanguage[] = ['en', 'fr', 'zh']
 

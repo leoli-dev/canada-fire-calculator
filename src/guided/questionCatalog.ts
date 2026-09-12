@@ -55,8 +55,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('assets.identify', 'assets', ['accounts'], ['balances', 'fhsa', 'lockedRetirement']),
   page('account.tfsa.balance', 'assets', ['balance'], ['balances.tfsa'], { applicableWhen: (_i, a) => accountSelected(a, 'tfsa'), prerequisitePageId: 'assets.identify' }),
   page('account.rrsp.balance', 'assets', ['balance'], ['balances.rrsp'], { applicableWhen: (_i, a) => accountSelected(a, 'rrsp'), prerequisitePageId: 'assets.identify' }),
-  page('account.nonReg.balance', 'assets', ['balance'], ['balances.nonReg'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
-  page('assets.cost', 'assets', ['nonRegBook'], ['nonRegBook'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
+  page('account.nonReg.balance', 'assets', ['balance', 'nonRegBook'], ['balances.nonReg', 'nonRegBook'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
   page('allocation.tfsa', 'assets', ['allocation'], ['savingsSplit.tfsa', 'savingsSplit.rrsp', 'savingsSplit.nonReg'], { estimatePolicy: 'assumption' }),
   page('fhsa.details', 'assets', ['fhsaBalance', 'fhsaContribution'], ['fhsa.balance', 'fhsa.annualContribution'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
   page('fhsa.open', 'assets', ['fhsaOpened'], ['fhsa.openedYearsAgo'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
@@ -122,6 +121,7 @@ export function questionForField(field: string): QuestionDefinition | undefined 
 
 export function pageById(id: string): QuestionDefinition | undefined {
   const aliases: Record<string, string> = {
+    'assets.cost': 'account.nonReg.balance',
     'allocation.rrsp': 'allocation.tfsa',
     'allocation.nonReg': 'allocation.tfsa',
   }
