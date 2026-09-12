@@ -536,6 +536,7 @@
   "guidedCppAgeGuideNote": "This changes a planning assumption only; it does not apply for benefits. Your actual amount and timing depend on your circumstances.",
   "guidedCppAgeGuideSource": "Official guidance on when to start",
   "guidedCppEstimateNote": "“Confirmed” means you accepted this planning amount, not that the government approved it. The work-history estimate is rough; replace it with your official account estimate when available.",
+  "guidedOasEstimateNote": "“Confirmed” means you accepted this planning amount, not that the government approved it. The residence-years estimate is rough; replace it with your official account estimate when available.",
   "guidedUseEstimate": "Use shown values as estimates",
   "guidedReturnReview": "Return to review",
   "guidedConfirmValues": "Review these {{count}} sample value(s), change them, or explicitly use them as estimates before continuing.",

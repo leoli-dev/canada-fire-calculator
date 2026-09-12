@@ -536,6 +536,7 @@
   "guidedCppAgeGuideNote": "Il s’agit d’une hypothèse de planification, pas d’une demande de prestations. Le montant réel et le bon moment dépendent de votre situation.",
   "guidedCppAgeGuideSource": "Consulter les conseils officiels",
   "guidedCppEstimateNote": "« Confirmé » signifie que vous avez retenu ce montant pour la planification, pas qu’il est approuvé par l’État. L’estimation fondée sur la carrière est approximative; remplacez-la par votre relevé officiel si possible.",
+  "guidedOasEstimateNote": "« Confirmé » signifie que vous avez retenu ce montant pour la planification, pas qu’il est approuvé par l’État. L’estimation fondée sur les années de résidence est approximative; remplacez-la par votre relevé officiel si possible.",
   "guidedUseEstimate": "Utiliser ces valeurs comme estimations",
   "guidedReturnReview": "Revenir à la vérification",
   "guidedConfirmValues": "Vérifiez ces {{count}} valeur(s) d’exemple, modifiez-les ou utilisez-les explicitement comme estimations.",

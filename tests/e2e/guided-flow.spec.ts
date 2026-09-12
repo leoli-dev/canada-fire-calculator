@@ -268,7 +268,7 @@ test('applying the CPP work-history estimate confirms the planning input and age
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
   await expect(amount.locator('small')).toHaveText('已确认')
   await expect(amount.locator('input')).not.toHaveValue('10000')
-  await expect(page.locator('.cpp-estimate-note')).toContainText('不代表政府核定')
+  await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
   await expect(age.locator('small')).toHaveText('示例')
 
   await page.getByRole('radio', { name: /70 岁 · 延后领取/ }).check()
@@ -280,6 +280,42 @@ test('applying the CPP work-history estimate confirms the planning input and age
   await expect(amount.locator('small')).toHaveText('已确认')
   await expect(age.locator('input')).toHaveValue('68')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
+})
+
+test('applying the OAS residence estimate confirms the accepted planning amount', async ({ page }) => {
+  await page.goto('/#/guided/income/oas.self')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const amount = page.locator('[data-field="oasAnnualAt65"]')
+  const age = page.locator('[data-field="oasStartAge"]')
+  await expect(amount.locator('small')).toHaveText('示例')
+  await expect(age.locator('small')).toHaveText('示例')
+  await page.locator('.estimator summary').click()
+  await page.locator('.estimator input').fill('32')
+  await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
+  await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(age.locator('small')).toHaveText('示例')
+  await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
+  await page.reload()
+  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('input')).toHaveValue('7,219')
+})
+
+test('partner OAS residence estimate also confirms on apply', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/family/family.people')
+  await page.getByRole('radio', { name: /Plan with my partner/ }).check()
+  await page.goto('/#/guided/income/oas.partner')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const amount = page.locator('[data-field="partner.oasAnnualAt65"]')
+  await page.locator('.estimator summary').click()
+  await page.locator('.estimator input').fill('32')
+  await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
+  await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(page.locator('[data-field="partner.oasStartAge"] small')).toHaveText('示例')
 })
 
 test('Québec QPP offers age 72 guidance for both household members', async ({ page }, testInfo) => {

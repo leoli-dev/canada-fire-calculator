@@ -360,25 +360,35 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ cppAnnualAt65 })} />
         <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ cppAnnualAt65, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
-        <p className="cpp-estimate-note">{t('guidedCppEstimateNote')}</p>
+        <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} />
         <CppClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ cppStartAge })} />
       </>
       break
     case 'oas.self':
-      control = <><div className="question-pair"><FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ oasAnnualAt65 })} /><FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} /></div><OasEstimator onApply={(oasAnnualAt65) => { set({ oasAnnualAt65 }); markAnswers(['oasAnnualAt65'], 'estimated') }} /></>
+      control = <>
+        <FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ oasAnnualAt65 })} />
+        <OasEstimator onApply={(oasAnnualAt65) => { set({ oasAnnualAt65 }); markAnswers(['oasAnnualAt65'], 'confirmed') }} />
+        <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
+        <FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} />
+      </>
       break
     case 'cpp.partner':
       control = <>
         <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.partner!.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ partner: { ...inputs.partner!, cppAnnualAt65 } })} />
         <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'confirmed') }} />
-        <p className="cpp-estimate-note">{t('guidedCppEstimateNote')}</p>
+        <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
         <CppClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
       </>
       break
     case 'oas.partner':
-      control = <><div className="question-pair"><FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.partner!.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ partner: { ...inputs.partner!, oasAnnualAt65 } })} /><FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} /></div><OasEstimator onApply={(oasAnnualAt65) => { set({ partner: { ...inputs.partner!, oasAnnualAt65 } }); markAnswers(['partner.oasAnnualAt65'], 'estimated') }} /></>
+      control = <>
+        <FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.partner!.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ partner: { ...inputs.partner!, oasAnnualAt65 } })} />
+        <OasEstimator onApply={(oasAnnualAt65) => { set({ partner: { ...inputs.partner!, oasAnnualAt65 } }); markAnswers(['partner.oasAnnualAt65'], 'confirmed') }} />
+        <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
+        <FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
+      </>
       break
     case 'pension.self':
       control = <ChoiceGroup id={definition.id} value={inputs.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ pension: value === 'db' ? (inputs.pension ?? DEFAULT_PENSION) : null }); markAnswers(['pension'], value === 'db' ? 'estimated' : 'notApplicable') }} />

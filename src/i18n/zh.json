@@ -536,6 +536,7 @@
   "guidedCppAgeGuideNote": "这只改变规划假设，不会替你申请福利；实际金额和适合的时间取决于个人情况。",
   "guidedCppAgeGuideSource": "查看官方开领说明",
   "guidedCppEstimateNote": "“已确认”表示你已采用这个规划金额，不代表政府核定；工作经历估算是粗估，之后可用官方账户金额替换。",
+  "guidedOasEstimateNote": "“已确认”表示你已采用这个规划金额，不代表政府核定；居住年数估算是粗估，之后可用官方账户金额替换。",
   "guidedUseEstimate": "把当前示例值作为估算",
   "guidedReturnReview": "返回核对",
   "guidedConfirmValues": "请检查这 {{count}} 个示例值：修改它们，或明确选择作为估算后再继续。",
