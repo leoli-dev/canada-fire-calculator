@@ -158,8 +158,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'assets.identify': {
       const selected = (questionAnswers[definition.id] as string[] | undefined) ?? []
-      const choices = ['tfsa', 'rrsp', 'nonReg', 'fhsa', 'locked']
-      control = <div className="check-group">{choices.map((account) => <label key={account}><input type="checkbox" checked={selected.includes(account)} onChange={(e) => {
+      const choices = ['tfsa', 'rrsp', 'nonReg', 'fhsa', 'locked'] as const
+      control = <div className="check-group">{choices.map((account) => <label key={account} className={selected.includes(account) ? 'selected' : undefined}><input type="checkbox" checked={selected.includes(account)} onChange={(e) => {
         if (!e.target.checked) {
           const nonZero = account === 'fhsa' ? (inputs.fhsa?.balance ?? 0) > 0
             : account === 'locked' ? (inputs.lockedRetirement?.balance ?? 0) > 0
@@ -172,7 +172,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         else if (account === 'locked') set({ lockedRetirement: e.target.checked ? (inputs.lockedRetirement ?? DEFAULT_LOCKED_RETIREMENT) : null })
         else set({ balances: { ...inputs.balances, [account]: e.target.checked ? inputs.balances[account as keyof typeof inputs.balances] : 0 } })
         markAnswers([account === 'locked' ? 'lockedRetirement' : account], e.target.checked ? 'estimated' : 'notApplicable')
-      }} /><span>{t(account === 'locked' ? 'lockedRetirementBalance' : account === 'fhsa' ? 'fhsaSection' : account)}</span></label>)}</div>
+      }} /><span><strong>{t(`questionnaire.accountNames.${account}`)}</strong><small>{t(`questionnaire.accountRoles.${account}`)}</small></span></label>)}</div>
       break
     }
     case 'account.tfsa.balance': case 'account.rrsp.balance': case 'account.nonReg.balance': {

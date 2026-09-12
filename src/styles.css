@@ -215,10 +215,10 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .question-select { display: grid; grid-template-columns: minmax(0,1fr) 210px; align-items: center; gap: 20px; max-width: 620px; margin: 18px 0; font-weight: 650; }
 .choice-group, .check-group { display: grid; gap: 10px; max-width: 620px; margin: 20px 0; }
 .choice-group label, .check-group label { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; padding: 13px 14px; cursor: pointer; }
-.choice-group label.selected { border-color: #174ea6; box-shadow: inset 3px 0 #174ea6; }
+.choice-group label.selected, .check-group label.selected { border-color: #174ea6; box-shadow: inset 3px 0 #174ea6; }
 .choice-group input, .check-group input { margin-top: 4px; accent-color: #174ea6; }
-.choice-group span { display: grid; gap: 3px; }
-.choice-group small { color: #526579; font-weight: 400; }
+.choice-group span, .check-group span { display: grid; gap: 3px; }
+.choice-group small, .check-group small { color: #526579; font-weight: 400; line-height: 1.45; }
 .question-help { max-width: 620px; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
 .question-help summary { color: #174ea6; cursor: pointer; font-weight: 600; }
 .question-help p { max-width: 65ch; color: #526579; line-height: 1.65; }

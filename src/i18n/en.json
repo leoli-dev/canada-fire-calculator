@@ -552,6 +552,14 @@
     "assumptionSummary": "Current disclosed assumptions: {{returns}}% real return, {{fees}}% annual fees, {{inflation}}% inflation. Account returns and market volatility remain estimates, not promises.", "acceptAssumptions": "Use these disclosed assumptions",
     "categories": { "family": "Family and timing", "saving": "Everyday saving", "assets": "Money you already have", "housing": "Housing and loans", "spending": "Retirement life", "income": "Other retirement income", "preferences": "Preferences and assumptions" },
     "status": { "answered": "answered", "pending": "to do" },
+    "accountNames": { "tfsa": "TFSA", "rrsp": "RRSP / RRIF", "nonReg": "Non-registered account", "fhsa": "FHSA", "locked": "Locked retirement account" },
+    "accountRoles": {
+      "tfsa": "After-tax money grows and can be withdrawn tax-free—useful for flexible retirement spending.",
+      "rrsp": "Contributions may reduce tax now; growth is tax-deferred and RRSP/RRIF withdrawals are taxable income.",
+      "nonReg": "No special tax shelter; interest, dividends and realized gains may create tax along the way.",
+      "fhsa": "Built for a first home: contributions may be deductible; unused funds can generally transfer tax-free to an RRSP/RRIF for retirement.",
+      "locked": "Usually pension money in a LIRA or locked-in DC plan; it is for retirement and cannot be accessed freely before the permitted age."
+    },
     "choice": {
       "single": "Plan for me", "couple": "Plan with my partner", "noChildren": "No children in this plan", "hasChildren": "Include children", "monthly": "I know the monthly amount", "annual": "I know the yearly amount", "noWork": "No work income after full-time work", "someWork": "I expect some work income", "undecided": "I have not decided", "no": "No", "yes": "Yes", "noRental": "No rental property", "hasRental": "Include a rental property", "noDebt": "No other loans", "hasDebt": "Include another loan", "knowBudget": "I know my overall budget", "estimateBudget": "Help me build it from categories", "unknown": "I need to come back to this", "noPension": "No employer pension", "dbPension": "My employer will pay me regularly", "dbDetail": "A defined-benefit pension pays income over time.", "dcPension": "I have an account balance", "dcDetail": "Put a DC/LIRA balance in the locked-account section.", "indexedFull": "It fully rises with inflation", "indexedPartial": "Only part rises with inflation", "indexedFixed": "The payment stays fixed", "leaveMore": "Keep my planned lifestyle and compare what may remain", "noLegacy": "I do not need to reserve a specific legacy", "fixedLegacy": "I want to leave a particular amount", "lifetimeGifts": "I prefer helping people while I am alive", "unsupported": "We will record this wish and explain the current limitation.", "maintainSpending": "Keep my current retirement budget", "exploreCeiling": "Show the theoretical spending ceiling"
     },

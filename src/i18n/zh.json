@@ -545,6 +545,14 @@
     "reviewAnswers": "核对答案", "backToQuestions": "返回问卷", "reviewTitle": "核对你的答案", "reviewIntro": "检查你填写的事实、接受的估算和仍待补的资料。现在还没有生成结果。", "needsAttention": "请补充或核对这些项目", "generateResults": "生成我的结果", "modifyAnswers": "修改答案", "resultsTitle": "你的退休投影", "resultsIntro": "以下结果只使用你明确核对过的答案和假设。", "nextCategory": "下一类别", "pendingSaved": "已标为待补。你可以继续，并在核对页回来处理。", "hasHome": "已计入住房", "notApplicable": "当前路径不适用这个问题。",
     "monthlySavings": "平均每月新增储蓄", "savingFeedback": "每月 {{monthly}}，等于每年 {{annual}}。", "spendingFeedback": "按今天购买力，每月 {{monthly}}，等于每年 {{annual}}。", "housingOtherLimit": "投资房和其他负债会进入各自的后续页面。", "confirmRemoveValue": "这项内容含有已保存的非零金额。确定从计划中移除吗？", "confirmIntent": "是，按这个方向比较", "intentUnsupported": "固定遗产金额或生前赠与会保存为愿望，但当前引擎还不能把它作为现金流硬约束。", "assumptionSummary": "已披露假设：实际收益 {{returns}}%、年费 {{fees}}%、通胀 {{inflation}}%。收益和波动是估算，不是承诺。", "acceptAssumptions": "采用这些已披露假设",
     "categories": { "family": "家庭与时间", "saving": "日常储蓄", "assets": "已有资金", "housing": "住房与贷款", "spending": "退休生活", "income": "其他退休收入", "preferences": "偏好与假设" }, "status": { "answered": "已回答", "pending": "待填写" },
+    "accountNames": { "tfsa": "TFSA 免税账户", "rrsp": "RRSP / RRIF", "nonReg": "非注册账户", "fhsa": "FHSA 首套房储蓄账户", "locked": "锁定退休账户" },
+    "accountRoles": {
+      "tfsa": "税后资金在账户内免税增长，提款也不纳税，适合灵活支付退休生活费。",
+      "rrsp": "供款通常可抵扣当年收入，账户内延税增长；从RRSP或RRIF提款时计入应税收入。",
+      "nonReg": "没有专门税务优惠；利息、分红和已实现资本增值可能在持有期间产生税。",
+      "fhsa": "专为首次购房准备；供款通常可抵税，未用于购房的资金一般可免税转入RRSP/RRIF继续用于退休。",
+      "locked": "通常来自单位养老金的LIRA或锁定DC资金，只供退休使用，达到规定年龄前不能自由提款。"
+    },
     "choice": { "single": "只为我规划", "couple": "我和伴侣一起规划", "noChildren": "本计划不纳入孩子", "hasChildren": "纳入孩子", "monthly": "我知道每月金额", "annual": "我知道全年金额", "noWork": "停工后没有工作收入", "someWork": "预计仍有工作收入", "undecided": "还没决定", "no": "没有", "yes": "有", "noRental": "没有投资房", "hasRental": "纳入一套投资房", "noDebt": "没有其他贷款", "hasDebt": "纳入一笔其他贷款", "knowBudget": "我知道总预算", "estimateBudget": "按生活项目帮我估算", "unknown": "稍后回来补", "noPension": "没有单位养老金", "dbPension": "单位以后按期发钱", "dbDetail": "这是按期领取的DB养老金。", "dcPension": "我有一笔账户余额", "dcDetail": "DC/LIRA余额应放在锁定账户部分。", "indexedFull": "全部随通胀增长", "indexedPartial": "只有一部分随通胀增长", "indexedFixed": "金额保持固定", "leaveMore": "维持计划生活，比较可能剩下多少", "noLegacy": "不需要预留指定遗产", "fixedLegacy": "希望留下固定金额", "lifetimeGifts": "希望生前帮助别人", "unsupported": "会记录愿望并说明当前限制。", "maintainSpending": "维持当前退休预算", "exploreCeiling": "查看理论支出上限" },
     "intentSummary": { "legacy": "维持每年约 {{spending}} 的支出，比较剩余税后资产。", "spending": "不改变当前预算，另行查看理论支出上限。", "sustainability": "只检查当前计划能否持续，不假称你选择了遗产偏好。" },
     "guidance": {

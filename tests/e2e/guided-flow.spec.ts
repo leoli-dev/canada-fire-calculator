@@ -110,6 +110,20 @@ test('question help follows the current page within one category', async ({ page
   expect(childrenHelp).not.toBe(agesHelp)
 })
 
+test('account selection explains the role of every account', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/assets/assets.identify')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const roles = page.locator('.check-group small')
+  await expect(roles).toHaveCount(5)
+  await expect(roles.nth(0)).toContainText('免税增长')
+  await expect(roles.nth(1)).toContainText('提款时计入应税收入')
+  await expect(roles.nth(2)).toContainText('已实现资本增值')
+  await expect(roles.nth(3)).toContainText('首次购房')
+  await expect(roles.nth(4)).toContainText('达到规定年龄前不能自由提款')
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
