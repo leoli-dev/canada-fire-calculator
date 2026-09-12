@@ -214,6 +214,29 @@ test('fee and inflation presets are sourced examples, independently editable and
   await expect(page.locator('.assumption-source a')).toHaveCount(6)
 })
 
+test('tax assumptions explain both inputs and update the worked example', async ({ page }) => {
+  await page.goto('/#/guided/preferences/invest.tax')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  await expect(page.getByRole('heading', { name: '非注册投资每年产生多少应税收入？按什么税率估算？' })).toBeVisible()
+  await expect(page.getByText('未卖出的市值上涨不算在这里。', { exact: false })).toBeVisible()
+  await expect(page.getByText('不是你全年收入的平均税率。', { exact: false })).toBeVisible()
+  await expect(page.getByRole('link', { name: '加拿大税务局的基金税务说明' })).toHaveAttribute('href', /canada\.ca/)
+  await expect(page.getByRole('link', { name: '加拿大税务局税档' })).toHaveAttribute('href', /canada\.ca/)
+
+  const example = page.locator('.tax-worked-example')
+  await expect(example).toContainText('CA$2,000')
+  await expect(example).toContainText('CA$700')
+  await page.locator('[data-field="nonRegDistributionYield"] input').fill('3')
+  await page.locator('[data-field="accumulationMarginalRate"] input').fill('40')
+  await expect(example).toContainText('CA$3,000')
+  await expect(example).toContainText('CA$1,200')
+  await page.reload()
+  await expect(example).toContainText('CA$1,200')
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+  expect(overflow).toBe(false)
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)

@@ -390,9 +390,28 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       </div>
       break
     }
-    case 'invest.tax':
-      control = <div className="question-pair"><FactNumber field="nonRegDistributionYield" label={t('nonRegYieldLabel')} value={(inputs.nonRegDistributionYield ?? 0.02) * 100} step={0.1} onValue={(value) => set({ nonRegDistributionYield: value / 100 })} /><FactNumber field="accumulationMarginalRate" label={t('accMarginalLabel')} value={(inputs.accumulationMarginalRate ?? 0.35) * 100} step={1} onValue={(value) => set({ accumulationMarginalRate: value / 100 })} /></div>
+    case 'invest.tax': {
+      const distributionRate = inputs.nonRegDistributionYield ?? 0.02
+      const marginalRate = inputs.accumulationMarginalRate ?? 0.35
+      const exampleDistribution = 100_000 * distributionRate
+      control = <div className="tax-assumptions">
+        <p className="tax-page-intro">{t('questionnaire.taxIntro')}</p>
+        <div className="tax-assumption-field">
+          <FactNumber field="nonRegDistributionYield" label={t('questionnaire.taxDistributionLabel')} value={distributionRate * 100} step={0.1} onValue={(value) => set({ nonRegDistributionYield: value / 100 })} />
+          <p>{t('questionnaire.taxDistributionMeaning')}</p>
+          <p>{t('questionnaire.taxDistributionFind')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/personal-income/line-12700-capital-gains/completing-schedule-3/tax-treatment-mutual-funds.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.taxDistributionSource')}</a></p>
+          <p>{t('questionnaire.taxDistributionZero')}</p>
+        </div>
+        <div className="tax-assumption-field">
+          <FactNumber field="accumulationMarginalRate" label={t('questionnaire.taxRateLabel')} value={marginalRate * 100} step={1} onValue={(value) => set({ accumulationMarginalRate: value / 100 })} />
+          <p>{t('questionnaire.taxRateMeaning')}</p>
+          <p>{t('questionnaire.taxRateFind')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.taxRateSource')}</a></p>
+        </div>
+        <p className="tax-worked-example" aria-live="polite">{t('questionnaire.taxWorkedExample', { balance: cad(100_000), distribution: cad(exampleDistribution), tax: cad(exampleDistribution * marginalRate) })}</p>
+        <p className="tax-model-note">{t('questionnaire.taxModelNote')}</p>
+      </div>
       break
+    }
     case 'invest.strategy':
       control = <ChoiceGroup id={definition.id} value={answer} options={(['meltdownPaced', 'nonRegFirst', 'tfsaFirst', 'rrspFirst'] as Strategy[]).map((value) => ({ value, label: t(`strat_${value}`) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ strategy: value as Strategy }); markAnswers(['strategy'], 'confirmed') }} />
       break

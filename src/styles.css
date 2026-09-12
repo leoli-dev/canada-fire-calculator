@@ -224,6 +224,14 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .assumption-preset { border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: #172b3a; padding: 9px 12px; text-align: left; cursor: pointer; }
 .assumption-preset[aria-pressed='true'] { border-color: #174ea6; background: #edf3fb; color: #174ea6; }
 .assumption-preset-field .assumption-source { font-size: .83rem; }
+.tax-assumptions { max-width: 620px; margin: 18px 0; }
+.tax-page-intro { margin: 0 0 18px; color: #172b3a; line-height: 1.6; }
+.tax-assumption-field { border-top: 1px solid var(--line); padding: 16px 0 18px; }
+.tax-assumption-field .question-answer { margin: 0 0 10px; }
+.tax-assumption-field p { margin: 8px 0; color: #526579; line-height: 1.55; }
+.tax-assumption-field a { color: #174ea6; }
+.tax-worked-example { margin: 8px 0; border-left: 3px solid #174ea6; background: #edf3fb; padding: 12px 14px; color: #172b3a; line-height: 1.55; }
+.tax-model-note { margin: 12px 0; color: #526579; font-size: .88rem; line-height: 1.55; }
 .allocation-editor .question-pair { max-width: 620px; }
 .allocation-editor .question-answer { width: 100%; margin: 8px 0; }
 .allocation-total { display: flex; justify-content: space-between; gap: 16px; max-width: 620px; margin-top: 16px; border-left: 3px solid; padding: 10px 12px; line-height: 1.45; }
