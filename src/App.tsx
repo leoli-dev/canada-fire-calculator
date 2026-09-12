@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { pensionStartAge, runProjection } from './engine'
+import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
 import { useStore } from './store'
 import { InputForm } from './components/InputForm'
+import { GuidedFlow } from './components/GuidedFlow'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
 import { IncomeChart } from './components/IncomeChart'
@@ -29,7 +30,17 @@ export default function App() {
   const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
   const displayMode = useStore((s) => s.displayMode)
-  const result = useMemo(() => runProjection(inputs), [inputs])
+  const entryMode = useStore((s) => s.entryMode)
+  const setEntryMode = useStore((s) => s.setEntryMode)
+  const guidedView = useStore((s) => s.guidedView)
+  const inputRevision = useStore((s) => s.inputRevision)
+  const resultRevision = useStore((s) => s.resultRevision)
+  const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision
+  const result = useMemo(() => entryMode === 'professional' || showGuidedResults ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs])
+  const hasBlockingIssues = useMemo(
+    () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
+    [inputs],
+  )
   const pensionAge = pensionStartAge(inputs)
   const inflation = inputs.inflation ?? 0.021
   const scale = useMemo(
@@ -70,11 +81,19 @@ export default function App() {
         </nav>
       </header>
 
-      <main>
+      <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
-          <InputForm />
+          <div className="entry-mode" aria-label={t('entryModeLabel')}>
+            <button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
+              {t('guidedMode')}
+            </button>
+            <button type="button" className={entryMode === 'professional' ? 'active' : ''} onClick={() => setEntryMode('professional')}>
+              {t('professionalMode')}
+            </button>
+          </div>
+          {entryMode === 'guided' ? <GuidedFlow /> : <InputForm />}
         </aside>
-        <section>
+        {result && !hasBlockingIssues && <section className="results-column">
           <ResultsPanel inputs={inputs} result={result} />
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
@@ -101,7 +120,7 @@ export default function App() {
           <TimingCard inputs={inputs} />
           <MonteCarloCard inputs={inputs} scale={scale} />
           <ScenarioCard />
-        </section>
+        </section>}
       </main>
 
       <footer>

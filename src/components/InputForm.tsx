@@ -213,7 +213,6 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('coupleNote')} /></p>
           </>
         )}
-
         <label className="field">
           <span><Jargon text={t('extraIncomeToggle')} /></span>
           <input
@@ -243,7 +242,6 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
           </>
         )}
-
         <label className="field">
           <span><Jargon text={t('childrenToggle')} /></span>
           <input

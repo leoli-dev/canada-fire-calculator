@@ -42,8 +42,8 @@ function toRaw(value: number): string {
 }
 
 /**
- * Text-based numeric input: clearable (empty commits null immediately so
- * results stay live while the box is blank), no leading zeros, live
+ * Text-based numeric input: clearable with a local draft (an empty edit does
+ * not enter the engine until blur), no leading zeros, live
  * locale-aware thousands separators, ArrowUp/Down stepping. Replaces
  * type="number" everywhere (user feedback #1/#2/#4).
  */
@@ -53,6 +53,7 @@ export function NumberInput(props: {
   step?: number
   className?: string
   placeholder?: string
+  id?: string
 }) {
   const { i18n } = useTranslation()
   const lang = i18n.language
@@ -97,6 +98,7 @@ export function NumberInput(props: {
   return (
     <input
       ref={ref}
+      id={props.id}
       type="text"
       inputMode="decimal"
       autoComplete="off"
@@ -107,14 +109,17 @@ export function NumberInput(props: {
         setText(props.value === null ? '' : toRaw(props.value))
         setFocused(true)
       }}
-      onBlur={() => setFocused(false)}
+      onBlur={() => {
+        commit(text)
+        setFocused(false)
+      }}
       onChange={(e) => {
         const el = e.target
         const before = el.value.slice(0, el.selectionStart ?? el.value.length)
         caretUnits.current = sanitize(before, lang).length
         const raw = sanitize(el.value, lang)
         setText(raw)
-        commit(raw)
+        if (raw !== '' && raw !== '-') commit(raw)
       }}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return

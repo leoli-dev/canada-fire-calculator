@@ -97,15 +97,68 @@ const DEFAULT_WORKSHEET: Record<string, number> = Object.fromEntries(
 )
 
 export type DisplayMode = 'real' | 'nominal'
+export type EntryMode = 'guided' | 'professional'
+export type GuidedView = 'questionnaire' | 'review' | 'results'
+export type LegacyPreference = 'undecided' | 'none' | 'maxRemaining' | 'minimumAmount' | 'lifetimeGifts'
+export type SpendingPreference = 'undecided' | 'maintain' | 'exploreCeiling'
+export interface PlanningIntent {
+  beneficiaries: string[]
+  legacyPreference: LegacyPreference
+  spendingPreference: SpendingPreference
+  understandingAcknowledged: boolean
+  confirmedIntentRevision: number | null
+}
+export type AnswerStatus = 'confirmed' | 'estimated' | 'unknown' | 'notApplicable'
+export type AnswerOrigin = 'user' | 'default' | 'legacy' | 'example'
+export interface AnswerMeta {
+  status: AnswerStatus
+  origin: AnswerOrigin
+  updatedAt: string
+  assumptionValue?: number
+}
+
+const LEGACY_META_FIELDS = [
+  'goal', 'currentAge', 'fireAge', 'lifeExpectancy', 'province', 'household', 'annualSavings',
+  'retirementSpending', 'balances.tfsa', 'balances.rrsp', 'balances.nonReg',
+  'nonRegBook', 'housingMode', 'cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65',
+]
+
+function legacyAnswerMeta(): Record<string, AnswerMeta> {
+  const updatedAt = new Date().toISOString()
+  return Object.fromEntries(LEGACY_META_FIELDS.map((field) => [field, {
+    status: 'estimated' as const,
+    origin: 'legacy' as const,
+    updatedAt,
+  }]))
+}
 
 interface Store {
   inputs: Inputs
   displayMode: DisplayMode
+  entryMode: EntryMode
+  activeStep: number
+  visitedSteps: number[]
+  activePageId: string
+  guidedView: GuidedView
+  questionAnswers: Record<string, string | boolean | string[]>
+  planningIntent: PlanningIntent
+  inputRevision: number
+  resultRevision: number | null
+  answerMeta: Record<string, AnswerMeta>
+  scenarioAAnswerMeta: Record<string, AnswerMeta> | null
   mixPresets: Record<AccountType, string>
   worksheet: Record<string, number>
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
   setDisplayMode: (m: DisplayMode) => void
+  setEntryMode: (m: EntryMode) => void
+  setActiveStep: (step: number) => void
+  setActivePage: (pageId: string) => void
+  setGuidedView: (view: GuidedView) => void
+  setQuestionAnswer: (questionId: string, value: string | boolean | string[]) => void
+  setPlanningIntent: (patch: Partial<PlanningIntent>) => void
+  generateGuidedResults: () => void
+  markAnswers: (fields: string[], status: AnswerStatus, origin?: AnswerOrigin) => void
   applyMixPreset: (account: AccountType, preset: string) => void
   setWorksheet: (key: string, value: number) => void
   saveScenarioA: () => void
@@ -119,17 +172,73 @@ export const useStore = create<Store>()(
     (set) => ({
       inputs: DEFAULT_INPUTS,
       displayMode: 'real',
+      entryMode: 'guided',
+      activeStep: 1,
+      visitedSteps: [1],
+      activePageId: 'family.people',
+      guidedView: 'questionnaire',
+      questionAnswers: {},
+      planningIntent: {
+        beneficiaries: ['self'],
+        legacyPreference: 'undecided',
+        spendingPreference: 'undecided',
+        understandingAcknowledged: false,
+        confirmedIntentRevision: null,
+      },
+      inputRevision: 0,
+      resultRevision: null,
+      answerMeta: {},
+      scenarioAAnswerMeta: null,
       mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
       worksheet: DEFAULT_WORKSHEET,
       scenarioA: null,
       set: (patch) => {
         trackOnce('adjust_inputs')
-        set((s) => ({ inputs: { ...s.inputs, ...patch } }))
+        set((s) => ({
+          inputs: { ...s.inputs, ...patch },
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
+        }))
       },
       setDisplayMode: (m) => {
         track('display_mode_change', { mode: m })
         set({ displayMode: m })
       },
+      setEntryMode: (m) => {
+        track('mode_change', { mode: m })
+        set({ entryMode: m })
+      },
+      setActiveStep: (step) =>
+        set((s) => ({
+          activeStep: Math.max(1, Math.min(7, step)),
+          visitedSteps: s.visitedSteps.includes(step)
+            ? s.visitedSteps
+            : [...s.visitedSteps, step],
+        })),
+      setActivePage: (activePageId) => set({ activePageId, guidedView: 'questionnaire' }),
+      setGuidedView: (guidedView) => set({ guidedView }),
+      setQuestionAnswer: (questionId, value) =>
+        set((s) => ({ questionAnswers: { ...s.questionAnswers, [questionId]: value } })),
+      setPlanningIntent: (patch) =>
+        set((s) => ({
+          planningIntent: {
+            ...s.planningIntent,
+            ...patch,
+            understandingAcknowledged: patch.understandingAcknowledged ?? false,
+            confirmedIntentRevision: patch.confirmedIntentRevision ?? null,
+          },
+          resultRevision: null,
+        })),
+      generateGuidedResults: () => set((s) => ({ guidedView: 'results', resultRevision: s.inputRevision })),
+      markAnswers: (fields, status, origin = 'user') =>
+        set((s) => {
+          const updatedAt = new Date().toISOString()
+          const answerMeta = { ...s.answerMeta }
+          fields.forEach((field) => {
+            answerMeta[field] = { status, origin, updatedAt }
+          })
+          return { answerMeta }
+        }),
       applyMixPreset: (account, preset) => {
         track('asset_mix_change', { account, preset })
         set((s) => {
@@ -145,22 +254,36 @@ export const useStore = create<Store>()(
                 [account]: blendedVolatility(mix),
               },
             },
+            inputRevision: s.inputRevision + 1,
+            resultRevision: null,
           }
         })
       },
       setWorksheet: (key, value) =>
-        set((s) => ({ worksheet: { ...s.worksheet, [key]: value } })),
+        set((s) => ({
+          worksheet: { ...s.worksheet, [key]: value },
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
+        })),
       saveScenarioA: () => {
         track('scenario_save')
-        set((s) => ({ scenarioA: structuredClone(s.inputs) }))
+        set((s) => ({
+          scenarioA: structuredClone(s.inputs),
+          scenarioAAnswerMeta: structuredClone(s.answerMeta),
+        }))
       },
       restoreScenarioA: () => {
         track('scenario_restore')
-        set((s) => (s.scenarioA ? { inputs: structuredClone(s.scenarioA) } : {}))
+        set((s) => (s.scenarioA ? {
+          inputs: structuredClone(s.scenarioA),
+          answerMeta: structuredClone(s.scenarioAAnswerMeta ?? legacyAnswerMeta()),
+          inputRevision: s.inputRevision + 1,
+          resultRevision: null,
+        } : {}))
       },
       clearScenarioA: () => {
         track('scenario_clear')
-        set({ scenarioA: null })
+        set({ scenarioA: null, scenarioAAnswerMeta: null })
       },
       reset: () => {
         track('reset_inputs')
@@ -168,16 +291,56 @@ export const useStore = create<Store>()(
           inputs: DEFAULT_INPUTS,
           worksheet: DEFAULT_WORKSHEET,
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
+          activeStep: 1,
+          visitedSteps: [1],
+          activePageId: 'family.people',
+          guidedView: 'questionnaire',
+          questionAnswers: {},
+          inputRevision: 0,
+          resultRevision: null,
+          answerMeta: {},
         })
       },
     }),
     {
       name: 'fire-inputs',
-      // v6: adds the optional locked DC/LIRA side account
-      version: 6,
+      // v10: stable questionnaire page IDs, independent review/results state,
+      // planning intent, and revision-bound result snapshots.
+      version: 10,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
-      migrate: (state) => state as Store,
+      migrate: (state, version) => {
+        const previous = state as Partial<Store>
+        // Existing users retain the dense form they already know. Fresh stores
+        // use the guided default declared above.
+        if (version < 10) {
+          const legacyPageByStep = [
+            'family.people', 'saving.amount', 'assets.identify', 'home.situation',
+            'spending.total', 'benefits.self', 'intent.legacy',
+          ]
+          return {
+            ...previous,
+            entryMode: version < 7 ? 'professional' : previous.entryMode,
+            activeStep: previous.activeStep ?? 1,
+            visitedSteps: previous.visitedSteps ?? [1],
+            activePageId: legacyPageByStep[(previous.activeStep ?? 1) - 1] ?? 'family.people',
+            guidedView: previous.activeStep === 7 ? 'review' : 'questionnaire',
+            questionAnswers: {},
+            planningIntent: {
+              beneficiaries: ['self'],
+              legacyPreference: 'undecided',
+              spendingPreference: 'undecided',
+              understandingAcknowledged: false,
+              confirmedIntentRevision: null,
+            },
+            inputRevision: 0,
+            resultRevision: null,
+            answerMeta: legacyAnswerMeta(),
+            scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
+          } as Store
+        }
+        return state as Store
+      },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Store> & {
           inputs?: Partial<Inputs> & { withdrawalOrder?: string[] }
@@ -215,6 +378,17 @@ export const useStore = create<Store>()(
           scenarioA: upgrade(p.scenarioA as LegacyInputs | null),
           worksheet: { ...DEFAULT_WORKSHEET, ...(p.worksheet ?? {}) },
           mixPresets: { ...current.mixPresets, ...(p.mixPresets ?? {}) },
+          entryMode: p.entryMode ?? current.entryMode,
+          activeStep: Math.max(1, Math.min(7, p.activeStep ?? current.activeStep)),
+          visitedSteps: p.visitedSteps ?? current.visitedSteps,
+          activePageId: p.activePageId ?? current.activePageId,
+          guidedView: p.guidedView ?? current.guidedView,
+          questionAnswers: p.questionAnswers ?? current.questionAnswers,
+          planningIntent: p.planningIntent ?? current.planningIntent,
+          inputRevision: p.inputRevision ?? current.inputRevision,
+          resultRevision: p.resultRevision ?? current.resultRevision,
+          answerMeta: p.answerMeta ?? current.answerMeta,
+          scenarioAAnswerMeta: p.scenarioAAnswerMeta ?? current.scenarioAAnswerMeta,
         }
       },
     },

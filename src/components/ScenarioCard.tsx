@@ -59,7 +59,7 @@ export function ScenarioCard() {
             <tr>
               <th></th>
               <th>{t('stratOutcome')}</th>
-              <th>{t('finalNetWorth')}</th>
+              <th scope="col" className="num">{t('finalNetWorth')}</th>
             </tr>
           </thead>
           <tbody>
