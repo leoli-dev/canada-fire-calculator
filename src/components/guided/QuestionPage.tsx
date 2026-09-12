@@ -82,7 +82,7 @@ function PensionIndexing(props: {
   </div>
 }
 
-export function QuestionPage({ definition }: { definition: QuestionDefinition }) {
+export function QuestionPage({ definition, onNavigate }: { definition: QuestionDefinition; onNavigate: (id: string) => void }) {
   const { t } = useTranslation()
   const cad = useCad()
   const {
@@ -362,7 +362,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'intent.confirm': {
       const supported = planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'
-      control = <div className="intent-confirm"><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}<button type="button" className="primary-action" onClick={() => { const goal: Goal = supported === 'spending' ? 'dieWithZero' : 'legacy'; set({ goal }); setPlanningIntent({ understandingAcknowledged: true, confirmedIntentRevision: Date.now() }); markAnswers(['goal'], 'confirmed') }}>{t('questionnaire.confirmIntent')}</button></div>
+      control = <div className="intent-confirm"><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}<div className="intent-actions"><button type="button" className="primary-action" onClick={() => { const goal: Goal = supported === 'spending' ? 'dieWithZero' : 'legacy'; set({ goal }); setPlanningIntent({ understandingAcknowledged: true, confirmedIntentRevision: Date.now() }); markAnswers(['goal'], 'confirmed') }}>{t('questionnaire.confirmIntent')}</button><button type="button" className="secondary-action" onClick={() => { setPlanningIntent({ understandingAcknowledged: false }); onNavigate('intent.spending') }}>{t('questionnaire.reviseIntent')}</button></div></div>
       break
     }
     case 'invest.mix':

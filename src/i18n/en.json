@@ -548,7 +548,7 @@
     "nextCategory": "Next category", "pendingSaved": "Marked to revisit. You can continue and resolve it from Review.", "hasHome": "Home included", "notApplicable": "This question is not applicable to the current path.",
     "monthlySavings": "Average new savings each month", "savingFeedback": "{{monthly}} per month becomes {{annual}} per year.", "spendingFeedback": "{{monthly}} per month becomes {{annual}} per year in today’s dollars.",
     "housingOtherLimit": "Rental properties and other debts are included through their own follow-up pages.", "confirmRemoveValue": "This item contains a non-zero saved amount. Remove it from the plan?",
-    "confirmIntent": "Yes, compare in this direction", "intentUnsupported": "A fixed legacy target or lifetime gift is saved as a wish, but this engine does not yet enforce it as a cash-flow constraint.",
+    "confirmIntent": "Confirm this comparison", "reviseIntent": "No, change my preferences", "intentUnsupported": "A fixed legacy target or lifetime gift is saved as a wish, but this engine does not yet enforce it as a cash-flow constraint.",
     "assumptionSummary": "Current disclosed assumptions: {{returns}}% real return, {{fees}}% annual fees, {{inflation}}% inflation. Account returns and market volatility remain estimates, not promises.", "acceptAssumptions": "Use these disclosed assumptions",
     "categories": { "family": "Family and timing", "saving": "Everyday saving", "assets": "Money you already have", "housing": "Housing and loans", "spending": "Retirement life", "income": "Other retirement income", "preferences": "Preferences and assumptions" },
     "status": { "answered": "answered", "pending": "to do" },

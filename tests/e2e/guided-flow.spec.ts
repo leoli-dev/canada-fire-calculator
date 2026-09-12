@@ -34,7 +34,7 @@ async function answerCurrentPage(page: Page, pageId: string) {
   else if (pageId === 'pension.self') await page.getByRole('radio', { name: 'No employer pension' }).check()
   else if (pageId === 'intent.legacy') await page.getByRole('radio', { name: /do not need to reserve/ }).check()
   else if (pageId === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
-  else if (pageId === 'intent.confirm') await page.getByRole('button', { name: /compare in this direction/ }).click()
+  else if (pageId === 'intent.confirm') await page.getByRole('button', { name: /Confirm this comparison/ }).click()
   else if (pageId === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
   else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Bracket-capped/ }).check()
   else if (pageId === 'assumptions.review') await page.getByRole('button', { name: /Use these disclosed assumptions/ }).click()
@@ -156,6 +156,16 @@ test('non-registered value and cost base share one page', async ({ page }, testI
   await page.locator('[data-field="nonRegBook"] input').fill('80000')
   await expect(page.locator('.answer-feedback')).toContainText('账面增值为 CA$20,000')
   await expect(page.locator('.answer-feedback')).toContainText('这不是税额')
+})
+
+test('intent confirmation offers a clear way to revise preferences', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/preferences/intent.confirm')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  await expect(page.getByRole('button', { name: '确认，按这个方式比较' })).toBeVisible()
+  await page.getByRole('button', { name: '不对，返回修改偏好' }).click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'intent.spending')
 })
 
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
