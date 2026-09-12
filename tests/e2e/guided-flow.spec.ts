@@ -81,6 +81,24 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await expect(page.locator('.results-column')).toHaveCount(0)
 })
 
+test('language buttons are clickable beside the GitHub corner across responsive widths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  const english = page.locator('.langs').getByRole('button', { name: 'EN' })
+  const chinese = page.locator('.langs').getByRole('button', { name: '中文' })
+  for (const width of [320, 640, 760, 761, 800, 900, 1100, 1280, 1320, 1440]) {
+    await page.setViewportSize({ width, height: 800 })
+    await english.click()
+    const exposed = await chinese.evaluate((button) => {
+      const bounds = button.getBoundingClientRect()
+      const hit = document.elementFromPoint(bounds.right - 6, bounds.top + 6)
+      return button === hit || button.contains(hit)
+    })
+    expect(exposed, `Chinese button is covered at ${width}px`).toBe(true)
+    await chinese.click({ position: { x: (await chinese.boundingBox())!.width - 6, y: 6 } })
+    await expect(chinese).toHaveClass(/active/)
+  }
+})
+
 test('question help follows the current page within one category', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await page.getByRole('button', { name: '中文' }).click()
