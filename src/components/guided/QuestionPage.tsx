@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import type { DebtKind, Goal, Pension, Province, Strategy } from '../../engine'
+import { blendedReturn, type DebtKind, type Goal, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
   DEFAULT_LOCKED_RETIREMENT,
   DEFAULT_PARTNER,
   DEFAULT_PENSION,
+  MIX_PRESETS,
   useStore,
 } from '../../store'
 import { useCad } from '../../format'
@@ -83,7 +84,7 @@ function PensionIndexing(props: {
 }
 
 export function QuestionPage({ definition, onNavigate }: { definition: QuestionDefinition; onNavigate: (id: string) => void }) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
   const cad = useCad()
   const {
     inputs, set, answerMeta, markAnswers, questionAnswers, setQuestionAnswer,
@@ -365,9 +366,11 @@ export function QuestionPage({ definition, onNavigate }: { definition: QuestionD
       control = <div className="intent-confirm"><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}<div className="intent-actions"><button type="button" className="primary-action" onClick={() => { const goal: Goal = supported === 'spending' ? 'dieWithZero' : 'legacy'; set({ goal }); setPlanningIntent({ understandingAcknowledged: true, confirmedIntentRevision: Date.now() }); markAnswers(['goal'], 'confirmed') }}>{t('questionnaire.confirmIntent')}</button><button type="button" className="secondary-action" onClick={() => { setPlanningIntent({ understandingAcknowledged: false }); onNavigate('intent.spending') }}>{t('questionnaire.reviseIntent')}</button></div></div>
       break
     }
-    case 'invest.mix':
-      control = <ChoiceGroup id={definition.id} value={answer} options={['allStocks', 'aggressive', 'balanced', 'conservative', 'gic'].map((value) => ({ value, label: t(`mix_${value}`) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); (['tfsa', 'rrsp', 'nonReg'] as const).forEach((account) => applyMixPreset(account, value)); markAnswers(['returns', 'volatilities'], 'estimated', 'default') }} />
+    case 'invest.mix': {
+      const number = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      control = <div className="mix-choice"><p className="mix-return-explanation">{t('questionnaire.mixReturnExplanation')}</p><ChoiceGroup id={definition.id} value={answer} options={['allStocks', 'aggressive', 'balanced', 'conservative', 'gic'].map((value) => ({ value, label: t(`questionnaire.mixNames.${value}`), detail: t('questionnaire.mixExpectedReturn', { value: number.format(Math.round((blendedReturn(MIX_PRESETS[value]) * 100) * 10 + 1e-9) / 10) }) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); (['tfsa', 'rrsp', 'nonReg'] as const).forEach((account) => applyMixPreset(account, value)); markAnswers(['returns', 'volatilities'], 'estimated', 'default') }} /></div>
       break
+    }
     case 'invest.fees':
       control = <div className="question-pair"><FactNumber field="fees" label={t('feesLabel')} value={(inputs.fees ?? 0) * 100} step={0.1} onValue={(value) => set({ fees: value / 100 })} /><FactNumber field="inflation" label={t('inflationLabel')} value={(inputs.inflation ?? 0.021) * 100} step={0.1} onValue={(value) => set({ inflation: value / 100 })} /></div>
       break

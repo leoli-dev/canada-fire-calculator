@@ -213,6 +213,8 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .answer-actions button, .text-action { border: 0; background: transparent; color: #174ea6; padding: 0; cursor: pointer; }
 .question-pair { display: grid; gap: 4px; }
 .allocation-instruction { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
+.mix-return-explanation { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
+.mix-choice .choice-group { margin-top: 12px; }
 .allocation-editor .question-pair { max-width: 620px; }
 .allocation-editor .question-answer { width: 100%; margin: 8px 0; }
 .allocation-total { display: flex; justify-content: space-between; gap: 16px; max-width: 620px; margin-top: 16px; border-left: 3px solid; padding: 10px 12px; line-height: 1.45; }

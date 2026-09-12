@@ -168,6 +168,20 @@ test('intent confirmation offers a clear way to revise preferences', async ({ pa
   await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'intent.spending')
 })
 
+test('investment mix explains annual real return percentages', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/preferences/invest.mix')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const explanation = page.locator('.mix-return-explanation')
+  await expect(explanation).toContainText('长期预计的年均实际收益率')
+  await expect(explanation).toContainText('已经扣除通胀影响')
+  await expect(explanation).toContainText('投资费用（MER）尚未扣除')
+  await expect(page.locator('.choice-group small')).toHaveCount(5)
+  await expect(page.getByText('预计年均实际收益：3.7%')).toBeVisible()
+  await expect(page.getByText('预计年均实际收益：2.4%')).toBeVisible()
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
