@@ -233,6 +233,57 @@ test('tax assumptions explain both inputs and update the worked example', async 
   expect(overflow).toBe(false)
 })
 
+test('applying the CPP work-history estimate confirms the planning input and age choices explain the trade-off', async ({ page }) => {
+  await page.goto('/#/guided/income/cpp.self')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const amount = page.locator('[data-field="cppAnnualAt65"]')
+  const age = page.locator('[data-field="cppStartAge"]')
+  await expect(amount.locator('small')).toHaveText('示例')
+  await expect(age.locator('small')).toHaveText('示例')
+  await expect(page.getByRole('heading', { name: '不知道选几岁？先比较这三种情形' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /65 岁 · 先用作比较基准/ })).not.toBeChecked()
+  await expect(page.getByRole('radio', { name: /72 岁/ })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '查看官方开领说明' })).toHaveAttribute('href', /canada\.ca/)
+
+  await page.locator('.estimator summary').click()
+  await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
+  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('input')).not.toHaveValue('10000')
+  await expect(page.locator('.cpp-estimate-note')).toContainText('不代表政府核定')
+  await expect(age.locator('small')).toHaveText('示例')
+
+  await page.getByRole('radio', { name: /70 岁 · 延后领取/ }).check()
+  await expect(age.locator('input')).toHaveValue('70')
+  await expect(age.locator('small')).toHaveText('已确认')
+  await age.locator('input').fill('68')
+  await expect(page.getByRole('radio', { name: /70 岁 · 延后领取/ })).not.toBeChecked()
+  await page.reload()
+  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(age.locator('input')).toHaveValue('68')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
+})
+
+test('Québec QPP offers age 72 guidance for both household members', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/family/family.people')
+  await page.getByRole('radio', { name: /Plan with my partner/ }).check()
+  await page.goto('/#/guided/family/family.province')
+  await page.getByLabel('Province').selectOption('QC')
+  await page.goto('/#/guided/income/cpp.partner')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  await expect(page.getByRole('heading', { name: '不知道选几岁？先比较这四种情形' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /72 岁 · 魁省 QPP/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: '查看官方开领说明' })).toHaveAttribute('href', /retraitequebec\.gouv\.qc\.ca/)
+  await page.getByRole('radio', { name: /72 岁 · 魁省 QPP/ }).check()
+  await expect(page.locator('[data-field="partner.cppStartAge"] input')).toHaveValue('72')
+  await expect(page.locator('[data-field="partner.cppStartAge"] small')).toHaveText('已确认')
+  await page.locator('.estimator summary').click()
+  await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
+  await expect(page.locator('[data-field="partner.cppAnnualAt65"] small')).toHaveText('已确认')
+})
+
 test('final review replaces the redundant assumption page without overwriting confirmed answers', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.fees')
   await page.getByRole('button', { name: '中文' }).click()

@@ -212,6 +212,14 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .answer-actions small { color: #8a4b08; }
 .answer-actions button, .text-action { border: 0; background: transparent; color: #174ea6; padding: 0; cursor: pointer; }
 .question-pair { display: grid; gap: 4px; }
+.cpp-age-guide { max-width: 620px; margin: 26px 0 18px; border-top: 1px solid var(--line); padding-top: 18px; }
+.cpp-age-guide h3 { margin: 0 0 8px; color: #172b3a; font-size: 1rem; }
+.cpp-age-guide > p, .cpp-estimate-note { color: #526579; line-height: 1.55; }
+.cpp-age-guide > p { margin: 0; }
+.cpp-age-guide .choice-group { margin: 14px 0; }
+.cpp-age-guide .cpp-age-source { font-size: .85rem; }
+.cpp-age-source a { color: #174ea6; }
+.cpp-estimate-note { max-width: 620px; margin: 12px 0; font-size: .85rem; }
 .allocation-instruction { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-return-explanation { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-choice .choice-group { margin-top: 12px; }

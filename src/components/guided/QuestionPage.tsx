@@ -46,12 +46,37 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
   </div>
 }
 
-function ChoiceGroup(props: { id: string; value?: string; options: Array<{ value: string; label: string; detail?: string }>; onChange: (value: string) => void }) {
-  return <div className="choice-group" role="radiogroup">
+function ChoiceGroup(props: { id: string; value?: string; label?: string; options: Array<{ value: string; label: string; detail?: string }>; onChange: (value: string) => void }) {
+  return <div className="choice-group" role="radiogroup" aria-label={props.label}>
     {props.options.map((option) => <label key={option.value} className={props.value === option.value ? 'selected' : ''}>
       <input type="radio" name={props.id} value={option.value} checked={props.value === option.value} onChange={() => props.onChange(option.value)} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
     </label>)}
+  </div>
+}
+
+function CppClaimAgeGuide(props: { field: string; value: number; isQuebec: boolean; onValue: (value: number) => void }) {
+  const { t } = useTranslation()
+  const markAnswers = useStore((s) => s.markAnswers)
+  const meta = useStore((s) => s.answerMeta[props.field])
+  const guideTitle = t(props.isQuebec ? 'guidedQppAgeGuideTitle' : 'guidedCppAgeGuideTitle')
+  const options = [
+    { value: '60', label: t('guidedCppAgeEarly'), detail: t('guidedCppAgeEarlyDetail') },
+    { value: '65', label: t('guidedCppAgeStandard'), detail: t('guidedCppAgeStandardDetail') },
+    { value: '70', label: t('guidedCppAgeLate'), detail: t('guidedCppAgeLateDetail') },
+    ...(props.isQuebec ? [{ value: '72', label: t('guidedQppAgeLate'), detail: t('guidedQppAgeLateDetail') }] : []),
+  ]
+  const source = props.isQuebec
+    ? 'https://www.retraitequebec.gouv.qc.ca/en/citizens/retirement-planning/applying-your-retirement-pension/retirement-pension-quebec-pension-plan/what-age-should-you-apply-your-retirement-pension'
+    : 'https://www.canada.ca/en/services/benefits/publicpensions/cpp/when-start.html'
+  return <div className="cpp-age-guide">
+    <h3>{guideTitle}</h3>
+    <p>{t('guidedCppAgeGuideIntro')}</p>
+    <ChoiceGroup id={props.field} label={guideTitle} value={meta?.status === 'confirmed' ? String(props.value) : undefined} options={options} onChange={(value) => {
+      props.onValue(Number(value))
+      markAnswers([props.field], 'confirmed')
+    }} />
+    <p className="cpp-age-source">{t('guidedCppAgeGuideNote')} <a href={source} target="_blank" rel="noopener noreferrer">{t('guidedCppAgeGuideSource')}</a></p>
   </div>
 }
 
@@ -332,13 +357,25 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <div className="question-pair"><FactNumber field="worksheet.wsEntertainment" label={t('wsEntertainment')} value={worksheet.wsEntertainment} onValue={(value) => setWorksheet('wsEntertainment', value)} /><FactNumber field="worksheet.wsOther" label={t('wsOther')} value={worksheet.wsOther} onValue={(value) => setWorksheet('wsOther', value)} /></div>
       break
     case 'cpp.self':
-      control = <><div className="question-pair"><FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ cppAnnualAt65 })} /><FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} /></div><CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ cppAnnualAt65, cppWork }); markAnswers(['cppAnnualAt65'], 'estimated') }} /></>
+      control = <>
+        <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ cppAnnualAt65 })} />
+        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ cppAnnualAt65, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
+        <p className="cpp-estimate-note">{t('guidedCppEstimateNote')}</p>
+        <FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} />
+        <CppClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ cppStartAge })} />
+      </>
       break
     case 'oas.self':
       control = <><div className="question-pair"><FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ oasAnnualAt65 })} /><FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} /></div><OasEstimator onApply={(oasAnnualAt65) => { set({ oasAnnualAt65 }); markAnswers(['oasAnnualAt65'], 'estimated') }} /></>
       break
     case 'cpp.partner':
-      control = <><div className="question-pair"><FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.partner!.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ partner: { ...inputs.partner!, cppAnnualAt65 } })} /><FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} /></div><CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'estimated') }} /></>
+      control = <>
+        <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.partner!.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ partner: { ...inputs.partner!, cppAnnualAt65 } })} />
+        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'confirmed') }} />
+        <p className="cpp-estimate-note">{t('guidedCppEstimateNote')}</p>
+        <FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
+        <CppClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
+      </>
       break
     case 'oas.partner':
       control = <><div className="question-pair"><FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.partner!.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ partner: { ...inputs.partner!, oasAnnualAt65 } })} /><FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} /></div><OasEstimator onApply={(oasAnnualAt65) => { set({ partner: { ...inputs.partner!, oasAnnualAt65 } }); markAnswers(['partner.oasAnnualAt65'], 'estimated') }} /></>
