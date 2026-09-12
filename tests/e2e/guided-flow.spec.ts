@@ -16,10 +16,19 @@ async function confirmVisibleNumbers(page: Page) {
   }
 }
 
-async function answerCurrentPage(page: Page, pageId: string) {
+async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes' | 'no') {
   if (pageId === 'family.people') await page.getByRole('radio', { name: /Plan for me/ }).check()
   else if (pageId === 'family.children') await page.getByRole('radio', { name: /No children/ }).check()
   else if (pageId === 'family.province') await page.getByLabel('Province').selectOption('BC')
+  else if (pageId === 'time.work') {
+    await confirmVisibleNumbers(page)
+    if (targetChoice === 'yes') {
+      await page.getByRole('radio', { name: 'I have my own asset target' }).check()
+      await page.locator('[data-field="fireTargetAssets"] input').fill('750000')
+    } else await page.getByRole('radio', { name: 'I do not have a target yet' }).check()
+    const widths = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+  }
   else if (pageId === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
   else if (pageId === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
   else if (pageId === 'assets.identify') {
@@ -39,7 +48,7 @@ async function answerCurrentPage(page: Page, pageId: string) {
   else await confirmVisibleNumbers(page)
 }
 
-async function completeGuidedQuestionnaire(page: Page) {
+async function completeGuidedQuestionnaire(page: Page, targetChoice: 'yes' | 'no' = 'yes') {
   const visited = new Set<string>()
   while (true) {
     const article = page.locator('.question-page')
@@ -48,7 +57,7 @@ async function completeGuidedQuestionnaire(page: Page) {
     if (!pageId) throw new Error('Question page is missing its stable ID')
     if (visited.has(pageId)) throw new Error(`Questionnaire loop detected at ${pageId}`)
     visited.add(pageId)
-    await answerCurrentPage(page, pageId)
+    await answerCurrentPage(page, pageId, targetChoice)
     const next = page.locator('.question-pager button').last()
     if (await next.innerText() === 'Review answers') { await next.click(); break }
     await next.click()
@@ -70,6 +79,8 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await generate.click()
   await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
+  await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+  await expect(page.locator('.target-field input')).toHaveValue('750,000')
 
   await page.getByRole('button', { name: 'Modify answers' }).click()
   await page.goto('/#/guided/family/family.ages')
@@ -79,6 +90,22 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await page.goto('/#/guided/results')
   await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
   await expect(page.locator('.results-column')).toHaveCount(0)
+})
+
+test('guided users may leave the personal target unset and add it from results', async ({ page }) => {
+  test.setTimeout(60_000)
+  await completeGuidedQuestionnaire(page, 'no')
+  await page.getByRole('button', { name: 'Generate my results' }).click()
+  await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+  await expect(page.locator('.target-field input')).toBeEmpty()
+  await expect(page.getByText('You did not set a personal asset target')).toBeVisible()
+  await page.locator('.target-field input').fill('900000')
+  await expect(page.locator('.results-column')).toBeVisible()
+  await expect(page.locator('.target-field input')).toHaveValue('900,000')
+  await page.getByRole('button', { name: 'Modify answers' }).click()
+  await page.goto('/#/guided/family/time.work')
+  await expect(page.getByRole('radio', { name: 'I have my own asset target' })).toBeChecked()
+  await expect(page.locator('[data-field="fireTargetAssets"] input')).toHaveValue('900,000')
 })
 
 test('language buttons are clickable beside the GitHub corner across responsive widths', async ({ page }, testInfo) => {

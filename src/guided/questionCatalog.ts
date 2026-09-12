@@ -37,7 +37,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('family.ages', 'family', ['currentAge', 'partnerAge'], ['currentAge', 'partner.currentAge']),
   page('family.children', 'family', ['children'], ['children']),
   page('family.province', 'family', ['province'], ['province']),
-  page('time.work', 'family', ['workStyle'], ['fireAge']),
+  page('time.work', 'family', ['workStyle', 'targetAssets'], ['fireAge', 'fireTargetAssets']),
   page('time.horizon', 'family', ['lifeExpectancy'], ['lifeExpectancy']),
 
   page('saving.method', 'saving', ['savingUnit'], []),

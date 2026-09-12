@@ -213,6 +213,9 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .answer-actions small { color: #8a4b08; }
 .answer-actions button, .text-action { border: 0; background: transparent; color: #174ea6; padding: 0; cursor: pointer; }
 .question-pair { display: grid; gap: 4px; }
+.target-question { max-width: 620px; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 18px; }
+.target-question h3 { margin: 0 0 8px; color: #172b3a; font-size: 1rem; }
+.target-question > p { color: #526579; line-height: 1.55; }
 .benefit-age-guide { max-width: 620px; margin: 26px 0 18px; border-top: 1px solid var(--line); padding-top: 18px; }
 .benefit-age-guide h3 { margin: 0 0 8px; color: #172b3a; font-size: 1rem; }
 .benefit-age-guide > p, .benefit-estimate-note { color: #526579; line-height: 1.55; }

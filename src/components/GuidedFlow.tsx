@@ -13,6 +13,11 @@ function requiredFields(definition: QuestionDefinition, partner: boolean): strin
 }
 
 function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof useStore.getState>): boolean {
+  if (definition.id === 'time.work' && state.questionAnswers['time.work.target'] === 'yes') {
+    return answerIsUsable(state.answerMeta.fireAge) &&
+      answerIsUsable(state.answerMeta.fireTargetAssets) &&
+      (state.inputs.fireTargetAssets ?? 0) > 0
+  }
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }

@@ -168,7 +168,30 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <label className="question-select"><span>{t('province')}</span><select value={inputs.province} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>{PROVINCES.map((p) => <option key={p}>{p}</option>)}</select></label>
       break
     case 'time.work':
-      control = <FactNumber field="fireAge" label={t('fireAge')} value={inputs.fireAge} onValue={(fireAge) => set({ fireAge })} />
+      control = <>
+        <FactNumber field="fireAge" label={t('fireAge')} value={inputs.fireAge} onValue={(fireAge) => set({ fireAge })} />
+        <section className="target-question" aria-labelledby="target-question-title">
+          <h3 id="target-question-title">{t('questionnaire.targetQuestion')}</h3>
+          <p>{t('questionnaire.targetExplanation')}</p>
+          <ChoiceGroup id="time.work.target" label={t('questionnaire.targetQuestion')} value={questionAnswers['time.work.target'] as string | undefined} options={[
+            { value: 'yes', label: t('questionnaire.choice.hasTarget') },
+            { value: 'no', label: t('questionnaire.choice.noTarget') },
+          ]} onChange={(value) => {
+            setQuestionAnswer('time.work.target', value)
+            if (value === 'no') {
+              set({ fireTargetAssets: null })
+              markAnswers(['fireTargetAssets'], 'notApplicable')
+            } else {
+              set({ fireTargetAssets: inputs.fireTargetAssets ?? 1_000_000 })
+              markAnswers(['fireTargetAssets'], 'unknown')
+            }
+          }} />
+          {questionAnswers['time.work.target'] === 'yes' && <>
+            <FactNumber field="fireTargetAssets" label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 1_000_000} step={50_000} onValue={(fireTargetAssets) => set({ fireTargetAssets })} />
+            {answerMeta.fireTargetAssets?.status !== 'confirmed' && <p className="answer-feedback">{t('questionnaire.targetExampleNote')}</p>}
+          </>}
+        </section>
+      </>
       break
     case 'time.horizon':
       control = <FactNumber field="lifeExpectancy" label={t('lifeExpectancy')} value={inputs.lifeExpectancy} onValue={(lifeExpectancy) => set({ lifeExpectancy })} />

@@ -46,6 +46,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     return row ? row.balances.tfsa + row.balances.rrsp + row.balances.nonReg : null
   }, [mode, earliest, inputs])
   const set = useStore((s) => s.set)
+  const markAnswers = useStore((s) => s.markAnswers)
+  const setQuestionAnswer = useStore((s) => s.setQuestionAnswer)
+  const entryMode = useStore((s) => s.entryMode)
   const dwzSpending = useMemo(
     () =>
       mode === 'last' && (inputs.goal ?? 'legacy') === 'dieWithZero'
@@ -71,7 +74,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             : true
 
   return (
-    <div className={`summary ${ok ? 'ok' : 'bad'}`}>
+    <div className={`summary ${mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
       <div className="mode-tabs" role="tablist">
         {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
           <button
@@ -169,9 +172,15 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             <NumberInput
               step={50000}
               value={inputs.fireTargetAssets ?? null}
-              onChange={(v) => set({ fireTargetAssets: v })}
+              onChange={(v) => {
+                set({ fireTargetAssets: v })
+                setQuestionAnswer('time.work.target', v != null && v > 0 ? 'yes' : 'no')
+                markAnswers(['fireTargetAssets'], v != null && v > 0 ? 'confirmed' : 'notApplicable')
+                if (entryMode === 'guided') useStore.getState().generateGuidedResults()
+              }}
             />
           </label>
+          {!goal && <p className="hint">{t('targetUnset')}</p>}
           {goal && (
             <p className="verdict">
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge

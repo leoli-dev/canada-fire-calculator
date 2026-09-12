@@ -178,6 +178,7 @@
   "saleLabel": "卖房",
   "mode_target": "目标达标？",
   "targetInputLabel": "FIRE 目标投资资产",
+  "targetUnset": "问卷里尚未设定个人资产目标。可在这里填写并比较；它不等于系统计算的退休所需资金。",
   "targetLate": "未达标：{{fireAge}} 岁时约 {{amount}}（目标 {{target}}）；继续工作储蓄到 {{age}} 岁才能达标。",
   "targetNever": "按当前储蓄与收益，达不到 {{target}}。",
   "targetHint": "含按计划出售房产的所得（主要住宅免税、投资房扣利得税；未售房产不计入）；未达标则假设继续工作储蓄。数值为当年年末口径，与图表一致。钱够不够花到寿终由其他模式回答。",
@@ -566,6 +567,9 @@
     "review": { "short": "核对", "title": "核对并阅读结果", "help": "先检查核心输入和警告，再读计划结论，然后查看完整图表和情景。" }
   }},
   "questionnaire": {
+    "targetQuestion": "你有希望在停工时达到的可投资资产目标吗？",
+    "targetExplanation": "可选。这个金额只用于“目标达标？”比较，不决定维持退休生活所需的 FIRE 数字；后者由系统另行计算。",
+    "targetExampleNote": "显示的 100 万只是示例。请按今天的购买力填写你自己的金额，输入后才算确认。",
     "directory": "问卷目录", "categoryCount": "第 {{current}} 类，共 {{total}} 类", "closeDirectory": "关闭目录", "chooseOne": "请选择", "helpTitle": "为什么要问、去哪里找", "findLabel": "资料位置：", "exampleLabel": "虚构示例：",
     "reviewAnswers": "核对答案", "backToQuestions": "返回问卷", "reviewTitle": "核对你的答案", "reviewIntro": "这里集中核对你的输入和投影假设；有不合适的项目可直接修改。核对完再生成结果。", "needsAttention": "请补充或核对这些项目", "generateResults": "生成我的结果", "modifyAnswers": "修改答案", "resultsTitle": "你的退休投影", "resultsIntro": "以下结果使用你填写或选择的数值与假设；估算不保证未来结果。", "nextCategory": "下一类别", "pendingSaved": "已标为待补。你可以继续，并在核对页回来处理。", "hasHome": "已计入住房", "notApplicable": "当前路径不适用这个问题。",
     "monthlySavings": "平均每月新增储蓄", "savingFeedback": "每月 {{monthly}}，等于每年 {{annual}}。", "spendingFeedback": "按今天购买力，每月 {{monthly}}，等于每年 {{annual}}。", "housingOtherLimit": "投资房和其他负债会进入各自的后续页面。", "confirmRemoveValue": "这项内容含有已保存的非零金额。确定从计划中移除吗？", "intentRecommendationLabel": "根据你的选择，结果会这样比较：", "intentUnsupported": "固定遗产金额或生前赠与会保存为愿望，但当前引擎还不能把它作为现金流硬约束。",
@@ -598,7 +602,7 @@
     "allocationComplete": "三个比例合计为100%。",
     "allocationRemaining": "还需要分配 {{difference}} 个百分点。",
     "allocationOver": "当前超出 {{difference}} 个百分点，请调低比例。",
-    "choice": { "single": "只为我规划", "couple": "我和伴侣一起规划", "noChildren": "本计划不纳入孩子", "hasChildren": "纳入孩子", "monthly": "我知道每月金额", "annual": "我知道全年金额", "noWork": "停工后没有工作收入", "someWork": "预计仍有工作收入", "undecided": "还没决定", "no": "没有", "yes": "有", "noRental": "没有投资房", "hasRental": "纳入一套投资房", "noDebt": "没有其他贷款", "hasDebt": "纳入一笔其他贷款", "knowBudget": "我知道总预算", "estimateBudget": "按生活项目帮我估算", "unknown": "稍后回来补", "noPension": "没有单位养老金", "dbPension": "单位以后按期发钱", "dbDetail": "这是按期领取的DB养老金。", "dcPension": "我有一笔账户余额", "dcDetail": "DC/LIRA余额应放在锁定账户部分。", "indexedFull": "全部随通胀增长", "indexedPartial": "只有一部分随通胀增长", "indexedFixed": "金额保持固定", "leaveMore": "维持计划生活，比较可能剩下多少", "noLegacy": "不需要预留指定遗产", "fixedLegacy": "希望留下固定金额", "lifetimeGifts": "希望生前帮助别人", "unsupported": "会记录愿望并说明当前限制。", "maintainSpending": "维持当前退休预算", "exploreCeiling": "查看理论支出上限" },
+    "choice": { "single": "只为我规划", "couple": "我和伴侣一起规划", "noChildren": "本计划不纳入孩子", "hasChildren": "纳入孩子", "monthly": "我知道每月金额", "annual": "我知道全年金额", "noWork": "停工后没有工作收入", "someWork": "预计仍有工作收入", "undecided": "还没决定", "no": "没有", "yes": "有", "noRental": "没有投资房", "hasRental": "纳入一套投资房", "noDebt": "没有其他贷款", "hasDebt": "纳入一笔其他贷款", "knowBudget": "我知道总预算", "estimateBudget": "按生活项目帮我估算", "unknown": "稍后回来补", "noPension": "没有单位养老金", "dbPension": "单位以后按期发钱", "dbDetail": "这是按期领取的DB养老金。", "dcPension": "我有一笔账户余额", "dcDetail": "DC/LIRA余额应放在锁定账户部分。", "indexedFull": "全部随通胀增长", "indexedPartial": "只有一部分随通胀增长", "indexedFixed": "金额保持固定", "leaveMore": "维持计划生活，比较可能剩下多少", "noLegacy": "不需要预留指定遗产", "fixedLegacy": "希望留下固定金额", "lifetimeGifts": "希望生前帮助别人", "unsupported": "会记录愿望并说明当前限制。", "maintainSpending": "维持当前退休预算", "exploreCeiling": "查看理论支出上限", "hasTarget": "我有自己的资产目标", "noTarget": "暂时没有目标" },
     "intentSummary": { "legacy": "维持每年约 {{spending}} 的支出，比较剩余税后资产。", "spending": "不改变当前预算，另行查看理论支出上限。", "sustainability": "只检查当前计划能否持续，不假称你选择了遗产偏好。" },
     "guidance": {
       "family": { "essential": "先说明计划照顾谁，以及要测试的时间线。", "why": "年龄决定储蓄期、退休期和收入开始时间；省份影响税额估算。", "help": "填写当前年龄和用于估税的省份。规划终点是测试范围，不是寿命预测。", "example": "Alex现在40岁，55岁停工，把计划测试到95岁。" },
@@ -610,7 +614,7 @@
       "preferences": { "essential": "事实可以估算；偏好必须由你选择并确认。", "why": "维持支出比较遗产，与探索最高支出回答不同问题，也有不同取舍。", "help": "选择符合你意图的比较。未支持的固定遗产和生前赠与会明确披露，不会偷换成引擎约束。", "example": "你可以只查看支出上限，不把它应用到当前预算。" }
     },
     "pages": {
-      "family_people": { "question": "这份计划只看你自己，还是你和伴侣一起？" }, "family_ages": { "question": "这份计划里的每个人现在几岁？" }, "family_children": { "question": "是否有孩子的当前年龄需要纳入家庭计划？" }, "family_province": { "question": "这份计划按哪个省份估算所得税？" }, "time_work": { "question": "你希望几岁停止全职工作？" }, "time_horizon": { "question": "希望把这份计划测试到多大年龄？" },
+      "family_people": { "question": "这份计划只看你自己，还是你和伴侣一起？" }, "family_ages": { "question": "这份计划里的每个人现在几岁？" }, "family_children": { "question": "是否有孩子的当前年龄需要纳入家庭计划？" }, "family_province": { "question": "这份计划按哪个省份估算所得税？" }, "time_work": { "question": "你想几岁停止全职工作，有个人资产目标吗？" }, "time_horizon": { "question": "希望把这份计划测试到多大年龄？" },
       "saving_method": { "question": "用每月还是全年金额回答更容易？" }, "saving_amount": { "question": "你实际会新增多少储蓄和投资？" }, "work_after": { "question": "停止全职工作后，还会有其他工作收入吗？" }, "work_amount": { "question": "预计每年有多少工作收入？" }, "work_period": { "question": "这笔收入从几岁持续到几岁？" },
       "assets_identify": { "question": "哪些账户里的钱准备留作退休使用？" }, "account_tfsa_balance": { "question": "你现在所有TFSA的总余额是多少？" }, "account_rrsp_balance": { "question": "你现在所有RRSP的总余额是多少？" }, "account_nonReg_balance": { "question": "非注册投资现在值多少，成本基础是多少？" }, "assets_allocation": { "question": "今后的储蓄准备怎样分到主要账户？" }, "fhsa_details": { "question": "FHSA现在有多少、以后每年投入多少？" }, "fhsa_open": { "question": "FHSA开户多久了？" }, "locked_access": { "question": "锁定资金最早何时可用、属于谁？" }, "locked_contributions": { "question": "你和单位每年分别投入多少？" },
       "home_situation": { "question": "你租房、已有自住房，还是计划买房？" }, "home_value": { "question": "住房现在值多少，以后计划出售吗？" }, "home_mortgage": { "question": "这套住房还在还贷吗？" }, "mortgage_balance": { "question": "房贷还欠多少？" }, "mortgage_payment": { "question": "房贷还款是多少，还要还多久？" }, "purchase_time": { "question": "预计几岁买房？" }, "purchase_price": { "question": "计划房价和首付分别是多少？" }, "purchase_loan": { "question": "计划采用多少月供和多长贷款期？" }, "housing_other": { "question": "投资房或其他贷款需要纳入计划吗？" },
