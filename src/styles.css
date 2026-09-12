@@ -474,6 +474,7 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 }
 .compare-table td { padding: 9px 8px; border-bottom: 1px solid #f0f3f6; }
 .compare-table tr:last-child td { border-bottom: none; }
+.compare-table th.num { text-align: right; }
 .compare-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .compare-table .current-row { background: #f6f9fc; }
 .tag {

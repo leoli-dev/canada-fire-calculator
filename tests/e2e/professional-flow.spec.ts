@@ -45,3 +45,21 @@ test('professional mode completes a representative household plan and scenario r
   await scenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
   await expect(field(page, 'Desired after-tax annual spending in retirement')).toHaveValue('50,000')
 })
+
+test('scenario final-net-worth heading aligns with its amounts', async ({ page }) => {
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const scenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await scenario.locator('summary').click()
+  await scenario.getByRole('button', { name: 'Save current as A' }).click()
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const localizedScenario = page.locator('details').filter({ hasText: '场景对比' })
+  const heading = localizedScenario.getByRole('columnheader', { name: '最终净资产' })
+  const amount = localizedScenario.locator('tbody tr').first().locator('td.num')
+  const textRight = async (locator: typeof heading) => locator.evaluate((cell) => {
+    const range = document.createRange()
+    range.selectNodeContents(cell)
+    return range.getBoundingClientRect().right
+  })
+  expect(Math.abs(await textRight(heading) - await textRight(amount))).toBeLessThan(2)
+})
