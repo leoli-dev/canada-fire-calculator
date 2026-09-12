@@ -249,10 +249,11 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .review-category-list p { margin-top: 7px; color: #526579; }
 .review-category-list button, .review-blockers button { border: 0; background: transparent; color: #174ea6; cursor: pointer; }
 .review-blockers { margin: 18px 0; padding: 14px 18px; background: #fff6e8; color: #8a4b08; }
-.intent-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.generate-results, .primary-action, .secondary-action { border-radius: 8px; padding: 12px 18px; font-weight: 650; cursor: pointer; }
+.intent-recommendation { max-width: 620px; margin: 16px 0 4px; border-left: 3px solid #174ea6; background: #edf3fb; padding: 12px 14px; color: #172b3a; }
+.intent-recommendation p { margin: 6px 0 0; line-height: 1.55; }
+.intent-recommendation .capability-note { margin-top: 10px; }
+.generate-results, .primary-action { border-radius: 8px; padding: 12px 18px; font-weight: 650; cursor: pointer; }
 .generate-results, .primary-action { border: 1px solid #174ea6; background: #174ea6; color: #fff; }
-.secondary-action { border: 1px solid var(--line-strong); background: #fff; color: #172b3a; }
 .generate-results:disabled { opacity: .4; cursor: default; }
 .results-intro { max-width: 760px; margin: 22px auto 8px; }
 .guided-results aside { width: 100%; }

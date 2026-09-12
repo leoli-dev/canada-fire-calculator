@@ -32,6 +32,12 @@ describe('question catalog', () => {
     expect(QUESTION_CATALOG.some((definition) => definition.id === 'assets.cost')).toBe(false)
   })
 
+  it('keeps intent recommendation inline and resolves the old confirmation link', () => {
+    expect(QUESTION_CATALOG.some((definition) => definition.id === 'intent.confirm')).toBe(false)
+    expect(pageById('intent.confirm')?.id).toBe('intent.spending')
+    expect(pageById('intent.spending')?.fieldBindings).toContain('goal')
+  })
+
   it('provides distinct page-level guidance in every supported language', () => {
     const languages: GuidanceLanguage[] = ['en', 'fr', 'zh']
 

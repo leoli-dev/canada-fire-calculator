@@ -13,7 +13,6 @@ function requiredFields(definition: QuestionDefinition, partner: boolean): strin
 }
 
 function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof useStore.getState>): boolean {
-  if (definition.id === 'intent.confirm') return state.planningIntent.understandingAcknowledged
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }
@@ -52,7 +51,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
   const issues = validateInputs(state.inputs).filter((issue) => issue.severity === 'error')
   const incomplete = pages.filter((page) => !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
-  const canGenerate = issues.length === 0 && incomplete.length === 0 && state.planningIntent.understandingAcknowledged
+  const canGenerate = issues.length === 0 && incomplete.length === 0
   return <section className="answer-review">
     <button type="button" className="text-action" onClick={() => state.setGuidedView('questionnaire')}>{t('questionnaire.backToQuestions')}</button>
     <h2 tabIndex={-1}>{t('questionnaire.reviewTitle')}</h2><p>{t('questionnaire.reviewIntro')}</p>
@@ -116,6 +115,6 @@ export function GuidedFlow() {
   return <div className="questionnaire-layout">
     <button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</button>
     <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} onNavigate={navigate} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" disabled={index === pages.length - 1} onClick={() => navigate(pages[index + 1].id)}>{pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" disabled={index === pages.length - 1} onClick={() => navigate(pages[index + 1].id)}>{pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
   </div>
 }

@@ -100,8 +100,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('pension.partner.indexing', 'income', ['pensionIndexing', 'pensionBridge'], ['partner.pension.indexation', 'partner.pension.bridgeAnnual'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
 
   page('intent.legacy', 'preferences', ['legacyPreference'], [], { estimatePolicy: 'none' }),
-  page('intent.spending', 'preferences', ['spendingPreference'], [], { estimatePolicy: 'none' }),
-  page('intent.confirm', 'preferences', ['intentConfirmation'], ['goal'], { estimatePolicy: 'none' }),
+  page('intent.spending', 'preferences', ['spendingPreference'], ['goal'], { estimatePolicy: 'none' }),
   page('invest.mix', 'preferences', ['investmentMix'], ['returns', 'volatilities'], { estimatePolicy: 'assumption' }),
   page('invest.fees', 'preferences', ['investmentFees', 'inflation'], ['fees', 'inflation'], { estimatePolicy: 'assumption' }),
   page('invest.tax', 'preferences', ['distributions', 'workingTaxRate'], ['nonRegDistributionYield', 'accumulationMarginalRate'], { estimatePolicy: 'assumption' }),
@@ -124,6 +123,7 @@ export function pageById(id: string): QuestionDefinition | undefined {
     'assets.cost': 'account.nonReg.balance',
     'allocation.rrsp': 'allocation.tfsa',
     'allocation.nonReg': 'allocation.tfsa',
+    'intent.confirm': 'intent.spending',
   }
   const resolvedId = aliases[id] ?? id
   return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)

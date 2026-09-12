@@ -83,7 +83,7 @@ function PensionIndexing(props: {
   </div>
 }
 
-export function QuestionPage({ definition, onNavigate }: { definition: QuestionDefinition; onNavigate: (id: string) => void }) {
+export function QuestionPage({ definition }: { definition: QuestionDefinition }) {
   const { i18n, t } = useTranslation()
   const cad = useCad()
   const {
@@ -95,6 +95,12 @@ export function QuestionPage({ definition, onNavigate }: { definition: QuestionD
   const markChoice = (field: string, value: string, status: 'confirmed' | 'notApplicable' = 'confirmed') => {
     setQuestionAnswer(definition.id, value)
     markAnswers([field], status)
+  }
+  const applyIntent = (legacyPreference: typeof planningIntent.legacyPreference, spendingPreference: typeof planningIntent.spendingPreference) => {
+    const goal: Goal = spendingPreference === 'exploreCeiling' ? 'dieWithZero' : 'legacy'
+    set({ goal })
+    setPlanningIntent({ legacyPreference, spendingPreference, understandingAcknowledged: true, confirmedIntentRevision: Date.now() })
+    markAnswers(['goal'], 'confirmed')
   }
 
   let control: React.ReactNode
@@ -356,14 +362,11 @@ export function QuestionPage({ definition, onNavigate }: { definition: QuestionD
       control = <PensionIndexing prefix="partner.pension" pension={inputs.partner!.pension!} answer={answer} setAnswer={setQuestionAnswer} setPension={(pension) => set({ partner: { ...inputs.partner!, pension } })} />
       break
     case 'intent.legacy':
-      control = <ChoiceGroup id={definition.id} value={planningIntent.legacyPreference} options={[{ value: 'maxRemaining', label: t('questionnaire.choice.leaveMore') }, { value: 'none', label: t('questionnaire.choice.noLegacy') }, { value: 'minimumAmount', label: t('questionnaire.choice.fixedLegacy'), detail: t('questionnaire.choice.unsupported') }, { value: 'lifetimeGifts', label: t('questionnaire.choice.lifetimeGifts'), detail: t('questionnaire.choice.unsupported') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); setPlanningIntent({ legacyPreference: value as typeof planningIntent.legacyPreference }) }} />
+      control = <ChoiceGroup id={definition.id} value={planningIntent.legacyPreference} options={[{ value: 'maxRemaining', label: t('questionnaire.choice.leaveMore') }, { value: 'none', label: t('questionnaire.choice.noLegacy') }, { value: 'minimumAmount', label: t('questionnaire.choice.fixedLegacy'), detail: t('questionnaire.choice.unsupported') }, { value: 'lifetimeGifts', label: t('questionnaire.choice.lifetimeGifts'), detail: t('questionnaire.choice.unsupported') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); applyIntent(value as typeof planningIntent.legacyPreference, planningIntent.spendingPreference) }} />
       break
-    case 'intent.spending':
-      control = <ChoiceGroup id={definition.id} value={planningIntent.spendingPreference} options={[{ value: 'maintain', label: t('questionnaire.choice.maintainSpending') }, { value: 'exploreCeiling', label: t('questionnaire.choice.exploreCeiling') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); setPlanningIntent({ spendingPreference: value as typeof planningIntent.spendingPreference }) }} />
-      break
-    case 'intent.confirm': {
+    case 'intent.spending': {
       const supported = planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'
-      control = <div className="intent-confirm"><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}<div className="intent-actions"><button type="button" className="primary-action" onClick={() => { const goal: Goal = supported === 'spending' ? 'dieWithZero' : 'legacy'; set({ goal }); setPlanningIntent({ understandingAcknowledged: true, confirmedIntentRevision: Date.now() }); markAnswers(['goal'], 'confirmed') }}>{t('questionnaire.confirmIntent')}</button><button type="button" className="secondary-action" onClick={() => { setPlanningIntent({ understandingAcknowledged: false }); onNavigate('intent.spending') }}>{t('questionnaire.reviseIntent')}</button></div></div>
+      control = <><ChoiceGroup id={definition.id} value={planningIntent.spendingPreference} options={[{ value: 'maintain', label: t('questionnaire.choice.maintainSpending') }, { value: 'exploreCeiling', label: t('questionnaire.choice.exploreCeiling') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); applyIntent(planningIntent.legacyPreference, value as typeof planningIntent.spendingPreference) }} />{answer && <div className="intent-recommendation" role="status"><strong>{t('questionnaire.intentRecommendationLabel')}</strong><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}</div>}</>
       break
     }
     case 'invest.mix': {

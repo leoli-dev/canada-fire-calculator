@@ -34,7 +34,6 @@ async function answerCurrentPage(page: Page, pageId: string) {
   else if (pageId === 'pension.self') await page.getByRole('radio', { name: 'No employer pension' }).check()
   else if (pageId === 'intent.legacy') await page.getByRole('radio', { name: /do not need to reserve/ }).check()
   else if (pageId === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
-  else if (pageId === 'intent.confirm') await page.getByRole('button', { name: /Confirm this comparison/ }).click()
   else if (pageId === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
   else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Bracket-capped/ }).check()
   else if (pageId === 'assumptions.review') await page.getByRole('button', { name: /Use these disclosed assumptions/ }).click()
@@ -158,13 +157,19 @@ test('non-registered value and cost base share one page', async ({ page }, testI
   await expect(page.locator('.answer-feedback')).toContainText('这不是税额')
 })
 
-test('intent confirmation offers a clear way to revise preferences', async ({ page }, testInfo) => {
+test('intent recommendation updates inline without a confirmation page', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
-  await page.goto('/#/guided/preferences/intent.confirm')
+  await page.goto('/#/guided/preferences/intent.legacy')
+  await page.getByRole('radio', { name: /do not need to reserve/ }).check()
+  await page.goto('/#/guided/preferences/intent.spending')
   await page.getByRole('button', { name: '中文' }).click()
 
-  await expect(page.getByRole('button', { name: '确认，按这个方式比较' })).toBeVisible()
-  await page.getByRole('button', { name: '不对，返回修改偏好' }).click()
+  await page.getByRole('radio', { name: '查看理论支出上限' }).check()
+  await expect(page.locator('.intent-recommendation')).toContainText('根据你的选择，结果会这样比较')
+  await expect(page.locator('.intent-recommendation')).toContainText('不改变当前预算，另行查看理论支出上限')
+  await expect(page.getByRole('button', { name: /确认|返回修改偏好/ })).toHaveCount(0)
+
+  await page.goto('/#/guided/preferences/intent.confirm')
   await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'intent.spending')
 })
 
