@@ -492,7 +492,15 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     }
     case 'invest.strategy':
-      control = <ChoiceGroup id={definition.id} value={answer} options={(['meltdownPaced', 'nonRegFirst', 'tfsaFirst', 'rrspFirst'] as Strategy[]).map((value) => ({ value, label: t(`strat_${value}`) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ strategy: value as Strategy }); markAnswers(['strategy'], 'confirmed') }} />
+      control = <div className="strategy-question">
+        <p className="strategy-intro">{t('questionnaire.strategyIntro')}</p>
+        <ChoiceGroup id={definition.id} value={answer} options={(['meltdownPaced', 'nonRegFirst', 'tfsaFirst', 'rrspFirst'] as Strategy[]).map((value) => ({
+          value,
+          label: t(`strat_${value}`),
+          detail: t(`questionnaire.strategyDetails.${value}`, { cap: t(`meltdownCap_${inputs.meltdownBracketCap ?? 'bracket1'}`) }),
+        }))} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ strategy: value as Strategy }); markAnswers(['strategy'], 'confirmed') }} />
+        <p className="strategy-source">{t('questionnaire.strategySourceLabel')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/rrsps-related-plans/making-withdrawals.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.strategySourceRrsp')}</a> · <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/tax-free-savings-account/what.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.strategySourceTfsa')}</a> · <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/personal-income/line-12700-capital-gains/calculating-reporting-your-capital-gains-losses.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.strategySourceCapital')}</a> · <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/registered-retirement-income-fund-rrif/receiving-income-a-rrif.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.strategySourceRrif')}</a> · <a href="https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/recovery-tax.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.strategySourceOas')}</a></p>
+      </div>
       break
     default:
       control = <p>{t('questionnaire.notApplicable')}</p>

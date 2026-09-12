@@ -182,11 +182,11 @@
   "targetLate": "Short: about {{amount}} at {{fireAge}} vs target {{target}}; saving on, you reach it at age {{age}}.",
   "targetNever": "With current savings and returns, {{target}} is never reached.",
   "targetHint": "Includes proceeds from planned property sales (principal residence tax-free, investment-property gain taxed; unsold real estate doesn't count); if short, saving is assumed to continue. Values are end-of-year, matching the chart. Whether the money lasts for life is what the other modes answer.",
-  "strat_meltdownPaced": "Bracket-capped RRSP meltdown",
-  "strat_rrspFirst": "Aggressive RRSP first (not recommended)",
+  "strat_meltdownPaced": "Paced RRSP withdrawals (income ceiling)",
+  "strat_rrspFirst": "Aggressive RRSP first (comparison scenario)",
   "strat_nonRegFirst": "Non-registered first",
   "strat_tfsaFirst": "TFSA first",
-  "meltdownNote": "The RRSP funds spending first each year, but only as much as spending needs and never beyond the lowest-bracket room left after CPP/OAS (one bracket per spouse) - nothing is withdrawn just to prepay tax. Shortfalls come from non-registered → TFSA; the RRSP remainder rides past 71 and exits via RRIF minimums, staying far below the OAS clawback.",
+  "meltdownNote": "After any required RRIF minimum, the model draws RRSP funds for spending up to the selected income ceiling (lowest bracket by default), then non-registered → TFSA. If those run out, it returns to RRSP; the ceiling cannot guarantee a tax bracket or avoid OAS recovery tax.",
   "totalTax": "Total tax (incl. estate)",
   "useStrategy": "Use",
   "estateValue": "Estate value (after tax)",
@@ -567,6 +567,14 @@
     "review": { "short": "Review", "title": "Review and read results", "help": "Check the core inputs and any warnings, then read the plan conclusion before exploring detailed charts and scenarios." }
   }},
   "questionnaire": {
+    "strategyIntro": "This sets the model's order for funding each year's after-tax spending. Required RRIF minimums come first. There is no best order for everyone; compare the outcomes in your results.",
+    "strategyDetails": {
+      "meltdownPaced": "After the RRIF minimum, draw RRSP funds toward the income ceiling (currently: {{cap}}); then use non-registered → TFSA → RRSP if needed. Aims to spread taxable withdrawals, but the ceiling is not a hard limit when other funds run out. You can change it in the results.",
+      "nonRegFirst": "After the RRIF minimum, use non-registered investments → RRSP → TFSA. Keeps tax-free TFSA assets for later; selling non-registered investments may realize taxable capital gains.",
+      "tfsaFirst": "After the RRIF minimum, use TFSA → non-registered → RRSP. TFSA withdrawals generally add no taxable income now, but use tax-free assets sooner and may shift RRSP tax to later years.",
+      "rrspFirst": "After the RRIF minimum, use RRSP/RRIF for spending before non-registered → TFSA. Reduces registered balances earlier, but larger taxable withdrawals may raise tax and income-tested benefit reductions."
+    },
+    "strategySourceLabel": "Tax-rule sources:", "strategySourceRrsp": "RRSP withdrawals", "strategySourceTfsa": "TFSA treatment", "strategySourceCapital": "Capital gains", "strategySourceRrif": "RRIF minimums", "strategySourceOas": "OAS recovery tax",
     "targetQuestion": "Do you have a personal investable-assets target for that age?",
     "targetExplanation": "Optional: this is the line used by ‘Will I hit my target?’. It does not determine the FIRE amount needed to fund your lifestyle; the calculator estimates that separately.",
     "targetExampleNote": "The $1,000,000 shown is only an example. Enter your own amount in today's dollars to confirm it.",

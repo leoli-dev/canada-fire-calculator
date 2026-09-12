@@ -182,11 +182,11 @@
   "targetLate": "未达标：{{fireAge}} 岁时约 {{amount}}（目标 {{target}}）；继续工作储蓄到 {{age}} 岁才能达标。",
   "targetNever": "按当前储蓄与收益，达不到 {{target}}。",
   "targetHint": "含按计划出售房产的所得（主要住宅免税、投资房扣利得税；未售房产不计入）；未达标则假设继续工作储蓄。数值为当年年末口径，与图表一致。钱够不够花到寿终由其他模式回答。",
-  "strat_meltdownPaced": "RRSP 压税 meltdown（不超最低税阶）",
-  "strat_rrspFirst": "激进 RRSP 优先（不推荐）",
+  "strat_meltdownPaced": "RRSP 分段提取（收入上限）",
+  "strat_rrspFirst": "激进 RRSP 优先（对照情景）",
   "strat_nonRegFirst": "先取非注册",
   "strat_tfsaFirst": "先取 TFSA",
-  "meltdownNote": "每年 RRSP 优先出钱，但只取支出所需、且绝不超过\"最低税阶顶\"扣除 CPP/OAS 后的剩余额度（夫妻各一份）——不为提前交税而多取一分。不足从非注册→TFSA 补；RRSP 剩余留过 71 岁，由 RRIF 最低取款自然流出，全程远离 OAS clawback。",
+  "meltdownNote": "先计入必须领取的 RRIF 最低额，再按所选收入上限（默认最低税阶）从 RRSP 支付生活费；不足依次用非注册、TFSA，仍不够会再取 RRSP。收入上限不保证最终停留在该税阶，也不能保证避开 OAS 回收税。",
   "totalTax": "总税负（含遗产税）",
   "useStrategy": "使用",
   "estateValue": "税后遗产价值",
@@ -567,6 +567,14 @@
     "review": { "short": "核对", "title": "核对并阅读结果", "help": "先检查核心输入和警告，再读计划结论，然后查看完整图表和情景。" }
   }},
   "questionnaire": {
+    "strategyIntro": "这决定模型每年凑足税后生活费时先动用哪个账户。必须领取的 RRIF 最低额会先计入；没有适合所有人的固定最优顺序，结果页可以比较。",
+    "strategyDetails": {
+      "meltdownPaced": "先计入 RRIF 最低提款，再从 RRSP 取到收入上限（当前：{{cap}}）；不足依次用非注册→TFSA，仍不够再取 RRSP。目的是把应税提款分散到多年；其他资金用尽时，上限不是硬限制。可在结果页调整。",
+      "nonRegFirst": "先计入 RRIF 最低提款，再依次用非注册→RRSP→TFSA。把免税的 TFSA 资金留到后期；卖出非注册投资可能产生应税资本利得。",
+      "tfsaFirst": "先计入 RRIF 最低提款，再依次用 TFSA→非注册→RRSP。TFSA 提款一般不增加当年应税收入；但会较早用掉免税资金，可能把 RRSP 税负推到以后。",
+      "rrspFirst": "先计入 RRIF 最低提款，再优先用 RRSP/RRIF 支付生活费，之后才用非注册→TFSA。可提早降低注册账户余额，但较大的应税提款可能增加税额，并影响按收入计算的福利。"
+    },
+    "strategySourceLabel": "税务规则参考：", "strategySourceRrsp": "RRSP 提款", "strategySourceTfsa": "TFSA 税务", "strategySourceCapital": "资本利得", "strategySourceRrif": "RRIF 最低提款", "strategySourceOas": "OAS 回收税",
     "targetQuestion": "你有希望在停工时达到的可投资资产目标吗？",
     "targetExplanation": "可选。这个金额只用于“目标达标？”比较，不决定维持退休生活所需的 FIRE 数字；后者由系统另行计算。",
     "targetExampleNote": "显示的 100 万只是示例。请按今天的购买力填写你自己的金额，输入后才算确认。",

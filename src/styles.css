@@ -257,6 +257,11 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .choice-group input, .check-group input { margin-top: 4px; accent-color: #174ea6; }
 .choice-group span, .check-group span { display: grid; gap: 3px; }
 .choice-group small, .check-group small { color: #526579; font-weight: 400; line-height: 1.45; }
+.strategy-question { max-width: 620px; }
+.strategy-intro { margin: 18px 0 0; color: #526579; line-height: 1.55; }
+.strategy-question .choice-group { margin-top: 16px; }
+.strategy-question .choice-group small { font-size: .87rem; line-height: 1.55; }
+.strategy-source { margin: -2px 0 0; color: #526579; font-size: .82rem; line-height: 1.5; }
 .question-help { max-width: 620px; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
 .question-help summary { color: #174ea6; cursor: pointer; font-weight: 600; }
 .question-help p { max-width: 65ch; color: #526579; line-height: 1.65; }

@@ -44,7 +44,7 @@ async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes'
   else if (pageId === 'intent.legacy') await page.getByRole('radio', { name: /do not need to reserve/ }).check()
   else if (pageId === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
   else if (pageId === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
-  else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Bracket-capped/ }).check()
+  else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Paced RRSP withdrawals/ }).check()
   else await confirmVisibleNumbers(page)
 }
 
@@ -228,6 +228,28 @@ test('investment mix explains annual real return percentages', async ({ page }, 
   await expect(page.getByText('预计年均实际收益：2.4%')).toBeVisible()
 })
 
+test('each withdrawal order explains its account sequence and trade-off', async ({ page }) => {
+  await page.goto('/#/guided/preferences/invest.strategy')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const cards = page.locator('.strategy-question .choice-group label')
+  await expect(cards).toHaveCount(4)
+  await expect(cards.nth(0)).toContainText('不足依次用非注册→TFSA，仍不够再取 RRSP')
+  await expect(cards.nth(0)).toContainText('当前：最低税阶')
+  await expect(cards.nth(1)).toContainText('非注册→RRSP→TFSA')
+  await expect(cards.nth(2)).toContainText('TFSA→非注册→RRSP')
+  await expect(cards.nth(3)).toContainText('之后才用非注册→TFSA')
+  await expect(page.locator('.strategy-source a')).toHaveCount(5)
+  await expect(page.getByText('没有适合所有人的固定最优顺序', { exact: false })).toBeVisible()
+
+  for (const card of await cards.all()) {
+    await card.click()
+    await expect(card.locator('input')).toBeChecked()
+  }
+  const widths = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport)
+})
+
 test('fee and inflation presets are sourced examples, independently editable and persisted', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.fees')
   await page.getByRole('button', { name: '中文' }).click()
@@ -393,7 +415,7 @@ test('final review replaces the redundant assumption page without overwriting co
   await page.locator('[data-field="fees"] input').fill('0.8')
   await page.getByRole('button', { name: '加拿大央行目标 · 2.0%' }).click()
   await page.goto('/#/guided/preferences/invest.strategy')
-  await page.getByRole('radio', { name: /RRSP 压税/ }).check()
+  await page.getByRole('radio', { name: /RRSP 分段提取/ }).check()
   await page.locator('.question-pager').getByRole('button', { name: '核对答案' }).click()
 
   await expect(page.getByRole('heading', { name: '核对你的答案' })).toBeVisible()

@@ -182,11 +182,11 @@
   "targetLate": "Insuffisant : environ {{amount}} à {{fireAge}} ans contre une cible de {{target}}; en continuant d’épargner, atteinte à {{age}} ans.",
   "targetNever": "Avec l’épargne et les rendements actuels, {{target}} n’est jamais atteint.",
   "targetHint": "Inclut le produit des ventes immobilières prévues (résidence principale libre d'impôt, gain d'immeuble locatif imposé; l'immobilier non vendu ne compte pas); si insuffisant, l'épargne est supposée continuer. Valeurs en fin d'année, comme le graphique.",
-  "strat_meltdownPaced": "Meltdown REER plafonné au premier palier",
-  "strat_rrspFirst": "REER d’abord agressif (déconseillé)",
+  "strat_meltdownPaced": "Retraits REER échelonnés (plafond de revenu)",
+  "strat_rrspFirst": "REER d’abord agressif (scénario comparatif)",
   "strat_nonRegFirst": "Non enregistré d’abord",
   "strat_tfsaFirst": "CELI d’abord",
-  "meltdownNote": "Le REER finance d'abord les dépenses chaque année, mais seulement selon le besoin et jamais au-delà de la place restante dans le premier palier après RPC/SV (un palier par conjoint) - rien n'est retiré juste pour payer l'impôt d'avance. Le complément vient du non enregistré → CELI; le reste du REER passe 71 ans et sort via les minimums FERR.",
+  "meltdownNote": "Après le minimum FERR requis, le modèle puise dans le REER jusqu’au plafond de revenu choisi (premier palier par défaut), puis dans le non enregistré → CELI. Si ces comptes sont épuisés, il revient au REER; le plafond ne garantit ni le palier d’impôt ni l’absence de récupération de la SV.",
   "totalTax": "Impôt total (succession incluse)",
   "useStrategy": "Utiliser",
   "estateValue": "Valeur successorale (après impôt)",
@@ -567,6 +567,14 @@
     "review": { "short": "Vérifier", "title": "Vérifier et lire les résultats", "help": "Contrôlez les données et avertissements, puis lisez la conclusion avant les graphiques détaillés." }
   }},
   "questionnaire": {
+    "strategyIntro": "Ce choix fixe l’ordre utilisé par le modèle pour financer les dépenses annuelles après impôt. Les minimums FERR requis passent d’abord. Aucun ordre n’est optimal pour tous; comparez les résultats.",
+    "strategyDetails": {
+      "meltdownPaced": "Après le minimum FERR, puiser dans le REER jusqu’au plafond de revenu (actuellement : {{cap}}); puis non enregistré → CELI → REER au besoin. L’objectif est d’étaler les retraits imposables; le plafond n’est pas absolu si les autres fonds s’épuisent. Modifiable dans les résultats.",
+      "nonRegFirst": "Après le minimum FERR, utiliser non enregistré → REER → CELI. Le CELI reste disponible pour plus tard; vendre des placements non enregistrés peut réaliser des gains en capital imposables.",
+      "tfsaFirst": "Après le minimum FERR, utiliser CELI → non enregistré → REER. Les retraits CELI n’ajoutent généralement pas de revenu imposable aujourd’hui, mais consomment plus tôt les actifs libres d’impôt et peuvent reporter l’impôt REER.",
+      "rrspFirst": "Après le minimum FERR, financer les dépenses par le REER/FERR avant le non enregistré → CELI. Le solde enregistré baisse plus tôt, mais de gros retraits imposables peuvent augmenter l’impôt et réduire les prestations liées au revenu."
+    },
+    "strategySourceLabel": "Règles fiscales :", "strategySourceRrsp": "Retraits REER", "strategySourceTfsa": "Traitement CELI", "strategySourceCapital": "Gains en capital", "strategySourceRrif": "Minimums FERR", "strategySourceOas": "Récupération SV",
     "targetQuestion": "Avez-vous une cible personnelle d’actifs investissables pour cet âge ?",
     "targetExplanation": "Facultatif : cette cible sert au résultat « Atteindrai-je ma cible ? ». Elle ne détermine pas le capital nécessaire pour votre niveau de vie, calculé séparément.",
     "targetExampleNote": "Le montant de 1 000 000 $ n’est qu’un exemple. Saisissez votre propre montant en dollars d’aujourd’hui pour le confirmer.",
