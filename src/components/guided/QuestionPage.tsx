@@ -415,9 +415,6 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'invest.strategy':
       control = <ChoiceGroup id={definition.id} value={answer} options={(['meltdownPaced', 'nonRegFirst', 'tfsaFirst', 'rrspFirst'] as Strategy[]).map((value) => ({ value, label: t(`strat_${value}`) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ strategy: value as Strategy }); markAnswers(['strategy'], 'confirmed') }} />
       break
-    case 'assumptions.review':
-      control = <div className="assumption-list"><p>{t('questionnaire.assumptionSummary', { returns: (inputs.returns.tfsa * 100).toFixed(1), fees: ((inputs.fees ?? 0) * 100).toFixed(1), inflation: ((inputs.inflation ?? 0.021) * 100).toFixed(1) })}</p><button type="button" onClick={() => markAnswers(definition.fieldBindings as string[], 'estimated', 'default')}>{t('questionnaire.acceptAssumptions')}</button></div>
-      break
     default:
       control = <p>{t('questionnaire.notApplicable')}</p>
   }

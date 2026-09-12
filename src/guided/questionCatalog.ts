@@ -105,7 +105,6 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('invest.fees', 'preferences', ['investmentFees', 'inflation'], ['fees', 'inflation'], { estimatePolicy: 'assumption' }),
   page('invest.tax', 'preferences', ['distributions', 'workingTaxRate'], ['nonRegDistributionYield', 'accumulationMarginalRate'], { estimatePolicy: 'assumption' }),
   page('invest.strategy', 'preferences', ['withdrawalStrategy'], ['strategy'], { estimatePolicy: 'assumption' }),
-  page('assumptions.review', 'preferences', ['assumptions'], ['returns', 'volatilities', 'fees', 'inflation', 'nonRegDistributionYield', 'accumulationMarginalRate', 'strategy', 'meltdownBracketCap'], { estimatePolicy: 'assumption' }),
 ]
 
 export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers): QuestionDefinition[] {
@@ -124,6 +123,7 @@ export function pageById(id: string): QuestionDefinition | undefined {
     'allocation.rrsp': 'allocation.tfsa',
     'allocation.nonReg': 'allocation.tfsa',
     'intent.confirm': 'intent.spending',
+    'assumptions.review': 'invest.strategy',
   }
   const resolvedId = aliases[id] ?? id
   return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)

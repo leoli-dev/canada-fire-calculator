@@ -45,24 +45,69 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
 }
 
 function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
   const cad = useCad()
   const state = useStore()
   const issues = validateInputs(state.inputs).filter((issue) => issue.severity === 'error')
   const incomplete = pages.filter((page) => !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
   const canGenerate = issues.length === 0 && incomplete.length === 0
+  const formatNumber = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { maximumFractionDigits: 2 })
+  const percent = (value: number) => `${formatNumber.format(value * 100)}%`
+  const chosenMix = state.questionAnswers['invest.mix']
+  const chosenStrategy = state.questionAnswers['invest.strategy']
+  const assumptionRows = [
+    {
+      id: 'invest.mix',
+      title: t('questionnaire.reviewMixTitle'),
+      value: typeof chosenMix === 'string'
+        ? t('questionnaire.reviewMixValue', { mix: t(`questionnaire.mixNames.${chosenMix}`), real: percent(state.inputs.returns.tfsa), volatility: percent(state.inputs.volatilities?.tfsa ?? 0) })
+        : t('questionnaire.reviewNotChosen'),
+    },
+    { id: 'invest.fees', title: t('questionnaire.reviewFeesTitle'), value: t('questionnaire.reviewFeesValue', { fees: percent(state.inputs.fees ?? 0), inflation: percent(state.inputs.inflation ?? 0.021) }) },
+    { id: 'invest.tax', title: t('questionnaire.reviewTaxTitle'), value: t('questionnaire.reviewTaxValue', { distributions: percent(state.inputs.nonRegDistributionYield ?? 0.02), rate: percent(state.inputs.accumulationMarginalRate ?? 0.35) }) },
+    {
+      id: 'invest.strategy',
+      title: t('questionnaire.reviewStrategyTitle'),
+      value: typeof chosenStrategy === 'string'
+        ? (state.inputs.strategy === 'meltdownPaced'
+          ? t('questionnaire.reviewStrategyWithCap', { strategy: t('questionnaire.reviewPacedStrategy'), cap: t(`meltdownCap_${state.inputs.meltdownBracketCap ?? 'bracket1'}`) })
+          : t(`strat_${state.inputs.strategy}`))
+        : t('questionnaire.reviewNotChosen'),
+    },
+  ]
+  const editPage = (id: string) => {
+    const definition = pageById(id)
+    if (!definition) return
+    state.setActivePage(definition.id)
+    window.location.hash = `#/guided/${definition.categoryId}/${definition.id}`
+  }
   return <section className="answer-review">
-    <button type="button" className="text-action" onClick={() => state.setGuidedView('questionnaire')}>{t('questionnaire.backToQuestions')}</button>
+    <button type="button" className="text-action" onClick={() => editPage(state.activePageId)}>{t('questionnaire.backToQuestions')}</button>
     <h2 tabIndex={-1}>{t('questionnaire.reviewTitle')}</h2><p>{t('questionnaire.reviewIntro')}</p>
+    <section className="review-assumptions" aria-labelledby="review-assumptions-title">
+      <h3 id="review-assumptions-title">{t('questionnaire.reviewAssumptionsTitle')}</h3>
+      <p>{t('questionnaire.reviewAssumptionsIntro')}</p>
+      <div>{assumptionRows.map((row) => {
+        const definition = pages.find((page) => page.id === row.id)
+        const complete = definition ? pageIsComplete(definition, state) : false
+        const containsEstimate = definition?.fieldBindings.some((field) => state.answerMeta[field]?.status === 'estimated') ?? false
+        const statusKey = !complete ? 'reviewAssumptionPending' : containsEstimate ? 'reviewAssumptionEstimated' : 'reviewAssumptionSet'
+        return <div className="review-assumption-row" key={row.id}>
+          <div><strong>{row.title}</strong><p>{row.value}</p><small>{t(`questionnaire.${statusKey}`)}</small></div>
+          <button type="button" onClick={() => editPage(row.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: row.title })}>{t('guidedEdit')}</button>
+        </div>
+      })}</div>
+      <p className="review-assumptions-note">{t('questionnaire.reviewAssumptionsNote')}</p>
+    </section>
     <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
       const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
       const value = category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
-      return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><button type="button" onClick={() => state.setActivePage(first.id)}>{t('guidedEdit')}</button></div><p>{value}</p></article>
+      return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</button></div><p>{value}</p></article>
     })}</div>
     {(incomplete.length > 0 || issues.length > 0) && <div className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
-      {incomplete.map((page) => <li key={page.id}><button type="button" onClick={() => state.setActivePage(page.id)}>{t(`questionnaire.pages.${page.contentKey}.question`)}</button></li>)}
-      {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => state.setActivePage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
+      {incomplete.map((page) => <li key={page.id}><button type="button" onClick={() => editPage(page.id)}>{t(`questionnaire.pages.${page.contentKey}.question`)}</button></li>)}
+      {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
     </ul></div>}
     <button type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</button>
   </section>
@@ -82,7 +127,11 @@ export function GuidedFlow() {
       const latest = useStore.getState()
       const latestPages = visibleQuestionPages(latest.inputs, latest.questionAnswers)
       const hash = window.location.hash
-      if (hash === '#/guided/review') return latest.setGuidedView('review')
+      if (hash === '#/guided/review' || hash.endsWith('/assumptions.review')) {
+        latest.setGuidedView('review')
+        if (hash !== '#/guided/review') window.location.hash = '#/guided/review'
+        return
+      }
       if (hash === '#/guided/results') return latest.resultRevision === latest.inputRevision ? latest.setGuidedView('results') : latest.setGuidedView('review')
       const id = hash.split('/').at(-1)
       const resolved = id ? pageById(id) : undefined
@@ -115,6 +164,6 @@ export function GuidedFlow() {
   return <div className="questionnaire-layout">
     <button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</button>
     <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" disabled={index === pages.length - 1} onClick={() => navigate(pages[index + 1].id)}>{pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
   </div>
 }

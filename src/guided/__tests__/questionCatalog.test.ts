@@ -38,6 +38,12 @@ describe('question catalog', () => {
     expect(pageById('intent.spending')?.fieldBindings).toContain('goal')
   })
 
+  it('uses the final answer review instead of a separate assumption-acceptance page', () => {
+    expect(QUESTION_CATALOG.some((definition) => definition.id === 'assumptions.review')).toBe(false)
+    expect(pageById('assumptions.review')?.id).toBe('invest.strategy')
+    expect(QUESTION_CATALOG.at(-1)?.id).toBe('invest.strategy')
+  })
+
   it('provides distinct page-level guidance in every supported language', () => {
     const languages: GuidanceLanguage[] = ['en', 'fr', 'zh']
 

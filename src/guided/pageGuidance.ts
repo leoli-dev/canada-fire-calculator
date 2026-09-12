@@ -63,7 +63,6 @@ const en: Record<string, Copy> = {
   'invest.fees': ['Fees reduce returns every year; inflation connects today’s prices to future nominal dollars.', 'Find MERs on fund facts and advisory statements; use a long-run inflation assumption, not one recent year.', 'A 0.2% ETF fee and 2.1% inflation are entered as percentages.'],
   'invest.tax': ['Taxable distributions create yearly tax drag in a non-registered account; before full-time work ends, the marginal rate also approximates tax on net rent and benefits already received.', 'Estimate the distribution share from taxable T3 / T5 amounts and brokerage records, then check federal plus provincial brackets for your working-years taxable income.', 'On $100,000 of non-registered investments, 2% distributions yield $2,000; at a modelled 35% marginal rate, the estimated drag is $700.'],
   'invest.strategy': ['Withdrawal order changes tax, benefit clawbacks and the assets left later.', 'Choose the strategy you want to compare; the results section can show alternatives.', 'A bracket-capped RRSP meltdown uses low-income years without draining RRSP all at once.'],
-  'assumptions.review': ['The projection should run only after you recognize the estimates it depends on.', 'Review return, volatility, fees, inflation and tax assumptions; change earlier pages if needed.', 'Accepting a 3% real return means testing that scenario, not promising it will occur.'],
 }
 
 const zh: Record<string, Copy> = {
@@ -127,7 +126,6 @@ const zh: Record<string, Copy> = {
   'invest.fees': ['费用每年降低收益；通胀把今天价格与未来名义金额连接起来。', '从基金资料和顾问账单查MER；通胀使用长期假设，不照搬最近一年。', 'ETF费用0.2%、通胀2.1%都按百分比填写。'],
   'invest.tax': ['非注册账户的应税分配会形成年度税耗；停工前的边际税率也用于净租金和已领福利的简化估算。', '从 T3 / T5 和券商记录估算应税分配比例，再按工作期应税收入与居住省份查联邦＋省税档。', '假设非注册投资 10 万、分配率 2%、边际税率 35%，模型估算每年分配 2,000、税耗约 700。'],
   'invest.strategy': ['提款顺序会改变税额、福利clawback和以后剩余资产。', '选择希望采用的策略；结果页仍可比较其他方案。', '税档上限RRSP meltdown利用低收入年份，但不会一次清空RRSP。'],
-  'assumptions.review': ['只有你知道投影依赖哪些估算后，才应该生成结果。', '核对收益、波动、费用、通胀和税务假设；不合适就返回前页修改。', '接受3%实际收益表示测试这个情景，不代表承诺未来一定发生。'],
 }
 
 // French copy stays page-specific as well; concise wording keeps the drawer readable.
@@ -193,7 +191,6 @@ Object.assign(fr, {
   'invest.fees': ['Les frais réduisent le rendement; l’inflation relie les prix actuels aux montants futurs.', 'Trouvez le RFG dans l’aperçu du fonds et utilisez une inflation à long terme.', 'Des frais de 0,2 % et une inflation de 2,1 % sont des pourcentages.'],
   'invest.tax': ['Les distributions imposables créent une ponction annuelle dans le compte non enregistré; avant l’arrêt du travail, ce taux estime aussi l’impôt sur le loyer net et les prestations déjà reçues.', 'Estimez la part des distributions imposables avec les feuillets T3 / T5 et les relevés, puis vérifiez les tranches fédérales et provinciales selon votre revenu.', 'Sur 100 000 $ de placements non enregistrés, 2 % donnent 2 000 $ de distributions; à 35 %, le modèle estime une ponction de 700 $.'],
   'invest.strategy': ['L’ordre des retraits change l’impôt, les récupérations et l’actif restant.', 'Choisissez la stratégie à appliquer; les résultats compareront les autres.', 'Une fonte REER plafonnée utilise les années à faible revenu.'],
-  'assumptions.review': ['Le résultat ne doit être généré qu’après reconnaissance de ses hypothèses.', 'Vérifiez rendement, volatilité, frais, inflation et fiscalité.', 'Accepter 3 % réel teste un scénario; ce n’est pas une promesse.'],
 })
 
 const languages: Record<GuidanceLanguage, Record<string, Copy>> = { en, fr, zh }

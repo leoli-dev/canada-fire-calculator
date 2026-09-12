@@ -36,7 +36,6 @@ async function answerCurrentPage(page: Page, pageId: string) {
   else if (pageId === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
   else if (pageId === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
   else if (pageId === 'invest.strategy') await page.getByRole('radio', { name: /Bracket-capped/ }).check()
-  else if (pageId === 'assumptions.review') await page.getByRole('button', { name: /Use these disclosed assumptions/ }).click()
   else await confirmVisibleNumbers(page)
 }
 
@@ -51,14 +50,11 @@ async function completeGuidedQuestionnaire(page: Page) {
     visited.add(pageId)
     await answerCurrentPage(page, pageId)
     const next = page.locator('.question-pager button').last()
-    if (await next.isDisabled()) break
+    if (await next.innerText() === 'Review answers') { await next.click(); break }
     await next.click()
   }
   expect(visited.size).toBeGreaterThan(20)
-
-  const mobileDirectory = page.getByRole('button', { name: /Questionnaire directory/ })
-  if (await mobileDirectory.isVisible()) await mobileDirectory.click()
-  await page.getByRole('button', { name: 'Review answers' }).click()
+  expect(visited.has('assumptions.review')).toBe(false)
 }
 
 test('guided mode completes a full UI flow and invalidates a stale result', async ({ page }) => {
@@ -235,6 +231,33 @@ test('tax assumptions explain both inputs and update the worked example', async 
   await expect(example).toContainText('CA$1,200')
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
   expect(overflow).toBe(false)
+})
+
+test('final review replaces the redundant assumption page without overwriting confirmed answers', async ({ page }) => {
+  await page.goto('/#/guided/preferences/invest.fees')
+  await page.getByRole('button', { name: '中文' }).click()
+  await page.locator('[data-field="fees"] input').fill('0.8')
+  await page.getByRole('button', { name: '加拿大央行目标 · 2.0%' }).click()
+  await page.goto('/#/guided/preferences/invest.strategy')
+  await page.getByRole('radio', { name: /RRSP 压税/ }).check()
+  await page.locator('.question-pager').getByRole('button', { name: '核对答案' }).click()
+
+  await expect(page.getByRole('heading', { name: '核对你的答案' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这次计算会用到的假设' })).toBeVisible()
+  await expect(page.locator('.review-assumption-row')).toHaveCount(4)
+  const feeRow = page.locator('.review-assumption-row').filter({ hasText: '费用与通胀' })
+  await expect(feeRow).toContainText('0.8%')
+  await expect(feeRow).toContainText('2%')
+  await expect(feeRow).toContainText('含估算')
+  await expect(page.getByRole('button', { name: '采用这些已披露假设' })).toHaveCount(0)
+  const savedFee = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.answerMeta.fees)
+  expect(savedFee.status).toBe('confirmed')
+  expect(savedFee.origin).toBe('user')
+
+  await page.getByRole('button', { name: '修改费用与通胀' }).click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'invest.fees')
+  await page.goto('/#/guided/preferences/assumptions.review')
+  await expect(page.getByRole('heading', { name: '核对你的答案' })).toBeVisible()
 })
 
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
