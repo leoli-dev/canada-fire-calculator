@@ -55,28 +55,35 @@ function ChoiceGroup(props: { id: string; value?: string; label?: string; option
   </div>
 }
 
-function CppClaimAgeGuide(props: { field: string; value: number; isQuebec: boolean; onValue: (value: number) => void }) {
+function BenefitClaimAgeGuide(props: { field: string; value: number; kind: 'cpp' | 'qpp' | 'oas'; onValue: (value: number) => void }) {
   const { t } = useTranslation()
   const markAnswers = useStore((s) => s.markAnswers)
   const meta = useStore((s) => s.answerMeta[props.field])
-  const guideTitle = t(props.isQuebec ? 'guidedQppAgeGuideTitle' : 'guidedCppAgeGuideTitle')
-  const options = [
+  const isOas = props.kind === 'oas'
+  const guideTitle = t(isOas ? 'guidedOasAgeGuideTitle' : props.kind === 'qpp' ? 'guidedQppAgeGuideTitle' : 'guidedCppAgeGuideTitle')
+  const options = isOas ? [
+    { value: '65', label: t('guidedOasAge65'), detail: t('guidedOasAge65Detail') },
+    { value: '67', label: t('guidedOasAge67'), detail: t('guidedOasAge67Detail') },
+    { value: '70', label: t('guidedOasAge70'), detail: t('guidedOasAge70Detail') },
+  ] : [
     { value: '60', label: t('guidedCppAgeEarly'), detail: t('guidedCppAgeEarlyDetail') },
     { value: '65', label: t('guidedCppAgeStandard'), detail: t('guidedCppAgeStandardDetail') },
     { value: '70', label: t('guidedCppAgeLate'), detail: t('guidedCppAgeLateDetail') },
-    ...(props.isQuebec ? [{ value: '72', label: t('guidedQppAgeLate'), detail: t('guidedQppAgeLateDetail') }] : []),
+    ...(props.kind === 'qpp' ? [{ value: '72', label: t('guidedQppAgeLate'), detail: t('guidedQppAgeLateDetail') }] : []),
   ]
-  const source = props.isQuebec
-    ? 'https://www.retraitequebec.gouv.qc.ca/en/citizens/retirement-planning/applying-your-retirement-pension/retirement-pension-quebec-pension-plan/what-age-should-you-apply-your-retirement-pension'
-    : 'https://www.canada.ca/en/services/benefits/publicpensions/cpp/when-start.html'
-  return <div className="cpp-age-guide">
+  const source = isOas
+    ? 'https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/when-start.html'
+    : props.kind === 'qpp'
+      ? 'https://www.retraitequebec.gouv.qc.ca/en/citizens/retirement-planning/applying-your-retirement-pension/retirement-pension-quebec-pension-plan/what-age-should-you-apply-your-retirement-pension'
+      : 'https://www.canada.ca/en/services/benefits/publicpensions/cpp/when-start.html'
+  return <div className="benefit-age-guide">
     <h3>{guideTitle}</h3>
-    <p>{t('guidedCppAgeGuideIntro')}</p>
+    <p>{t(isOas ? 'guidedOasAgeGuideIntro' : 'guidedCppAgeGuideIntro')}</p>
     <ChoiceGroup id={props.field} label={guideTitle} value={meta?.status === 'confirmed' ? String(props.value) : undefined} options={options} onChange={(value) => {
       props.onValue(Number(value))
       markAnswers([props.field], 'confirmed')
     }} />
-    <p className="cpp-age-source">{t('guidedCppAgeGuideNote')} <a href={source} target="_blank" rel="noopener noreferrer">{t('guidedCppAgeGuideSource')}</a></p>
+    <p className="benefit-age-source">{t(isOas ? 'guidedOasAgeGuideNote' : 'guidedCppAgeGuideNote')} <a href={source} target="_blank" rel="noopener noreferrer">{t(isOas ? 'guidedOasAgeGuideSource' : 'guidedCppAgeGuideSource')}</a></p>
   </div>
 }
 
@@ -362,7 +369,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ cppAnnualAt65, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} />
-        <CppClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ cppStartAge })} />
+        <BenefitClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ cppStartAge })} />
       </>
       break
     case 'oas.self':
@@ -371,6 +378,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <OasEstimator onApply={(oasAnnualAt65) => { set({ oasAnnualAt65 }); markAnswers(['oasAnnualAt65'], 'confirmed') }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} />
+        <BenefitClaimAgeGuide field="oasStartAge" value={inputs.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ oasStartAge })} />
       </>
       break
     case 'cpp.partner':
@@ -379,7 +387,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'confirmed') }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
-        <CppClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} isQuebec={inputs.province === 'QC'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
+        <BenefitClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
       </>
       break
     case 'oas.partner':
@@ -388,6 +396,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <OasEstimator onApply={(oasAnnualAt65) => { set({ partner: { ...inputs.partner!, oasAnnualAt65 } }); markAnswers(['partner.oasAnnualAt65'], 'confirmed') }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
+        <BenefitClaimAgeGuide field="partner.oasStartAge" value={inputs.partner!.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
       </>
       break
     case 'pension.self':

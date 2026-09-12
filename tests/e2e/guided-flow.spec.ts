@@ -282,7 +282,7 @@ test('applying the CPP work-history estimate confirms the planning input and age
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
 })
 
-test('applying the OAS residence estimate confirms the accepted planning amount', async ({ page }) => {
+test('OAS estimate and claim-age options independently confirm the planning inputs', async ({ page }) => {
   await page.goto('/#/guided/income/oas.self')
   await page.getByRole('button', { name: '中文' }).click()
 
@@ -297,12 +297,26 @@ test('applying the OAS residence estimate confirms the accepted planning amount'
   await expect(amount.locator('small')).toHaveText('已确认')
   await expect(age.locator('small')).toHaveText('示例')
   await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
+  await expect(page.getByRole('heading', { name: '不知道选几岁？先比较这三种情形' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /65 岁 · 尽早领取/ })).not.toBeChecked()
+  await expect(page.getByRole('radio', { name: /60 岁/ })).toHaveCount(0)
+  await expect(page.locator('.benefit-age-guide')).toContainText('延后 OAS 期间不能领 GIS')
+  await expect(page.locator('.benefit-age-guide')).toContainText('不自动计入额外居住年数')
+  await expect(page.getByRole('link', { name: '查看加拿大政府开领说明' })).toHaveAttribute('href', /canada\.ca\/en\/services\/benefits\/publicpensions\/old-age-security\/when-start/)
+  await page.getByRole('radio', { name: /65 岁 · 尽早领取/ }).check()
+  await expect(age.locator('small')).toHaveText('已确认')
+  await page.getByRole('radio', { name: /67 岁 · 延后两年/ }).check()
+  await expect(age.locator('input')).toHaveValue('67')
+  await age.locator('input').fill('68')
+  await expect(page.getByRole('radio', { name: /67 岁 · 延后两年/ })).not.toBeChecked()
   await page.reload()
   await expect(amount.locator('small')).toHaveText('已确认')
   await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(age.locator('input')).toHaveValue('68')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
 })
 
-test('partner OAS residence estimate also confirms on apply', async ({ page }, testInfo) => {
+test('partner OAS estimate and claim-age options update partner fields', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await page.goto('/#/guided/family/family.people')
   await page.getByRole('radio', { name: /Plan with my partner/ }).check()
@@ -315,7 +329,15 @@ test('partner OAS residence estimate also confirms on apply', async ({ page }, t
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
   await expect(amount.locator('input')).toHaveValue('7,219')
   await expect(amount.locator('small')).toHaveText('已确认')
-  await expect(page.locator('[data-field="partner.oasStartAge"] small')).toHaveText('示例')
+  const age = page.locator('[data-field="partner.oasStartAge"]')
+  await expect(age.locator('small')).toHaveText('示例')
+  await expect(page.getByRole('radio', { name: /70 岁 · 延后五年/ })).toBeVisible()
+  await page.getByRole('radio', { name: /70 岁 · 延后五年/ }).check()
+  await expect(age.locator('input')).toHaveValue('70')
+  await expect(age.locator('small')).toHaveText('已确认')
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(saved.inputs.partner.oasStartAge).toBe(70)
+  expect(saved.inputs.oasStartAge).toBe(65)
 })
 
 test('Québec QPP offers age 72 guidance for both household members', async ({ page }, testInfo) => {
