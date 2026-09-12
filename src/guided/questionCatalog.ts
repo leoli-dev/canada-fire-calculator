@@ -21,6 +21,7 @@ const page = (
   id,
   categoryId,
   contentKey: id.replaceAll('.', '_'),
+  guidanceKey: id,
   questions,
   fieldBindings,
   estimatePolicy: options.estimatePolicy ?? 'fact-only',

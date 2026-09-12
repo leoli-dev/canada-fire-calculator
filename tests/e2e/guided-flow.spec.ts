@@ -86,6 +86,30 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await expect(page.locator('.results-column')).toHaveCount(0)
 })
 
+test('question help follows the current page within one category', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const help = page.locator('.question-help')
+  await help.locator('summary').click()
+  const householdHelp = await help.innerText()
+  expect(householdHelp).toContain('家庭人数')
+
+  await page.locator('.question-pager button').last().click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'family.ages')
+  if (!(await help.evaluate((element) => element.hasAttribute('open')))) await help.locator('summary').click()
+  const agesHelp = await help.innerText()
+  expect(agesHelp).toContain('出生日期')
+  expect(agesHelp).not.toBe(householdHelp)
+
+  await page.locator('.question-pager button').last().click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'family.children')
+  if (!(await help.evaluate((element) => element.hasAttribute('open')))) await help.locator('summary').click()
+  const childrenHelp = await help.innerText()
+  expect(childrenHelp).toContain('18岁')
+  expect(childrenHelp).not.toBe(agesHelp)
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)

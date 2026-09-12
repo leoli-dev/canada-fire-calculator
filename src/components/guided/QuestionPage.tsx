@@ -10,18 +10,20 @@ import {
 } from '../../store'
 import { useCad } from '../../format'
 import type { QuestionDefinition } from '../../guided/schema'
+import { guidanceForPage } from '../../guided/pageGuidance'
 import { NumberInput } from '../NumberInput'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
-function QuestionHelp({ categoryId }: { categoryId: string }) {
-  const { t } = useTranslation()
+function QuestionHelp({ guidanceKey }: { guidanceKey: string }) {
+  const { i18n, t } = useTranslation()
+  const guidance = guidanceForPage(guidanceKey, i18n.resolvedLanguage ?? i18n.language)
   return <details className="question-help">
     <summary>{t('questionnaire.helpTitle')}</summary>
-    <p>{t(`questionnaire.guidance.${categoryId}.why`)}</p>
-    <p><strong>{t('questionnaire.findLabel')}</strong> {t(`questionnaire.guidance.${categoryId}.help`)}</p>
-    <p className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {t(`questionnaire.guidance.${categoryId}.example`)}</p>
+    <p>{guidance.why}</p>
+    <p><strong>{t('questionnaire.findLabel')}</strong> {guidance.find}</p>
+    <p className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {guidance.example}</p>
   </details>
 }
 
@@ -372,9 +374,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   return <article className="question-page" data-page-id={definition.id}>
     <p className="question-location">{t(`questionnaire.categories.${definition.categoryId}`)}</p>
     <h2 id="question-title" tabIndex={-1}>{t(`questionnaire.pages.${key}.question`)}</h2>
-    <p className="question-essential">{t(`questionnaire.guidance.${definition.categoryId}.essential`)}</p>
     {control}
-    <QuestionHelp categoryId={definition.categoryId} />
+    <QuestionHelp guidanceKey={definition.guidanceKey} />
     {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <p className="pending-note">{t('questionnaire.pendingSaved')}</p>}
   </article>
 }

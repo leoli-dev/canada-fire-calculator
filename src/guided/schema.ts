@@ -8,6 +8,7 @@ export interface QuestionDefinition {
   id: string
   categoryId: CategoryId
   contentKey: string
+  guidanceKey: string
   questions: readonly string[]
   fieldBindings: readonly string[]
   estimatePolicy: 'none' | 'fact-only' | 'assumption'

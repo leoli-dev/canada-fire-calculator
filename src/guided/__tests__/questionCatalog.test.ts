@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
 import { DEFAULT_INPUTS } from '../../store'
+import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
 describe('question catalog', () => {
   it('uses unique stable string IDs and at most two main questions per page', () => {
@@ -14,6 +15,31 @@ describe('question catalog', () => {
     expect(QUESTION_CATEGORIES.map((category) => category.id)).toEqual([
       'family', 'saving', 'assets', 'housing', 'spending', 'income', 'preferences',
     ])
+  })
+
+  it('provides distinct page-level guidance in every supported language', () => {
+    const languages: GuidanceLanguage[] = ['en', 'fr', 'zh']
+
+    for (const definition of QUESTION_CATALOG) {
+      for (const language of languages) {
+        expect(hasLocalizedGuidance(definition.guidanceKey, language), `${definition.id} (${language})`).toBe(true)
+        const guidance = guidanceForPage(definition.guidanceKey, language)
+        expect(guidance.why.trim().length, `${definition.id} why (${language})`).toBeGreaterThan(10)
+        expect(guidance.find.trim().length, `${definition.id} find (${language})`).toBeGreaterThan(10)
+        expect(guidance.example.trim().length, `${definition.id} example (${language})`).toBeGreaterThan(10)
+      }
+
+      expect(guidanceForPage(definition.guidanceKey, 'fr')).not.toEqual(guidanceForPage(definition.guidanceKey, 'en'))
+      expect(guidanceForPage(definition.guidanceKey, 'zh')).not.toEqual(guidanceForPage(definition.guidanceKey, 'en'))
+    }
+
+    for (const language of languages) {
+      for (const category of QUESTION_CATEGORIES) {
+        const pages = QUESTION_CATALOG.filter((definition) => definition.categoryId === category.id)
+        const signatures = pages.map(({ guidanceKey }) => JSON.stringify(guidanceForPage(guidanceKey, language)))
+        expect(new Set(signatures).size, `${category.id} (${language})`).toBe(pages.length)
+      }
+    }
   })
 
   it('adds conditional household and property branches without hiding unrelated pages', () => {

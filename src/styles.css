@@ -205,7 +205,6 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .question-location { margin: 0 0 14px; color: #526579; font-size: 0.9rem; }
 .question-page h2 { margin: 0; max-width: 22ch; color: #172b3a; font-size: clamp(1.65rem, 3vw, 2.08rem); line-height: 1.22; letter-spacing: -0.025em; outline: none; }
 .question-page h2:focus-visible { outline: 3px solid rgba(23,78,166,.25); outline-offset: 5px; }
-.question-essential { max-width: 62ch; margin: 15px 0 24px; color: #526579; font-size: 1.05rem; line-height: 1.65; }
 .question-answer { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 8px 20px; align-items: center; max-width: 620px; margin: 18px 0; }
 .question-answer > label { color: #172b3a; font-weight: 650; }
 .question-number, .question-select select { width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; padding: 11px 12px; color: #172b3a; font-size: 1rem; font-variant-numeric: tabular-nums; }
