@@ -215,6 +215,15 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .allocation-instruction { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-return-explanation { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-choice .choice-group { margin-top: 12px; }
+.assumption-presets { display: grid; gap: 22px; max-width: 620px; margin: 18px 0; }
+.assumption-preset-field { border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.assumption-preset-field:last-child { border-bottom: 0; }
+.assumption-preset-field .question-answer { margin: 0 0 8px; }
+.assumption-preset-field > p { margin: 8px 0; color: #526579; line-height: 1.55; }
+.assumption-preset-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.assumption-preset { border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; color: #172b3a; padding: 9px 12px; text-align: left; cursor: pointer; }
+.assumption-preset[aria-pressed='true'] { border-color: #174ea6; background: #edf3fb; color: #174ea6; }
+.assumption-preset-field .assumption-source { font-size: .83rem; }
 .allocation-editor .question-pair { max-width: 620px; }
 .allocation-editor .question-answer { width: 100%; margin: 8px 0; }
 .allocation-total { display: flex; justify-content: space-between; gap: 16px; max-width: 620px; margin-top: 16px; border-left: 3px solid; padding: 10px 12px; line-height: 1.45; }

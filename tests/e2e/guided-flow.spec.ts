@@ -187,6 +187,33 @@ test('investment mix explains annual real return percentages', async ({ page }, 
   await expect(page.getByText('预计年均实际收益：2.4%')).toBeVisible()
 })
 
+test('fee and inflation presets are sourced examples, independently editable and persisted', async ({ page }) => {
+  await page.goto('/#/guided/preferences/invest.fees')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  const fee = page.locator('[data-field="fees"] input')
+  const inflation = page.locator('[data-field="inflation"] input')
+  const managed = page.getByRole('button', { name: '代管 ETF 组合 · 0.65%' })
+  const fpCanada = page.getByRole('button', { name: 'FP Canada 2026 · 2.1%' })
+  await expect(managed).toHaveAttribute('aria-pressed', 'false')
+  await managed.click()
+  await expect(fee).toHaveValue('0.65')
+  await expect(inflation).toHaveValue('2.1')
+  await expect(managed).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-field="fees"] small')).toContainText('估算')
+  await expect(fpCanada).toHaveAttribute('aria-pressed', 'false')
+
+  await page.getByRole('button', { name: '偏高通胀情景 · 3.0%' }).click()
+  await expect(inflation).toHaveValue('3')
+  await fee.fill('0.8')
+  await expect(managed).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('[data-field="fees"] small')).toContainText('已确认')
+  await page.reload()
+  await expect(fee).toHaveValue('0.8')
+  await expect(inflation).toHaveValue('3')
+  await expect(page.locator('.assumption-source a')).toHaveCount(6)
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)

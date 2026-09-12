@@ -374,9 +374,22 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <div className="mix-choice"><p className="mix-return-explanation">{t('questionnaire.mixReturnExplanation')}</p><ChoiceGroup id={definition.id} value={answer} options={['allStocks', 'aggressive', 'balanced', 'conservative', 'gic'].map((value) => ({ value, label: t(`questionnaire.mixNames.${value}`), detail: t('questionnaire.mixExpectedReturn', { value: number.format(Math.round((blendedReturn(MIX_PRESETS[value]) * 100) * 10 + 1e-9) / 10) }) }))} onChange={(value) => { setQuestionAnswer(definition.id, value); (['tfsa', 'rrsp', 'nonReg'] as const).forEach((account) => applyMixPreset(account, value)); markAnswers(['returns', 'volatilities'], 'estimated', 'default') }} /></div>
       break
     }
-    case 'invest.fees':
-      control = <div className="question-pair"><FactNumber field="fees" label={t('feesLabel')} value={(inputs.fees ?? 0) * 100} step={0.1} onValue={(value) => set({ fees: value / 100 })} /><FactNumber field="inflation" label={t('inflationLabel')} value={(inputs.inflation ?? 0.021) * 100} step={0.1} onValue={(value) => set({ inflation: value / 100 })} /></div>
+    case 'invest.fees': {
+      const choosePreset = (field: 'fees' | 'inflation', value: number) => {
+        set({ [field]: value / 100 })
+        markAnswers([field], 'estimated', 'default')
+      }
+      const preset = (field: 'fees' | 'inflation', value: number, label: string) => <button key={`${field}-${value}`} type="button" className="assumption-preset" aria-pressed={Boolean(answerMeta[field]?.status === 'estimated' && answerMeta[field]?.origin === 'default' && Math.abs((inputs[field] ?? 0) * 100 - value) < 0.001)} onClick={() => choosePreset(field, value)}>{label}</button>
+      control = <div className="assumption-presets">
+        <div className="assumption-preset-field"><FactNumber field="fees" label={t('questionnaire.feeTotalLabel')} value={(inputs.fees ?? 0) * 100} step={0.1} onValue={(value) => set({ fees: value / 100 })} /><p>{t('questionnaire.feePresetIntro')}</p><div className="assumption-preset-options" role="group" aria-label={t('questionnaire.feePresetGroup')}>
+          {preset('fees', 0.2, t('questionnaire.feePreset.etf'))}{preset('fees', 0.65, t('questionnaire.feePreset.managed'))}{preset('fees', 2.1, t('questionnaire.feePreset.mutual'))}
+        </div><p className="assumption-source">{t('questionnaire.feePresetSource')} <a href="https://www.vanguard.ca/en/product/etf/asset-allocation/9692/vanguard-all-equity-etf-portfolio" target="_blank" rel="noopener noreferrer">Vanguard</a>, <a href="https://www.wealthsimple.com/en-ca/pricing" target="_blank" rel="noopener noreferrer">Wealthsimple</a> + <a href="https://help.wealthsimple.com/hc/en-ca/articles/360056584334-Management-expense-ratio-MER-fees-for-managed-accounts" target="_blank" rel="noopener noreferrer">ETF MER</a>, <a href="https://funds.rbcgam.com/pdf/fund-facts/funds/rbf272_e.pdf" target="_blank" rel="noopener noreferrer">RBC</a>.</p></div>
+        <div className="assumption-preset-field"><FactNumber field="inflation" label={t('inflationLabel')} value={(inputs.inflation ?? 0.021) * 100} step={0.1} onValue={(value) => set({ inflation: value / 100 })} /><p>{t('questionnaire.inflationPresetIntro')}</p><div className="assumption-preset-options" role="group" aria-label={t('questionnaire.inflationPresetGroup')}>
+          {preset('inflation', 2.1, t('questionnaire.inflationPreset.fpCanada'))}{preset('inflation', 2.0, t('questionnaire.inflationPreset.bankTarget'))}{preset('inflation', 3.0, t('questionnaire.inflationPreset.stress'))}
+        </div><p className="assumption-source">{t('questionnaire.inflationPresetSource')} <a href="https://www.fpcanada.ca/projection-assumption-guidelines" target="_blank" rel="noopener noreferrer">FP Canada</a>, <a href="https://www.bankofcanada.ca/rates/indicators/key-variables/inflation-control-target/" target="_blank" rel="noopener noreferrer">Bank of Canada</a>.</p></div>
+      </div>
       break
+    }
     case 'invest.tax':
       control = <div className="question-pair"><FactNumber field="nonRegDistributionYield" label={t('nonRegYieldLabel')} value={(inputs.nonRegDistributionYield ?? 0.02) * 100} step={0.1} onValue={(value) => set({ nonRegDistributionYield: value / 100 })} /><FactNumber field="accumulationMarginalRate" label={t('accMarginalLabel')} value={(inputs.accumulationMarginalRate ?? 0.35) * 100} step={1} onValue={(value) => set({ accumulationMarginalRate: value / 100 })} /></div>
       break
