@@ -21,7 +21,12 @@ function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof
   if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined
   const fields = requiredFields(definition, !!state.inputs.partner)
   if (!fields.length) return true
-  return fields.every((field) => answerIsUsable(state.answerMeta[field]) || Object.entries(state.answerMeta).some(([candidate, meta]) => candidate.startsWith(`${field}.`) && answerIsUsable(meta)))
+  const fieldsAreUsable = fields.every((field) => answerIsUsable(state.answerMeta[field]) || Object.entries(state.answerMeta).some(([candidate, meta]) => candidate.startsWith(`${field}.`) && answerIsUsable(meta)))
+  if (definition.id === 'allocation.tfsa') {
+    const split = state.inputs.savingsSplit
+    return fieldsAreUsable && Math.abs(split.tfsa + split.rrsp + split.nonReg - 1) <= 0.005
+  }
+  return fieldsAreUsable
 }
 
 function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
@@ -81,7 +86,8 @@ export function GuidedFlow() {
       if (hash === '#/guided/review') return latest.setGuidedView('review')
       if (hash === '#/guided/results') return latest.resultRevision === latest.inputRevision ? latest.setGuidedView('results') : latest.setGuidedView('review')
       const id = hash.split('/').at(-1)
-      if (id && latestPages.some((page) => page.id === id)) latest.setActivePage(id)
+      const resolved = id ? pageById(id) : undefined
+      if (resolved && latestPages.some((page) => page.id === resolved.id)) latest.setActivePage(resolved.id)
     }
     applyHash(); window.addEventListener('hashchange', applyHash)
     return () => window.removeEventListener('hashchange', applyHash)
@@ -89,7 +95,8 @@ export function GuidedFlow() {
 
   useEffect(() => {
     if (!pages.some((page) => page.id === state.activePageId)) {
-      const fallback = pages.find((page) => page.categoryId === pageById(state.activePageId)?.categoryId) ?? pages[0]
+      const resolved = pageById(state.activePageId)
+      const fallback = (resolved && pages.find((page) => page.id === resolved.id)) ?? pages.find((page) => page.categoryId === resolved?.categoryId) ?? pages[0]
       if (fallback) navigate(fallback.id)
     }
   }, [pages, state.activePageId])

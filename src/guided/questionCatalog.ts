@@ -57,9 +57,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('account.rrsp.balance', 'assets', ['balance'], ['balances.rrsp'], { applicableWhen: (_i, a) => accountSelected(a, 'rrsp'), prerequisitePageId: 'assets.identify' }),
   page('account.nonReg.balance', 'assets', ['balance'], ['balances.nonReg'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
   page('assets.cost', 'assets', ['nonRegBook'], ['nonRegBook'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
-  page('allocation.tfsa', 'assets', ['allocation'], ['savingsSplit.tfsa'], { estimatePolicy: 'assumption' }),
-  page('allocation.rrsp', 'assets', ['allocation'], ['savingsSplit.rrsp'], { estimatePolicy: 'assumption' }),
-  page('allocation.nonReg', 'assets', ['allocation'], ['savingsSplit.nonReg'], { estimatePolicy: 'assumption' }),
+  page('allocation.tfsa', 'assets', ['allocation'], ['savingsSplit.tfsa', 'savingsSplit.rrsp', 'savingsSplit.nonReg'], { estimatePolicy: 'assumption' }),
   page('fhsa.details', 'assets', ['fhsaBalance', 'fhsaContribution'], ['fhsa.balance', 'fhsa.annualContribution'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
   page('fhsa.open', 'assets', ['fhsaOpened'], ['fhsa.openedYearsAgo'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
   page('locked.balance', 'assets', ['lockedBalance'], ['lockedRetirement.balance'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
@@ -123,5 +121,10 @@ export function questionForField(field: string): QuestionDefinition | undefined 
 }
 
 export function pageById(id: string): QuestionDefinition | undefined {
-  return QUESTION_CATALOG.find((definition) => definition.id === id)
+  const aliases: Record<string, string> = {
+    'allocation.rrsp': 'allocation.tfsa',
+    'allocation.nonReg': 'allocation.tfsa',
+  }
+  const resolvedId = aliases[id] ?? id
+  return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)
 }

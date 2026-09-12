@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
+import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
 import { DEFAULT_INPUTS } from '../../store'
 import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
@@ -15,6 +15,14 @@ describe('question catalog', () => {
     expect(QUESTION_CATEGORIES.map((category) => category.id)).toEqual([
       'family', 'saving', 'assets', 'housing', 'spending', 'income', 'preferences',
     ])
+  })
+
+  it('keeps future account allocation on one page and resolves old page links', () => {
+    const allocationPages = QUESTION_CATALOG.filter((page) => page.fieldBindings.some((field) => field.startsWith('savingsSplit.')))
+    expect(allocationPages.map((page) => page.id)).toEqual(['allocation.tfsa'])
+    expect(allocationPages[0].fieldBindings).toEqual(['savingsSplit.tfsa', 'savingsSplit.rrsp', 'savingsSplit.nonReg'])
+    expect(pageById('allocation.rrsp')?.id).toBe('allocation.tfsa')
+    expect(pageById('allocation.nonReg')?.id).toBe('allocation.tfsa')
   })
 
   it('provides distinct page-level guidance in every supported language', () => {

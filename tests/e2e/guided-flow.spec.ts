@@ -124,6 +124,24 @@ test('account selection explains the role of every account', async ({ page }, te
   await expect(roles.nth(4)).toContainText('达到规定年龄前不能自由提款')
 })
 
+test('future savings allocation is one page with a live 100 percent total', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.goto('/#/guided/assets/allocation.tfsa')
+  await page.getByRole('button', { name: '中文' }).click()
+
+  await expect(page.getByRole('heading', { name: '未来新增储蓄准备如何分配到各账户？' })).toBeVisible()
+  await expect(page.locator('[data-field^="savingsSplit."]')).toHaveCount(3)
+  await expect(page.locator('.allocation-total')).toContainText('合计 100%')
+  await expect(page.locator('.allocation-total')).toContainText('三个比例合计为100%')
+
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('10')
+  await expect(page.locator('.allocation-total')).toContainText('合计 90%')
+  await expect(page.locator('.allocation-total')).toContainText('还需要分配 10 个百分点')
+
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('20')
+  await expect(page.locator('.allocation-total')).toHaveClass(/complete/)
+})
+
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)

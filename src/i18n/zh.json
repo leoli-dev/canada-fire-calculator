@@ -553,6 +553,11 @@
       "fhsa": "专为首次购房准备；供款通常可抵税，未用于购房的资金一般可免税转入RRSP/RRIF继续用于退休。",
       "locked": "通常来自单位养老金的LIRA或锁定DC资金，只供退休使用，达到规定年龄前不能自由提款。"
     },
+    "allocationInstruction": "把未来每100元新增储蓄分配到下面三个去向。这里不是在填写现有投资的资产配置。",
+    "allocationTotal": "合计 {{total}}%",
+    "allocationComplete": "三个比例合计为100%。",
+    "allocationRemaining": "还需要分配 {{difference}} 个百分点。",
+    "allocationOver": "当前超出 {{difference}} 个百分点，请调低比例。",
     "choice": { "single": "只为我规划", "couple": "我和伴侣一起规划", "noChildren": "本计划不纳入孩子", "hasChildren": "纳入孩子", "monthly": "我知道每月金额", "annual": "我知道全年金额", "noWork": "停工后没有工作收入", "someWork": "预计仍有工作收入", "undecided": "还没决定", "no": "没有", "yes": "有", "noRental": "没有投资房", "hasRental": "纳入一套投资房", "noDebt": "没有其他贷款", "hasDebt": "纳入一笔其他贷款", "knowBudget": "我知道总预算", "estimateBudget": "按生活项目帮我估算", "unknown": "稍后回来补", "noPension": "没有单位养老金", "dbPension": "单位以后按期发钱", "dbDetail": "这是按期领取的DB养老金。", "dcPension": "我有一笔账户余额", "dcDetail": "DC/LIRA余额应放在锁定账户部分。", "indexedFull": "全部随通胀增长", "indexedPartial": "只有一部分随通胀增长", "indexedFixed": "金额保持固定", "leaveMore": "维持计划生活，比较可能剩下多少", "noLegacy": "不需要预留指定遗产", "fixedLegacy": "希望留下固定金额", "lifetimeGifts": "希望生前帮助别人", "unsupported": "会记录愿望并说明当前限制。", "maintainSpending": "维持当前退休预算", "exploreCeiling": "查看理论支出上限" },
     "intentSummary": { "legacy": "维持每年约 {{spending}} 的支出，比较剩余税后资产。", "spending": "不改变当前预算，另行查看理论支出上限。", "sustainability": "只检查当前计划能否持续，不假称你选择了遗产偏好。" },
     "guidance": {
@@ -571,7 +576,7 @@
       "home_situation": { "question": "你租房、已有自住房，还是计划买房？" }, "home_value": { "question": "住房现在值多少，以后计划出售吗？" }, "home_mortgage": { "question": "这套住房还在还贷吗？" }, "mortgage_balance": { "question": "房贷还欠多少？" }, "mortgage_payment": { "question": "房贷还款是多少，还要还多久？" }, "purchase_time": { "question": "预计几岁买房？" }, "purchase_price": { "question": "计划房价和首付分别是多少？" }, "purchase_loan": { "question": "计划采用多少月供和多长贷款期？" }, "housing_other": { "question": "投资房或其他贷款需要纳入计划吗？" },
       "spending_method": { "question": "你知道退休预算，还是按生活项目一起估算？" }, "spending_total": { "question": "一年的退休生活大约需要多少钱？" }, "spending_homeFood": { "question": "住房和饮食预计花多少？" }, "spending_travelHealth": { "question": "旅行和医疗预计花多少？" },
       "benefits_self": { "question": "你预计领取多少CPP/QPP和OAS，分别何时开始？" }, "benefits_partner": { "question": "伴侣预计领取多少CPP/QPP和OAS？" }, "pension_self": { "question": "单位以后按期发养老金，还是给你一笔账户余额？" }, "pension_self_details": { "question": "终身养老金每年多少、何时开始？" }, "pension_self_indexing": { "question": "养老金会随物价上涨吗，65岁前有临时补贴吗？" },
-      "allocation_tfsa": { "question": "未来储蓄中有多少比例存入TFSA？" }, "allocation_rrsp": { "question": "未来储蓄中有多少比例存入RRSP？" }, "allocation_nonReg": { "question": "未来储蓄中有多少比例放入非注册投资？" }, "locked_balance": { "question": "锁定退休账户现在有多少余额？" },
+      "allocation_tfsa": { "question": "未来新增储蓄准备如何分配到各账户？" }, "locked_balance": { "question": "锁定退休账户现在有多少余额？" },
       "rental_0_value": { "question": "投资房现在值多少，买入成本是多少？" }, "rental_0_income": { "question": "净租金是多少，预计何时出售？" }, "rental_0_mortgage": { "question": "这套投资房有相关贷款吗？" }, "rental_0_loan": { "question": "该贷款余额和每年还款额是多少？" }, "rental_0_term": { "question": "投资房贷款还要还多少年？" }, "debt_0_type": { "question": "这笔其他贷款属于哪一类？" }, "debt_0_balance": { "question": "这笔贷款还剩多少？" }, "debt_0_payment": { "question": "每年还款多少，还要还多少年？" },
       "spending_utilitiesTransport": { "question": "水电和交通一年需要多少？" }, "spending_funOther": { "question": "娱乐和其他开支一年需要多少？" },
       "cpp_self": { "question": "你预计CPP/QPP领多少，准备几岁开始？" }, "oas_self": { "question": "你预计OAS领多少，准备几岁开始？" }, "cpp_partner": { "question": "伴侣预计CPP/QPP领多少？" }, "oas_partner": { "question": "伴侣预计OAS领多少？" }, "pension_partner": { "question": "伴侣的单位养老金属于哪一种？" }, "pension_partner_details": { "question": "伴侣终身养老金每年多少，何时开始？" }, "pension_partner_indexing": { "question": "伴侣的养老金会随物价上涨吗，另有过渡金吗？" },

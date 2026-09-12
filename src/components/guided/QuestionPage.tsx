@@ -186,9 +186,19 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'assets.cost':
       control = <><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} onValue={(nonRegBook) => set({ nonRegBook })} /><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(Math.max(0, inputs.balances.nonReg - inputs.nonRegBook)) })}</p></>
       break
-    case 'allocation.tfsa': case 'allocation.rrsp': case 'allocation.nonReg': {
-      const account = definition.id.split('.')[1] as 'tfsa' | 'rrsp' | 'nonReg'
-      control = <FactNumber field={`savingsSplit.${account}`} label={`${t(account)} %`} value={Math.round(inputs.savingsSplit[account] * 100)} onValue={(value) => set({ savingsSplit: { ...inputs.savingsSplit, [account]: value / 100 } })} />
+    case 'allocation.tfsa': {
+      const accounts = ['tfsa', 'rrsp', 'nonReg'] as const
+      const total = Math.round(accounts.reduce((sum, account) => sum + inputs.savingsSplit[account], 0) * 100)
+      const difference = Math.abs(100 - total)
+      const isComplete = difference === 0
+      control = <div className="allocation-editor">
+        <p className="allocation-instruction">{t('questionnaire.allocationInstruction')}</p>
+        <div className="question-pair">{accounts.map((account) => <FactNumber key={account} field={`savingsSplit.${account}`} label={`${t(account)} %`} value={Math.round(inputs.savingsSplit[account] * 100)} onValue={(value) => set({ savingsSplit: { ...inputs.savingsSplit, [account]: value / 100 } })} />)}</div>
+        <div className={`allocation-total ${isComplete ? 'complete' : 'incomplete'}`} role="status" aria-live="polite">
+          <strong>{t('questionnaire.allocationTotal', { total })}</strong>
+          <span>{isComplete ? t('questionnaire.allocationComplete') : total < 100 ? t('questionnaire.allocationRemaining', { difference }) : t('questionnaire.allocationOver', { difference })}</span>
+        </div>
+      </div>
       break
     }
     case 'fhsa.details':
