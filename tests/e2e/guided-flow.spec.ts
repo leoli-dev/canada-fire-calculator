@@ -79,6 +79,7 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await generate.click()
   await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
+  await expect(page.locator('.results-column')).toContainText('shared projected endpoint')
   await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
   await expect(page.locator('.target-field input')).toHaveValue('750,000')
 

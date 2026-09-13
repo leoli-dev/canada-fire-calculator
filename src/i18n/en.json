@@ -191,6 +191,8 @@
   "totalTax": "Total tax (incl. estate)",
   "useStrategy": "Use",
   "estateValue": "Estate value (after tax)",
+  "terminalTaxBreakdown": "Final-year taxable addition: remaining registered {{registered}} + taxable gains {{gains}}. Added income tax {{tax}}; separate probate fee {{probate}}.",
+  "terminalEstimateNote": "This after-tax estate value estimates a shared projected endpoint. It adds remaining registered balances and taxable unrealized gains to the final year's modeled income. It does not model which partner dies first, spousal rollovers, or beneficiary designations, so it is not a person-by-person final return or a complete death scenario.",
   "goal": "Optimization goal",
   "goal_legacy": "Maximize estate",
   "goal_dieWithZero": "Die with Zero",

@@ -394,11 +394,15 @@ export interface ProjectionResult {
   /** face value at life expectancy — overstates RRSP-heavy outcomes */
   finalNetWorth: number
   /**
-   * Deemed-disposition tax at death: remaining RRSP/RRIF is fully income in
-   * the final year (no spousal rollover left at joint life expectancy), plus
-   * 50% of unrealized non-registered and investment-property gains.
+   * Incremental final-year income tax from remaining RRSP/RRIF and taxable
+   * unrealized gains, added to the year's modeled ordinary income. The
+   * shared-endpoint allocation is not a person-by-person death model.
    */
   estateTax: number
+  /** Closing registered income included in the shared-endpoint estimate. */
+  terminalRegisteredIncome: number
+  /** Taxable portion of remaining non-registered and property gains. */
+  terminalCapitalGainsIncome: number
   /**
    * Probate / estate administration fee on probatable assets (non-registered
    * account, unsold real estate) — registered accounts bypass it via named

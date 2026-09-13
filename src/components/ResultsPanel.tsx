@@ -123,6 +123,13 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             {' · '}
             {t('estateValue')}: <strong>{cad(result.estateValue)}</strong>
           </p>
+          <p className="hint">{t('terminalTaxBreakdown', {
+            registered: cad(result.terminalRegisteredIncome),
+            gains: cad(result.terminalCapitalGainsIncome),
+            tax: cad(result.estateTax),
+            probate: cad(result.probateFee),
+          })}</p>
+          <p className="hint">{t('terminalEstimateNote')}</p>
           {dwzSpending !== null && Number.isFinite(dwzSpending) && (
             <>
               <p>
