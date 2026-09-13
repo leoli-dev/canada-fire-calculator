@@ -87,18 +87,28 @@ export function changeAccountPresence(
   account: 'tfsa' | 'rrsp' | 'nonReg', present: boolean,
 ): Partial<PlanFieldSnapshot> & { questionAnswers: Record<string, string | boolean | string[]> } {
   const id = `balances.${account}` as SharedFieldId
-  const amount = present ? state.inputs.balances[account] : 0
-  const edit = editField(state, id, String(amount))
   const selected = (state.questionAnswers['assets.identify'] as string[] | undefined) ?? []
   const nextSelected = present ? [...new Set([...selected, account])] : selected.filter((item) => item !== account)
-  const previous = state.answerMeta[id]
-  const status = present ? (previous?.status === 'confirmed' ? 'confirmed' : 'estimated') : 'notApplicable'
   const updatedAt = new Date().toISOString()
+  if (present) {
+    const previous = state.answerMeta[id]
+    const unresolved = Object.prototype.hasOwnProperty.call(state.draftByField, id) || previous?.status === 'unknown'
+    const fieldMeta = unresolved
+      ? previous?.status === 'unknown' ? previous : { status: 'unknown' as const, origin: 'user' as const, updatedAt }
+      : previous?.status === 'confirmed' || previous?.status === 'estimated'
+        ? previous : { status: 'estimated' as const, origin: 'default' as const, updatedAt }
+    return {
+      questionAnswers: { ...state.questionAnswers, 'assets.identify': nextSelected },
+      answerMeta: { ...state.answerMeta, [id]: fieldMeta, [account]: { status: 'estimated', origin: 'user', updatedAt } },
+      inputRevision: state.inputRevision + 1, resultRevision: null,
+    }
+  }
+  const edit = editField(state, id, '0')
   return {
     ...edit,
     questionAnswers: { ...state.questionAnswers, 'assets.identify': nextSelected },
-    answerMeta: { ...edit.answerMeta, [id]: { status, origin: status === 'estimated' ? 'default' : 'user', updatedAt },
-      [account]: { status: present ? 'estimated' : 'notApplicable', origin: 'user', updatedAt } },
+    answerMeta: { ...edit.answerMeta, [id]: { status: 'notApplicable', origin: 'user', updatedAt },
+      [account]: { status: 'notApplicable', origin: 'user', updatedAt } },
   }
 }
 

@@ -60,15 +60,16 @@ describe('shared field commands', () => {
     expect(reconciled.answerMeta['balances.rrsp'].status).toBe('estimated')
   })
 
-  it('marks explicit account absence usable while clearing its draft in one revision', () => {
+  it.each(['tfsa', 'rrsp', 'nonReg'] as const)('marks explicit %s absence usable while clearing its draft in one revision', (account) => {
     const initialState = initial()
-    initialState.inputs.balances.tfsa = 0
-    const unknown = { ...initialState, ...editField(initialState, 'balances.tfsa', ''), questionAnswers: { 'assets.identify': ['tfsa'] } } as PlanFieldSnapshot & { questionAnswers: Record<string, string[]> }
-    const change = changeAccountPresence(unknown, 'tfsa', false)
+    initialState.inputs.balances[account] = 0
+    const id = `balances.${account}` as const
+    const unknown = { ...initialState, ...editField(initialState, id, ''), questionAnswers: { 'assets.identify': [account] } } as PlanFieldSnapshot & { questionAnswers: Record<string, string[]> }
+    const change = changeAccountPresence(unknown, account, false)
     const state = { ...unknown, ...change } as typeof unknown
     expect(state.inputRevision).toBe(unknown.inputRevision + 1)
-    expect(Object.hasOwn(state.draftByField, 'balances.tfsa')).toBe(false)
-    expect(fieldState(state, 'balances.tfsa')).toMatchObject({ lastValid: 0, usable: true, meta: { status: 'notApplicable' } })
+    expect(Object.hasOwn(state.draftByField, id)).toBe(false)
+    expect(fieldState(state, id)).toMatchObject({ lastValid: 0, usable: true, meta: { status: 'notApplicable' } })
     expect(state.questionAnswers['assets.identify']).toEqual([])
   })
 
@@ -97,5 +98,34 @@ describe('shared field commands', () => {
     const direct = reconcileDirectFields(state, { balances }, { ...state.inputs, balances })
     expect(direct.questionAnswers?.['assets.identify']).toContain(account)
     expect(state.questionAnswers['assets.identify']).toEqual([])
+  })
+
+  it.each(['tfsa', 'rrsp', 'nonReg'] as const)('keeps unresolved %s amount unknown when selecting presence', (account) => {
+    const initialState = { ...initial(), questionAnswers: { 'assets.identify': [] } }
+    const unknown = { ...initialState, ...editField(initialState, `balances.${account}`, '') }
+    const selection = changeAccountPresence(unknown, account, true)
+    const state = { ...unknown, ...selection }
+    expect(state.inputs.balances[account]).toBe(initialState.inputs.balances[account])
+    expect(state.draftByField[`balances.${account}`]).toBe('')
+    expect(state.answerMeta[`balances.${account}`].status).toBe('unknown')
+    expect(fieldState(state, `balances.${account}`).usable).toBe(false)
+    expect(state.questionAnswers['assets.identify']).toContain(account)
+    expect(state.inputRevision).toBe(unknown.inputRevision + 1)
+  })
+
+  it.each(['tfsa', 'rrsp', 'nonReg'] as const)('does not promote an invalid %s draft or unknown meta-only amount on presence selection', (account) => {
+    const id = `balances.${account}` as const
+    const initialState = { ...initial(), questionAnswers: { 'assets.identify': [] } }
+    for (const unresolved of [
+      { ...initialState, ...editField(initialState, id, 'invalid') },
+      { ...initialState, answerMeta: { [id]: { status: 'unknown' as const, origin: 'user' as const, updatedAt: '2026-01-01' } } },
+    ]) {
+      const state = { ...unresolved, ...changeAccountPresence(unresolved, account, true) }
+      expect(state.inputs.balances[account]).toBe(initialState.inputs.balances[account])
+      expect(state.draftByField[id]).toBe(unresolved.draftByField[id])
+      expect(state.answerMeta[id].status).toBe('unknown')
+      expect(fieldState(state, id).usable).toBe(false)
+      expect(state.inputRevision).toBe(unresolved.inputRevision + 1)
+    }
   })
 })

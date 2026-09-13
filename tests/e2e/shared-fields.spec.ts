@@ -291,3 +291,34 @@ test('rent to planned-home round trip restores a usable cash-purchase payment st
   await expect(page.locator('.validation-banner')).toHaveCount(0)
   await expect(page.locator('.results-column')).toBeVisible()
 })
+
+for (const account of ['tfsa', 'rrsp', 'nonReg'] as const) {
+  test(`selecting guided ${account} preserves an unresolved professional balance until an explicit amount edit`, async ({ page }) => {
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    const professionalLabel = account === 'tfsa' ? /^TFSA$/ : account === 'rrsp' ? /^RRSP \/ RRIF$/ : /^Non-registered$/
+    const professional = page.locator('label.field').filter({ hasText: professionalLabel }).locator('input').first()
+    await professional.fill('')
+    await professional.blur()
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+    expect(Object.hasOwn(before.draftByField, `balances.${account}`)).toBe(true)
+    await expect(page.locator('.results-column')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await page.goto('/#/guided/assets/assets.identify')
+    const choiceName = account === 'tfsa' ? 'TFSA' : account === 'rrsp' ? 'RRSP / RRIF' : 'Non-registered account'
+    await page.getByRole('checkbox', { name: choiceName }).check()
+    const selected = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+    expect(selected.inputRevision).toBe(before.inputRevision + 1)
+    expect(selected.inputs.balances[account]).toBe(before.inputs.balances[account])
+    expect(selected.draftByField[`balances.${account}`]).toBe('')
+    expect(selected.answerMeta[`balances.${account}`].status).toBe('unknown')
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await expect(professional).toHaveValue('')
+    await expect(page.locator('.results-column')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await page.goto(`/#/guided/assets/account.${account}.balance`)
+    await page.locator(`[data-field="balances.${account}"] input`).fill('100000')
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await expect(professional).toHaveValue('100,000')
+    await expect(page.locator('.results-column')).toBeVisible()
+  })
+}
