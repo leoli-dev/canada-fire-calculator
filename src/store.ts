@@ -387,11 +387,16 @@ export const useStore = create<Store>()(
         })),
       saveScenarioA: () => {
         track('scenario_save')
-        set((s) => ({
-          scenarioA: structuredClone(s.inputs),
-          scenarioACanonical: structuredClone(s.canonical),
-          scenarioAAnswerMeta: structuredClone(s.answerMeta),
-        }))
+        set((s) => {
+          const canonical = s.canonical ?? refreshCanonicalFromLegacy(null, s.inputs)
+          assertCanonicalPlan(canonical)
+          return {
+            canonical,
+            scenarioA: structuredClone(s.inputs),
+            scenarioACanonical: structuredClone(canonical),
+            scenarioAAnswerMeta: structuredClone(s.answerMeta),
+          }
+        })
       },
       restoreScenarioA: () => {
         track('scenario_restore')

@@ -5,7 +5,7 @@ import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
-import { migrationReview } from '../engine/migrationReview'
+import { canComparePrecisely, migrationReview } from '../engine/migrationReview'
 
 function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolean }) {
   const { t } = useTranslation()
@@ -27,8 +27,7 @@ export function ScenarioCard() {
   const { inputs, canonical, scenarioA, scenarioACanonical, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
   const currentReview = migrationReview(canonical)
   const scenarioReview = migrationReview(scenarioACanonical)
-  const comparisonBlocked = !!scenarioA && (
-    currentReview?.precisionAllowed === false || scenarioReview?.precisionAllowed === false)
+  const comparisonBlocked = !!scenarioA && !canComparePrecisely(canonical, scenarioACanonical)
   const ownershipPending = currentReview?.ownershipPending || scenarioReview?.ownershipPending
 
   const resultA = useMemo(

@@ -36,9 +36,11 @@ export default function App() {
   const inputs = useStore((s) => s.inputs)
   const canonical = useStore((s) => s.canonical)
   const scenarioACanonical = useStore((s) => s.scenarioACanonical)
+  const scenarioA = useStore((s) => s.scenarioA)
   const storageIssue = getStorageReadOnlyReason()
   const unresolvedHousehold = migrationReview(canonical)?.ownershipPending ?? !!inputs.partner
   const precision = canonical ? precisionGate(canonical) : null
+  const precisionBlocked = precision ? !precision.allowed : !!inputs.partner
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
   const setEntryMode = useStore((s) => s.setEntryMode)
@@ -96,8 +98,7 @@ export default function App() {
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
         <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
       </div>}
-      <MigrationReview current={canonical} scenarioA={scenarioACanonical} />
-      {!unresolvedHousehold && precision && !precision.allowed && <div role="status" className="hint">{t('migrationApproximate')}</div>}
+      <MigrationReview current={canonical} scenarioA={scenarioACanonical} scenarioAExists={scenarioA !== null} />
       {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
@@ -112,8 +113,8 @@ export default function App() {
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
-          <ResultsPanel inputs={inputs} result={result} legacyEstimate={unresolvedHousehold} />
-          {unresolvedHousehold ? <ScenarioCard /> : <>
+          <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold} />
+          {precisionBlocked ? <ScenarioCard /> : <>
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
             result={result}

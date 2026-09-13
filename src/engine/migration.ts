@@ -163,7 +163,13 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     debts: attachIds(inputs.debts ?? [], previous.legacyProjection.debts ?? [], 'debt:other'),
   } : inputs
   const next = migratePersistedPlan({ inputs: normalized }, 10, previous?.baseYear ?? new Date().getFullYear())
-  if (!previous) return next
+  if (!previous) {
+    // A plan first entered in this UI has no pre-v11 age or savings wording to
+    // migrate. Keep unresolved budget facts unknown; do not turn assumptions
+    // into user confirmations merely to allow the existing preview.
+    next.migration = { ...next.migration, sourcePersistVersion: 11, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    return next
+  }
   if (returningPartner) next.people = next.people.map(person => person.id === returningPartner.id ? {
     ...person,
     earnedIncome: returningPartner.earnedIncome,

@@ -6,10 +6,12 @@ const p17 = pending.cases.find((item) => item.id === 'P17')!
 
 async function openPlan(page: import('@playwright/test').Page, mode: 'guided' | 'professional', allFail = false) {
   await page.goto('/')
-  await page.evaluate(({ inputs, mode, allFail }) => {
+  await page.evaluate(async ({ inputs, mode, allFail }) => {
     const plan = allFail ? { ...inputs, balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, cppAnnualAt65: 0, oasAnnualAt65: 0 } : inputs
-    localStorage.setItem('fire-inputs', JSON.stringify({ version: 10, state: {
-      inputs: plan, entryMode: mode, guidedView: 'results', inputRevision: 0, resultRevision: 0,
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const canonical = refreshCanonicalFromLegacy(null, plan)
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs: plan, canonical, entryMode: mode, guidedView: 'results', inputRevision: 0, resultRevision: 0,
     } }))
   }, { inputs: p17.inputs, mode, allFail })
   await page.reload()

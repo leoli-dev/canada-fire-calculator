@@ -22,3 +22,7 @@ export function migrationReview(plan: InputsV2 | null): MigrationReview | null {
     orphanedPeople: plan.orphanedPeople ?? [],
   }
 }
+
+export function canComparePrecisely(current: InputsV2 | null, scenarioA: InputsV2 | null): boolean {
+  return current !== null && scenarioA !== null && precisionGate(current).allowed && precisionGate(scenarioA).allowed
+}

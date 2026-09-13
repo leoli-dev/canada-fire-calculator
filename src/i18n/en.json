@@ -715,5 +715,8 @@
   "migrationNoAutomaticSplit": "The full household amount is retained. No self/partner split has been assumed.",
   "migrationProperty": "Property",
   "migrationOrphanedPerson": "Removed person awaiting review",
-  "migrationComparisonBlocked": "Precise Scenario A comparison is unavailable until both plans pass the ownership and migration gate."
+  "migrationComparisonBlocked": "Precise Scenario A comparison is unavailable until both plans pass the ownership and migration gate.",
+  "migrationPrecisionWarning": "Plan facts need confirmation before precise tax, retirement, and strategy advice is available.",
+  "migrationStatusUnverified": "This plan's migration status cannot be verified; precise comparison is unavailable.",
+  "migrationSharedStatus": "Guided and professional modes use the same status for each plan."
 }

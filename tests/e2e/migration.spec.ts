@@ -106,6 +106,78 @@ test('Scenario A ownership gate stays separate from a singly owned current plan 
   expect(state.stored.state.scenarioACanonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').ownerId).toBeNull()
 })
 
+test('single-person v10 age and savings uncertainty limits exact current advice in both modes', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.inputs.partner = null
+    stored.state.scenarioA = null
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(state.canonical.migration).toMatchObject({ ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: true, savingsBasisNeedsConfirmation: true })
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-current')).toContainText('estimates')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  await expect(page.getByTestId('legacy-estimate')).not.toContainText('ownership is unconfirmed')
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
+  await page.getByLabel('Annual after-tax savings').fill('42000')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.migration.sourcePersistVersion)).toBe(10)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.guidedView = 'results'
+    stored.state.resultRevision = stored.state.inputRevision
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-current')).toContainText('estimates')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
+})
+
+test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays gated through restore', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Save current as A' }).click()
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(before.canonical.migration.sourcePersistVersion).toBe(11)
+  expect(before.scenarioACanonical).toEqual(before.canonical)
+  expect(before.scenarioACanonical.budget).toMatchObject({ debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' } })
+  await expect(card).not.toContainText('Precise Scenario A comparison is unavailable')
+  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('CA$')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(page.getByTestId('migration-gate')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  await expect(page.getByRole('button', { name: 'Run 1,000 simulations' })).toBeVisible()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.scenarioACanonical = null
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
+  await expect(card).toContainText('Precise Scenario A comparison is unavailable')
+  await card.locator('summary').click()
+  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('—')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  if ((await card.getAttribute('open')) === null) await card.locator('summary').click()
+  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('—')
+})
+
 test('future-version and corrupt bytes are not overwritten', async ({ page }) => {
   await page.goto('/')
   for (const value of ['{broken', JSON.stringify({ version: 999, state: { inputs: {} } })]) {

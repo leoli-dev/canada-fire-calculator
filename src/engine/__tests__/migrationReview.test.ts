@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_INPUTS } from '../../store'
-import { migratePersistedPlan } from '../migration'
-import { migrationReview } from '../migrationReview'
+import { migratePersistedPlan, refreshCanonicalFromLegacy } from '../migration'
+import { canComparePrecisely, migrationReview } from '../migrationReview'
 
 describe('shared migration review', () => {
   it('keeps a coupled legacy total unassigned and never infers a half split', () => {
@@ -22,5 +22,32 @@ describe('shared migration review', () => {
     expect(migrationReview(current)?.ownershipPending).toBe(false)
     expect(migrationReview(scenario)?.ownershipPending).toBe(true)
     expect(migrationReview(scenario)?.unassignedAccounts.find(account => account.kind === 'tfsa')?.balance).toBe(220000)
+    expect(canComparePrecisely(current, scenario)).toBe(false)
+    expect(canComparePrecisely(scenario, current)).toBe(false)
+  })
+
+  it('withholds a comparison when either canonical snapshot is missing', () => {
+    const plan = migratePersistedPlan({ inputs: structuredClone(DEFAULT_INPUTS) }, 10, 2026)
+    expect(canComparePrecisely(null, null)).toBe(false)
+    expect(canComparePrecisely(plan, null)).toBe(false)
+    expect(canComparePrecisely(null, plan)).toBe(false)
+  })
+
+  it('keeps single-person legacy age and savings uncertainty distinct from ownership', () => {
+    const plan = migratePersistedPlan({ inputs: structuredClone(DEFAULT_INPUTS) }, 10, 2026)
+    const review = migrationReview(plan)!
+    expect(review.ownershipPending).toBe(false)
+    expect(review.precisionAllowed).toBe(false)
+    expect(canComparePrecisely(plan, plan)).toBe(false)
+  })
+
+  it('distinguishes a new UI plan from persisted legacy uncertainty without inventing confirmed budget facts', () => {
+    const fresh = refreshCanonicalFromLegacy(null, structuredClone(DEFAULT_INPUTS))
+    expect(fresh.migration).toMatchObject({ sourcePersistVersion: 11, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false })
+    expect(fresh.budget).toMatchObject({ debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' } })
+    expect(migrationReview(fresh)?.precisionAllowed).toBe(true)
+    const edited = refreshCanonicalFromLegacy(fresh, { ...fresh.legacyProjection, annualSavings: 42000 })
+    expect(edited.migration.sourcePersistVersion).toBe(11)
+    expect(migrationReview(edited)?.precisionAllowed).toBe(true)
   })
 })

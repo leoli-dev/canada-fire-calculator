@@ -711,5 +711,8 @@
   "migrationNoAutomaticSplit": "家庭总额已保留；没有假设本人和配偶的分配比例。",
   "migrationProperty": "房产",
   "migrationOrphanedPerson": "待核对的已移除成员",
-  "migrationComparisonBlocked": "当前计划和场景 A 均通过归属与迁移核对前，不能显示精确场景比较。"
+  "migrationComparisonBlocked": "当前计划和场景 A 均通过归属与迁移核对前，不能显示精确场景比较。",
+  "migrationPrecisionWarning": "计划资料尚待确认，暂不能提供精确税务、退休或策略建议。",
+  "migrationStatusUnverified": "无法核实该计划的迁移状态；暂不能显示精确比较。",
+  "migrationSharedStatus": "引导和专业模式显示每份计划的相同状态。"
 }

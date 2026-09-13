@@ -5,7 +5,7 @@ import { migrationReview } from '../engine/migrationReview'
 function PlanStatus({ label, plan }: { label: string; plan: InputsV2 | null }) {
   const { t } = useTranslation()
   const review = migrationReview(plan)
-  if (!plan || !review) return <section><h3>{label}</h3><p>{t('migrationNoScenario')}</p></section>
+  if (!plan || !review) return <section data-testid={label === t('scenarioA') ? 'migration-scenario-a' : 'migration-current'}><h3>{label}</h3><p>{t('migrationStatusUnverified')}</p></section>
   return <section data-testid={label === t('scenarioA') ? 'migration-scenario-a' : 'migration-current'}>
     <h3>{label}</h3>
     <p>{t(review.ownershipPending ? 'migrationStatusUnassigned' : review.precisionAllowed ? 'migrationStatusReady' : 'migrationApproximate')}</p>
@@ -21,15 +21,15 @@ function PlanStatus({ label, plan }: { label: string; plan: InputsV2 | null }) {
   </section>
 }
 
-export function MigrationReview({ current, scenarioA }: { current: InputsV2 | null; scenarioA: InputsV2 | null }) {
+export function MigrationReview({ current, scenarioA, scenarioAExists }: { current: InputsV2 | null; scenarioA: InputsV2 | null; scenarioAExists: boolean }) {
   const { t } = useTranslation()
   const currentReview = migrationReview(current)
   const scenarioReview = migrationReview(scenarioA)
-  if (!currentReview?.ownershipPending && !scenarioReview?.ownershipPending) return null
+  if ((currentReview === null || currentReview.precisionAllowed) && (!scenarioAExists || scenarioReview?.precisionAllowed)) return null
   return <div role="status" className="hint" data-testid="migration-gate">
-    <strong>{t('migrationOwnershipWarning')}</strong>
-    <p>{t('migrationSharedPlan')}</p>
+    <strong>{t('migrationPrecisionWarning')}</strong>
+    <p>{t(currentReview?.ownershipPending || scenarioReview?.ownershipPending ? 'migrationSharedPlan' : 'migrationSharedStatus')}</p>
     <PlanStatus label={t('scenarioCurrent')} plan={current} />
-    {scenarioA && <PlanStatus label={t('scenarioA')} plan={scenarioA} />}
+    {scenarioAExists && <PlanStatus label={t('scenarioA')} plan={scenarioA} />}
   </div>
 }
