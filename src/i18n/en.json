@@ -690,5 +690,7 @@
   "storageFuture": "This plan was saved by a newer version. It is read-only here.",
   "storageCorrupt": "Saved plan could not be read safely. The original storage has not been replaced.",
   "migrationOwnerSelf": "self",
-  "migrationOwnerPartner": "partner"
+  "migrationOwnerPartner": "partner",
+  "migrationLegacySummary": "Legacy household estimate: ownership is unconfirmed, so this is not a precise tax or FIRE recommendation.",
+  "storageDownloadOriginal": "Download original saved plan"
 }

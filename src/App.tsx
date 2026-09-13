@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
-import { getStorageReadOnlyReason, useStore } from './store'
+import { downloadStoredPlan, getStorageReadOnlyReason, useStore } from './store'
 import { precisionGate } from './engine/model'
 import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
@@ -90,7 +90,10 @@ export default function App() {
         </nav>
       </header>
 
-      {storageIssue && <div role="alert" className="hint">{t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}</div>}
+      {storageIssue && <div role="alert" className="hint">
+        {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
+        <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
+      </div>}
       {unresolvedHousehold && <div role="status" className="hint" data-testid="migration-gate">
         {t('migrationOwnershipWarning')}
         <ul>{ownershipAccounts.map((account) => <li key={account.id}>{account.kind}: {account.balance.toLocaleString()} CAD {account.ownerId === null ? t('migrationUnassigned') : t(canonical?.people.find((person) => person.id === account.ownerId)?.role === 'partner' ? 'migrationOwnerPartner' : 'migrationOwnerSelf')}{account.acb.status === 'known' ? `, ${t('migrationBasis')} ${account.acb.value.toLocaleString()} CAD` : ''}</li>)}</ul>
@@ -110,7 +113,8 @@ export default function App() {
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
-          <ResultsPanel inputs={inputs} result={result} />
+          <ResultsPanel inputs={inputs} result={result} legacyEstimate={unresolvedHousehold} />
+          {unresolvedHousehold ? <ScenarioCard legacyEstimate /> : <>
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
             result={result}
@@ -128,13 +132,14 @@ export default function App() {
             </p>
           )}
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
-          {!unresolvedHousehold && <TaxChart result={result} inputs={inputs} scale={scale} />}
+          <TaxChart result={result} inputs={inputs} scale={scale} />
           <YearTable result={result} inputs={inputs} />
-          {!unresolvedHousehold && <StrategyCard inputs={inputs} />}
-          {!unresolvedHousehold && <TimingCard inputs={inputs} />}
+          <StrategyCard inputs={inputs} />
+          <TimingCard inputs={inputs} />
           <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
           <ScenarioCard />
+          </>}
         </section>}
       </main>
 

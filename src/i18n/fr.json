@@ -686,5 +686,7 @@
   "storageFuture": "Ce plan a été enregistré par une version plus récente. Il est en lecture seule ici.",
   "storageCorrupt": "Le plan enregistré ne peut pas être lu en toute sécurité. Les données originales n’ont pas été remplacées.",
   "migrationOwnerSelf": "vous",
-  "migrationOwnerPartner": "partenaire"
+  "migrationOwnerPartner": "partenaire",
+  "migrationLegacySummary": "Estimation familiale de l’ancien modèle : la propriété des comptes reste à confirmer; ce résultat n’est pas un conseil fiscal ou de retraite précis.",
+  "storageDownloadOriginal": "Télécharger le plan original"
 }

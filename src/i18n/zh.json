@@ -686,5 +686,7 @@
   "storageFuture": "该计划由较新版本保存，此版本只能只读查看。",
   "storageCorrupt": "无法安全读取已保存计划，原始存储未被覆盖。",
   "migrationOwnerSelf": "本人",
-  "migrationOwnerPartner": "伴侣"
+  "migrationOwnerPartner": "伴侣",
+  "migrationLegacySummary": "旧版家庭估算：账户归属尚未确认，不能作为精确税务或退休建议。",
+  "storageDownloadOriginal": "下载原始计划"
 }

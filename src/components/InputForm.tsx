@@ -583,7 +583,7 @@ export function InputForm() {
             set({ investmentProperties: next })
           }
           return (
-            <div className="property-card" key={i}>
+            <div className="property-card" key={ip.id ?? i}>
               <p className="subhead property-head">
                 🏢 <Jargon text={t('investmentProperty')} /> #{i + 1}
                 <button
@@ -696,7 +696,7 @@ export function InputForm() {
             set({ debts: next })
           }
           return (
-            <div className="property-card" key={i}>
+            <div className="property-card" key={d.id ?? i}>
               <p className="subhead property-head">
                 {t(`debt_${d.kind}`)} #{i + 1}
                 <button

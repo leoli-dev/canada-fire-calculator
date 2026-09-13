@@ -1,4 +1,4 @@
-import type { Goal, Inputs, Province, Strategy } from './types'
+import type { Goal, Inputs, Pension, Province, Strategy } from './types'
 
 export type EntityId = string
 export type Known<T> = { status: 'known'; value: T } | { status: 'unknown'; reason: string }
@@ -18,6 +18,7 @@ export interface Person {
   cppAnnualAt65: number
   oasAnnualAt65: number
   pensionAnnual: number
+  pension: Pension | null
   provenance: Record<string, Provenance>
 }
 export const ageReachedInYear = (person: Person, baseYear: number, year: number) => person.ageInBaseYear + year - baseYear
@@ -56,6 +57,8 @@ export interface Property {
   value: number
   acb: Known<number>
   annualRent: Known<number>
+  appreciation: number
+  sellAtAge: number | null
   plannedPurchaseAge: number | null
   plannedDownPayment: number | null
   taxableOwnerShares: TaxShares

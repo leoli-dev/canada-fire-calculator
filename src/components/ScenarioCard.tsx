@@ -21,7 +21,7 @@ function Cell(props: { r: ProjectionResult; life: number }) {
   )
 }
 
-export function ScenarioCard() {
+export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: boolean }) {
   const { t } = useTranslation()
   const { inputs, scenarioA, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
 
@@ -35,6 +35,7 @@ export function ScenarioCard() {
     <details className="chart-card collapsible"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
+      {legacyEstimate && <p className="hint">{t('migrationLegacySummary')}</p>}
       <div className="card-head">
         <div>
           <button onClick={saveScenarioA}>

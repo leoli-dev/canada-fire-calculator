@@ -177,6 +177,16 @@ interface Store {
 const BACKUP_KEY = 'fire-inputs:pre-v11-backup'
 let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
 export const getStorageReadOnlyReason = () => storageReadOnlyReason
+export function downloadStoredPlan() {
+  const original = localStorage.getItem('fire-inputs') ?? localStorage.getItem('fire-inputs:pre-v11-backup')
+  if (original === null) return
+  const url = URL.createObjectURL(new Blob([original], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'fire-plan-original.json'
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
 const planStorage: PersistStorage<Store> = {
   getItem(name) {
     const original = localStorage.getItem(name)
@@ -185,9 +195,14 @@ const planStorage: PersistStorage<Store> = {
       const parsed = JSON.parse(original) as StorageValue<Store>
       if (!parsed || typeof parsed !== 'object' || !('state' in parsed) || typeof parsed.version !== 'number') throw new Error('Invalid persisted envelope')
       if (parsed.version > 11) { storageReadOnlyReason = 'futureVersion'; return null }
+      const prior = parsed.state as Store
+      migratePersistedPlan({ inputs: prior.inputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+      if (prior.scenarioA !== null && prior.scenarioA !== undefined) {
+        migratePersistedPlan({ inputs: prior.scenarioA }, Math.min(parsed.version, 10), new Date().getFullYear())
+      }
+      if (parsed.version === 11 && prior.canonical && prior.canonical.schemaVersion !== 2) throw new Error('Invalid canonical schema')
       if (parsed.version < 11) {
-        // Validate before allowing any subsequent write, including a failed migration.
-        migratePersistedPlan(parsed.state, parsed.version, new Date().getFullYear())
+        // The full envelope has been validated before any backup or upgraded write.
         // Write-once original bytes. If this fails, hydration aborts without replacing the plan.
         if (localStorage.getItem(BACKUP_KEY) === null) localStorage.setItem(BACKUP_KEY, original)
       }
@@ -244,9 +259,10 @@ export const useStore = create<Store>()(
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
           const inputs = { ...s.inputs, ...patch }
+          const canonical = refreshCanonicalFromLegacy(s.canonical, inputs)
           return {
-            inputs,
-            canonical: refreshCanonicalFromLegacy(s.canonical, inputs),
+            inputs: canonical.legacyProjection,
+            canonical,
             inputRevision: s.inputRevision + 1,
             resultRevision: null,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
@@ -382,10 +398,14 @@ export const useStore = create<Store>()(
             'family.people', 'saving.amount', 'assets.identify', 'home.situation',
             'spending.total', 'benefits.self', 'intent.legacy',
           ]
+          const canonical = migratePersistedPlan(previous, version, new Date().getFullYear())
+          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null
           return {
             ...previous,
-            canonical: migratePersistedPlan(previous, version, new Date().getFullYear()),
-            scenarioACanonical: previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null,
+            inputs: canonical.legacyProjection,
+            scenarioA: scenarioACanonical?.legacyProjection ?? null,
+            canonical,
+            scenarioACanonical,
             draftByField: {},
             entryMode: version < 7 ? 'professional' : previous.entryMode,
             activeStep: previous.activeStep ?? 1,
@@ -406,12 +426,18 @@ export const useStore = create<Store>()(
             scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
           } as Store
         }
-        if (version === 10) return {
+        if (version === 10) {
+          const canonical = migratePersistedPlan(previous, version, new Date().getFullYear())
+          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null
+          return {
           ...previous,
-          canonical: migratePersistedPlan(previous, version, new Date().getFullYear()),
-          scenarioACanonical: previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null,
+          inputs: canonical.legacyProjection,
+          scenarioA: scenarioACanonical?.legacyProjection ?? null,
+          canonical,
+          scenarioACanonical,
           draftByField: {},
-        } as Store
+          } as Store
+        }
         return state as Store
       },
       merge: (persisted, current) => {

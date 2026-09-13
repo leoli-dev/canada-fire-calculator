@@ -18,7 +18,7 @@ import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 
-export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }) {
+export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
@@ -52,7 +52,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
   const entryMode = useStore((s) => s.entryMode)
   const dwzSpending = useMemo(
     () =>
-      mode === 'last' && (inputs.goal ?? 'legacy') === 'dieWithZero'
+      !props.legacyEstimate && mode === 'last' && (inputs.goal ?? 'legacy') === 'dieWithZero'
         ? maxSustainableSpending(inputs)
         : null,
     [mode, inputs],
@@ -89,6 +89,13 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             ? !quickEstimateUnsupported && Number.isFinite(projectedAtFire) && fireNumber?.value !== null &&
               fireNumber?.value !== undefined && projectedAtFire! >= fireNumber.value
             : true
+
+  if (props.legacyEstimate) return (
+    <div className="summary uncertain" data-testid="legacy-estimate">
+      <p className="hint">{t('migrationLegacySummary')}</p>
+      <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
+    </div>
+  )
 
   return (
     <div className={`summary ${resultUnverified

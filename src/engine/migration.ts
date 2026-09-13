@@ -7,6 +7,11 @@ const source: Provenance = { origin: 'legacy', sourceYear: null }
 const shares = (ownerId: string | null): TaxShares => ownerId ? { status: 'known', shares: { [ownerId]: 1 } } : unknown('legacy household tax ownership')
 const finite = (value: unknown, fallback = 0) => typeof value === 'number' && Number.isFinite(value) ? value : fallback
 const legacyId = (kind: string, index?: number) => `legacy:${kind}${index === undefined ? '' : `:${index}`}`
+const normalizeListIds = <T extends { id?: string }>(items: T[], kind: string): T[] => {
+  const result = items.map((item, index) => ({ ...item, id: item.id ?? legacyId(kind, index) }))
+  if (new Set(result.map(item => item.id)).size !== result.length) throw new Error(`Duplicate ${kind} ID`)
+  return result
+}
 
 /** Pure, deterministic migration of a previously supported persisted plan. */
 export function migratePersistedPlan(raw: unknown, persistVersion: number, baseYear: number): InputsV2 {
@@ -18,7 +23,8 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   if (!legacyInput || typeof legacyInput !== 'object' || !legacyInput.balances || typeof legacyInput.balances !== 'object') throw new Error('Invalid legacy inputs')
   const input: Inputs = { ...legacyInput,
     strategy: legacyInput.strategy ?? (legacyInput.withdrawalOrder?.[0] === 'tfsa' ? 'tfsaFirst' : legacyInput.withdrawalOrder?.[0] === 'nonReg' ? 'nonRegFirst' : 'meltdownPaced'),
-    investmentProperties: legacyInput.investmentProperties ?? (legacyInput.investmentProperty ? [legacyInput.investmentProperty] : []),
+    investmentProperties: normalizeListIds(legacyInput.investmentProperties ?? (legacyInput.investmentProperty ? [legacyInput.investmentProperty] : []), 'property:investment'),
+    debts: normalizeListIds(legacyInput.debts ?? [], 'debt:other'),
   }
   const requireAmount = (value: unknown, label: string) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Invalid legacy amount: ${label}`)
@@ -36,15 +42,15 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   const couple = !!input.partner
   const selfId = legacyId('person:self')
   const partnerId = legacyId('person:partner')
-  const person = (id: string, role: 'self' | 'partner', age: number, cpp: number, oas: number, pension: number): Person => ({
+  const person = (id: string, role: 'self' | 'partner', age: number, cpp: number, oas: number, pension: import('./types').Pension | null): Person => ({
     id, role, ageInBaseYear: finite(age), retirementAge: role === 'self' ? finite(input.fireAge) : finite(input.fireAge) - finite(input.currentAge) + finite(age),
     earnedIncome: unknown('not present in legacy plan'), previousYearEarnedIncome: unknown('not present in legacy plan'),
     rrspDeductionLimit: unknown('CRA statement not supplied'), rrspAvailableRoom: unknown('CRA statement not supplied'), tfsaAvailableRoom: unknown('CRA statement not supplied'),
-    cppAnnualAt65: finite(cpp), oasAnnualAt65: finite(oas), pensionAnnual: finite(pension),
+    cppAnnualAt65: finite(cpp), oasAnnualAt65: finite(oas), pensionAnnual: finite(pension?.annualAmount), pension,
     provenance: { ageInBaseYear: source, retirementAge: source, cppAnnualAt65: source, oasAnnualAt65: source, pensionAnnual: source },
   })
-  const people = [person(selfId, 'self', input.currentAge, input.cppAnnualAt65, input.oasAnnualAt65, input.pension?.annualAmount ?? 0)]
-  if (input.partner) people.push(person(partnerId, 'partner', input.partner.currentAge, input.partner.cppAnnualAt65, input.partner.oasAnnualAt65, input.partner.pension?.annualAmount ?? 0))
+  const people = [person(selfId, 'self', input.currentAge, input.cppAnnualAt65, input.oasAnnualAt65, input.pension ?? null)]
+  if (input.partner) people.push(person(partnerId, 'partner', input.partner.currentAge, input.partner.cppAnnualAt65, input.partner.oasAnnualAt65, input.partner.pension ?? null))
   const ownerId = couple ? null : selfId
   const account = (id: string, kind: Account['kind'], balance: number, acb?: number, actualOwner?: string | null): Account => {
     const owner = actualOwner === undefined ? ownerId : actualOwner
@@ -78,22 +84,22 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   if (input.principalResidence && ('value' in input.principalResidence)) {
     const p = input.principalResidence
     const id = legacyId('property:principal')
-    properties.push({ id, kind: 'principal', value: finite(p.value), acb: unknown('principal residence basis not supplied'), annualRent: known(0), plannedPurchaseAge: null, plannedDownPayment: null, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(legacyId('debt:principal'), 'mortgage', p.mortgage, id) : null, provenance: { value: source } })
+    properties.push({ id, kind: 'principal', value: finite(p.value), acb: unknown('principal residence basis not supplied'), annualRent: known(0), appreciation: finite(p.appreciation), sellAtAge: p.sellAtAge, plannedPurchaseAge: null, plannedDownPayment: null, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(`${id}:mortgage`, 'mortgage', p.mortgage, id) : null, provenance: { value: source } })
   } else if (input.principalResidence?.mode === 'planned') {
     const p = input.principalResidence
-    properties.push({ id: legacyId('property:principal'), kind: 'principal', value: finite(p.price), acb: known(finite(p.price)), annualRent: known(0), plannedPurchaseAge: p.buyAtAge, plannedDownPayment: finite(p.downPayment), taxableOwnerShares: shares(ownerId), mortgageDebtId: null, provenance: { value: source, plannedPurchaseAge: source } })
+    properties.push({ id: legacyId('property:principal'), kind: 'principal', value: finite(p.price), acb: known(finite(p.price)), annualRent: known(0), appreciation: finite(p.appreciation), sellAtAge: p.sellAtAge, plannedPurchaseAge: p.buyAtAge, plannedDownPayment: finite(p.downPayment), taxableOwnerShares: shares(ownerId), mortgageDebtId: null, provenance: { value: source, plannedPurchaseAge: source } })
   }
   const investmentProperties: InvestmentProperty[] = input.investmentProperties ?? []
   investmentProperties.forEach((p, i) => {
-    const id = legacyId('property:investment', i)
-    properties.push({ id, kind: 'investment', value: finite(p.value), acb: known(finite(p.acb)), annualRent: known(finite(p.annualRent)), plannedPurchaseAge: null, plannedDownPayment: null, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(legacyId('debt:investment', i), 'mortgage', p.mortgage, id) : null, provenance: { value: source, acb: source, annualRent: source } })
+    const id = p.id ?? legacyId('property:investment', i)
+    properties.push({ id, kind: 'investment', value: finite(p.value), acb: known(finite(p.acb)), annualRent: known(finite(p.annualRent)), appreciation: finite(p.appreciation), sellAtAge: p.sellAtAge, plannedPurchaseAge: null, plannedDownPayment: null, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(`${id}:mortgage`, 'mortgage', p.mortgage, id) : null, provenance: { value: source, acb: source, annualRent: source } })
   })
-  ;(input.debts ?? []).forEach((d, i) => addDebt(legacyId('debt:other', i), d.kind, d, null))
+  ;(input.debts ?? []).forEach((d, i) => addDebt(d.id ?? legacyId('debt:other', i), d.kind, d, null))
   const incomeSources: IncomeSource[] = []
   for (const p of people) {
     incomeSources.push({ id: `${p.id}:cpp`, kind: 'cpp', recipientId: p.id, annualAmount: known(p.cppAnnualAt65), startAge: p.role === 'self' ? input.cppStartAge : input.partner?.cppStartAge, provenance: source })
     incomeSources.push({ id: `${p.id}:oas`, kind: 'oas', recipientId: p.id, annualAmount: known(p.oasAnnualAt65), startAge: p.role === 'self' ? input.oasStartAge : input.partner?.oasStartAge, provenance: source })
-    incomeSources.push({ id: `${p.id}:pension`, kind: 'pension', recipientId: p.id, annualAmount: known(p.pensionAnnual), provenance: source })
+    incomeSources.push({ id: `${p.id}:pension`, kind: 'pension', recipientId: p.id, annualAmount: known(p.pensionAnnual), startAge: p.pension?.startAge, provenance: source })
   }
   if (input.extraIncome) incomeSources.push({ id: legacyId('income:extra'), kind: 'other', recipientId: selfId, annualAmount: known(finite(input.extraIncome.annual)), fromAge: input.extraIncome.fromAge, toAge: input.extraIncome.toAge, provenance: source })
   return {
@@ -108,32 +114,58 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
 
 /** Keep stable ownership and references while the legacy form remains the editor. */
 export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: Inputs): InputsV2 {
-  const next = migratePersistedPlan({ inputs }, 10, previous?.baseYear ?? new Date().getFullYear())
+  const attachIds = <T extends { id?: string }>(incoming: T[], old: T[], kind: string): T[] => {
+    const used = new Set<string>()
+    const allOld = new Set(old.map(item => item.id).filter((id): id is string => !!id))
+    let serial = 0
+    const allocate = () => {
+      let id = legacyId(kind, serial++)
+      while (allOld.has(id) || used.has(id)) id = legacyId(kind, serial++)
+      return id
+    }
+    const fingerprint = (item: T) => JSON.stringify({ ...item, id: undefined })
+    return incoming.map((item) => {
+      let id = item.id && !used.has(item.id) ? item.id : undefined
+      if (!id) {
+        const matching = old.filter(candidate => candidate.id && !used.has(candidate.id) && fingerprint(candidate) === fingerprint(item))
+        if (matching.length === 1) id = matching[0].id
+      }
+      id ??= allocate()
+      used.add(id)
+      return { ...item, id }
+    })
+  }
+  const normalized: Inputs = previous ? {
+    ...inputs,
+    investmentProperties: attachIds(inputs.investmentProperties ?? [], previous.legacyProjection.investmentProperties ?? [], 'property:investment'),
+    debts: attachIds(inputs.debts ?? [], previous.legacyProjection.debts ?? [], 'debt:other'),
+  } : inputs
+  const next = migratePersistedPlan({ inputs: normalized }, 10, previous?.baseYear ?? new Date().getFullYear())
   if (!previous) return next
   const live = new Set(next.people.map(person => person.id))
   const previousAccounts = new Map(previous.accounts.map(account => [account.id, account]))
+  const lockedOwnerChanged = previous.legacyProjection.lockedRetirement?.owner !== inputs.lockedRetirement?.owner
   next.accounts = next.accounts.map(account => {
     const old = previousAccounts.get(account.id)
     if (!old) return account
-    const ownerId = old.ownerId && live.has(old.ownerId) ? old.ownerId : null
+    const useExplicitLockedOwner = account.kind === 'lira' && lockedOwnerChanged
+    const sourceOwner = useExplicitLockedOwner ? account.ownerId : old.ownerId
+    const ownerId = sourceOwner && live.has(sourceOwner) ? sourceOwner : null
     return {
       ...account,
       ownerId,
-      taxableOwnerShares: old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
+      taxableOwnerShares: useExplicitLockedOwner ? shares(ownerId) : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
         ? old.taxableOwnerShares : unknown('owner reference requires confirmation'),
       acb: account.acb.status === 'unknown' ? old.acb : account.acb,
       contributionRoom: old.contributionRoom,
       openedYear: old.openedYear,
-      accessibleAgeConfirmed: old.accessibleAgeConfirmed,
+      accessibleAgeConfirmed: useExplicitLockedOwner ? false : old.accessibleAgeConfirmed,
     }
   })
   const currentAccountIds = new Set(next.accounts.map(account => account.id))
   // A removed side account with nonzero value cannot silently disappear.
   for (const old of previous.accounts) if (!currentAccountIds.has(old.id) && old.balance !== 0) next.accounts.push({ ...old, ownerId: old.ownerId && live.has(old.ownerId) ? old.ownerId : null })
-  const nextPropertyIds = new Set(next.properties.map(property => property.id))
-  for (const old of previous.properties) if (!nextPropertyIds.has(old.id) && old.value !== 0) next.properties.push({ ...old, taxableOwnerShares: unknown('removed legacy property needs review') })
-  const nextDebtIds = new Set(next.debts.map(debt => debt.id))
-  for (const old of previous.debts) if (!nextDebtIds.has(old.id) && old.principal !== 0) next.debts.push(old)
+  // Removed list entities are intentional deletions; never revive or reassign them by position.
   next.properties = next.properties.map(property => {
     const old = previous.properties.find(item => item.id === property.id)
     return old && old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
