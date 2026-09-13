@@ -82,7 +82,7 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
   try {
     const self = plan.people.find(person => person.role === 'self')!
     if (!Number.isInteger(opening.year) || opening.year < plan.baseYear || opening.baseYear !== plan.baseYear) return 'snapshot year/base mismatch'
-    if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return 'year beyond plan horizon'
+    if (opening.year > plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return 'year beyond plan horizon'
     if (Object.keys(opening.byPerson ?? {}).sort().join('|') !== plan.people.map(p => p.id).sort().join('|') ||
         Object.keys(opening.byAccount ?? {}).sort().join('|') !== plan.accounts.map(a => a.id).sort().join('|') ||
         Object.keys(opening.byDependent ?? {}).sort().join('|') !== plan.dependents.map(d => d.id).sort().join('|') ||
@@ -111,15 +111,23 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const self = plan.people.find(person => person.role === 'self')!
   const problem = snapshotProblem(plan, opening)
   if (problem) return fail('invalid', problem)
+  if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return fail('invalid', 'year beyond plan horizon')
   const state = clone(opening)
   const year = opening.year
   // Rules not yet supplied by BE-11/12/23/38 must not masquerade as exact advice.
   if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
   if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
   if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
-  if (plan.accounts.some(account => account.kind === 'fhsa' && state.byAccount[account.id].openedYear.status === 'unknown' &&
-      (state.byAccount[account.id].balance > 0 || plan.recurringContributions.some(c => c.accountId === account.id && c.annualAmount > 0)))) return fail('unsupported', 'FHSA opening year unknown')
-  if (plan.accounts.some(account => account.kind === 'fhsa' && account.openedYear.status === 'known' && year - account.openedYear.value >= 15)) return fail('unsupported', 'FHSA statutory rollover not yet wired')
+  const activeFhsa = plan.accounts.filter(account => account.kind === 'fhsa' &&
+    (state.byAccount[account.id].balance > 0 || plan.recurringContributions.some(c => c.accountId === account.id && c.annualAmount > 0)))
+  if (activeFhsa.some(account => {
+    const opened = state.byAccount[account.id].openedYear
+    return opened.status === 'unknown' || year < opened.value
+  })) return fail('unsupported', 'FHSA opening year unknown or in the future')
+  if (activeFhsa.some(account => {
+    const opened = state.byAccount[account.id].openedYear
+    return opened.status === 'known' && year - opened.value >= 15
+  })) return fail('unsupported', 'FHSA statutory rollover not yet wired')
   if (plan.contributions.some(contribution => contribution.calendarYear === year)) return fail('unsupported', 'scheduled contribution funding and deduction rule not yet wired')
   const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
   let evaluation: AnnualEvaluation
@@ -129,7 +137,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   for (const [id, person] of Object.entries(state.byPerson)) {
     const entry = evaluation.byPerson[id]
     if (!entry || ![entry.income, entry.earnedIncome, entry.benefits, entry.tax, entry.spending, entry.taxableIncome].every(finiteNonnegative) ||
-        !entry.benefitIncomeForNextYear || (entry.benefitIncomeForNextYear.status === 'known' && !finiteNonnegative(entry.benefitIncomeForNextYear.value))) return fail('invalid', `evaluator amounts: ${id}`)
+        !validKnownAmount(entry.benefitIncomeForNextYear)) return fail('invalid', `evaluator amounts: ${id}`)
     personRows[id] = { age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
   }
   for (const dependent of Object.values(state.byDependent)) dependent.age += 1
@@ -209,13 +217,20 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
     accountRows[id].acb = clone(account.acb)
   }
-  for (const property of plan.properties) if (state.byProperty[property.id].held) state.byProperty[property.id].value *= (1 + property.appreciation) * (1 + plan.inflation)
+  for (const property of plan.properties) if (state.byProperty[property.id].held) {
+    const growthFactor = (1 + property.appreciation) * (1 + plan.inflation)
+    if (!Number.isFinite(growthFactor)) return fail('invalid', `property growth is not finite: ${property.id}`)
+    if (property.appreciation < -1 || plan.inflation < -1 || growthFactor < 0) return fail('unsupported', `property growth outside nonnegative value model: ${property.id}`)
+    state.byProperty[property.id].value *= growthFactor
+  }
   for (const [id, person] of Object.entries(state.byPerson)) {
     person.age += 1
     person.previousYearEarnedIncome = { status: 'known', value: personRows[id].earnedIncome }
     state.benefitIncomeLag[id] = clone(evaluation.byPerson[id].benefitIncomeForNextYear)
   }
   state.year += 1
+  const committedProblem = snapshotProblem(plan, state)
+  if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
   const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), unallocated: 0 },

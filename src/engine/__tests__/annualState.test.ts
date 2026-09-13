@@ -230,4 +230,41 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(projectFromState(canonical, broken, 0, providers(110)).status).toBe('invalid')
     expect(projectFromState(canonical, broken, 1, providers(110)).status).toBe('invalid')
   })
+
+  it('does not book an FHSA contribution before its known opening year', () => {
+    const canonical = plan({ ...input(), debts: [], fhsa: { balance: 0, annualContribution: 10, openedYearsAgo: 0 } })
+    const fhsa = canonical.accounts.find(a => a.kind === 'fhsa')!
+    fhsa.openedYear = { status: 'known', value: 2028 }
+    const opening = ok(initializeState(canonical))
+    const evaluate = vi.fn(providers(110).evaluate)
+    expect(annualStep(canonical, opening, { evaluate, returns: () => 0 })).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('FHSA opening year') }] })
+    expect(evaluate).not.toHaveBeenCalled()
+    expect(opening.byAccount[fhsa.id].balance).toBe(0)
+    expect(opening.contributionHistory).toHaveLength(0)
+  })
+
+  it('never returns ok with malformed evaluator lag or negative property value', () => {
+    const canonical = plan({ ...input(), debts: [], principalResidence: { value: 200, appreciation: 0, sellAtAge: null } })
+    const opening = ok(initializeState(canonical))
+    const malformed = { evaluate: () => ({ byPerson: { [canonical.people[0].id]: {
+      income: 110, earnedIncome: 110, benefits: 0, tax: 20, spending: 50, taxableIncome: 110,
+      benefitIncomeForNextYear: { status: 'unknown' },
+    } } }), returns: () => 0 } as unknown as AnnualProviders
+    expect(annualStep(canonical, opening, malformed).status).toBe('invalid')
+    const validUnknown = ok(annualStep(canonical, opening, { ...providers(110), returns: () => 0 }))
+    expect(projectFromState(canonical, validUnknown.state, 0, providers(110)).status).toBe('ok')
+    const falling = structuredClone(canonical)
+    falling.properties[0].appreciation = -1.2
+    const result = annualStep(falling, ok(initializeState(falling)), { ...providers(110), returns: () => 0 })
+    expect(result).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('property growth') }] })
+  })
+
+  it('keeps the final committed year resumable for a zero-year read', () => {
+    const canonical = plan({ ...input(), debts: [], lifeExpectancy: 40 })
+    canonical.people[0].retirementAge = 100
+    const opening = ok(initializeState(canonical))
+    const final = ok(annualStep(canonical, opening, providers(110)))
+    expect(projectFromState(canonical, final.state, 0, providers(110)).status).toBe('ok')
+    expect(annualStep(canonical, final.state, providers(110)).status).toBe('invalid')
+  })
 })
