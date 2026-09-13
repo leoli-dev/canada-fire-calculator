@@ -1,0 +1,227 @@
+import type { InputsV2, Known, AccountKind } from './model'
+import { ageReachedInYear, precisionGate } from './model'
+import { assertCanonicalPlan } from './modelValidation'
+import { allocateContributions, type FundingGap } from './funding'
+import { impliedRate } from './debts'
+
+/** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
+export interface AnnualState {
+  year: number
+  baseYear: number
+  byPerson: Record<string, { age: number; retirementAge: number; previousYearEarnedIncome: Known<number>; rrspRoom: Known<number>; tfsaRoom: Known<number> }>
+  byAccount: Record<string, { kind: AccountKind; ownerId: string; balance: number; acb: Known<number>; room: Known<number>; openedYear: Known<number> }>
+  byDependent: Record<string, { age: number }>
+  byDebt: Record<string, { principal: number; annualPayment: number; yearsRemaining: number; propertyId: string | null }>
+  byProperty: Record<string, { value: number; held: boolean; acb: Known<number> }>
+  contributionHistory: { id: string; accountId: string; contributorId: string | null; calendarYear: number; amount: number; deductionYear: number | null }[]
+  benefitIncomeLag: Record<string, Known<number>>
+  unfundedEvents: FundingGap[]
+}
+
+export interface AnnualEvaluation {
+  /** Explicit external cash/tax facts for this year. No legacy household tax split is inferred here. */
+  byPerson: Record<string, { income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number; benefitIncomeForNextYear: Known<number> }>
+}
+export interface AnnualContext { plan: InputsV2; state: AnnualState }
+export type TaxBenefitEvaluator = (context: AnnualContext) => AnnualEvaluation
+export type ReturnProvider = (context: AnnualContext, accountId: string) => number
+export interface AnnualProviders { evaluate: TaxBenefitEvaluator; returns: ReturnProvider }
+/** Deterministic nominal return from the canonical real-return and fee assumptions. */
+export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
+  const account = plan.accounts.find(item => item.id === accountId)
+  if (!account) return Number.NaN
+  return (1 + account.realReturn - account.annualFee) * (1 + plan.inflation) - 1
+}
+export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
+export interface YearRow {
+  year: number
+  byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
+  byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; unallocated: number }
+  taxLedger: Record<string, { taxableIncome: number; tax: number }>
+  issues: AnnualIssue[]
+}
+export type KernelResult<T> = { status: 'ok'; value: T } | { status: 'invalid' | 'unsupported'; issues: AnnualIssue[] }
+export interface AnnualStepValue { state: AnnualState; row: YearRow }
+const clone = <T>(value: T): T => structuredClone(value)
+const fail = (status: 'invalid' | 'unsupported', detail: string): KernelResult<never> => ({ status, issues: [{ code: status, detail }] })
+const finiteNonnegative = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
+
+export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
+  try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
+  const gate = precisionGate(plan)
+  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  if (plan.accounts.some(account => account.ownerId === null)) return fail('unsupported', 'account ownership unknown')
+  if (plan.accounts.some(account => !finiteNonnegative(account.balance)) || plan.debts.some(debt => !finiteNonnegative(debt.principal))) return fail('invalid', 'negative or nonfinite opening balance')
+  const byPerson = Object.fromEntries(plan.people.map(person => [person.id, {
+    age: ageReachedInYear(person, plan.baseYear, plan.baseYear), retirementAge: person.retirementAge,
+    previousYearEarnedIncome: clone(person.previousYearEarnedIncome), rrspRoom: clone(person.rrspAvailableRoom), tfsaRoom: clone(person.tfsaAvailableRoom),
+  }]))
+  const byAccount = Object.fromEntries(plan.accounts.map(account => [account.id, {
+    kind: account.kind, ownerId: account.ownerId!, balance: account.balance, acb: clone(account.acb), room: clone(account.contributionRoom), openedYear: clone(account.openedYear),
+  }]))
+  const byDebt = Object.fromEntries(plan.debts.map(debt => [debt.id, { principal: debt.principal, annualPayment: debt.annualPayment, yearsRemaining: debt.yearsRemaining, propertyId: debt.propertyId }]))
+  const byDependent = Object.fromEntries(plan.dependents.map(dependent => [dependent.id, { age: dependent.ageInBaseYear }]))
+  const byProperty = Object.fromEntries(plan.properties.map(property => [property.id, { value: property.value, held: property.plannedPurchaseAge === null, acb: clone(property.acb) }]))
+  return { status: 'ok', value: { year: plan.baseYear, baseYear: plan.baseYear, byPerson, byAccount, byDependent, byDebt, byProperty,
+    contributionHistory: plan.contributions.filter(c => c.calendarYear < plan.baseYear).map(c => ({ id: c.id, accountId: c.accountId, contributorId: c.contributorId, calendarYear: c.calendarYear, amount: c.amount, deductionYear: c.deductionYear })),
+    benefitIncomeLag: Object.fromEntries(plan.people.map(person => [person.id, { status: 'unknown', reason: 'benefit income basis not supplied' }])), unfundedEvents: [] } }
+}
+
+/** Only supported, settled events commit. No trial may mutate the caller's state. */
+function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
+  try {
+    const self = plan.people.find(person => person.role === 'self')!
+    if (!Number.isInteger(opening.year) || opening.year < plan.baseYear || opening.baseYear !== plan.baseYear) return 'snapshot year/base mismatch'
+    if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return 'year beyond plan horizon'
+    if (Object.keys(opening.byPerson ?? {}).sort().join('|') !== plan.people.map(p => p.id).sort().join('|') ||
+        Object.keys(opening.byAccount ?? {}).sort().join('|') !== plan.accounts.map(a => a.id).sort().join('|') ||
+        Object.keys(opening.byDependent ?? {}).sort().join('|') !== plan.dependents.map(d => d.id).sort().join('|') ||
+        Object.keys(opening.byDebt ?? {}).sort().join('|') !== plan.debts.map(d => d.id).sort().join('|') ||
+        Object.keys(opening.byProperty ?? {}).sort().join('|') !== plan.properties.map(p => p.id).sort().join('|')) return 'snapshot entity IDs'
+    if (Object.values(opening.byAccount).some(a => !finiteNonnegative(a.balance)) ||
+        Object.values(opening.byDebt).some(d => !finiteNonnegative(d.principal) || !finiteNonnegative(d.annualPayment) || !Number.isInteger(d.yearsRemaining) || d.yearsRemaining < 0 || (d.principal > 0 && d.yearsRemaining === 0))) return 'snapshot balance or debt term'
+    if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year)) ||
+        plan.dependents.some(dependent => opening.byDependent[dependent.id].age !== dependent.ageInBaseYear + opening.year - plan.baseYear) ||
+        plan.accounts.some(account => opening.byAccount[account.id].kind !== account.kind || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
+    return null
+  } catch { return 'damaged annual snapshot' }
+}
+
+function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders): KernelResult<AnnualStepValue> {
+  try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
+  const gate = precisionGate(plan)
+  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const self = plan.people.find(person => person.role === 'self')!
+  const problem = snapshotProblem(plan, opening)
+  if (problem) return fail('invalid', problem)
+  const state = clone(opening)
+  const year = opening.year
+  // Rules not yet supplied by BE-11/12/23/38 must not masquerade as exact advice.
+  if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
+  if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
+  if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
+  if (plan.accounts.some(account => account.kind === 'fhsa' && account.balance > 0 && account.openedYear.status === 'unknown')) return fail('unsupported', 'FHSA opening year unknown')
+  if (plan.accounts.some(account => account.kind === 'fhsa' && account.openedYear.status === 'known' && year - account.openedYear.value >= 15)) return fail('unsupported', 'FHSA statutory rollover not yet wired')
+  if (plan.contributions.some(contribution => contribution.calendarYear === year)) return fail('unsupported', 'scheduled contribution funding and deduction rule not yet wired')
+  const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
+  let evaluation: AnnualEvaluation
+  try { evaluation = providers.evaluate(view()) } catch { return fail('invalid', 'tax/benefit evaluator failed') }
+  if (!evaluation || Object.keys(evaluation.byPerson ?? {}).sort().join('|') !== Object.keys(state.byPerson).sort().join('|')) return fail('invalid', 'evaluator person IDs')
+  const personRows: YearRow['byPerson'] = {}
+  for (const [id, person] of Object.entries(state.byPerson)) {
+    const entry = evaluation.byPerson[id]
+    if (!entry || ![entry.income, entry.earnedIncome, entry.benefits, entry.tax, entry.spending, entry.taxableIncome].every(finiteNonnegative) ||
+        !entry.benefitIncomeForNextYear || (entry.benefitIncomeForNextYear.status === 'known' && !finiteNonnegative(entry.benefitIncomeForNextYear.value))) return fail('invalid', `evaluator amounts: ${id}`)
+    personRows[id] = { age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
+  }
+  for (const dependent of Object.values(state.byDependent)) dependent.age += 1
+  const income = sum(Object.values(personRows).map(p => p.income))
+  const benefits = sum(Object.values(personRows).map(p => p.benefits))
+  const tax = sum(Object.values(personRows).map(p => p.tax))
+  const spending = sum(Object.values(personRows).map(p => p.spending))
+  let debtPayments = 0
+  for (const [id, debt] of Object.entries(state.byDebt)) {
+    if (debt.principal <= 0 || debt.yearsRemaining <= 0) continue
+    const rate = impliedRate(debt.principal, debt.annualPayment, debt.yearsRemaining)
+    if (debt.annualPayment * debt.yearsRemaining + 1e-8 < debt.principal) return fail('invalid', `debt cannot amortize: ${id}`)
+    const due = Math.min(debt.annualPayment, debt.principal * (1 + rate))
+    debtPayments += due
+    debt.principal = Math.max(0, debt.principal * (1 + rate) - due)
+    debt.yearsRemaining -= 1
+  }
+  const cash = income + benefits - tax - spending - debtPayments
+  if (cash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
+  const recurring = plan.recurringContributions.filter(c => state.byAccount[c.accountId])
+  if (recurring.length !== plan.recurringContributions.length) return fail('invalid', 'recurring contribution account missing')
+  const fhsa = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'fhsa' && c.funding === 'fromSavings').map(c => c.annualAmount))
+  const employee = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'lira' && c.funding === 'fromSavings').map(c => c.annualAmount))
+  const employer = sum(recurring.filter(c => c.funding === 'employerAdditional').map(c => c.annualAmount))
+  if (recurring.some(c => !finiteNonnegative(c.annualAmount) || !['fhsa', 'lira'].includes(state.byAccount[c.accountId].kind) || (state.byAccount[c.accountId].kind === 'fhsa' && c.funding !== 'fromSavings'))) return fail('unsupported', 'recurring contribution rule not yet wired')
+  const allocation = allocateContributions({ age: state.byPerson[self.id].age, budget: cash, fhsa, employee, employer, split: plan.savingsAllocation.shares })
+  if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
+  const accountRows: YearRow['byAccount'] = {}
+  for (const [id, account] of Object.entries(state.byAccount)) accountRows[id] = { opening: account.balance, contribution: 0, withdrawal: 0, returnAmount: 0, closing: account.balance, acb: clone(account.acb), ownerId: account.ownerId }
+  for (const contribution of recurring) {
+    const amount = contribution.annualAmount
+    accountRows[contribution.accountId].contribution += amount
+    state.contributionHistory.push({ id: `${contribution.id}:${year}`, accountId: contribution.accountId, contributorId: contribution.contributorId, calendarYear: year, amount, deductionYear: null })
+  }
+  for (const kind of ['tfsa', 'rrsp', 'nonReg'] as const) {
+    const amount = allocation.voluntary[kind]
+    const destinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === kind)
+    if (amount > 0 && destinations.length !== 1) return fail('unsupported', `ambiguous ${kind} contribution destination`)
+    if (destinations.length === 1) {
+      accountRows[destinations[0][0]].contribution += amount
+      if (amount > 0) state.contributionHistory.push({ id: `annual:${year}:${kind}`, accountId: destinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount, deductionYear: null })
+    }
+  }
+  for (const [id, row] of Object.entries(accountRows)) {
+    if (row.contribution <= 0) continue
+    const account = state.byAccount[id]
+    if (!['tfsa', 'rrsp', 'spousalRrsp', 'fhsa'].includes(account.kind)) continue
+    if (plan.people.length > 1 && ['rrsp', 'spousalRrsp'].includes(account.kind)) return fail('unsupported', `couple RRSP contributor and room attribution not yet wired: ${id}`)
+    if (account.room.status !== 'known') return fail('unsupported', `contribution room unknown: ${id}`)
+    if (row.contribution > account.room.value + 1e-8) return fail('unsupported', `contribution exceeds account room: ${id}`)
+    const person = state.byPerson[account.ownerId]
+    const personRoom = account.kind === 'tfsa' ? person?.tfsaRoom : person?.rrspRoom
+    if (account.kind !== 'fhsa' && (!personRoom || personRoom.status !== 'known')) return fail('unsupported', `person contribution room unknown: ${account.ownerId}`)
+    if (personRoom?.status === 'known' && row.contribution > personRoom.value + 1e-8) return fail('unsupported', `contribution exceeds person room: ${account.ownerId}`)
+    account.room.value -= row.contribution
+    if (personRoom?.status === 'known') personRoom.value -= row.contribution
+  }
+  const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
+  if (Math.abs(totalContributions - cash - employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
+  for (const [id, account] of Object.entries(state.byAccount)) {
+    let rate: number
+    try { rate = providers.returns(view(), id) } catch { return fail('invalid', `return provider failed: ${id}`) }
+    if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
+    const beforeGrowth = account.balance + accountRows[id].contribution
+    accountRows[id].returnAmount = beforeGrowth * rate
+    account.balance = beforeGrowth + accountRows[id].returnAmount
+    accountRows[id].closing = account.balance
+    if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
+    accountRows[id].acb = clone(account.acb)
+  }
+  for (const property of plan.properties) if (state.byProperty[property.id].held) state.byProperty[property.id].value *= (1 + property.appreciation) * (1 + plan.inflation)
+  for (const [id, person] of Object.entries(state.byPerson)) {
+    person.age += 1
+    person.previousYearEarnedIncome = { status: 'known', value: personRows[id].earnedIncome }
+    state.benefitIncomeLag[id] = clone(evaluation.byPerson[id].benefitIncomeForNextYear)
+  }
+  state.year += 1
+  const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
+    cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
+      employerContributions: employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), unallocated: 0 },
+    taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), issues: [] }
+  return { status: 'ok', value: { state, row } }
+}
+
+export function annualStep(plan: InputsV2, opening: AnnualState, providers: AnnualProviders): KernelResult<AnnualStepValue> {
+  try { return annualStepUnchecked(plan, opening, providers) }
+  catch { return fail('invalid', 'damaged annual snapshot or provider result') }
+}
+
+export function projectFromState(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<{ state: AnnualState; rows: YearRow[] }> {
+  if (!Number.isInteger(years) || years < 0 || years > 120) return fail('invalid', 'projection years')
+  try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
+  const gate = precisionGate(plan)
+  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const problem = snapshotProblem(plan, opening)
+  if (problem) return fail('invalid', problem)
+  let state: AnnualState
+  try { state = clone(opening) } catch { return fail('invalid', 'snapshot cannot be cloned') }
+  const rows: YearRow[] = []
+  for (let index = 0; index < years; index++) {
+    const next = annualStep(plan, state, providers)
+    if (next.status !== 'ok') return next
+    state = next.value.state
+    rows.push(next.value.row)
+  }
+  return { status: 'ok', value: { state, rows } }
+}
+
+export const sumInvestableAssets = (state: AnnualState) => sum(Object.values(state.byAccount).map(account => account.balance))
+export const sumNetWorth = (state: AnnualState) => sumInvestableAssets(state) + sum(Object.values(state.byProperty).filter(p => p.held).map(p => p.value)) - sum(Object.values(state.byDebt).map(d => d.principal))
+export const sumWithdrawals = (row: YearRow) => sum(Object.values(row.byAccount).map(account => account.withdrawal))
