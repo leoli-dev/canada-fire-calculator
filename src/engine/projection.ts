@@ -22,7 +22,7 @@ import {
   oasAfterClawback,
 } from './benefits'
 import { rrifMinFactor } from './rrif'
-import { buildDebtStream, impliedRate } from './debts'
+import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale } from './debts'
 import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
@@ -290,7 +290,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   // future origination decays from *that* year exactly like an existing
   // mortgage decays from year 0 — so the stream is just time-shifted, no
   // extra deflation math needed. Zero-padding the front makes every existing
-  // per-year access (`prMortgage?.balances[yearIdx]`) work unchanged.
+  // per-year access to opening and closing balances uses the same offset.
   const prMortgage = (() => {
     if (plannedPurchase) {
       const principal = purchaseTerms?.mortgagePrincipal ?? 0
@@ -304,8 +304,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       )
       const zeros = new Array(Math.min(startIdx, years)).fill(0)
       return {
-        payments: [...zeros, ...stream.payments].slice(0, years),
-        balances: [...zeros, ...stream.balances].slice(0, years),
+        payment: [...zeros, ...stream.payment].slice(0, years),
+        openingBalance: [...zeros, ...stream.openingBalance].slice(0, years),
+        closingBalance: [...zeros, ...stream.closingBalance].slice(0, years),
         interest: [...zeros, ...stream.interest].slice(0, years),
       }
     }
@@ -318,6 +319,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let fhsaActive = !!inputs.fhsa
   let lockedBal = inputs.lockedRetirement?.balance ?? 0
   let unpaidPlannedMortgage = 0
+  let unpaidSaleDebt = 0
+  let prSold = false
   const plannedMortgageRate = plannedPurchase && plannedPurchase.mortgageYears && plannedPurchase.annualMortgagePayment
     ? impliedRate(plannedPurchase.price - plannedPurchase.downPayment,
       plannedPurchase.annualMortgagePayment, plannedPurchase.mortgageYears)
@@ -330,6 +333,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
+    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], years, inflation)
@@ -350,6 +354,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let shortfall = 0
     let extraTaxable = 0
     let saleGainsTaxable = 0
+    let accumulationSaleTax = 0
+    const saleTaxObligations: { amount: number; propertyIdx: number }[] = []
     let taxablePerPerson = 0
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
@@ -364,7 +370,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     const yearIdx = age - inputs.currentAge
     if (plannedPurchase && yearIdx > buyYearIdx! && unpaidPlannedMortgage > 0) {
       const sellingAtOpen = plannedPurchase.sellAtAge !== null && age >= plannedPurchase.sellAtAge && prValue > 0
-      unpaidPlannedMortgage *= (sellingAtOpen ? 1 : 1 + plannedMortgageRate) / (1 + inflation)
+      unpaidPlannedMortgage *= sellingAtOpen ? 1 : (1 + plannedMortgageRate) / (1 + inflation)
     }
 
     // v1 boundary model: the balance keeps compounding while locked, then
@@ -396,7 +402,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook,
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           annualSavings: inputs.annualSavings,
-          firstYearCost: (prMortgage?.payments[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange,
+          firstYearCost: (prMortgage?.payment[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange,
         })
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
@@ -463,32 +469,96 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       }
     }
 
-    // principal residence sale: tax-free; any linked mortgage is discharged
-    // from the proceeds (a plain cash-flow cost until then — its interest
-    // isn't deductible, unlike a rental's)
+    // All planned sales close at the opening of the year, before interest,
+    // rent, appreciation or the scheduled mortgage installment. If the lien
+    // exceeds the sale price, draw only opening liquid assets. Any unpaid
+    // remainder remains a debt and an explicit funding gap.
+    const settleSale = (sale: ReturnType<typeof yearStartSale>, field: string) => {
+      if (sale.proceeds > 0) {
+        bal.nonReg += sale.proceeds
+        nonRegBook += sale.proceeds
+      }
+      if (sale.cashNeeded > 0) {
+        const plan = planAnnualHousingFunding(age, sale.cashNeeded, {
+          balances: bal, nonRegBook, annualSavings: 0,
+          marginalRate: inputs.accumulationMarginalRate ?? 0.35,
+          taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0),
+        })
+        if (plan.allocation) {
+          Object.assign(bal, plan.allocation.balances)
+          nonRegBook = plan.allocation.nonRegBook
+          if (phase === 'accumulation') dpAccumTax += plan.allocation.withdrawalTax
+          else {
+            purchaseTaxable += plan.allocation.taxableWithdrawal
+            purchaseTaxPaid += plan.allocation.withdrawalTax
+          }
+          purchaseNonRegTaxable += plan.allocation.nonRegTaxable
+          purchaseRrspWithdrawal += plan.allocation.rrspWithdrawal
+        }
+        if (plan.gap) {
+          yearGaps.push({ ...plan.gap, eventId: `sale:${age}:${field}`, field, reason: 'saleDischarge' })
+          unpaidSaleDebt += plan.gap.amount
+        }
+      }
+    }
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
-      // A planned sale closes at the year's opening, before that year's
-      // scheduled payment. Discharge both scheduled debt and any arrears.
-      const scheduledOwed = plannedPurchase && yearIdx > buyYearIdx!
-        ? (prMortgage?.balances[yearIdx - 1] ?? 0) / (1 + inflation)
-        : (prMortgage?.balances[yearIdx] ?? 0)
-      const owed = scheduledOwed + unpaidPlannedMortgage
-      bal.nonReg += prValue - owed
-      nonRegBook += prValue - owed
+      const sale = yearStartSale(prValue, prMortgage, yearIdx, unpaidPlannedMortgage)
+      settleSale(sale, 'principalResidence.sellAtAge')
       prValue = 0
+      prSold = true
       unpaidPlannedMortgage = 0
     }
-    // investment property sales: gain is 50% taxable; clamped to retirement;
-    // a linked mortgage is discharged from the proceeds the same way
-    for (const p of ips) {
-      if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
-        const owed = p.mortgage?.balances[yearIdx] ?? 0
+    for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
+      const p = ips[propertyIdx]
+      if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
+        const sale = yearStartSale(p.value, p.mortgage, yearIdx)
         const gain = Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
         extraTaxable += gain
         saleGainsTaxable += gain
-        bal.nonReg += p.value - owed
-        nonRegBook += p.value - owed
+        settleSale(sale, `investmentProperties.${propertyIdx}.sellAtAge`)
         p.value = 0
+        p.sold = true
+        if (phase === 'accumulation' && gain > 0) {
+          const amount = gain * (inputs.accumulationMarginalRate ?? 0.35)
+          accumulationSaleTax += amount
+          saleTaxObligations.push({ amount, propertyIdx })
+        }
+      }
+    }
+    const releasedPayments =
+      releasedMortgagePayment(prMortgage, prSold && !plannedPurchase, yearIdx) +
+      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
+    const workingSavings = inputs.annualSavings + releasedPayments
+    let savingsAfterSaleTax = workingSavings
+    // A same-year planned home's installment/holding cost already has a
+    // claim on these savings. Do not let sale tax spend that cash and then
+    // let the purchase ledger spend it again.
+    const committedHousingCost = plannedPurchase && prValue > 0
+      ? Math.max(0, (prMortgage?.payment[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange)
+      : 0
+    let freeSavingsForSaleTax = Math.max(0, workingSavings - committedHousingCost)
+    // Gains tax is an annual cash obligation. Current-year savings can pay
+    // it before new contributions; any remainder draws sale proceeds or
+    // other liquid assets through the BE-30 funding allocator. A final
+    // shortage remains a visible liability rather than negative cash.
+    for (const obligation of saleTaxObligations) {
+      const plan = planAnnualHousingFunding(age, obligation.amount, {
+        balances: bal, nonRegBook, annualSavings: freeSavingsForSaleTax,
+        marginalRate: inputs.accumulationMarginalRate ?? 0.35,
+      })
+      if (plan.allocation) {
+        Object.assign(bal, plan.allocation.balances)
+        nonRegBook = plan.allocation.nonRegBook
+        savingsAfterSaleTax -= plan.allocation.firstYearCostFromSavings
+        freeSavingsForSaleTax -= plan.allocation.firstYearCostFromSavings
+        dpAccumTax += plan.allocation.withdrawalTax
+        purchaseNonRegTaxable += plan.allocation.nonRegTaxable
+        purchaseRrspWithdrawal += plan.allocation.rrspWithdrawal
+      }
+      if (plan.gap) {
+        yearGaps.push({ ...plan.gap, eventId: `sale:${age}:tax:${obligation.propertyIdx}`,
+          field: `investmentProperties.${obligation.propertyIdx}.sellAtAge`, reason: 'saleTax' })
+        unpaidSaleDebt += plan.gap.amount
       }
     }
     // net rent from properties still held (stops the year a property sells);
@@ -507,13 +577,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     // outstanding (properties already sold this year stop contributing —
     // their mortgage was just discharged from the sale proceeds above)
     let debtPayment =
-      (debtStream.payments[yearIdx] ?? 0) +
-      (prValue > 0 ? prMortgage?.payments[yearIdx] ?? 0 : 0) +
-      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.payments[yearIdx] ?? 0 : 0), 0)
+      (debtStream.payment[yearIdx] ?? 0) +
+      (prValue > 0 ? prMortgage?.payment[yearIdx] ?? 0 : 0) +
+      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.payment[yearIdx] ?? 0 : 0), 0)
     let debtBalance =
-      (debtStream.balances[yearIdx] ?? 0) +
-      (prValue > 0 ? (prMortgage?.balances[yearIdx] ?? 0) + unpaidPlannedMortgage : 0) +
-      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[yearIdx] ?? 0 : 0), 0)
+      (debtStream.closingBalance[yearIdx] ?? 0) + unpaidSaleDebt +
+      (prValue > 0 ? (prMortgage?.closingBalance[yearIdx] ?? 0) + unpaidPlannedMortgage : 0) +
+      ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.closingBalance[yearIdx] ?? 0 : 0), 0)
     // net change in living costs from a future purchase (rent saved, property
     // tax/insurance/maintenance added, etc. — excludes the mortgage payment
     // itself, already in debtPayment above); stops once sold like the mortgage
@@ -574,14 +644,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     if (phase === 'accumulation') {
       // FHSA contribution is carved out of annualSavings before the
       // remainder is split across the three accounts
-      const futureMortgagePayment = plannedPurchase && prValue > 0 ? prMortgage?.payments[yearIdx] ?? 0 : 0
+      const futureMortgagePayment = plannedPurchase && prValue > 0 ? prMortgage?.payment[yearIdx] ?? 0 : 0
       const housingCost = futureMortgagePayment + netHoldingCost
       if (plannedPurchase && prValue > 0 && yearIdx !== buyYearIdx && housingCost > 0) {
         // Reuse the purchase cash ledger for every later installment. Annual
         // savings arrive before the payment; only then are liquid assets sold.
         const plan = planAnnualHousingFunding(age, housingCost, {
           balances: bal, nonRegBook, marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          annualSavings: inputs.annualSavings,
+          annualSavings: savingsAfterSaleTax,
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
@@ -607,7 +677,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
           debtBalance += unpaidMortgage
         }
       }
-      const budget = Math.max(0, inputs.annualSavings - housingCost)
+      const budget = Math.max(0, savingsAfterSaleTax - housingCost)
       const allocation = allocateContributions({
         age, budget,
         fhsa: fhsaActive && inputs.fhsa ? inputs.fhsa.annualContribution : 0,
@@ -653,7 +723,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       bal.nonReg += benefitBase - benefitTax
       nonRegBook += benefitBase - benefitTax
       oas = oasGross
-      tax = dragTax + rentTax + benefitTax + dpAccumTax
+      tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax
       const marginalPurchaseTax = inputs.accumulationMarginalRate ?? 0.35
       const rrspWithdrawalTax = purchaseRrspWithdrawal * marginalPurchaseTax
       const nonRegWithdrawalTax = purchaseNonRegTaxable * marginalPurchaseTax
@@ -663,12 +733,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       taxBySource = {
         rrsp: rrspWithdrawalTax, nonReg: dragTax + nonRegWithdrawalTax,
         cpp: cppTax, oas: benefitTax - cppTax - pensionTax,
-        property: rentTax, extraIncome: 0, pension: pensionTax,
+        property: rentTax + accumulationSaleTax, extraIncome: 0, pension: pensionTax,
       }
       taxableBySource = {
         rrsp: purchaseRrspWithdrawal, nonReg: dist + purchaseNonRegTaxable,
         cpp, oas: oasGross,
-        property: rent - rentMortgageInterest, extraIncome: 0, pension,
+        property: rent - rentMortgageInterest + saleGainsTaxable, extraIncome: 0, pension,
       }
     } else {
       extraTaxable += dist + purchaseTaxable
@@ -768,7 +838,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       // only cash left for this mortgage may reduce its principal. The
       // existing total shortfall remains the all-costs spending deficit.
       const plannedMortgagePayment = plannedPurchase && prValue > 0
-        ? (prMortgage?.payments[yearIdx] ?? 0) : 0
+        ? (prMortgage?.payment[yearIdx] ?? 0) : 0
       if (plannedMortgagePayment > 0) {
         const cashForMortgage = netCash - (spendTarget - plannedMortgagePayment)
         const { unpaid } = reconcileMortgagePayment(plannedMortgagePayment, cashForMortgage)
@@ -841,9 +911,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   // which the generic debtStream-only figure used to omit (estate looked
   // richer than the balances/Monte Carlo charts, which do subtract it)
   const finalPropertyDebt =
-    (prValue > 0 ? (prMortgage?.balances[lastYearIdx] ?? 0) + unpaidPlannedMortgage : 0) +
-    ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.balances[lastYearIdx] ?? 0 : 0), 0)
-  const finalDebt = (debtStream.balances[lastYearIdx] ?? 0) + finalPropertyDebt
+    (prValue > 0 ? (prMortgage?.closingBalance[lastYearIdx] ?? 0) + unpaidPlannedMortgage : 0) +
+    ips.reduce((s, p) => s + (p.value > 0 ? p.mortgage?.closingBalance[lastYearIdx] ?? 0 : 0), 0)
+  const finalDebt = (debtStream.closingBalance[lastYearIdx] ?? 0) + finalPropertyDebt + unpaidSaleDebt
   // in the rare case life expectancy is reached before the FHSA's 15-year
   // clock or age 71 (it must mature by one of those), its balance is still
   // tax-free like an on-time rollover would have been

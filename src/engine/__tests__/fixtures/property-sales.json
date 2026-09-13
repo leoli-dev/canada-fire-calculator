@@ -1,0 +1,64 @@
+{
+  "schema": "qa30-property-sales-v1",
+  "cases": [
+    {
+      "id": "P01",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "Year-start sale: 500,000 property proceeds − 400,000 opening mortgage = 100,000 cash. No current-year 40,000 principal payment.",
+        "audit": "fire-model-reassessment-2026-09 §3, diagnostics probe P01-sale-mortgage-conservation"
+      },
+      "toleranceCad": 0.01,
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 50,
+        "lifeExpectancy": 50,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "principalResidence": {
+          "value": 500000,
+          "appreciation": 0,
+          "sellAtAge": 50,
+          "mortgage": {
+            "balance": 400000,
+            "annualPayment": 40000,
+            "yearsRemaining": 10
+          }
+        }
+      },
+      "expected": {
+        "finalNetWorth": 100000,
+        "debtPaymentAtSale": 0
+      },
+      "baselineRevision": "9017dc4d73854160ff0bdad4603699c5f0c4902a",
+      "provenanceRef": "fire-model-reassessment-2026-09-evidence/diagnostics.json#P01-sale-mortgage-conservation"
+    }
+  ]
+}

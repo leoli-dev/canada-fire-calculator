@@ -1,5 +1,5 @@
 import { pensionPaid, runProjection } from './projection'
-import { buildDebtStream, rollDebtsForward } from './debts'
+import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSale } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
 import {
@@ -31,6 +31,10 @@ export function requiredFireAssets(inputs: Inputs): number {
   // numeric answer would omit its cash outflow while keeping the rest of the
   // plan, so expose unsupported instead of a fabricated threshold.
   if (inputs.principalResidence?.mode === 'planned') return Number.NaN
+  // A FIRE-year snapshot cannot infer how earlier sale proceeds were invested.
+  if ((inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
+      (inputs.investmentProperties ?? []).some((p) => (p.sellAtAge ?? Infinity) < inputs.fireAge))
+    return Number.NaN
   if (runProjection(inputs).unfundedObligations.length > 0) return Number.NaN
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
@@ -54,9 +58,9 @@ export function requiredFireAssets(inputs: Inputs): number {
   }
   // a principal residence sold BEFORE the FIRE age is already cash inside the
   // investable balances the user compares this number against — passing it
-  // through would count the house twice (IP sales are clamped to FIRE, so
-  // they can't double up the same way). Planned purchases returned
-  // unsupported above because this snapshot estimator cannot replay them.
+  // through would count the house twice. Earlier sales of either property
+  // type and planned purchases returned unsupported above because this
+  // snapshot estimator cannot replay their earlier cash flows.
   const pr =
     inputs.principalResidence &&
     (inputs.principalResidence.sellAtAge === null ||
@@ -174,10 +178,14 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
   if (runProjection(inputs).unfundedObligations.length > 0)
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+  // This shortcut has no source/use ledger for a negative-equity discharge.
+  // The event checks below suppress it only when the actual sale-year value
+  // cannot clear the opening lien (today's negative equity may recover).
   const bal = { ...inputs.balances }
   // Planned purchases returned unsupported above.
   const pr = inputs.principalResidence
   let prValue = pr?.value ?? 0
+  let prSold = false
   const horizon = 100 - inputs.currentAge + 1
   const inflation = inputs.inflation ?? 0.021
   const prMortgage = pr?.mortgage
@@ -188,6 +196,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
+    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], horizon, inflation)
@@ -204,17 +213,27 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
   for (let age = inputs.currentAge; age <= 100; age++) {
     const yearIdx = age - inputs.currentAge
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
-      const owed = prMortgage?.balances[yearIdx] ?? 0
-      bal.nonReg += prValue - owed
+      const sale = yearStartSale(prValue, prMortgage, yearIdx)
+      if (sale.cashNeeded > 0)
+        return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+      bal.nonReg += sale.proceeds
       prValue = 0
+      prSold = true
     }
     for (const p of ips) {
-      if (p.sellAtAge !== null && age >= Math.max(p.sellAtAge, inputs.fireAge) && p.value > 0) {
-        const owed = p.mortgage?.balances[yearIdx] ?? 0
-        const gainTax =
-          incomeTax((Math.max(0, p.value - p.acb) * 0.5) / persons, inputs.province) * persons
-        bal.nonReg += p.value - owed - gainTax
+      if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
+        const sale = yearStartSale(p.value, p.mortgage, yearIdx)
+        if (sale.cashNeeded > 0)
+          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+        const taxableGain = Math.max(0, p.value - p.acb) * 0.5
+        const gainTax = age < inputs.fireAge
+          ? taxableGain * marginal
+          : incomeTax(taxableGain / persons, inputs.province) * persons
+        if (gainTax > sale.proceeds)
+          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+        bal.nonReg += sale.proceeds - gainTax
         p.value = 0
+        p.sold = true
       }
     }
     // assets entering FIRE plus any sale landing that year — snapshot before
@@ -262,8 +281,11 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
     }
     bal.nonReg += benefits * (1 - marginal)
+    const releasedPayments =
+      releasedMortgagePayment(prMortgage, prSold, yearIdx) +
+      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
     for (const t of ACCOUNT_TYPES) {
-      bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
+      bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
     if (lockedBal > 0) {

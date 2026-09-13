@@ -293,7 +293,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'home.value': {
       const home = inputs.principalResidence!
       if (home.mode === 'planned') break
-      control = <div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /><FactNumber field="principalResidence.sellAtAge" label={t('propSellAt')} value={home.sellAtAge ?? 0} onValue={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge: sellAtAge || null } })} /></div>
+      control = <><div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /><FactNumber field="principalResidence.sellAtAge" label={t('propSellAt')} value={home.sellAtAge ?? 0} onValue={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge: sellAtAge || null } })} /></div>{home.mortgage && home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'home.mortgage': {
@@ -309,7 +309,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'mortgage.payment': {
       const home = inputs.principalResidence!; if (home.mode === 'planned' || !home.mortgage) break
-      control = <div className="question-pair"><FactNumber field="principalResidence.mortgage.annualPayment" label={t('debtPaymentLabel')} value={home.mortgage.annualPayment} onValue={(annualPayment) => set({ principalResidence: { ...home, mortgage: { ...home.mortgage!, annualPayment } } })} /><FactNumber field="principalResidence.mortgage.yearsRemaining" label={t('debtYears')} value={home.mortgage.yearsRemaining} onValue={(yearsRemaining) => set({ principalResidence: { ...home, mortgage: { ...home.mortgage!, yearsRemaining } } })} /></div>
+      control = <><div className="question-pair"><FactNumber field="principalResidence.mortgage.annualPayment" label={t('debtPaymentLabel')} value={home.mortgage.annualPayment} onValue={(annualPayment) => set({ principalResidence: { ...home, mortgage: { ...home.mortgage!, annualPayment } } })} /><FactNumber field="principalResidence.mortgage.yearsRemaining" label={t('debtYears')} value={home.mortgage.yearsRemaining} onValue={(yearsRemaining) => set({ principalResidence: { ...home, mortgage: { ...home.mortgage!, yearsRemaining } } })} /></div>{home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'purchase.time': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <FactNumber field="principalResidence.buyAtAge" label={t('prBuyAtAge')} value={home.buyAtAge} onValue={(buyAtAge) => set({ principalResidence: { ...home, buyAtAge } })} />; break }
@@ -340,7 +340,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'rental.0.income': {
       const property = inputs.investmentProperties![0]
-      control = <div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /></div>
+      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /></div>{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'rental.0.mortgage': {
@@ -350,7 +350,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'rental.0.loan': {
       const property = inputs.investmentProperties![0]; const mortgage = property.mortgage!
-      control = <div className="question-pair"><FactNumber field="investmentProperties.0.mortgage.balance" label={t('debtBalance')} value={mortgage.balance} onValue={(balance) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, mortgage: { ...mortgage, balance } }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.mortgage.annualPayment" label={t('debtPaymentLabel')} value={mortgage.annualPayment} onValue={(annualPayment) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, mortgage: { ...mortgage, annualPayment } }; set({ investmentProperties: next }) }} /></div>
+      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.mortgage.balance" label={t('debtBalance')} value={mortgage.balance} onValue={(balance) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, mortgage: { ...mortgage, balance } }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.mortgage.annualPayment" label={t('debtPaymentLabel')} value={mortgage.annualPayment} onValue={(annualPayment) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, mortgage: { ...mortgage, annualPayment } }; set({ investmentProperties: next }) }} /></div>{property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'rental.0.term': {

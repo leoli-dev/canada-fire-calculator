@@ -121,7 +121,7 @@ export interface OwnedResidence {
   value: number
   /** real annual appreciation */
   appreciation: number
-  /** sale is tax-free (principal residence exemption); null = never sell */
+  /** tax-free sale at the opening of this age; null = never sell */
   sellAtAge: number | null
   /** discharged from sale proceeds when the home sells; a plain cash-flow
    * cost until then (mortgage interest on a principal residence isn't
@@ -153,7 +153,7 @@ export interface PlannedResidence {
    * cheaper than whatever housing cost — e.g. rent — it replaces); excludes
    * the mortgage payment itself, which is handled like any other mortgage */
   netHoldingCostChange: number
-  /** can still sell later; sale is tax-free like an owned residence */
+  /** tax-free sale at the opening of this age, after purchase; null = never sell */
   sellAtAge: number | null
 }
 
@@ -218,7 +218,7 @@ export interface InvestmentProperty {
   /** adjusted cost base; gain above it is 50% taxable at sale */
   acb: number
   appreciation: number
-  /** engine clamps the sale to no earlier than fireAge; null = never sell */
+  /** sale occurs at the opening of this age, including before FIRE; null = never sell */
   sellAtAge: number | null
   /**
    * Net annual rent while the property is held (rent minus operating costs,

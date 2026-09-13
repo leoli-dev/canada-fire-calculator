@@ -4,7 +4,7 @@ This is the A slice only. `households.json` is executable now; `pending-audit.js
 
 | Audit | Correct assertion / activation point | Status here |
 |---|---|---|
-| P01 | Year-start sale 500k less opening 400k debt = 100k; BE-31 | Correct pending fixture |
+| P01 | Year-start sale 500k less opening 400k debt = 100k; BE-31 | Active property-sales fixture and debt test |
 | P02 | 500k purchase with 100k cash and zero valid loan has 400k unfunded; BE-30 | Correct pending fixture |
 | P03 | 100k down payment cannot use next year's income; BE-30 | Correct pending fixture |
 | P04 | 10k savings cannot pay 8k FHSA + 8k employee DC; BE-30 | Correct pending fixture |

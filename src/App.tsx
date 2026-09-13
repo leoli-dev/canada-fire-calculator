@@ -102,9 +102,7 @@ export default function App() {
             pensionAge={pensionAge}
             saleAges={[
               inputs.principalResidence?.sellAtAge,
-              ...(inputs.investmentProperties ?? []).map((p) =>
-                p.sellAtAge != null ? Math.max(p.sellAtAge, inputs.fireAge) : null,
-              ),
+              ...(inputs.investmentProperties ?? []).map((p) => p.sellAtAge),
             ].filter((a): a is number => a != null)}
             scale={scale}
           />

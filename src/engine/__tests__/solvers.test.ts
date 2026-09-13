@@ -218,8 +218,9 @@ describe('targetReport', () => {
       ...base,
       principalResidence: { value: 800000, appreciation: 0.02, sellAtAge: base.currentAge + 2 },
     })
-    const without = requiredFireAssets(base)
-    expect(withEarlySale).toBeCloseTo(without, -3)
+    // A FIRE-year snapshot cannot infer how sale proceeds were invested
+    // during the prior working years; this shortcut is explicitly unsupported.
+    expect(withEarlySale).toBeNaN()
   })
 
   it('taxes the investment-property gain on sale in target mode', () => {

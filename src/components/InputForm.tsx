@@ -531,6 +531,8 @@ export function InputForm() {
                 <OptionalAge label={t('propSellAt')} value={pr.sellAtAge}
                   issue={issueFor('principalResidence.sellAtAge')}
                   onChange={(v) => set({ principalResidence: { ...pr, sellAtAge: v } })} />
+                {pr.sellAtAge !== null && pr.sellAtAge < inputs.fireAge && pr.mortgage &&
+                  <p className="hint">{t('saleSavingsHint')}</p>}
                 <p className="hint"><Jargon text={t('prNote')} /></p>
                 <label className="field">
                   <span>{t('hasMortgage')}</span>
@@ -615,6 +617,8 @@ export function InputForm() {
               <OptionalAge label={t('propSellAt')} value={ip.sellAtAge}
                 issue={issueFor(`investmentProperties.${i}.sellAtAge`)}
                 onChange={(v) => patch({ sellAtAge: v })} />
+              {ip.sellAtAge !== null && ip.sellAtAge < inputs.fireAge && ip.mortgage &&
+                <p className="hint">{t('saleSavingsHint')}</p>}
               <label className="field">
                 <span>{t('hasMortgage')}</span>
                 <input

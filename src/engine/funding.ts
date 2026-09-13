@@ -5,7 +5,7 @@ export interface FundingGap {
   eventId: string
   field: string
   amount: number
-  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase'
+  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase' | 'saleDischarge' | 'saleTax'
 }
 
 export interface PurchaseFunds {

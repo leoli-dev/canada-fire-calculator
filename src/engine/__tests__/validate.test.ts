@@ -118,7 +118,7 @@ describe('validateInputs', () => {
     const w = fields(bad, 'warning')
     expect(w).toContain('principalResidence.sellAtAge')
     expect(w).toContain('investmentProperties.0.acb')
-    expect(w).toContain('investmentProperties.0.sellAtAge')
+    expect(w).not.toContain('investmentProperties.0.sellAtAge')
   })
 
   it('flags FHSA inconsistencies', () => {

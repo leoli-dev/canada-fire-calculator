@@ -23,9 +23,11 @@ export function impliedRate(balance: number, payment: number, years: number): nu
 
 export interface DebtStream {
   /** total real (today's-dollar) payments due, indexed by years from now */
-  payments: number[]
-  /** total real end-of-year balance outstanding, indexed by years from now */
-  balances: number[]
+  payment: number[]
+  /** real principal outstanding at the opening of each year */
+  openingBalance: number[]
+  /** real principal outstanding after that year's scheduled payment */
+  closingBalance: number[]
   /** real interest portion of that year's payment (deductible for a rental mortgage) */
   interest: number[]
 }
@@ -47,24 +49,26 @@ export function buildDebtStream(
   // total function: transient UI states can produce negative or fractional
   // year spans (e.g. FIRE age typed above life expectancy) — never throw
   const n = Number.isFinite(years) ? Math.max(0, Math.floor(years)) : 0
-  const payments = new Array<number>(n).fill(0)
-  const balances = new Array<number>(n).fill(0)
+  const payment = new Array<number>(n).fill(0)
+  const openingBalance = new Array<number>(n).fill(0)
+  const closingBalance = new Array<number>(n).fill(0)
   const interest = new Array<number>(n).fill(0)
   for (const d of debts) {
     if (d.balance <= 0 || d.yearsRemaining <= 0) continue
     const r = impliedRate(d.balance, d.annualPayment, d.yearsRemaining)
     let nominal = d.balance
     for (let t = 0; t < n && t < d.yearsRemaining; t++) {
+      openingBalance[t] += nominal * Math.pow(1 + inflation, -t)
       const deflate = Math.pow(1 + inflation, -(t + 1))
       const interestNominal = nominal * r
-      payments[t] += Math.min(d.annualPayment, nominal + interestNominal) * deflate
+      payment[t] += Math.min(d.annualPayment, nominal + interestNominal) * deflate
       interest[t] += interestNominal * deflate
       nominal = Math.max(0, nominal + interestNominal - d.annualPayment)
       if (t === d.yearsRemaining - 1) nominal = 0
-      balances[t] += nominal * deflate
+      closingBalance[t] += nominal * deflate
     }
   }
-  return { payments, balances, interest }
+  return { payment, openingBalance, closingBalance, interest }
 }
 
 /**
@@ -91,4 +95,15 @@ export function rollDebtsForward(debts: Debt[], years: number, inflation: number
     })
   }
   return out
+}
+
+/** A property sale takes place before the year's interest and scheduled payment. */
+export function yearStartSale(value: number, mortgage: DebtStream | null, yearIdx: number, arrears = 0) {
+  const owed = (mortgage?.openingBalance[yearIdx] ?? 0) + arrears
+  return { owed, proceeds: Math.max(0, value - owed), cashNeeded: Math.max(0, owed - value) }
+}
+
+/** Existing linked payments were already subtracted from annualSavings. */
+export function releasedMortgagePayment(mortgage: DebtStream | null, sold: boolean, yearIdx: number) {
+  return sold ? (mortgage?.payment[yearIdx] ?? 0) : 0
 }
