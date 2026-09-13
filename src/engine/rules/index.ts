@@ -85,15 +85,16 @@ const TAX_PACKS: TaxRulePack[] = [
     id: `CA-${jurisdiction}-tax-2026-legacy-v1`, jurisdiction: jurisdiction as Province,
     taxYear: 2026, federal: FEDERAL_2026_SNAPSHOT, provincial,
     frozenProvincialBracketIndexes: jurisdiction === 'ON' ? [2, 3] : jurisdiction === 'YT' ? [3] : jurisdiction === 'MB' ? [0, 1] : [],
-    sourceURL: jurisdiction === 'BC' ? BC_2026_JULY : jurisdiction === 'PE' ? PE_2026_GOV : TAX_2026_PDF(jurisdiction), effectiveDate: '2026-01-01', verifiedAt: '2026-09-13',
+    sourceURL: jurisdiction === 'BC' ? BC_2026_JULY : TAX_2026_PDF(jurisdiction), effectiveDate: '2026-01-01', verifiedAt: '2026-09-13',
     fieldSources: { federalBrackets: TAX_2026_PDF(jurisdiction), federalBpa: TAX_2026_PDF(jurisdiction),
-      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'BC' ? BC_2026_JULY : jurisdiction === 'PE' ? PE_2026_GOV : TAX_2026_PDF(jurisdiction),
+      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'BC' ? BC_2026_JULY : TAX_2026_PDF(jurisdiction),
       provincialBpa: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'NL' ? NL_2026_JULY : TAX_2026_PDF(jurisdiction) },
-    additionalSourceURLs: jurisdiction === 'MB' ? [CRA_2026_RATES] : jurisdiction === 'PE' ? [TAX_2026_PDF(jurisdiction)] : [],
+    fieldAdditionalSources: jurisdiction === 'PE' ? { provincialBrackets: [PE_2026_GOV] } : undefined,
+    additionalSourceURLs: jurisdiction === 'MB' ? [CRA_2026_RATES] : [],
     sourceConflict: jurisdiction === 'MB'
       ? 'CRA generic 2026 rate page lists $47,564/$101,200; dedicated T4032-MB 2026 lists $47,000/$100,000 and $15,780 BPA, matching this retained legacy snapshot. BE-38 B must reconcile legal authority before changing calculations.'
       : jurisdiction === 'PE'
-      ? 'Mixed-vintage legacy PE snapshot: the retained $142,250 fourth threshold appears in neither January T4032-PE 2026 nor the PE government 2026 table, which lists $142,520. The January guide ends at 19%; the PE government 2026 table adds a sixth bracket over $200,000 at 20%. BE-38 B must reconcile before changing calculations.'
+      ? 'Mixed-vintage legacy PE snapshot: January CRA T4032-PE 2026 supports the retained $142,250 fourth threshold at 17.62% and 19% above it. The PE government 2026 table instead lists $142,520 and adds a sixth bracket over $200,000 at 20%. This pack combines the January threshold with the later sixth bracket; BE-38 B must reconcile before changing calculations.'
       : undefined,
     indexationRule: jurisdiction === 'MB' ? 'frozen' : 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
@@ -247,10 +248,11 @@ export function selectBenefitRules(program: 'CCB', period: string, future?: { an
     throw new Error('Unpublished benefit period requires an explicit future indexation assumption')
   const base = BENEFIT_PACKS[1]
   const years = start - 2026
-  return { ...base, id: `${base.id}+assumed-${start}-${future.annualRate}`,
+  const projected: BenefitRulePack = { ...base, id: `${base.id}+assumed-${start}-${future.annualRate}`,
     paymentPeriod: period, incomeTaxYear: start - 1, effectiveDate: `${start}-07-01`,
     values: Object.fromEntries(Object.entries(base.values).map(([k, v]) => [k, indexed(v, years, future.annualRate)])) as BenefitRulePack['values'],
     assumedFutureRule: true, assumedAnnualRate: future.annualRate, basedOnRuleId: base.id,
   }
+  return publishRulePack<BenefitRulePack>(projected)
 }
 export const publishedTaxCoverage = TAX_PACKS.map(p => ({ jurisdiction: p.jurisdiction, taxYear: p.taxYear, coverage: p.coverage, limitation: p.limitation }))

@@ -23,6 +23,9 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       ] as const).map(([label, url]) => <span key={label}>
         <a href={url} target="_blank" rel="noreferrer">{t(label)}</a>{' · '}
       </span>)}
+      {tax.fieldAdditionalSources?.provincialBrackets?.map(url => <span key={url}>
+        <a href={url} target="_blank" rel="noreferrer">{t('rulePeUpdatedBracketSource')}</a>{' · '}
+      </span>)}
       {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{t('ruleConflictingSource')}</a>{' · '}</span>)}
     </div>
     {tax.sourceConflict && <p>{t(province === 'PE' ? 'rulePeConflict' : 'ruleMbConflict')}</p>}
