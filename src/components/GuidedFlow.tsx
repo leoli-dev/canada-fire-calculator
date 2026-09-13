@@ -9,7 +9,8 @@ import { useCad } from '../format'
 import { QuestionPage } from './guided/QuestionPage'
 
 function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
-  return definition.fieldBindings.filter((field) => partner || !field.startsWith('partner.'))
+  return definition.fieldBindings.filter((field) => partner ||
+    (!field.startsWith('partner.') && field !== 'lockedRetirement.owner'))
 }
 
 function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof useStore.getState>): boolean {

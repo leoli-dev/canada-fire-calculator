@@ -14,6 +14,7 @@ import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
+import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 
@@ -33,10 +34,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
   )
   const projectedAtFire = useMemo(
     () =>
-      mode === 'number'
+      mode === 'number' && fireNumber?.status === 'solved'
         ? targetReport(inputs, Number.MAX_SAFE_INTEGER).assetsAtFire
         : null,
-    [mode, inputs],
+    [mode, inputs, fireNumber],
   )
   const earliestAssets = useMemo(() => {
     if (mode !== 'when' || earliest?.status !== 'solved' || earliest.value === null) return null
@@ -68,11 +69,14 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
   const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
     ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
       ? t('fundingQuickUnsupported') : earlySale ? t('saleQuickUnsupported')
-        : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
-  const lockedWithdrawalUnverified = !!inputs.lockedRetirement && (
-    inputs.lockedRetirement.balance > 0 || inputs.lockedRetirement.employeeContribution > 0 ||
-    inputs.lockedRetirement.employerContribution > 0)
+        : fireNumber?.reason === 'lockedWithdrawalLimits'
+          ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
+  const lockedWithdrawalUnverified = hasUnverifiedLockedWithdrawals(inputs)
   const lastResultUnverified = result.success && (lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
+  const quickResultUnverified = (mode === 'when' && earliest?.reason === 'lockedWithdrawalLimits') ||
+    (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits')
+  const targetResultUnverified = mode === 'target' && goal?.status === 'supported' && lockedWithdrawalUnverified
+  const resultUnverified = (mode === 'last' && lastResultUnverified) || quickResultUnverified || targetResultUnverified
 
   const ok =
     mode === 'last'
@@ -87,7 +91,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             : true
 
   return (
-    <div className={`summary ${mode === 'last' && lastResultUnverified ? 'uncertain' : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
+    <div className={`summary ${resultUnverified
+      ? 'uncertain' : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
       <div className="mode-tabs" role="tablist">
         {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
           <button
@@ -164,7 +169,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             {earliest?.status === 'solved'
               ? t('whenAnswer', { age: earliest.value })
               : earliest?.status === 'infeasible' ? t('whenNever', { age: earliest.lastVerifiedBound ?? inputs.currentAge })
-                : t(`solver_${earliest?.status ?? 'unsupported'}`)}
+                : earliest?.reason === 'lockedWithdrawalLimits' ? t('solverReason_lockedWithdrawalLimits')
+                  : t(`solver_${earliest?.status ?? 'unsupported'}`)}
           </p>
           {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&
             <p className="hint">{t('solverCheckedAge', { age: earliest.lastVerifiedBound, iterations: earliest.iterations })}</p>}
@@ -259,6 +265,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
                   : t('targetNever', { target: cad(target) })}
             </p>
           )}
+          {targetResultUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
           <p className="hint"><Jargon text={t('targetHint')} /></p>
         </>
       )}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { findEarliestFireAge, maxSustainableSpending, requiredFireAssets } from '../solvers'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
+import { DEFAULT_INPUTS } from '../../store'
 
 const base: Inputs = {
   currentAge: 50, fireAge: 50, lifeExpectancy: 85, province: 'ON',
@@ -13,6 +14,27 @@ const base: Inputs = {
 }
 
 describe('explicit solver outcomes', () => {
+  it('does not certify quick answers that rely on unverified locked withdrawals', () => {
+    const input: Inputs = { ...DEFAULT_INPUTS, lockedRetirement: {
+      balance: 500_000, accessibleAge: 55, owner: 'self', jurisdiction: 'ON',
+      employeeContribution: 0, employerContribution: 0,
+    } }
+    expect(runProjection(input).success).toBe(true)
+    for (const solve of [findEarliestFireAge, requiredFireAssets, maxSustainableSpending]) {
+      expect(solve(input)).toMatchObject({ status: 'unsupported', value: null, reason: 'lockedWithdrawalLimits' })
+    }
+  })
+
+  it('keeps an empty locked-account placeholder within supported quick paths', () => {
+    const input: Inputs = { ...base, lockedRetirement: {
+      balance: 0, accessibleAge: 55, owner: 'self', jurisdiction: 'ON',
+      employeeContribution: 0, employerContribution: 0,
+    } }
+    for (const solve of [findEarliestFireAge, requiredFireAssets, maxSustainableSpending]) {
+      expect(solve(input).status).toBe('solved')
+    }
+  })
+
   it('continues past an early purchase gap to the first feasible retirement year', () => {
     const input: Inputs = { ...base, fireAge: 55, annualSavings: 100_000,
       principalResidence: { mode: 'planned', buyAtAge: 60, price: 500_000,
