@@ -52,7 +52,8 @@ export function NumberInput(props: {
   value: number | null
   onChange: (v: number | null) => void
   draft?: string
-  onDraftChange?: (raw: string) => void
+  /** Return true when the field adapter handled this text as a draft. */
+  onDraftChange?: (raw: string) => boolean | void
   preserveInvalidDraft?: boolean
   step?: number
   className?: string
@@ -62,6 +63,7 @@ export function NumberInput(props: {
   const { i18n } = useTranslation()
   const lang = i18n.language
   const ref = useRef<HTMLInputElement>(null)
+  const edited = useRef(false)
   const [focused, setFocused] = useState(false)
   const [text, setText] = useState('')
   const caretUnits = useRef<number | null>(null)
@@ -112,21 +114,26 @@ export function NumberInput(props: {
       placeholder={props.placeholder}
       value={display}
       onFocus={() => {
+        edited.current = false
         setText(props.draft ?? (props.value === null ? '' : toRaw(props.value)))
         setFocused(true)
       }}
       onBlur={() => {
-        commit(text)
+        // Valid text was committed on change; adapters handled drafts there too.
+        // Only legacy nullable controls need a deferred empty commit.
+        if (edited.current && !props.onDraftChange && (text === '' || text === '-')) commit(text)
+        edited.current = false
         setFocused(false)
       }}
       onChange={(e) => {
+        edited.current = true
         const el = e.target
         const before = el.value.slice(0, el.selectionStart ?? el.value.length)
         caretUnits.current = sanitize(before, lang).length
         const raw = props.preserveInvalidDraft && /[a-z]/i.test(el.value) ? el.value : sanitize(el.value, lang)
         setText(raw)
-        props.onDraftChange?.(raw)
-        if (raw !== '' && raw !== '-') commit(raw)
+        const handledAsDraft = props.onDraftChange?.(raw) === true
+        if (!handledAsDraft && raw !== '' && raw !== '-') commit(raw)
       }}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return

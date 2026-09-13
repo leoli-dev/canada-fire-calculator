@@ -58,7 +58,9 @@ function Num(props: {
           preserveInvalidDraft={!!props.field}
           step={props.step ?? 1}
           onDraftChange={props.field ? (raw) => {
-            if (parseField(props.field!, raw).status === 'draft') editSharedField(props.field!, raw)
+            if (parseField(props.field!, raw).status !== 'draft') return false
+            editSharedField(props.field!, raw)
+            return true
           } : undefined}
           onChange={(v) => {
             if (props.field) { editSharedField(props.field, v === null ? (draft ?? '') : String(v)); return }

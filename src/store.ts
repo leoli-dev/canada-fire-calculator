@@ -113,6 +113,13 @@ export interface PlanningIntent {
   understandingAcknowledged: boolean
   confirmedIntentRevision: number | null
 }
+const DEFAULT_PLANNING_INTENT: PlanningIntent = {
+  beneficiaries: ['self'],
+  legacyPreference: 'undecided',
+  spendingPreference: 'undecided',
+  understandingAcknowledged: false,
+  confirmedIntentRevision: null,
+}
 export type AnswerStatus = 'confirmed' | 'estimated' | 'unknown' | 'notApplicable'
 export type AnswerOrigin = 'user' | 'default' | 'legacy' | 'example'
 export interface AnswerMeta {
@@ -275,13 +282,7 @@ export const useStore = create<Store>()(
       activePageId: 'family.people',
       guidedView: 'questionnaire',
       questionAnswers: {},
-      planningIntent: {
-        beneficiaries: ['self'],
-        legacyPreference: 'undecided',
-        spendingPreference: 'undecided',
-        understandingAcknowledged: false,
-        confirmedIntentRevision: null,
-      },
+      planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
       inputRevision: 0,
       resultRevision: null,
       answerMeta: {},
@@ -411,6 +412,7 @@ export const useStore = create<Store>()(
           activePageId: 'family.people',
           guidedView: 'questionnaire',
           questionAnswers: {},
+          planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
           inputRevision: 0,
           resultRevision: null,
           answerMeta: {},
@@ -448,13 +450,7 @@ export const useStore = create<Store>()(
             activePageId: legacyPageByStep[(previous.activeStep ?? 1) - 1] ?? 'family.people',
             guidedView: previous.activeStep === 7 ? 'review' : 'questionnaire',
             questionAnswers: {},
-            planningIntent: {
-              beneficiaries: ['self'],
-              legacyPreference: 'undecided',
-              spendingPreference: 'undecided',
-              understandingAcknowledged: false,
-              confirmedIntentRevision: null,
-            },
+            planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
             inputRevision: 0,
             resultRevision: null,
             answerMeta: legacyAnswerMeta(),

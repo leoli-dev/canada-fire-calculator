@@ -62,7 +62,10 @@ export function parseField(id: SharedFieldId, raw: string, displayUnit: 'canonic
   if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(trimmed)) return { status: 'draft', reason: 'invalid' }
   const definition = fieldRegistry[id]
   const entered = Number(trimmed)
-  const value = displayUnit === 'monthly' && definition.unit === 'annualCad' ? entered * 12 : entered
+  // Annual CAD is stored to cents after an intentional monthly edit. Display
+  // rounding alone must never be written back (NumberInput guards no-edit blur).
+  const value = displayUnit === 'monthly' && definition.unit === 'annualCad'
+    ? Math.round(entered * 12 * 100) / 100 : entered
   if (!Number.isFinite(value) || value < definition.min || value > definition.max || (definition.integer && !Number.isInteger(value))) return { status: 'draft', reason: 'invalid' }
   return { status: 'valid', value }
 }

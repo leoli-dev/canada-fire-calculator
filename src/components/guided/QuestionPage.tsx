@@ -44,7 +44,9 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
     <label htmlFor={`q-${props.field}`}>{props.label}</label>
     <NumberInput id={`q-${props.field}`} value={props.value} draft={draft} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
       onDraftChange={isSharedField(props.field) ? (raw) => {
-        if (parseField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit).status === 'draft') editSharedField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit)
+        if (parseField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit).status !== 'draft') return false
+        editSharedField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit)
+        return true
       } : undefined}
       onChange={(value) => {
         if (isSharedField(props.field)) { editSharedField(props.field, value == null ? (draft ?? '') : String(value), props.unit); return }

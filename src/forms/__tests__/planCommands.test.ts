@@ -30,6 +30,7 @@ describe('shared field commands', () => {
       state = { ...state, ...editField(state, 'annualSavings', '24000') } as PlanFieldSnapshot
       expect(state.inputs.annualSavings).toBe(24000)
     }
+    expect(parseField('annualSavings', '3333.33', 'monthly')).toEqual({ status: 'valid', value: 39999.96 })
   })
 
   it('changes advice revision for an intent-only edit', () => {
