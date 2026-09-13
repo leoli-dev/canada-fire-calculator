@@ -7,6 +7,7 @@ import type { QuestionDefinition } from '../guided/schema'
 import { useStore } from '../store'
 import { useCad } from '../format'
 import { QuestionPage } from './guided/QuestionPage'
+import { RuleAssumptions } from './RuleAssumptions'
 
 function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
   return definition.fieldBindings.filter((field) => partner ||
@@ -108,6 +109,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
         </div>
       })}</div>
       <p className="review-assumptions-note">{t('questionnaire.reviewAssumptionsNote')}</p>
+      <RuleAssumptions province={state.inputs.province} inflation={state.inputs.inflation ?? 0.021} />
     </section>
     <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
       const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
