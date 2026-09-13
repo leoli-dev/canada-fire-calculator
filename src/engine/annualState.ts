@@ -55,6 +55,9 @@ const validKnownAmount = (value: unknown, nonnegative = false): value is Known<n
 const sameKnown = (left: Known<number>, right: Known<number>) => left.status === right.status &&
   (left.status === 'known' && right.status === 'known' ? left.value === right.value :
     left.status === 'unknown' && right.status === 'unknown' && left.reason === right.reason)
+const sameContribution = (left: AnnualState['contributionHistory'][number], right: InputsV2['contributions'][number]) =>
+  left.id === right.id && left.accountId === right.accountId && left.contributorId === right.contributorId &&
+  left.calendarYear === right.calendarYear && left.amount === right.amount && left.deductionYear === right.deductionYear
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
 export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
@@ -100,19 +103,32 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
         Object.keys(opening.benefitIncomeLag ?? {}).sort().join('|') !== plan.people.map(p => p.id).sort().join('|') ||
         !Array.isArray(opening.contributionHistory) || opening.contributionHistory.some(c => !finiteNonnegative(c.amount) || !Number.isInteger(c.calendarYear)) ||
         !Array.isArray(opening.unfundedEvents) || opening.unfundedEvents.some(gap => !finiteNonnegative(gap.amount))) return 'snapshot nested amount'
-    if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year)) ||
+    if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year) ||
+        opening.byPerson[person.id].retirementAge !== person.retirementAge) ||
         plan.dependents.some(dependent => opening.byDependent[dependent.id].age !== dependent.ageInBaseYear + opening.year - plan.baseYear) ||
         plan.accounts.some(account => opening.byAccount[account.id].kind !== account.kind || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
     // A never executes purchase/sale or changes opening-year facts. A candidate
     // cannot claim the property was acquired or a missing statement was verified.
-    if (plan.properties.some(property => opening.byProperty[property.id].held !== (property.plannedPurchaseAge === null)) ||
+    if (plan.properties.some(property => opening.byProperty[property.id].held !== (property.plannedPurchaseAge === null) ||
+        !sameKnown(opening.byProperty[property.id].acb, property.acb)) ||
+        plan.debts.some(debt => opening.byDebt[debt.id].annualPayment !== debt.annualPayment ||
+          opening.byDebt[debt.id].propertyId !== debt.propertyId) ||
         plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].openedYear, account.openedYear))) return 'snapshot event or opening fact'
+    const priorContributions = plan.contributions.filter(contribution => contribution.calendarYear < plan.baseYear)
     if (opening.year === plan.baseYear && (
-      plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].room, account.contributionRoom)) ||
+      plan.accounts.some(account => opening.byAccount[account.id].balance !== account.balance ||
+        !sameKnown(opening.byAccount[account.id].acb, account.acb) ||
+        !sameKnown(opening.byAccount[account.id].room, account.contributionRoom)) ||
+      plan.properties.some(property => opening.byProperty[property.id].value !== property.value) ||
+      plan.debts.some(debt => opening.byDebt[debt.id].principal !== debt.principal ||
+        opening.byDebt[debt.id].yearsRemaining !== debt.yearsRemaining) ||
       plan.people.some(person => !sameKnown(opening.byPerson[person.id].rrspRoom, person.rrspAvailableRoom) ||
         !sameKnown(opening.byPerson[person.id].tfsaRoom, person.tfsaAvailableRoom) ||
         !sameKnown(opening.byPerson[person.id].previousYearEarnedIncome, person.previousYearEarnedIncome)) ||
-      plan.people.some(person => !sameKnown(opening.benefitIncomeLag[person.id], { status: 'unknown', reason: 'benefit income basis not supplied' }))
+      plan.people.some(person => !sameKnown(opening.benefitIncomeLag[person.id], { status: 'unknown', reason: 'benefit income basis not supplied' })) ||
+      opening.unfundedEvents.length !== 0 ||
+      priorContributions.length !== opening.contributionHistory.length ||
+      priorContributions.some((contribution, index) => !sameContribution(opening.contributionHistory[index], contribution))
     )) return 'snapshot base-year facts'
     return null
   } catch { return 'damaged annual snapshot' }

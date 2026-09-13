@@ -318,6 +318,64 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(annualStep(canonical, forgedRoom, providers(110)).status).toBe('invalid')
   })
 
+  it('anchors base-year account, owned-property, debt, and contribution-history facts to the plan', () => {
+    const canonical = plan({ ...input(), principalResidence: { value: 200000, appreciation: .05, sellAtAge: null } })
+    const owned = canonical.properties[0]
+    owned.acb = { status: 'known', value: 150000 }
+    const account = canonical.accounts.find(item => item.kind === 'nonReg')!
+    account.acb = { status: 'known', value: 12 }
+    canonical.contributions = [{ id: 'past:tfsa', accountId: canonical.accounts[0].id,
+      contributorId: canonical.people[0].id, calendarYear: 2025, amount: 5, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: 2025 } }]
+    const opening = ok(initializeState(canonical))
+    const mutations: Array<[string, (snapshot: typeof opening) => void]> = [
+      ['account balance', snapshot => { snapshot.byAccount[canonical.accounts[0].id].balance = 200 }],
+      ['account ACB', snapshot => { snapshot.byAccount[account.id].acb = { status: 'known', value: 100 } }],
+      ['property value', snapshot => { snapshot.byProperty[owned.id].value = 400000 }],
+      ['property ACB', snapshot => { snapshot.byProperty[owned.id].acb = { status: 'known', value: 250000 } }],
+      ['debt principal', snapshot => { snapshot.byDebt.loan.principal = 0 }],
+      ['debt payment', snapshot => { snapshot.byDebt.loan.annualPayment = 20 }],
+      ['debt term', snapshot => { snapshot.byDebt.loan.yearsRemaining = 2 }],
+      ['debt property link', snapshot => { snapshot.byDebt.loan.propertyId = owned.id }],
+      ['contribution history', snapshot => { snapshot.contributionHistory = [] }],
+      ['unfunded event', snapshot => { snapshot.unfundedEvents = [{ eventId: 'fake', field: 'debt', amount: 1, reason: 'downPayment' }] }],
+    ]
+    for (const [name, mutate] of mutations) {
+      const forged = structuredClone(opening)
+      mutate(forged)
+      expect(projectFromState(canonical, forged, 0, providers(120)), name).toMatchObject({ status: 'invalid' })
+      expect(annualStep(canonical, forged, providers(120)), name).toMatchObject({ status: 'invalid' })
+    }
+    expect(sumNetWorth(opening)).toBe(200090)
+    expect(ok(projectFromState(canonical, opening, 0, providers(120))).state).toEqual(opening)
+  })
+
+  it('resumes a legitimately changed later-year snapshot after growth, contributions, and debt amortization', () => {
+    const canonical = plan({ ...input(), principalResidence: { value: 200000, appreciation: .05, sellAtAge: null },
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, inflation: 0 })
+    const opening = ok(initializeState(canonical))
+    const first = ok(annualStep(canonical, opening, providers(120)))
+    const nonReg = canonical.accounts.find(account => account.kind === 'nonReg')!
+    expect(first.state.byAccount[nonReg.id].balance).not.toBe(nonReg.balance)
+    expect(first.state.byAccount[nonReg.id].acb).not.toEqual(nonReg.acb)
+    expect(first.state.byProperty[canonical.properties[0].id].value).not.toBe(canonical.properties[0].value)
+    expect(first.state.byDebt.loan.principal).not.toBe(canonical.debts[0].principal)
+    expect(ok(projectFromState(canonical, first.state, 0, providers(110))).state).toEqual(first.state)
+    expect(annualStep(canonical, first.state, providers(110)).status).toBe('ok')
+    const staticForgeries: Array<(snapshot: typeof first.state) => void> = [
+      snapshot => { snapshot.byPerson[canonical.people[0].id].retirementAge = 99 },
+      snapshot => { snapshot.byDebt.loan.annualPayment = 0 },
+      snapshot => { snapshot.byDebt.loan.propertyId = canonical.properties[0].id },
+      snapshot => { snapshot.byProperty[canonical.properties[0].id].acb = { status: 'known', value: 1 } },
+    ]
+    for (const mutate of staticForgeries) {
+      const forged = structuredClone(first.state)
+      mutate(forged)
+      expect(projectFromState(canonical, forged, 0, providers(110)).status).toBe('invalid')
+      expect(annualStep(canonical, forged, providers(110)).status).toBe('invalid')
+    }
+  })
+
   it('samples every account return from one settled snapshot regardless of split, order, or provider mutation', () => {
     const make = (tfsa: number, rrsp: number) => plan({ ...input(), debts: [], annualSavings: 0,
       savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, balances: { tfsa, rrsp, nonReg: 0 },
