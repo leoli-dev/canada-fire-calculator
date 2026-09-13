@@ -147,7 +147,7 @@ describe('debts in the projection', () => {
   it('a mortgage outstanding at FIRE raises the FIRE number', () => {
     const withDebt = requiredFireAssets({ ...base, debts: [mortgage] })
     const without = requiredFireAssets(base)
-    expect(withDebt).toBeGreaterThan(without)
+    expect(withDebt.value!).toBeGreaterThan(without.value!)
   })
 
   it('FIRE-number solver appreciates real estate to the FIRE year like it rolls debts', () => {
@@ -165,7 +165,7 @@ describe('debts in the projection', () => {
         { value: 500000, acb: 300000, appreciation: 0, sellAtAge: base.fireAge },
       ],
     })
-    expect(appreciating).toBeLessThan(flat)
+    expect(appreciating.value!).toBeLessThan(flat.value!)
   })
 
   it('never throws on transient invalid ages (FIRE age above life expectancy)', () => {
@@ -519,7 +519,7 @@ describe('property-linked mortgages', () => {
         { value: 600000, acb: 400000, appreciation: 0, sellAtAge: base.fireAge },
       ],
     })
-    expect(withMortgage).toBeGreaterThan(withoutMortgage)
+    expect(withMortgage.value!).toBeGreaterThan(withoutMortgage.value!)
 
     const report = targetReport(
       {

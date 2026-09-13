@@ -109,6 +109,29 @@ test('guided users may leave the personal target unset and add it from results',
   await expect(page.locator('[data-field="fireTargetAssets"] input')).toHaveValue('900,000')
 })
 
+test('an unverified FIRE asset search shows its boundary in guided and professional results', async ({ page }) => {
+  test.setTimeout(60_000)
+  await completeGuidedQuestionnaire(page, 'no')
+  await page.getByRole('button', { name: 'Generate my results' }).click()
+  await page.getByRole('button', { name: 'Modify answers' }).click()
+  await page.goto('/#/guided/spending/spending.total')
+  await page.locator('[data-field="retirementSpending"] input').fill('20000000')
+  await page.goto('/#/guided/review')
+  await page.getByRole('button', { name: 'Generate my results' }).click()
+  await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+  const summary = page.locator('.summary')
+  await expect(summary).toContainText('search limit was reached')
+  await expect(summary).toContainText('Checked through')
+  await expect(summary).not.toContainText('Your FIRE number:')
+
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+  await expect(page.locator('.summary')).toContainText('search limit was reached')
+  await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
+  await expect(page.locator('.results-column')).not.toContainText('NaN')
+  await expect(page.locator('.results-column')).not.toContainText('Infinity')
+})
+
 test('language buttons are clickable beside the GitHub corner across responsive widths', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   const english = page.locator('.langs').getByRole('button', { name: 'EN' })

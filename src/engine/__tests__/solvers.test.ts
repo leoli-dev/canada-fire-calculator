@@ -33,9 +33,9 @@ const base: Inputs = {
 describe('findEarliestFireAge', () => {
   it('finds an age no later than a known-successful fireAge', () => {
     const earliest = findEarliestFireAge(base)
-    expect(earliest).not.toBeNull()
-    expect(earliest!).toBeLessThanOrEqual(45)
-    expect(runProjection({ ...base, fireAge: earliest! }).success).toBe(true)
+    expect(earliest.status).toBe('solved')
+    expect(earliest.value!).toBeLessThanOrEqual(45)
+    expect(runProjection({ ...base, fireAge: earliest.value! }).success).toBe(true)
   })
 
   it('returns null when retirement is impossible', () => {
@@ -49,14 +49,15 @@ describe('findEarliestFireAge', () => {
         cppAnnualAt65: 0,
         oasAnnualAt65: 0,
       }),
-    ).toBeNull()
+    ).toMatchObject({ status: 'infeasible', value: null })
   })
 })
 
 describe('requiredFireAssets', () => {
   it('returns a number that succeeds and whose 90% fails', () => {
     const T = requiredFireAssets(base)
-    expect(T).toBeGreaterThan(0)
+    expect(T.status).toBe('solved')
+    expect(T.value!).toBeGreaterThan(0)
     const total = base.balances.tfsa + base.balances.rrsp + base.balances.nonReg
     const scale = (k: number) => ({
       ...base,
@@ -69,8 +70,8 @@ describe('requiredFireAssets', () => {
       },
       nonRegBook: ((k * base.balances.nonReg) / total) * (base.nonRegBook / base.balances.nonReg),
     })
-    expect(runProjection(scale(T * 1.01)).success).toBe(true)
-    expect(runProjection(scale(T * 0.9)).success).toBe(false)
+    expect(runProjection(scale(T.value! * 1.01)).success).toBe(true)
+    expect(runProjection(scale(T.value! * 0.9)).success).toBe(false)
   })
 })
 
@@ -140,14 +141,15 @@ describe('compareStrategies / scanBenefitTiming', () => {
 describe('maxSustainableSpending (die with zero)', () => {
   it('returns a spending level that succeeds while 5% more fails', () => {
     const s = maxSustainableSpending(base)
-    expect(s).toBeGreaterThan(base.retirementSpending)
-    expect(runProjection({ ...base, retirementSpending: s * 0.99 }).success).toBe(true)
-    expect(runProjection({ ...base, retirementSpending: s * 1.05 }).success).toBe(false)
+    expect(s.status).toBe('solved')
+    expect(s.value!).toBeGreaterThan(base.retirementSpending)
+    expect(runProjection({ ...base, retirementSpending: s.value! * 0.99 }).success).toBe(true)
+    expect(runProjection({ ...base, retirementSpending: s.value! * 1.05 }).success).toBe(false)
   })
 
   it('ends near zero: spending at the maximum leaves little estate', () => {
     const s = maxSustainableSpending(base)
-    const capped = runProjection({ ...base, retirementSpending: s * 0.999 })
+    const capped = runProjection({ ...base, retirementSpending: s.value! * 0.999 })
     const asPlanned = runProjection(base)
     expect(capped.finalNetWorth).toBeLessThan(asPlanned.finalNetWorth / 4)
   })
@@ -155,7 +157,7 @@ describe('maxSustainableSpending (die with zero)', () => {
   it('tax-efficient paced meltdown sustains at least as much spending as TFSA-first', () => {
     const paced = maxSustainableSpending({ ...base, strategy: 'meltdownPaced' })
     const tfsaFirst = maxSustainableSpending({ ...base, strategy: 'tfsaFirst' })
-    expect(paced).toBeGreaterThanOrEqual(tfsaFirst)
+    expect(paced.value!).toBeGreaterThanOrEqual(tfsaFirst.value!)
   })
 })
 
@@ -220,7 +222,7 @@ describe('targetReport', () => {
     })
     // A FIRE-year snapshot cannot infer how sale proceeds were invested
     // during the prior working years; this shortcut is explicitly unsupported.
-    expect(withEarlySale).toBeNaN()
+    expect(withEarlySale.status).toBe('unsupported')
   })
 
   it('taxes the investment-property gain on sale in target mode', () => {

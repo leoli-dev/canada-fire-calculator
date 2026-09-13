@@ -35,8 +35,14 @@ export function TimingCard(props: { inputs: Inputs }) {
   const dwz = (inputs.goal ?? 'legacy') === 'dieWithZero'
 
   const { cppRows, oasRows, best } = useMemo(() => {
-    const metric = (v: Inputs) =>
-      dwz ? maxSustainableSpending(v) : runProjection(v).estateValue
+    const metric = (v: Inputs) => {
+      if (dwz) {
+        const solved = maxSustainableSpending(v)
+        return solved.status === 'solved' ? solved.value! : -Infinity
+      }
+      const result = runProjection(v)
+      return result.success && Number.isFinite(result.estateValue) ? result.estateValue : -Infinity
+    }
 
     const buildRow = (v: Inputs, age: number, annual: number): TimingRow => {
       const r = runProjection(v)
@@ -74,7 +80,7 @@ export function TimingCard(props: { inputs: Inputs }) {
 
   const currentCpp = cppRows.find((r) => r.age === inputs.cppStartAge)!
   const currentOas = oasRows.find((r) => r.age === inputs.oasStartAge)!
-  const currentMetric = dwz ? maxSustainableSpending(inputs) : runProjection(inputs).estateValue
+  const currentMetric = dwz ? maxSustainableSpending(inputs).value ?? -Infinity : runProjection(inputs).estateValue
   const metricLabel = dwz ? t('maxSpendingCol') : t('estateValue')
 
   const renderTable = (
@@ -98,8 +104,9 @@ export function TimingCard(props: { inputs: Inputs }) {
       <tbody>
         {rows.map((r) => {
           const isCurrent = r.age === currentAge
-          const delta = r.metric - currentRow.metric
-          const isBestRow = r.metric === Math.max(...rows.map((x) => x.metric))
+          const delta = Number.isFinite(r.metric) && Number.isFinite(currentRow.metric)
+            ? r.metric - currentRow.metric : null
+          const isBestRow = Number.isFinite(r.metric) && r.metric === Math.max(...rows.map((x) => x.metric))
           return (
             <tr key={r.age} className={isCurrent ? 'current-row' : ''}>
               <td>
@@ -109,9 +116,9 @@ export function TimingCard(props: { inputs: Inputs }) {
               </td>
               <td className="num">{cad(r.annual)}</td>
               <td>{r.success ? t('stratOk') : t('stratDepleted', { age: r.depletedAge })}</td>
-              <td className="num">{cad(r.metric)}</td>
-              <td className={`num ${delta > 0 ? 'good' : delta < 0 ? 'poor' : ''}`}>
-                {isCurrent ? '—' : `${delta >= 0 ? '+' : '−'}${cad(Math.abs(delta))}`}
+              <td className="num">{Number.isFinite(r.metric) ? cad(r.metric) : '—'}</td>
+              <td className={`num ${delta !== null && delta > 0 ? 'good' : delta !== null && delta < 0 ? 'poor' : ''}`}>
+                {isCurrent || delta === null ? '—' : `${delta >= 0 ? '+' : '−'}${cad(Math.abs(delta))}`}
               </td>
               <td className="num">
                 {!isCurrent && (
@@ -152,18 +159,18 @@ export function TimingCard(props: { inputs: Inputs }) {
 
       <div className="card-head" style={{ marginTop: 14 }}>
         <p className="combo">
-          {bestIsCurrent ? (
+          {!Number.isFinite(best.metric) ? t('solver_infeasible') : bestIsCurrent ? (
             t('timingAlready')
           ) : (
             <>
               <Jargon text={t('timingBestCombo', { cpp: best.cpp, oas: best.oas })} />{' '}
-              {best.metric > currentMetric && (
+              {Number.isFinite(currentMetric) && best.metric > currentMetric && (
                 <strong className="good">+{cad(best.metric - currentMetric)}</strong>
               )}
             </>
           )}
         </p>
-        {!bestIsCurrent && (
+        {!bestIsCurrent && Number.isFinite(best.metric) && (
           <button
             type="button"
             className="use-strategy"

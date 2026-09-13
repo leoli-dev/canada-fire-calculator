@@ -17,9 +17,10 @@ export function StrategyCard(props: { inputs: Inputs }) {
   )
 
   const score = (r: (typeof rows)[number]) =>
-    dwz ? (r.maxSpending ?? 0) : r.result.estateValue
+    dwz ? r.maxSpending?.status === 'solved' ? r.maxSpending.value : null
+      : r.result.success && Number.isFinite(r.result.estateValue) ? r.result.estateValue : null
   const bestScore = Math.max(
-    ...rows.filter((r) => dwz || r.result.success).map(score),
+    ...rows.map(score).filter((value): value is number => value !== null),
     -Infinity,
   )
 
@@ -41,7 +42,7 @@ export function StrategyCard(props: { inputs: Inputs }) {
         </thead>
         <tbody>
           {rows.map((r) => {
-            const isBest = (dwz || r.result.success) && score(r) === bestScore
+            const isBest = score(r) !== null && score(r) === bestScore
             const isCurrent = r.strategy === props.inputs.strategy
             return (
               <tr key={r.strategy} className={isCurrent ? 'current-row' : ''}>
@@ -58,7 +59,9 @@ export function StrategyCard(props: { inputs: Inputs }) {
                 <td className="num">{cad(r.totalTax)}</td>
                 <td className="num">{cad(r.result.rrspTax)}</td>
                 <td className="num">
-                  {dwz ? cad(r.maxSpending ?? 0) : cad(r.result.estateValue)}
+                  {dwz ? r.maxSpending?.status === 'solved' && r.maxSpending.value !== null
+                    ? cad(r.maxSpending.value) : t(`solver_${r.maxSpending?.status ?? 'unsupported'}`)
+                    : Number.isFinite(r.result.estateValue) ? cad(r.result.estateValue) : '—'}
                 </td>
                 <td className="num">
                   {!isCurrent && (
