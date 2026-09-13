@@ -28,6 +28,8 @@ export {
   scanBenefitTiming,
   targetReport,
   type StrategyResult,
+  type SolverResult,
+  type SolverStatus,
   type TargetReport,
   type TimingResult,
 } from './solvers'

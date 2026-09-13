@@ -39,9 +39,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     [mode, inputs],
   )
   const earliestAssets = useMemo(() => {
-    if (mode !== 'when' || earliest === null) return null
-    const row = runProjection({ ...inputs, fireAge: earliest }).rows.find(
-      (x) => x.age === earliest,
+    if (mode !== 'when' || earliest?.status !== 'solved' || earliest.value === null) return null
+    const row = runProjection({ ...inputs, fireAge: earliest.value }).rows.find(
+      (x) => x.age === earliest.value,
     )
     return row ? row.balances.tfsa + row.balances.rrsp + row.balances.nonReg : null
   }, [mode, earliest, inputs])
@@ -64,20 +64,22 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
   const earlySale = (inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
     (inputs.investmentProperties ?? []).some((property) => (property.sellAtAge ?? Infinity) < inputs.fireAge)
   const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' ||
-    result.unfundedObligations.length > 0 || earlySale || fireNumber !== null && !Number.isFinite(fireNumber)
+    result.unfundedObligations.length > 0 || earlySale || fireNumber !== null && fireNumber.status !== 'solved'
   const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
     ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
-      ? t('fundingQuickUnsupported') : t('saleQuickUnsupported')
+      ? t('fundingQuickUnsupported') : earlySale ? t('saleQuickUnsupported')
+        : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
 
   const ok =
     mode === 'last'
       ? result.success
       : mode === 'when'
-        ? earliest !== null
+        ? earliest?.status === 'solved'
       : mode === 'target'
           ? goal !== null && goal.status === 'supported' && goal.reachedAge !== null && goal.reachedAge <= inputs.fireAge
           : mode === 'number'
-            ? !quickEstimateUnsupported && projectedAtFire !== null && fireNumber !== null && projectedAtFire >= fireNumber
+            ? !quickEstimateUnsupported && Number.isFinite(projectedAtFire) && fireNumber?.value !== null &&
+              fireNumber?.value !== undefined && projectedAtFire! >= fireNumber.value
             : true
 
   return (
@@ -133,30 +135,37 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             probate: cad(result.probateFee),
           })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
           <p className="hint">{t('terminalEstimateNote')}</p>
-          {dwzSpending !== null && Number.isFinite(dwzSpending) && (
+          {dwzSpending?.status === 'solved' && dwzSpending.value !== null && (
             <>
               <p>
-                {t('dwzSpending')}: <strong>{cad(dwzSpending)}</strong>
+                {t('dwzSpending')}: <strong>{cad(dwzSpending.value)}</strong>
                 <span className="hint"> ({t('currentSpending')}: {cad(inputs.retirementSpending)})</span>
               </p>
               <p className="hint"><Jargon text={t('dwzNote')} /></p>
               <p className="dwz-warning"><Jargon text={t('dwzRiskWarning')} /></p>
             </>
           )}
+          {dwzSpending && dwzSpending.status !== 'solved' &&
+            <p className="hint">{t(`solver_${dwzSpending.status}`)}</p>}
+          {dwzSpending?.status === 'searchLimit' && dwzSpending.lastVerifiedBound !== null &&
+            <p className="hint">{t('solverCheckedSpending', { amount: cad(dwzSpending.lastVerifiedBound), iterations: dwzSpending.iterations })}</p>}
         </>
       )}
 
       {mode === 'when' && (
         <>
           <p className="verdict">
-            {earliest !== null
-              ? t('whenAnswer', { age: earliest })
-              : t('whenNever')}
+            {earliest?.status === 'solved'
+              ? t('whenAnswer', { age: earliest.value })
+              : earliest?.status === 'infeasible' ? t('whenNever', { age: earliest.lastVerifiedBound ?? inputs.currentAge })
+                : t(`solver_${earliest?.status ?? 'unsupported'}`)}
           </p>
-          {earliest !== null && earliestAssets !== null && (
+          {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&
+            <p className="hint">{t('solverCheckedAge', { age: earliest.lastVerifiedBound, iterations: earliest.iterations })}</p>}
+          {earliest?.status === 'solved' && earliestAssets !== null && (
             <p>
               <Jargon
-                text={t('whenAssets', { age: earliest, amount: cad(earliestAssets) })}
+                text={t('whenAssets', { age: earliest.value, amount: cad(earliestAssets) })}
               />
             </p>
           )}
@@ -168,23 +177,28 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
               })}
             />
           </p>
+          <p className="hint">{t('solverWhenAssumptions')}</p>
         </>
       )}
 
       {mode === 'number' && (
         <>
-          {quickEstimateUnsupported ? <p className="verdict">{quickEstimateMessage}</p> : <>
+          {quickEstimateUnsupported ? <>
+            <p className="verdict">{quickEstimateMessage}</p>
+            {fireNumber?.status === 'searchLimit' && fireNumber.lastVerifiedBound !== null &&
+              <p className="hint">{t('solverCheckedAssets', { amount: cad(fireNumber.lastVerifiedBound), iterations: fireNumber.iterations })}</p>}
+          </> : <>
           <p className="verdict">
-            {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber ?? 0) })}
+            {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber!.value!) })}
           </p>
-          {projectedAtFire !== null && fireNumber !== null && (
+          {Number.isFinite(projectedAtFire) && fireNumber?.value !== null && fireNumber?.value !== undefined && (
             <p>
               <Jargon
                 text={
-                  t('numberHave', { age: inputs.fireAge, amount: cad(projectedAtFire) }) +
-                  (projectedAtFire >= fireNumber
-                    ? t('numberSurplus', { amount: cad(projectedAtFire - fireNumber) })
-                    : t('numberGap', { amount: cad(fireNumber - projectedAtFire) }))
+                  t('numberHave', { age: inputs.fireAge, amount: cad(projectedAtFire!) }) +
+                  (projectedAtFire! >= fireNumber.value
+                    ? t('numberSurplus', { amount: cad(projectedAtFire! - fireNumber.value) })
+                    : t('numberGap', { amount: cad(fireNumber.value - projectedAtFire!) }))
                 }
               />
             </p>
@@ -193,6 +207,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             <Jargon text={t('numberExplain', { age: inputs.fireAge, life: inputs.lifeExpectancy })} />
           </p>
           </>}
+          <p className="hint">{t('solverNumberAssumptions')}</p>
         </>
       )}
 

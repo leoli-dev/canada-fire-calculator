@@ -236,8 +236,8 @@ describe('BE-30 independently derived funding identities', () => {
       expect.objectContaining({ eventId: 'contributions:50', amount: 3_000 }),
     ]))
     expect(targetReport(input, 100_000).status).toBe('unsupported')
-    expect(Number.isNaN(requiredFireAssets(input))).toBe(true)
-    expect(Number.isNaN(maxSustainableSpending(input))).toBe(true)
+    expect(requiredFireAssets(input).status).toBe('unsupported')
+    expect(maxSustainableSpending(input).status).toBe('unsupported')
   })
 
   it.each([
@@ -380,10 +380,10 @@ describe('BE-30 independently derived funding identities', () => {
     expect(issue.severity).toBe('error')
     expect(issue.amount).toBe(400_000)
     expect(targetReport(input, 100_000).status).toBe('unsupported')
-    expect(Number.isNaN(requiredFireAssets(input))).toBe(true)
-    expect(Number.isNaN(maxSustainableSpending(input))).toBe(true)
+    expect(requiredFireAssets(input).status).toBe('unsupported')
+    expect(maxSustainableSpending(input).status).toBe('unsupported')
     expect(compareStrategies(input).every((candidate) => !candidate.result.success)).toBe(true)
-    expect(findEarliestFireAge(fixture('P03'))).toBeNull()
+    expect(findEarliestFireAge(fixture('P03')).status).toBe('unsupported')
   })
 
   it('does not book an accumulation-year mortgage payment that the savings budget cannot fund', () => {
