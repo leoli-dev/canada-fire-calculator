@@ -12,6 +12,12 @@ export interface PlanFieldSnapshot {
   answerMeta: Record<string, AnswerMeta>
   inputRevision: number
   resultRevision: number | null
+  questionAnswers?: Record<string, string | boolean | string[]>
+}
+
+function revealAccount(answers: Record<string, string | boolean | string[]>, account: 'tfsa' | 'rrsp' | 'nonReg') {
+  const selected = (answers['assets.identify'] as string[] | undefined) ?? []
+  return { ...answers, 'assets.identify': [...new Set([...selected, account])] }
 }
 
 export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: string, displayUnit: 'canonical' | 'monthly' = 'canonical', origin: AnswerMeta['origin'] = 'user'):
@@ -31,6 +37,9 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
   return {
     inputs: canonical.legacyProjection, canonical, draftByField,
     answerMeta: { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
+    ...(id.startsWith('balances.') && parsed.value > 0 && state.questionAnswers
+      ? { questionAnswers: revealAccount(state.questionAnswers, id.slice('balances.'.length) as 'tfsa' | 'rrsp' | 'nonReg') }
+      : {}),
     inputRevision: state.inputRevision + 1, resultRevision: null,
   }
 }
@@ -48,9 +57,10 @@ export function applyEstimate(state: PlanFieldSnapshot, id: SharedFieldId, value
 /** Reconcile legacy callers that explicitly write a registered value through
  * store.set. A whole balances object is commonly spread by callers, so only
  * changed account values count; account presence has its own command below. */
-export function reconcileDirectFields(state: PlanFieldSnapshot, patch: Partial<Inputs>, nextInputs: Inputs): Pick<PlanFieldSnapshot, 'draftByField' | 'answerMeta'> {
+export function reconcileDirectFields(state: PlanFieldSnapshot, patch: Partial<Inputs>, nextInputs: Inputs): Pick<PlanFieldSnapshot, 'draftByField' | 'answerMeta'> & Partial<Pick<PlanFieldSnapshot, 'questionAnswers'>> {
   const draftByField = { ...state.draftByField }
   const answerMeta = { ...state.answerMeta }
+  let questionAnswers = state.questionAnswers
   const updatedAt = new Date().toISOString()
   for (const id of Object.keys(fieldRegistry) as SharedFieldId[]) {
     const oldValue = fieldRegistry[id].read(state.inputs)
@@ -61,14 +71,15 @@ export function reconcileDirectFields(state: PlanFieldSnapshot, patch: Partial<I
     const homePatched = id === 'principalResidence.annualMortgagePayment' && patch.principalResidence !== undefined
     const homeBecameInapplicable = homePatched && state.inputs.principalResidence?.mode === 'planned' && nextInputs.principalResidence?.mode !== 'planned'
     const homeBecameApplicable = homePatched && state.inputs.principalResidence?.mode !== 'planned' && nextInputs.principalResidence?.mode === 'planned'
-    if (!explicitScalar && !changedBalance && !(homePatched && oldValue !== newValue) && !homeBecameInapplicable) continue
+    if (!explicitScalar && !changedBalance && !(homePatched && oldValue !== newValue) && !homeBecameInapplicable && !homeBecameApplicable) continue
     delete draftByField[id]
+    if (changedBalance && newValue > 0 && questionAnswers) questionAnswers = revealAccount(questionAnswers, id.slice('balances.'.length) as 'tfsa' | 'rrsp' | 'nonReg')
     answerMeta[id] = {
       status: homeBecameInapplicable ? 'notApplicable' : homeBecameApplicable ? 'estimated' : 'confirmed',
       origin: homeBecameApplicable ? 'default' : 'user', updatedAt,
     }
   }
-  return { draftByField, answerMeta }
+  return { draftByField, answerMeta, questionAnswers }
 }
 
 export function changeAccountPresence(

@@ -79,4 +79,23 @@ describe('shared field commands', () => {
     const reconciled = reconcileDirectFields(state, { principalResidence }, next)
     expect(reconciled.answerMeta['principalResidence.annualMortgagePayment']).toMatchObject({ status: 'estimated', origin: 'default' })
   })
+
+  it('restores a zero planned-home payment from not-applicable after rent', () => {
+    const state = initial()
+    state.answerMeta['principalResidence.annualMortgagePayment'] = { status: 'notApplicable', origin: 'user', updatedAt: '2026-01-01' }
+    const principalResidence = { mode: 'planned' as const, buyAtAge: 40, price: 100000, downPayment: 100000, appreciation: 0.02, annualMortgagePayment: 0, mortgageYears: 25, netHoldingCostChange: 0, sellAtAge: null }
+    const reconciled = reconcileDirectFields(state, { principalResidence }, { ...state.inputs, principalResidence })
+    expect(reconciled.answerMeta['principalResidence.annualMortgagePayment']).toMatchObject({ status: 'estimated', origin: 'default' })
+  })
+
+  it.each(['tfsa', 'rrsp', 'nonReg'] as const)('reveals %s on positive edits and direct patches', (account) => {
+    const state = { ...initial(), questionAnswers: { 'assets.identify': [] } }
+    state.inputs.balances[account] = 0
+    const edit = editField(state, `balances.${account}`, '100000')
+    expect(edit.questionAnswers?.['assets.identify']).toContain(account)
+    const balances = { ...state.inputs.balances, [account]: 100000 }
+    const direct = reconcileDirectFields(state, { balances }, { ...state.inputs, balances })
+    expect(direct.questionAnswers?.['assets.identify']).toContain(account)
+    expect(state.questionAnswers['assets.identify']).toEqual([])
+  })
 })

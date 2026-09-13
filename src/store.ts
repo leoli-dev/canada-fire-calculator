@@ -307,6 +307,7 @@ export const useStore = create<Store>()(
           return {
             ...reconciled,
             draftByField: shared.draftByField,
+            questionAnswers: shared.questionAnswers ?? s.questionAnswers,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
               ? { ...shared.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
               : shared.answerMeta,
