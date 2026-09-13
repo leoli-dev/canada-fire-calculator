@@ -30,6 +30,7 @@ export {
   targetReport,
   type StrategyResult,
   type RankedCandidate,
+  type CandidateRankingStatus,
   type SolverResult,
   type SolverStatus,
   type TargetReport,

@@ -38,10 +38,64 @@ for (const mode of ['guided', 'professional'] as const) {
     const strategy = page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })
     await timing.locator('summary').click()
     await strategy.locator('summary').click()
-    await expect(timing.locator('.combo')).toContainText('No feasible candidate')
+    await expect(timing.locator('.combo')).toContainText('No valid, funded candidate')
     await expect(timing.locator('.combo')).toContainText('shortfall')
     await expect(timing.locator('.use-strategy')).toHaveCount(0)
-    await expect(strategy).toContainText('No feasible candidate')
+    await expect(strategy).toContainText('No valid, funded candidate')
     await expect(strategy.locator('.use-strategy')).toHaveCount(0)
   })
 }
+
+async function openFundedUnranked(page: import('@playwright/test').Page,
+  mode: 'guided' | 'professional', kind: 'searchLimit' | 'unsupported') {
+  await page.goto('/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.evaluate(({ mode, kind }) => {
+    const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+    saved.state.inputs.goal = 'dieWithZero'
+    saved.state.inputs.balances.tfsa = kind === 'searchLimit' ? 10_000_000_000 : 5_000_000
+    if (kind === 'unsupported') saved.state.inputs.principalResidence = {
+      mode: 'planned', buyAtAge: 45, price: 500_000, downPayment: 500_000,
+      appreciation: 0, netHoldingCostChange: 0, sellAtAge: null,
+    }
+    saved.state.entryMode = mode
+    saved.state.guidedView = 'results'
+    saved.state.resultRevision = saved.state.inputRevision
+    localStorage.setItem('fire-inputs', JSON.stringify(saved))
+  }, { mode, kind })
+  await page.reload()
+}
+
+for (const mode of ['guided', 'professional'] as const) {
+  for (const kind of ['searchLimit', 'unsupported'] as const) {
+    test(`${mode} funded ${kind} objective stays unranked without a failure claim`, async ({ page }) => {
+      await openFundedUnranked(page, mode, kind)
+      const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
+      const strategy = page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })
+      await timing.locator('summary').click()
+      await strategy.locator('summary').click()
+      await expect(timing.locator('.combo')).toContainText('funds the planned spending')
+      await expect(strategy).toContainText('funds the planned spending')
+      await expect(timing.locator('.combo')).not.toContainText('shortfall')
+      await expect(timing.locator('.combo')).not.toContainText('failed plan')
+      await expect(timing.locator('.use-strategy')).toHaveCount(0)
+      await expect(strategy.locator('.use-strategy')).toHaveCount(0)
+      await expect(timing.locator('.tag.best')).toHaveCount(0)
+      await expect(strategy.locator('.tag.best')).toHaveCount(0)
+      await expect(page.locator('.withdrawal-order-card')).not.toContainText('failed scenario')
+    })
+  }
+}
+
+test('unranked funded explanation is localized in French and Chinese', async ({ page }) => {
+  await openFundedUnranked(page, 'professional', 'searchLimit')
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  const frenchTiming = page.locator('details').filter({ hasText: 'Suggestion de calendrier RPC/SV' })
+  await frenchTiming.locator('summary').click()
+  await expect(frenchTiming.locator('.combo')).toContainText('Au moins une option finance les dépenses prévues')
+  await page.getByRole('button', { name: '中文' }).click()
+  const chineseTiming = page.locator('details').filter({ hasText: 'CPP/OAS 开领时机建议' })
+  await expect(chineseTiming.locator('.combo')).toContainText('至少有一个候选能支付计划支出')
+})

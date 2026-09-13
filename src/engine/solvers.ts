@@ -308,6 +308,7 @@ export interface StrategyResult {
 }
 
 export type CandidateStatus = 'feasible' | 'infeasible' | 'invalid' | 'unsupported' | 'searchLimit'
+export type CandidateRankingStatus = 'ranked' | 'noFeasibleCandidate' | 'unrankedObjective'
 export interface RankedCandidate<T> {
   value: T
   inputs: Inputs
@@ -324,7 +325,7 @@ export interface RankedCandidate<T> {
 export function rankCandidates<T>(
   candidates: { value: T; inputs: Inputs; result?: ProjectionResult; solver?: SolverResult<number> }[],
   objective: 'estate' | 'maxSpending',
-): { status: 'ranked' | 'noFeasibleCandidate'; best: RankedCandidate<T> | null; candidates: RankedCandidate<T>[] } {
+): { status: CandidateRankingStatus; best: RankedCandidate<T> | null; candidates: RankedCandidate<T>[] } {
   const assessed = candidates.map((candidate): RankedCandidate<T> => {
     const { value, inputs, solver } = candidate
     const base = { value, inputs, result: null as ProjectionResult | null, solver, metric: null as number | null,
@@ -352,7 +353,8 @@ export function rankCandidates<T>(
   // Stable tie: preserve the caller's candidate order.
   const best = assessed.reduce<RankedCandidate<T> | null>((winner, row) =>
     row.status === 'feasible' && (!winner || row.metric! > winner.metric!) ? row : winner, null)
-  return { status: best ? 'ranked' : 'noFeasibleCandidate', best, candidates: assessed }
+  const funded = assessed.some((row) => row.result?.success && row.result.unfundedObligations.length === 0)
+  return { status: best ? 'ranked' : funded ? 'unrankedObjective' : 'noFeasibleCandidate', best, candidates: assessed }
 }
 
 /**
@@ -585,7 +587,7 @@ export interface TimingResult {
 
 /** Scan the primary person's CPP and OAS start ages for the best outcome. */
 export function scanBenefitTiming(inputs: Inputs): {
-  status: 'ranked' | 'noFeasibleCandidate'
+  status: CandidateRankingStatus
   best: TimingResult | null
   current: TimingResult
   candidates: RankedCandidate<{ cppStartAge: number; oasStartAge: number }>[]

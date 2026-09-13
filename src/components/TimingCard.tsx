@@ -55,6 +55,7 @@ export function TimingCard({ inputs }: { inputs: Inputs }) {
   }
   const bestIsCurrent = best?.value.cppStartAge === inputs.cppStartAge && best?.value.oasStartAge === inputs.oasStartAge
   const gaps = ranking.candidates.filter((row) => row.gap !== null).sort((a, b) => a.gap! - b.gap!)
+  const unranked = ranking.candidates.find((row) => row.result?.success && row.result.unfundedObligations.length === 0)
   return <details className="chart-card collapsible"
     onToggle={(event) => event.currentTarget.open && track('panel_open', { panel: 'timing_comparison' })}>
     <summary><h3>{t('timingTitle')}</h3></summary>
@@ -67,6 +68,8 @@ export function TimingCard({ inputs }: { inputs: Inputs }) {
       <p className="combo">{ranking.status === 'noFeasibleCandidate'
         ? <>{t('noFeasibleCandidate')} {ranking.candidates[0] && failure(ranking.candidates[0])}{' '}
           {gaps.length > 0 && t('smallestCandidateGap', { amount: cad(gaps[0].gap!), cpp: gaps[0].value.cppStartAge, oas: gaps[0].value.oasStartAge })}</>
+        : ranking.status === 'unrankedObjective'
+          ? <>{t('unrankedObjective')} {unranked && failure(unranked)}</>
         : bestIsCurrent ? t('timingAlready') : <>
           <Jargon text={t('timingBestCombo', { cpp: best?.value.cppStartAge, oas: best?.value.oasStartAge })} />{' '}
           {best?.metric !== null && current?.metric !== null && current?.metric !== undefined && best!.metric! > current.metric &&

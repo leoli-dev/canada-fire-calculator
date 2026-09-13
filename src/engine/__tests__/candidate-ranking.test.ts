@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compareStrategies, rankCandidates, scanBenefitTiming } from '../solvers'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
+import { DEFAULT_INPUTS } from '../../store'
 import pending from './fixtures/pending-audit.json'
 
 const p17 = pending.cases.find((item) => item.id === 'P17')!
@@ -75,5 +76,31 @@ describe('shared candidate ranking', () => {
     expect(ranking.best?.result?.success).toBe(true)
     expect(ranking.best?.result?.rows).toEqual(runProjection({ ...inputs,
       strategy: ranking.best!.value }).rows)
+  })
+
+  it('keeps a funded plan distinct when every spending search reaches its limit', () => {
+    const rich: Inputs = { ...DEFAULT_INPUTS, goal: 'dieWithZero',
+      balances: { ...DEFAULT_INPUTS.balances, tfsa: 10_000_000_000 } }
+    const projection = runProjection(rich)
+    expect(projection.success).toBe(true)
+    expect(projection.unfundedObligations).toHaveLength(0)
+    const ranking = scanBenefitTiming(rich)
+    expect(ranking.candidates).toHaveLength(66)
+    expect(ranking.candidates.every((row) => row.result?.success && row.result.unfundedObligations.length === 0)).toBe(true)
+    expect(ranking.candidates.every((row) => row.solver?.status === 'searchLimit')).toBe(true)
+    expect(ranking.status).toBe('unrankedObjective')
+    expect(ranking.best).toBeNull()
+  })
+
+  it('keeps funded planned purchases distinct when only the quick spending solver is unsupported', () => {
+    const funded: Inputs = { ...DEFAULT_INPUTS, goal: 'dieWithZero',
+      balances: { ...DEFAULT_INPUTS.balances, tfsa: 5_000_000 },
+      principalResidence: { mode: 'planned', buyAtAge: 45, price: 500_000, downPayment: 500_000,
+        appreciation: 0, netHoldingCostChange: 0, sellAtAge: null } }
+    expect(runProjection(funded).success).toBe(true)
+    const ranking = scanBenefitTiming(funded)
+    expect(ranking.status).toBe('unrankedObjective')
+    expect(ranking.best).toBeNull()
+    expect(ranking.candidates.some((row) => row.result?.success && row.solver?.status === 'unsupported')).toBe(true)
   })
 })

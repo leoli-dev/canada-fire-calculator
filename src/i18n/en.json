@@ -669,7 +669,8 @@
       "intent_legacy": { "question": "After supporting your retirement, do you want to reserve something for other people or causes?" }, "intent_spending": { "question": "If the plan has room, do you want to explore spending more or keep your current budget?" }, "invest_mix": { "question": "Which broad investment mix best describes the plan?" }, "invest_fees": { "question": "What investment fee and inflation assumptions should we use?" }, "invest_tax": { "question": "How much taxable income do non-registered investments pay each year, and what tax rate should we estimate?" }, "invest_strategy": { "question": "In what order should retirement accounts fund spending?" }
     }
   },
-  "noFeasibleCandidate": "No feasible candidate. Compare the shortfalls below; there is no best plan to apply.",
+  "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",
+  "unrankedObjective": "At least one candidate funds the planned spending, but this objective cannot be ranked with the available quick-solver result. No recommendation can be applied.",
   "smallestCandidateGap": "Smallest annual shortfall: {{amount}} at CPP {{cpp}} / OAS {{oas}}. This is still a failed plan.",
   "manualFailureExploration": "This manually selected order is a failed scenario for exploration, not a recommendation.",
   "manualFailureGap": "Largest annual shortfall: {{amount}}.",
