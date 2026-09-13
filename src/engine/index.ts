@@ -22,12 +22,14 @@ export { buildDebtStream, impliedRate, rollDebtsForward } from './debts'
 export { pensionPaid, pensionStartAge, runProjection, type ReturnSampler } from './projection'
 export {
   compareStrategies,
+  rankCandidates,
   findEarliestFireAge,
   maxSustainableSpending,
   requiredFireAssets,
   scanBenefitTiming,
   targetReport,
   type StrategyResult,
+  type RankedCandidate,
   type SolverResult,
   type SolverStatus,
   type TargetReport,

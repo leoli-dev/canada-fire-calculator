@@ -664,5 +664,10 @@
       "cpp_self": { "question": "Quel montant RPC/RRQ prévoyez-vous et quand le demanderez-vous?" }, "oas_self": { "question": "Quel montant de SV prévoyez-vous et quand le demanderez-vous?" }, "cpp_partner": { "question": "Quel montant RPC/RRQ votre partenaire prévoit-il?" }, "oas_partner": { "question": "Quel montant de SV votre partenaire prévoit-il?" }, "pension_partner": { "question": "Quel type de pension d’employeur votre partenaire a-t-il?" }, "pension_partner_details": { "question": "Quel revenu viager votre partenaire recevra-t-il et quand?" }, "pension_partner_indexing": { "question": "La pension de votre partenaire suivra-t-elle les prix et comporte-t-elle un raccordement?" },
       "intent_legacy": { "question": "Après votre retraite, souhaitez-vous réserver quelque chose à d’autres personnes ou causes?" }, "intent_spending": { "question": "Souhaitez-vous explorer plus de dépenses ou maintenir le budget?" }, "invest_mix": { "question": "Quelle répartition générale des placements décrit le mieux le plan?" }, "invest_fees": { "question": "Quelles hypothèses de frais et d’inflation faut-il utiliser?" }, "invest_tax": { "question": "Quel revenu imposable vos placements non enregistrés versent-ils chaque année, et à quel taux l’estimer?" }, "invest_strategy": { "question": "Dans quel ordre les comptes devraient-ils financer les dépenses?" }
     }
-  }
+  },
+  "noFeasibleCandidate": "Aucune option réalisable. Comparez les manques ci-dessous; aucun meilleur plan ne peut être appliqué.",
+  "smallestCandidateGap": "Plus petit manque annuel : {{amount}} avec RPC/RRQ à {{cpp}} ans et SV à {{oas}} ans. Ce plan échoue tout de même.",
+  "manualFailureExploration": "Cet ordre choisi manuellement est un scénario d’échec à explorer, et non une recommandation.",
+  "manualFailureGap": "Plus grand manque annuel : {{amount}}.",
+  "candidateGap": "Plus grand manque annuel : {{amount}}."
 }

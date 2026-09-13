@@ -1,154 +1,79 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cppAnnual, maxSustainableSpending, oasAnnual, runProjection, type Inputs, type SolverResult } from '../engine'
+import { cppAnnual, oasAnnual, scanBenefitTiming, type Inputs, type RankedCandidate } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
-const CPP_AGES = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70]
-const OAS_AGES = [65, 66, 67, 68, 69, 70]
+type AgeCandidate = RankedCandidate<{ cppStartAge: number; oasStartAge: number }>
 
-interface TimingRow {
-  age: number
-  annual: number
-  success: boolean
-  depletedAge: number | null
-  metric: number | null
-  solver: SolverResult<number> | null
-}
-
-function withAge(ages: number[], current: number): number[] {
-  return ages.includes(current) ? ages : [...ages, current].sort((a, b) => a - b)
-}
-
-const failurePriority = { invalid: 0, unsupported: 1, searchLimit: 2, infeasible: 3, solved: 4 }
-
-export function TimingCard(props: { inputs: Inputs }) {
+export function TimingCard({ inputs }: { inputs: Inputs }) {
   const { t } = useTranslation()
   const cad = useCad()
   const set = useStore((s) => s.set)
-  const { inputs } = props
+  const ranking = useMemo(() => scanBenefitTiming(inputs), [inputs])
   const dwz = (inputs.goal ?? 'legacy') === 'dieWithZero'
-
-  const describeSolver = (solver: SolverResult<number>) => {
-    if (solver.status === 'solved') return ''
-    const reason = solver.reason === 'plannedPurchase' ? t('solverReason_plannedPurchase')
-      : solver.reason === 'unfundedTransaction' ? t('solverReason_unfundedTransaction')
-        : solver.reason === 'zeroSpendingFails' ? t('solverReason_zeroSpendingFails')
-          : solver.reason === 'noFailingUpperBound' ? t('solverReason_noFailingUpperBound')
-            : solver.reason === 'projectionError' ? t('solverReason_projectionError')
-              : solver.reason === 'nonFiniteResult' ? t('solverReason_projectionError')
-              : solver.reason ? t('solverReason_invalidField', { field: solver.reason }) : ''
-    const bound = solver.status === 'searchLimit' && solver.lastVerifiedBound !== null
-      ? ` ${t('solverCheckedSpending', { amount: cad(solver.lastVerifiedBound), iterations: solver.iterations })}` : ''
-    return `${t(`solver_${solver.status}`)} ${reason}${bound}`.trim()
-  }
-
-  const { cppRows, oasRows, best } = useMemo(() => {
-    const evaluate = (v: Inputs): { metric: number | null; solver: SolverResult<number> | null } => {
-      if (dwz) {
-        const solver = maxSustainableSpending(v)
-        return { metric: solver.status === 'solved' ? solver.value : null, solver }
-      }
-      const result = runProjection(v)
-      return { metric: result.success && Number.isFinite(result.estateValue) ? result.estateValue : null, solver: null }
-    }
-    const buildRow = (v: Inputs, age: number, annual: number): TimingRow => {
-      const assessed = evaluate(v)
-      if (assessed.solver?.status === 'invalid')
-        return { age, annual, success: false, depletedAge: null, ...assessed }
-      try {
-        const result = runProjection(v)
-        return { age, annual, success: result.success, depletedAge: result.depletedAge, ...assessed }
-      } catch {
-        return { age, annual, success: false, depletedAge: null, ...assessed }
-      }
-    }
-    const cppRows = withAge(CPP_AGES, inputs.cppStartAge).map((age) =>
-      buildRow({ ...inputs, cppStartAge: age }, age, cppAnnual(inputs.cppAnnualAt65, age)))
-    const oasRows = withAge(OAS_AGES, inputs.oasStartAge).map((age) =>
-      buildRow({ ...inputs, oasStartAge: age }, age, oasAnnual(inputs.oasAnnualAt65, age)))
-
-    let best = { cpp: inputs.cppStartAge, oas: inputs.oasStartAge,
-      metric: null as number | null, solver: null as SolverResult<number> | null }
-    if (dwz) {
-      const feasibleCpp = cppRows.filter((row) => row.metric !== null)
-      const feasibleOas = oasRows.filter((row) => row.metric !== null)
-      if (feasibleCpp.length && feasibleOas.length) {
-        const cpp = feasibleCpp.reduce((a, b) => (b.metric! > a.metric! ? b : a)).age
-        const oas = feasibleOas.reduce((a, b) => (b.metric! > a.metric! ? b : a)).age
-        best = { cpp, oas, ...evaluate({ ...inputs, cppStartAge: cpp, oasStartAge: oas }) }
-      } else {
-        const failed = [...cppRows, ...oasRows].map((row) => row.solver)
-          .filter((solver): solver is SolverResult<number> => solver !== null && solver.status !== 'solved')
-        best.solver = failed.sort((a, b) => failurePriority[a.status] - failurePriority[b.status])[0] ?? null
-      }
-    } else {
-      for (const cpp of withAge(CPP_AGES, inputs.cppStartAge)) {
-        for (const oas of withAge(OAS_AGES, inputs.oasStartAge)) {
-          const candidate = evaluate({ ...inputs, cppStartAge: cpp, oasStartAge: oas })
-          if (candidate.metric !== null && (best.metric === null || candidate.metric > best.metric))
-            best = { cpp, oas, ...candidate }
-        }
-      }
-    }
-    return { cppRows, oasRows, best }
-  }, [inputs, dwz])
-
-  const currentCpp = cppRows.find((row) => row.age === inputs.cppStartAge)!
-  const currentOas = oasRows.find((row) => row.age === inputs.oasStartAge)!
-  const currentMetric = dwz ? currentCpp.metric : runProjection(inputs).estateValue
-  const metricLabel = dwz ? t('maxSpendingCol') : t('estateValue')
-
-  const renderTable = (rows: TimingRow[], currentAge: number, currentRow: TimingRow, apply: (age: number) => void) => {
-    const bestScore = Math.max(...rows.map((row) => row.metric ?? -Infinity))
+  const current = ranking.candidates.find((row) => row.value.cppStartAge === inputs.cppStartAge && row.value.oasStartAge === inputs.oasStartAge)
+  const best = ranking.candidates.find((row) => row.value.cppStartAge === ranking.best?.cppStartAge && row.value.oasStartAge === ranking.best?.oasStartAge)
+  const cppRows = ranking.candidates.filter((row) => row.value.oasStartAge === inputs.oasStartAge)
+    .sort((a, b) => a.value.cppStartAge - b.value.cppStartAge)
+  const oasRows = ranking.candidates.filter((row) => row.value.cppStartAge === inputs.cppStartAge)
+    .sort((a, b) => a.value.oasStartAge - b.value.oasStartAge)
+  const failure = (row: AgeCandidate) => row.status === 'unsupported' && row.reason
+    ? t(`solverReason_${row.reason}`, { defaultValue: t('solver_unsupported') })
+    : row.status === 'searchLimit' || row.status === 'invalid' || row.status === 'unsupported'
+      ? t(`solver_${row.status}`)
+      : t('stratDepleted', { age: row.result?.depletedAge })
+  const renderTable = (rows: AgeCandidate[], which: 'cpp' | 'oas') => {
+    const currentAge = which === 'cpp' ? inputs.cppStartAge : inputs.oasStartAge
+    const bestScore = Math.max(-Infinity, ...rows.filter((row) => row.status === 'feasible').map((row) => row.metric!))
     return <div className="table-scroll"><table className="compare-table">
       <thead><tr><th>{t('colStartAge')}</th><th>{t('colAnnual')}</th><th>{t('stratOutcome')}</th>
-        <th>{metricLabel}</th><th>{t('colDelta')}</th><th></th></tr></thead>
+        <th>{dwz ? t('maxSpendingCol') : t('estateValue')}</th><th>{t('colDelta')}</th><th></th></tr></thead>
       <tbody>{rows.map((row) => {
-        const isCurrent = row.age === currentAge
-        const delta = row.metric !== null && currentRow.metric !== null ? row.metric - currentRow.metric : null
-        const isBestRow = row.metric !== null && row.metric === bestScore
-        return <tr key={row.age} className={isCurrent ? 'current-row' : ''}>
-          <td>{row.age}{isCurrent && <span className="tag">{t('current')}</span>}
-            {isBestRow && <span className="tag best">{t('best')}</span>}</td>
-          <td className="num">{Number.isFinite(row.annual) ? cad(row.annual) : '—'}</td>
-          <td>{row.solver && row.solver.status !== 'solved'
-            ? describeSolver(row.solver) : row.success ? t('stratOk') : t('stratDepleted', { age: row.depletedAge })}</td>
+        const age = which === 'cpp' ? row.value.cppStartAge : row.value.oasStartAge
+        const annual = which === 'cpp' ? cppAnnual(inputs.cppAnnualAt65, age, inputs.province === 'QC' ? 72 : 70) : oasAnnual(inputs.oasAnnualAt65, age)
+        const isCurrent = age === currentAge
+        const delta = row.metric !== null && current?.metric !== null && current?.metric !== undefined ? row.metric - current.metric : null
+        return <tr key={age} className={isCurrent ? 'current-row' : ''}>
+          <td>{age}{isCurrent && <span className="tag">{t('current')}</span>}
+            {row.status === 'feasible' && row.metric === bestScore && <span className="tag best">{t('best')}</span>}</td>
+          <td className="num">{Number.isFinite(annual) ? cad(annual) : '—'}</td>
+          <td>{row.status === 'feasible' ? t('stratOk') : <>{failure(row)}{' '}
+            {row.gap !== null && t('candidateGap', { amount: cad(row.gap) })}</>}</td>
           <td className="num">{row.metric !== null ? cad(row.metric) : '—'}</td>
           <td className={`num ${delta !== null && delta > 0 ? 'good' : delta !== null && delta < 0 ? 'poor' : ''}`}>
             {isCurrent || delta === null ? '—' : `${delta >= 0 ? '+' : '−'}${cad(Math.abs(delta))}`}</td>
-          <td className="num">{!isCurrent && (!dwz || row.solver?.status === 'solved') &&
-            <button type="button" className="use-strategy" onClick={() => apply(row.age)}>{t('useStrategy')}</button>}</td>
+          <td className="num">{!isCurrent && row.status === 'feasible' &&
+            <button type="button" className="use-strategy" onClick={() => {
+              set({ [which === 'cpp' ? 'cppStartAge' : 'oasStartAge']: age }); track('timing_apply', { which })
+            }}>{t('useStrategy')}</button>}</td>
         </tr>
       })}</tbody>
     </table></div>
   }
-
-  const bestIsCurrent = best.cpp === inputs.cppStartAge && best.oas === inputs.oasStartAge
+  const bestIsCurrent = best?.value.cppStartAge === inputs.cppStartAge && best?.value.oasStartAge === inputs.oasStartAge
+  const gaps = ranking.candidates.filter((row) => row.gap !== null).sort((a, b) => a.gap! - b.gap!)
   return <details className="chart-card collapsible"
     onToggle={(event) => event.currentTarget.open && track('panel_open', { panel: 'timing_comparison' })}>
     <summary><h3>{t('timingTitle')}</h3></summary>
     <p className="hint"><Jargon text={t('timingWhy', { life: inputs.lifeExpectancy })} /></p>
     <h4 className="table-title">{t('timingCppTitle')}</h4>
-    {renderTable(cppRows, inputs.cppStartAge, currentCpp, (age) => {
-      set({ cppStartAge: age }); track('timing_apply', { which: 'cpp' })
-    })}
+    {renderTable(cppRows, 'cpp')}
     <h4 className="table-title">{t('timingOasTitle')}</h4>
-    {renderTable(oasRows, inputs.oasStartAge, currentOas, (age) => {
-      set({ oasStartAge: age }); track('timing_apply', { which: 'oas' })
-    })}
+    {renderTable(oasRows, 'oas')}
     <div className="card-head" style={{ marginTop: 14 }}>
-      <p className="combo">{best.metric === null
-        ? best.solver ? describeSolver(best.solver) : t('solver_infeasible')
+      <p className="combo">{ranking.status === 'noFeasibleCandidate'
+        ? <>{t('noFeasibleCandidate')} {ranking.candidates[0] && failure(ranking.candidates[0])}{' '}
+          {gaps.length > 0 && t('smallestCandidateGap', { amount: cad(gaps[0].gap!), cpp: gaps[0].value.cppStartAge, oas: gaps[0].value.oasStartAge })}</>
         : bestIsCurrent ? t('timingAlready') : <>
-          <Jargon text={t('timingBestCombo', { cpp: best.cpp, oas: best.oas })} />{' '}
-          {currentMetric !== null && Number.isFinite(currentMetric) && best.metric > currentMetric &&
-            <strong className="good">+{cad(best.metric - currentMetric)}</strong>}
+          <Jargon text={t('timingBestCombo', { cpp: best?.value.cppStartAge, oas: best?.value.oasStartAge })} />{' '}
+          {best?.metric !== null && current?.metric !== null && current?.metric !== undefined && best!.metric! > current.metric &&
+            <strong className="good">+{cad(best!.metric! - current.metric)}</strong>}
         </>}</p>
-      {!bestIsCurrent && best.metric !== null && <button type="button" className="use-strategy" onClick={() => {
-        set({ cppStartAge: best.cpp, oasStartAge: best.oas }); track('timing_apply', { which: 'combo' })
+      {!bestIsCurrent && best && <button type="button" className="use-strategy" onClick={() => {
+        set({ cppStartAge: best.value.cppStartAge, oasStartAge: best.value.oasStartAge }); track('timing_apply', { which: 'combo' })
       }}>{t('useStrategy')}</button>}
     </div>
     <p className="hint"><Jargon text={t('timingNote')} /></p>
