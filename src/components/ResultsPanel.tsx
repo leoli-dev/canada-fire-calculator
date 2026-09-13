@@ -120,15 +120,18 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
           </ul>}
           <p>
             {t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong>
-            {' · '}
-            {t('estateValue')}: <strong>{cad(result.estateValue)}</strong>
+            {result.terminalTaxStatus === 'estimated' && <>
+              {' · '}
+              {t('estateValue')}: <strong>{cad(result.estateValue)}</strong>
+            </>}
           </p>
-          <p className="hint">{t('terminalTaxBreakdown', {
+          {result.terminalTaxStatus === 'estimated' ? <p className="hint">{t('terminalTaxBreakdown', {
             registered: cad(result.terminalRegisteredIncome),
             gains: cad(result.terminalCapitalGainsIncome),
             tax: cad(result.estateTax),
+            oas: cad(result.terminalOasRecovery),
             probate: cad(result.probateFee),
-          })}</p>
+          })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
           <p className="hint">{t('terminalEstimateNote')}</p>
           {dwzSpending !== null && Number.isFinite(dwzSpending) && (
             <>

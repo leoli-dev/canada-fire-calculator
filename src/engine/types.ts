@@ -393,12 +393,17 @@ export interface ProjectionResult {
   depletedAge: number | null
   /** face value at life expectancy — overstates RRSP-heavy outcomes */
   finalNetWorth: number
+  /** Unsupported when an invalid direct-engine plan ends in accumulation;
+   * numeric fields then retain a known-income surrogate for legacy callers. */
+  terminalTaxStatus: 'estimated' | 'unsupported'
   /**
-   * Incremental final-year income tax from remaining RRSP/RRIF and taxable
+   * Incremental final-return income tax and OAS recovery from remaining RRSP/RRIF and taxable
    * unrealized gains, added to the year's modeled ordinary income. The
    * shared-endpoint allocation is not a person-by-person death model.
    */
   estateTax: number
+  /** Additional OAS repayment included in estateTax, net of the annual recovery. */
+  terminalOasRecovery: number
   /** Closing registered income included in the shared-endpoint estimate. */
   terminalRegisteredIncome: number
   /** Taxable portion of remaining non-registered and property gains. */

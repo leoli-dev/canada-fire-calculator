@@ -185,7 +185,7 @@ function evaluate(
       pensionIncome,
     }
     const taxableIncome = personTaxable + personOas
-    taxPeople.push({ taxableIncome, credits })
+    taxPeople.push({ taxableIncome, credits, oasGross: oasGrossPerPerson[i], oasNet: personOas })
     tax += incomeTax(taxableIncome, inputs.province, credits)
   }
   // GIS: requires receiving OAS; income test is on combined household income
@@ -263,7 +263,7 @@ export function pensionStartAge(inputs: Inputs): number {
 
 export function runProjection(inputs: Inputs, sample?: ReturnSampler): ProjectionResult {
   const bal: Record<AccountType, number> = { ...inputs.balances }
-  let nonRegBook = Math.min(inputs.nonRegBook, bal.nonReg)
+  let nonRegBook = inputs.nonRegBook
   const pensionAge = pensionStartAge(inputs)
   const partner = inputs.partner ?? null
   const rows: YearRow[] = []
@@ -337,7 +337,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let prValue = plannedPurchase ? 0 : pr && pr.mode !== 'planned' ? pr.value : 0
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
-    acb: Math.min(p.acb, p.value),
+    acb: p.acb,
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
     sold: false,
@@ -748,9 +748,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         cpp, oas: oasGross,
         property: rent - rentMortgageInterest + saleGainsTaxable, extraIncome: 0, pension,
       }
-      // Working salary is not an input in the accumulation model; this is
-      // the known-income context only, with the existing marginal-rate tax
-      // estimate remaining in the annual row.
+      // Salary is not modeled in accumulation. Preserve the prior known-
+      // income approximation for direct-engine callers of invalid plans, but
+      // mark it unsupported below rather than calling it an actual tax base.
       const knownTaxable = Object.values(taxableBySource).reduce((sum, value) => sum + value, 0)
       yearTaxPeople = agesPerPerson.map((personAge) => ({
         taxableIncome: knownTaxable / agesPerPerson.length,
@@ -938,15 +938,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + lockedBal + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
-  const nonRegGain = Math.max(0, bal.nonReg - nonRegBook)
-  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? Math.max(0, p.value - p.acb) : 0), 0)
-  const terminal = terminalTax({
+  const nonRegGain = bal.nonReg > 0 ? bal.nonReg - nonRegBook : 0
+  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? p.value - p.acb : 0), 0)
+  const terminal = finalYearPeople.length > 0 ? terminalTax({
     province: inputs.province,
     people: finalYearPeople,
     remainingRegistered: bal.rrsp + lockedBal,
     nonRegisteredGain: nonRegGain,
     investmentPropertyGain: ipGain,
-  })
+  }) : null
   // probate applies to the net value of non-registered holdings and unsold
   // real estate (a registered mortgage against the property reduces the
   // probatable estate); RRSP/RRIF/TFSA bypass it via named beneficiaries
@@ -960,11 +960,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
-    estateTax: terminal.incrementalTax,
-    terminalRegisteredIncome: terminal.registeredIncome,
-    terminalCapitalGainsIncome: terminal.taxableCapitalGains,
+    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' ? 'estimated' : 'unsupported',
+    estateTax: terminal?.incrementalTax ?? Number.NaN,
+    terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
+    terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,
+    terminalCapitalGainsIncome: terminal?.taxableCapitalGains ?? Number.NaN,
     probateFee,
-    estateValue: finalNetWorth - terminal.incrementalTax - probateFee,
-    rrspTax: rrspTaxTotal + terminal.registeredTaxShare,
+    estateValue: terminal ? finalNetWorth - terminal.incrementalTax - probateFee : Number.NaN,
+    rrspTax: terminal ? rrspTaxTotal + terminal.registeredTaxShare : Number.NaN,
   }
 }
