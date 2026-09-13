@@ -195,14 +195,14 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     if (ip.acb < 0) err(at('acb'), 'valNegative')
     if ((ip.annualRent ?? 0) < 0) err(at('annualRent'), 'valNegative')
     if (ip.acb > ip.value) warn(at('acb'), 'valAcbAboveValue')
-    if (ip.sellAtAge !== null && ip.sellAtAge < inputs.fireAge)
-      warn(at('sellAtAge'), 'valSellBeforeFire')
     checkMortgage(ip.mortgage, at('mortgage'))
   })
 
   // Use the same event ledger as projection. Current assets alone are not a
   // valid proxy for purchase-year funds: growth and earlier contributions matter.
-  if ((pr?.mode === 'planned' || inputs.lockedRetirement || inputs.fhsa) &&
+  if ((pr?.mode === 'planned' || pr?.sellAtAge !== null && pr?.sellAtAge !== undefined ||
+      inputs.investmentProperties?.some((property) => property.sellAtAge !== null) ||
+      inputs.lockedRetirement || inputs.fhsa) &&
       inputs.lifeExpectancy >= inputs.currentAge && inputs.lifeExpectancy <= AGE_MAX &&
       inputs.fireAge >= inputs.currentAge &&
       Object.values(inputs.balances).every(Number.isFinite)) {
@@ -217,6 +217,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
           : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
           : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
           : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
+            : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
             : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
         params: { amount: Math.ceil(gap.amount), age: Number(gap.eventId.split(':')[1]) },
         eventId: gap.eventId, amount: gap.amount,

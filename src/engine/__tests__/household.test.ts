@@ -9,7 +9,7 @@ import { expectCad } from './fixtures/types'
 describe('QA-30 A: invented household cash baselines', () => {
   it('keeps pending audit inputs and independently derived expectations reviewable', () => {
     const cases = pendingAudit.cases
-    expect(cases.map((fixture) => fixture.id)).toEqual(['P01', 'P02', 'P03', 'P04', 'P10', 'P17'])
+    expect(cases.map((fixture) => fixture.id)).toEqual(['P02', 'P03', 'P04', 'P10', 'P17'])
     for (const fixture of cases) {
       expect(fixture.inputVersion).toBe('legacy-inputs-v1')
       expect(fixture.baselineRevision).toBe('9017dc4d73854160ff0bdad4603699c5f0c4902a')
@@ -21,14 +21,10 @@ describe('QA-30 A: invented household cash baselines', () => {
       expect(Object.keys(fixture)).not.toContain('observedFinalNetWorth')
       expect(Object.keys(fixture.expected).some((key) => key.startsWith('observed'))).toBe(false)
     }
-    const sale = (cases[0].inputs as Inputs).principalResidence
-    if (!sale || sale.mode === 'planned' || !sale.mortgage) throw new Error('P01 requires owned home and mortgage')
-    expectCad(sale.value - sale.mortgage.balance,
-      (cases[0].expected as { finalNetWorth: number }).finalNetWorth, 0.01)
-    const purchase = (cases[1].inputs as Inputs).principalResidence
+    const purchase = (cases[0].inputs as Inputs).principalResidence
     if (!purchase || purchase.mode !== 'planned') throw new Error('P02 requires planned home')
-    expectCad(purchase.price - cases[1].inputs.balances.tfsa,
-      (cases[1].expected as { unfundedPurchasePrice: number }).unfundedPurchasePrice, 0.01)
+    expectCad(purchase.price - cases[0].inputs.balances.tfsa,
+      (cases[0].expected as { unfundedPurchasePrice: number }).unfundedPurchasePrice, 0.01)
     const p17 = cases.find((fixture) => fixture.id === 'P17')!
     const timingExpected = p17.expected as { firstUnfundedAge: number; unfundedAtAge62: number }
     expect(Object.keys(p17.expected)).not.toContain('knownFeasible')

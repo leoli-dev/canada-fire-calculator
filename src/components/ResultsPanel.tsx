@@ -61,9 +61,13 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     () => (mode === 'target' && target > 0 ? targetReport(inputs, target) : null),
     [mode, inputs, target],
   )
-  const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' || result.unfundedObligations.length > 0
+  const earlySale = (inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
+    (inputs.investmentProperties ?? []).some((property) => (property.sellAtAge ?? Infinity) < inputs.fireAge)
+  const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' ||
+    result.unfundedObligations.length > 0 || earlySale || fireNumber !== null && !Number.isFinite(fireNumber)
   const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
-    ? t('plannedPurchaseQuickUnsupported') : t('fundingQuickUnsupported')
+    ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
+      ? t('fundingQuickUnsupported') : t('saleQuickUnsupported')
 
   const ok =
     mode === 'last'
@@ -108,6 +112,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
                 : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
                 : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
                 : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
+                  : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
                   : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}
