@@ -25,6 +25,7 @@ import { track } from '../analytics'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
+import { RuleAssumptions } from './RuleAssumptions'
 
 const PROVINCES: Province[] = [
   'ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU',
@@ -114,6 +115,7 @@ export function InputForm() {
       )}
       <fieldset>
         <legend>{t('profile')}</legend>
+        <RuleAssumptions province={inputs.province} inflation={inputs.inflation ?? 0.021} />
         <Num label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
         <Num label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
