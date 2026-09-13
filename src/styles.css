@@ -389,6 +389,10 @@ details summary:hover { color: var(--ink); }
 details[open] summary { color: var(--ink); font-weight: 600; }
 
 .hint { font-size: 0.78rem; color: var(--ink-faint); margin: 6px 0 0; }
+.professional-field-help { margin: 0 0 8px; font-size: 0.78rem; color: var(--ink-faint); }
+.professional-field-help summary { cursor: pointer; width: fit-content; }
+.professional-field-help p { margin: 4px 0; }
+.field-content-facts { font-size: 0.78rem; color: var(--ink-faint); }
 .dwz-warning { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 6px 0 0; }
 
 .subhead {

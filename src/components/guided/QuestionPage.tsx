@@ -15,17 +15,21 @@ import { guidanceForPage } from '../../guided/pageGuidance'
 import { NumberInput } from '../NumberInput'
 import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
+import { contentForPage, contentGuidance } from '../../content/fieldContent'
+import { FieldContentFacts } from '../FieldContentHelp'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
 function QuestionHelp({ guidanceKey }: { guidanceKey: string }) {
   const { i18n, t } = useTranslation()
-  const guidance = guidanceForPage(guidanceKey, i18n.resolvedLanguage ?? i18n.language)
+  const content = contentForPage(guidanceKey)
+  const guidance = content ? contentGuidance(content, i18n.resolvedLanguage ?? i18n.language) : guidanceForPage(guidanceKey, i18n.resolvedLanguage ?? i18n.language)
   return <details className="question-help">
     <summary>{t('questionnaire.helpTitle')}</summary>
     <p>{guidance.why}</p>
     <p><strong>{t('questionnaire.findLabel')}</strong> {guidance.find}</p>
     <p className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {guidance.example}</p>
+    {content && <FieldContentFacts content={content} />}
   </details>
 }
 
