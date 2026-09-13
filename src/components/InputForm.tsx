@@ -25,6 +25,7 @@ import { track } from '../analytics'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
+import { parseField, type SharedFieldId } from '../forms/fieldRegistry'
 import { RuleAssumptions } from './RuleAssumptions'
 
 const PROVINCES: Province[] = [
@@ -36,25 +37,48 @@ function Num(props: {
   label: string
   value: number
   onChange: (v: number) => void
+  field?: SharedFieldId
   step?: number
   issue?: ValidationIssue
 }) {
   const { t } = useTranslation()
+  const home = useStore((s) => s.inputs.principalResidence)
+  const draft = useStore((s) => props.field ? s.draftByField[props.field] : undefined)
+  const meta = useStore((s) => props.field ? s.answerMeta[props.field] : undefined)
+  const missingMortgage = props.field === 'principalResidence.annualMortgagePayment' && meta?.status === 'unknown' && home?.mode === 'planned' && home.price > home.downPayment
+  const editSharedField = useStore((s) => s.editSharedField)
   return (
-    <label className="field">
-      <span><Jargon text={props.label} /></span>
-      <NumberInput
-        className={props.issue ? `invalid-${props.issue.severity}` : undefined}
-        value={props.value}
-        step={props.step ?? 1}
-        onChange={(v) => props.onChange(v ?? 0)}
-      />
-      {props.issue && (
-        <em className={`field-issue ${props.issue.severity}`}>
-          {t(props.issue.key, props.issue.params)}
-        </em>
-      )}
-    </label>
+    <>
+      <label className="field">
+        <span><Jargon text={props.label} /></span>
+        <NumberInput
+          className={props.issue ? `invalid-${props.issue.severity}` : undefined}
+          value={props.value}
+          draft={draft}
+          preserveInvalidDraft={!!props.field}
+          step={props.step ?? 1}
+          onDraftChange={props.field ? (raw) => {
+            if (parseField(props.field!, raw).status !== 'draft') return false
+            editSharedField(props.field!, raw)
+            return true
+          } : undefined}
+          onChange={(v) => {
+            if (props.field) { editSharedField(props.field, v === null ? (draft ?? '') : String(v)); return }
+            // Until FE-14 B registers the remaining fields, retain their
+            // existing clear semantics (including optional values mapped by
+            // the caller), rather than silently keeping stale inputs.
+            props.onChange(v ?? 0)
+          }}
+        />
+        {missingMortgage && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
+        {props.issue && (
+          <em className={`field-issue ${props.issue.severity}`}>
+            {t(props.issue.key, props.issue.params)}
+          </em>
+        )}
+      </label>
+      {meta && <small className="answer-status">{t(`guided.meta.${meta.origin === 'legacy' ? 'legacy' : meta.status}`)}</small>}
+    </>
   )
 }
 
@@ -86,6 +110,7 @@ function OptionalAge(props: {
 export function InputForm() {
   const { t } = useTranslation()
   const cad = useCad()
+  const setGoalFromProfessional = useStore((s) => s.setGoalFromProfessional)
   const {
     inputs, set, reset,
     mixPresets, applyMixPreset,
@@ -116,9 +141,9 @@ export function InputForm() {
       <fieldset>
         <legend>{t('profile')}</legend>
         <RuleAssumptions province={inputs.province} inflation={inputs.inflation ?? 0.021} />
-        <Num label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
-        <Num label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
-        <Num label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
+        <Num field="currentAge" label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
+        <Num field="fireAge" label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
+        <Num field="lifeExpectancy" label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
         <label className="field">
           <span><Jargon text={t('province')} /></span>
           <select
@@ -133,8 +158,8 @@ export function InputForm() {
             ))}
           </select>
         </label>
-        <Num label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
-        <Num label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
+        <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
+        <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
         <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
           <summary>{t('worksheetTitle')}</summary>
           {WORKSHEET_KEYS.map((k) => (
@@ -159,7 +184,7 @@ export function InputForm() {
           <select
             value={inputs.goal ?? 'legacy'}
             onChange={(e) => {
-              set({ goal: e.target.value as Goal })
+              setGoalFromProfessional(e.target.value as Goal)
               track('goal_change', { goal: e.target.value })
             }}
           >
@@ -302,6 +327,7 @@ export function InputForm() {
         {ACCOUNTS.map((a) => (
           <Num
             key={a}
+            field={`balances.${a}`}
             label={t(a)}
             value={inputs.balances[a]}
             step={5000}
@@ -510,7 +536,7 @@ export function InputForm() {
                 <p className="hint"><Jargon text={t('prFundingOrderHint')} /></p>
                 <Num label={t('propAppreciation')} value={pr.appreciation * 100} step={0.5}
                   onChange={(v) => set({ principalResidence: { ...pr, appreciation: v / 100 } })} />
-                <Num label={t('debtPaymentLabel')} value={pr.annualMortgagePayment ?? 0} step={1000}
+                <Num field="principalResidence.annualMortgagePayment" label={t('debtPaymentLabel')} value={pr.annualMortgagePayment ?? 0} step={1000}
                   issue={issueFor('principalResidence.annualMortgagePayment')}
                   onChange={(v) => set({ principalResidence: { ...pr, annualMortgagePayment: v } })} />
                 <Num label={t('debtYears')} value={pr.mortgageYears ?? 0}

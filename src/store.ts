@@ -6,6 +6,8 @@ import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
+import { changeAccountPresence, changeIntent, editField, reconcileDirectFields } from './forms/planCommands'
+import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -111,6 +113,13 @@ export interface PlanningIntent {
   understandingAcknowledged: boolean
   confirmedIntentRevision: number | null
 }
+const DEFAULT_PLANNING_INTENT: PlanningIntent = {
+  beneficiaries: ['self'],
+  legacyPreference: 'undecided',
+  spendingPreference: 'undecided',
+  understandingAcknowledged: false,
+  confirmedIntentRevision: null,
+}
 export type AnswerStatus = 'confirmed' | 'estimated' | 'unknown' | 'notApplicable'
 export type AnswerOrigin = 'user' | 'default' | 'legacy' | 'example'
 export interface AnswerMeta {
@@ -156,6 +165,8 @@ interface Store {
   worksheet: Record<string, number>
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
+  editSharedField: (field: SharedFieldId, raw: string, unit?: 'canonical' | 'monthly', origin?: AnswerOrigin) => void
+  setAccountPresence: (account: 'tfsa' | 'rrsp' | 'nonReg', present: boolean) => void
   commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
@@ -164,6 +175,7 @@ interface Store {
   setGuidedView: (view: GuidedView) => void
   setQuestionAnswer: (questionId: string, value: string | boolean | string[]) => void
   setPlanningIntent: (patch: Partial<PlanningIntent>) => void
+  setGoalFromProfessional: (goal: 'legacy' | 'dieWithZero') => void
   generateGuidedResults: () => void
   markAnswers: (fields: string[], status: AnswerStatus, origin?: AnswerOrigin) => void
   applyMixPreset: (account: AccountType, preset: string) => void
@@ -271,13 +283,7 @@ export const useStore = create<Store>()(
       activePageId: 'family.people',
       guidedView: 'questionnaire',
       questionAnswers: {},
-      planningIntent: {
-        beneficiaries: ['self'],
-        legacyPreference: 'undecided',
-        spendingPreference: 'undecided',
-        understandingAcknowledged: false,
-        confirmedIntentRevision: null,
-      },
+      planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
       inputRevision: 0,
       resultRevision: null,
       answerMeta: {},
@@ -296,13 +302,25 @@ export const useStore = create<Store>()(
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
           const inputs = { ...s.inputs, ...patch }
+          const reconciled = reconcileLegacyInputs(s, inputs)
+          const shared = reconcileDirectFields(s, patch, reconciled.inputs)
           return {
-            ...reconcileLegacyInputs(s, inputs),
+            ...reconciled,
+            draftByField: shared.draftByField,
+            questionAnswers: shared.questionAnswers ?? s.questionAnswers,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
-              ? { ...s.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
-              : s.answerMeta,
+              ? { ...shared.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
+              : shared.answerMeta,
           }
         })
+      },
+      editSharedField: (field, raw, unit = 'canonical', origin = 'user') => {
+        trackOnce('adjust_inputs')
+        set((s) => editField(s, field, raw, unit, origin))
+      },
+      setAccountPresence: (account, present) => {
+        trackOnce('adjust_inputs')
+        set((s) => changeAccountPresence(s, account, present))
       },
       commitPlan: ({ inputs, canonical, answerMeta, draftByField }) => set((s) => ({
         inputs, canonical, answerMeta, draftByField,
@@ -327,16 +345,11 @@ export const useStore = create<Store>()(
       setGuidedView: (guidedView) => set({ guidedView }),
       setQuestionAnswer: (questionId, value) =>
         set((s) => ({ questionAnswers: { ...s.questionAnswers, [questionId]: value } })),
-      setPlanningIntent: (patch) =>
-        set((s) => ({
-          planningIntent: {
-            ...s.planningIntent,
-            ...patch,
-            understandingAcknowledged: patch.understandingAcknowledged ?? false,
-            confirmedIntentRevision: patch.confirmedIntentRevision ?? null,
-          },
-          resultRevision: null,
-        })),
+      setPlanningIntent: (patch) => set((s) => changeIntent(s, patch)),
+      setGoalFromProfessional: (goal) => set((s) => changeIntent(s, {
+        spendingPreference: goal === 'dieWithZero' ? 'exploreCeiling' : 'maintain',
+        understandingAcknowledged: false,
+      })),
       generateGuidedResults: () => set((s) => ({ guidedView: 'results', resultRevision: s.inputRevision })),
       markAnswers: (fields, status, origin = 'user') =>
         set((s) => {
@@ -408,6 +421,7 @@ export const useStore = create<Store>()(
           activePageId: 'family.people',
           guidedView: 'questionnaire',
           questionAnswers: {},
+          planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
           inputRevision: 0,
           resultRevision: null,
           answerMeta: {},
@@ -445,13 +459,7 @@ export const useStore = create<Store>()(
             activePageId: legacyPageByStep[(previous.activeStep ?? 1) - 1] ?? 'family.people',
             guidedView: previous.activeStep === 7 ? 'review' : 'questionnaire',
             questionAnswers: {},
-            planningIntent: {
-              beneficiaries: ['self'],
-              legacyPreference: 'undecided',
-              spendingPreference: 'undecided',
-              understandingAcknowledged: false,
-              confirmedIntentRevision: null,
-            },
+            planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
             inputRevision: 0,
             resultRevision: null,
             answerMeta: legacyAnswerMeta(),

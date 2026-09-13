@@ -29,6 +29,7 @@ function sanitize(text: string, lang: string): string {
 /** "-1234.5" -> "-1,234.5" / "-1 234,5" depending on locale. No rounding. */
 function formatRaw(raw: string, lang: string): string {
   if (raw === '' || raw === '-') return raw
+  if (/[a-z]/i.test(raw)) return raw
   const { group, decimal } = seps(lang)
   const neg = raw.startsWith('-')
   const [int, frac] = (neg ? raw.slice(1) : raw).split('.')
@@ -42,14 +43,18 @@ function toRaw(value: number): string {
 }
 
 /**
- * Text-based numeric input: clearable with a local draft (an empty edit does
- * not enter the engine until blur), no leading zeros, live
+ * Text-based numeric input: clearable with a draft supplied by the field adapter
+ * when available, no leading zeros, live
  * locale-aware thousands separators, ArrowUp/Down stepping. Replaces
  * type="number" everywhere (user feedback #1/#2/#4).
  */
 export function NumberInput(props: {
   value: number | null
   onChange: (v: number | null) => void
+  draft?: string
+  /** Return true when the field adapter handled this text as a draft. */
+  onDraftChange?: (raw: string) => boolean | void
+  preserveInvalidDraft?: boolean
   step?: number
   className?: string
   placeholder?: string
@@ -58,13 +63,16 @@ export function NumberInput(props: {
   const { i18n } = useTranslation()
   const lang = i18n.language
   const ref = useRef<HTMLInputElement>(null)
+  const edited = useRef(false)
   const [focused, setFocused] = useState(false)
   const [text, setText] = useState('')
   const caretUnits = useRef<number | null>(null)
 
   const display = focused
     ? formatRaw(text, lang)
-    : props.value === null
+    : props.draft !== undefined
+      ? formatRaw(props.draft, lang)
+      : props.value === null
       ? ''
       : formatRaw(toRaw(props.value), lang)
 
@@ -106,20 +114,26 @@ export function NumberInput(props: {
       placeholder={props.placeholder}
       value={display}
       onFocus={() => {
-        setText(props.value === null ? '' : toRaw(props.value))
+        edited.current = false
+        setText(props.draft ?? (props.value === null ? '' : toRaw(props.value)))
         setFocused(true)
       }}
       onBlur={() => {
-        commit(text)
+        // Valid text was committed on change; adapters handled drafts there too.
+        // Only legacy nullable controls need a deferred empty commit.
+        if (edited.current && !props.onDraftChange && (text === '' || text === '-')) commit(text)
+        edited.current = false
         setFocused(false)
       }}
       onChange={(e) => {
+        edited.current = true
         const el = e.target
         const before = el.value.slice(0, el.selectionStart ?? el.value.length)
         caretUnits.current = sanitize(before, lang).length
-        const raw = sanitize(el.value, lang)
+        const raw = props.preserveInvalidDraft && /[a-z]/i.test(el.value) ? el.value : sanitize(el.value, lang)
         setText(raw)
-        if (raw !== '' && raw !== '-') commit(raw)
+        const handledAsDraft = props.onDraftChange?.(raw) === true
+        if (!handledAsDraft && raw !== '' && raw !== '-') commit(raw)
       }}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
