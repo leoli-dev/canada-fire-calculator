@@ -385,7 +385,7 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('lockedRetirementNote')} /></p>
           </>
         )}
-        <Num label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
+        <Num field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
         <p className="hint"><Jargon text={t('nonRegBookHint')} /></p>
 
         <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'tax_drag' })}>
@@ -642,6 +642,9 @@ export function InputForm() {
               <Num label={t('propAcb')} value={ip.acb} step={25000}
                 issue={issueFor(`investmentProperties.${i}.acb`)}
                 onChange={(v) => patch({ acb: v })} />
+              <Num label={t('propSaleExpenses')} value={ip.saleExpenses ?? 0} step={1000}
+                issue={issueFor(`investmentProperties.${i}.saleExpenses`)}
+                onChange={(v) => patch({ saleExpenses: v })} />
               <Num label={t('propAppreciation')} value={ip.appreciation * 100} step={0.5}
                 onChange={(v) => patch({ appreciation: v / 100 })} />
               <Num label={t('propRent')} value={ip.annualRent ?? 0} step={1000}

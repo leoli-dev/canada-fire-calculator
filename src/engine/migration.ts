@@ -38,6 +38,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   for (const [index, property] of (input.investmentProperties ?? []).entries()) {
     requireAmount(property.value, `investmentProperties.${index}.value`)
     requireAmount(property.acb, `investmentProperties.${index}.acb`)
+    if (property.saleExpenses !== undefined) requireAmount(property.saleExpenses, `investmentProperties.${index}.saleExpenses`)
     if (property.mortgage) requireAmount(property.mortgage.balance, `investmentProperties.${index}.mortgage.balance`)
   }
   for (const [index, debt] of (input.debts ?? []).entries()) requireAmount(debt.balance, `debts.${index}.balance`)
@@ -96,7 +97,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   const investmentProperties: InvestmentProperty[] = input.investmentProperties ?? []
   investmentProperties.forEach((p, i) => {
     const id = p.id ?? legacyId('property:investment', i)
-    properties.push({ id, kind: 'investment', value: finite(p.value), acb: known(finite(p.acb)), annualRent: known(finite(p.annualRent)), appreciation: finite(p.appreciation), sellAtAge: p.sellAtAge, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null, annualHoldingCostChange: 0, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(`${id}:mortgage`, 'mortgage', p.mortgage, id) : null, provenance: { value: source, acb: source, annualRent: source } })
+    properties.push({ id, kind: 'investment', value: finite(p.value), acb: known(finite(p.acb)), saleExpenses: p.saleExpenses === undefined ? unknown('selling expenses not supplied') : known(finite(p.saleExpenses)), annualRent: known(finite(p.annualRent)), appreciation: finite(p.appreciation), sellAtAge: p.sellAtAge, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null, annualHoldingCostChange: 0, taxableOwnerShares: shares(ownerId), mortgageDebtId: p.mortgage ? addDebt(`${id}:mortgage`, 'mortgage', p.mortgage, id) : null, provenance: { value: source, acb: source, annualRent: source } })
   })
   ;(input.debts ?? []).forEach((d, i) => addDebt(d.id ?? legacyId('debt:other', i), d.kind, d, null))
   const incomeSources: IncomeSource[] = []
@@ -206,7 +207,9 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       ownerId,
       taxableOwnerShares: expandedHousehold && account.kind !== 'lira' ? unknown('new combined household balance needs owner allocation') : useExplicitLockedOwner ? shares(ownerId) : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
         ? old.taxableOwnerShares : unknown('owner reference requires confirmation'),
-      acb: account.acb.status === 'unknown' ? old.acb : account.acb,
+      acb: account.kind === 'nonReg' && old.acb.status === 'unknown' &&
+        previous.legacyProjection.nonRegBook === inputs.nonRegBook ? old.acb
+        : account.acb.status === 'unknown' ? old.acb : account.acb,
       contributionRoom: old.contributionRoom,
       openedYear: old.openedYear,
       rrifFactorCategory: old.rrifFactorCategory,
@@ -220,7 +223,8 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.properties = next.properties.map(property => {
     const old = prior.properties.find(item => item.id === property.id)
     if (!old) return property
-    return { ...property, taxableOwnerShares: expandedHousehold ? unknown('new combined household property needs owner allocation') : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
+    return { ...property, saleExpenses: property.saleExpenses?.status === 'unknown' ? old.saleExpenses ?? property.saleExpenses : property.saleExpenses,
+      taxableOwnerShares: expandedHousehold ? unknown('new combined household property needs owner allocation') : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
       ? old.taxableOwnerShares : unknown('owner reference requires confirmation') }
   })
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))

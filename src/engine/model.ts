@@ -70,6 +70,7 @@ export interface Property {
   kind: 'principal' | 'investment'
   value: number
   acb: Known<number>
+  saleExpenses?: Known<number>
   annualRent: Known<number>
   appreciation: number
   sellAtAge: number | null

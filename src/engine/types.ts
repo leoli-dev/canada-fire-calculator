@@ -221,6 +221,9 @@ export interface InvestmentProperty {
   value: number
   /** adjusted cost base; gain above it is 50% taxable at sale */
   acb: number
+  /** Estimated selling expenses in base-year purchasing-power CAD; charged
+   * once at sale, then converted to nominal CAD for the tax-basis ledger. */
+  saleExpenses?: number
   appreciation: number
   /** sale occurs at the opening of this age, including before FIRE; null = never sell */
   sellAtAge: number | null

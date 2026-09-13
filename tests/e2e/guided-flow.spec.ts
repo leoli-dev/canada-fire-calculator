@@ -218,8 +218,8 @@ test('non-registered value and cost base share one page', async ({ page }, testI
   await expect(page.locator('[data-field="nonRegBook"]')).toBeVisible()
   await page.locator('[data-field="balances.nonReg"] input').fill('100000')
   await page.locator('[data-field="nonRegBook"] input').fill('80000')
-  await expect(page.locator('.answer-feedback')).toContainText('账面增值为 CA$20,000')
-  await expect(page.locator('.answer-feedback')).toContainText('这不是税额')
+  await expect(page.locator('.answer-feedback')).toContainText('账面变动为 CA$20,000')
+  await expect(page.locator('.answer-feedback')).toContainText('都不是税额')
 })
 
 test('intent recommendation updates inline without a confirmation page', async ({ page }, testInfo) => {

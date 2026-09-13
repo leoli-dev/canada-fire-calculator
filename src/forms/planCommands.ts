@@ -34,6 +34,10 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
   delete draftByField[id]
   const inputs = fieldRegistry[id].write(state.inputs, parsed.value)
   const canonical = refreshCanonicalFromLegacy(state.canonical, inputs)
+  if (id === 'nonRegBook') {
+    const account = canonical.accounts.find(item => item.kind === 'nonReg')
+    if (account) account.acb = { status: 'known', value: parsed.value }
+  }
   return {
     inputs: canonical.legacyProjection, canonical, draftByField,
     answerMeta: { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
@@ -65,7 +69,7 @@ export function reconcileDirectFields(state: PlanFieldSnapshot, patch: Partial<I
   for (const id of Object.keys(fieldRegistry) as SharedFieldId[]) {
     const oldValue = fieldRegistry[id].read(state.inputs)
     const newValue = fieldRegistry[id].read(nextInputs)
-    const scalar = id === 'currentAge' || id === 'fireAge' || id === 'lifeExpectancy' || id === 'annualSavings' || id === 'retirementSpending'
+    const scalar = id === 'currentAge' || id === 'fireAge' || id === 'lifeExpectancy' || id === 'annualSavings' || id === 'retirementSpending' || id === 'nonRegBook'
     const explicitScalar = scalar && Object.prototype.hasOwnProperty.call(patch, id)
     const changedBalance = id.startsWith('balances.') && patch.balances !== undefined && oldValue !== newValue
     const homePatched = id === 'principalResidence.annualMortgagePayment' && patch.principalResidence !== undefined

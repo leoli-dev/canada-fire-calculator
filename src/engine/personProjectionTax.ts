@@ -62,6 +62,8 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
   if ((f.nonRegDistributions || f.withdrawals.nonReg) && nonReg.length !== 1)
     return { status: 'unsupported', reason: 'multiple or missing non-registered accounts need BE-14 B allocation' }
   if (nonReg[0]) {
+    if ((f.nonRegDistributions || f.withdrawals.nonReg) && nonReg[0].acb.status !== 'known')
+      return { status: 'unsupported', reason: 'non-registered adjusted cost base is unknown' }
     if (f.nonRegDistributions) annualEvents.push({ id: `nonreg:distribution:${f.year}`, kind: 'interest', accountId: nonReg[0].id, amount: f.nonRegDistributions })
     const gain = f.withdrawals.nonReg * f.nonRegGainFraction
     if (gain) annualEvents.push({ id: `nonreg:gain:${f.year}`, kind: 'realizedGain', accountId: nonReg[0].id, amount: gain })

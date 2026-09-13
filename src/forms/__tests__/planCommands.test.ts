@@ -9,6 +9,18 @@ const initial = (): PlanFieldSnapshot => ({
 })
 
 describe('shared field commands', () => {
+  it('does not promote an unknown migrated ACB from a stale numeric backup on unrelated edits', () => {
+    const starting = { ...initial(), ...editField(initial(), 'nonRegBook', '80000') } as PlanFieldSnapshot
+    const unresolved = structuredClone(starting)
+    unresolved.canonical!.accounts.find(account => account.kind === 'nonReg')!.acb = {
+      status: 'unknown', reason: 'original purchase records missing',
+    }
+    const savingsEdit = { ...unresolved, ...editField(unresolved, 'annualSavings', '45000') } as PlanFieldSnapshot
+    expect(savingsEdit.canonical!.accounts.find(account => account.kind === 'nonReg')!.acb.status).toBe('unknown')
+    const confirmed = { ...savingsEdit, ...editField(savingsEdit, 'nonRegBook', '80000') } as PlanFieldSnapshot
+    expect(confirmed.canonical!.accounts.find(account => account.kind === 'nonReg')!.acb)
+      .toEqual({ status: 'known', value: 80000 })
+  })
   it('keeps clear, minus, and invalid age as unknown drafts over the last valid value', () => {
     const saved = { ...initial(), ...editField(initial(), 'annualSavings', '24000') } as PlanFieldSnapshot
     const cleared = { ...saved, ...editField(saved, 'annualSavings', '') } as PlanFieldSnapshot
