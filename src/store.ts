@@ -5,6 +5,7 @@ import { blendedReturn, blendedVolatility } from './engine'
 import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
+import { assertCanonicalPlan } from './engine/modelValidation'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -200,7 +201,10 @@ const planStorage: PersistStorage<Store> = {
       if (prior.scenarioA !== null && prior.scenarioA !== undefined) {
         migratePersistedPlan({ inputs: prior.scenarioA }, Math.min(parsed.version, 10), new Date().getFullYear())
       }
-      if (parsed.version === 11 && prior.canonical && prior.canonical.schemaVersion !== 2) throw new Error('Invalid canonical schema')
+      if (parsed.version === 11) {
+        if (prior.canonical !== null) assertCanonicalPlan(prior.canonical)
+        if (prior.scenarioACanonical !== null) assertCanonicalPlan(prior.scenarioACanonical)
+      }
       if (parsed.version < 11) {
         // The full envelope has been validated before any backup or upgraded write.
         // Write-once original bytes. If this fails, hydration aborts without replacing the plan.

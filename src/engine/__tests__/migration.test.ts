@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
 import { migratePersistedPlan, refreshCanonicalFromLegacy, removePerson, swapPersonRoles } from '../migration'
 import { ageReachedInYear } from '../model'
+import { assertCanonicalPlan } from '../modelValidation'
 
 const fixture = (couple = false): Inputs => ({
   currentAge: 45, fireAge: 55, lifeExpectancy: 90, province: 'ON', annualSavings: 40000,
@@ -103,11 +104,47 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     const next = refreshCanonicalFromLegacy(plan, { ...input, lockedRetirement: { ...input.lockedRetirement!, owner: 'partner' } })
     expect(next.accounts.find(a => a.kind === 'lira')?.ownerId).toBe(plan.people[1].id)
   })
+  it('makes partner-owned rental tax shares unknown when the partner is removed', () => {
+    const input = fixture(true)
+    const plan = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const rental = plan.properties.find(p => p.kind === 'investment')!
+    rental.taxableOwnerShares = { status: 'known', shares: { [plan.people[1].id]: 1 } }
+    const next = refreshCanonicalFromLegacy(plan, { ...plan.legacyProjection, partner: null })
+    expect(next.people).toHaveLength(1)
+    expect(next.properties.find(p => p.id === rental.id)).toMatchObject({ value: 450000, acb: { status: 'known', value: 300000 }, mortgageDebtId: rental.mortgageDebtId, taxableOwnerShares: { status: 'unknown' } })
+    expect(next.debts.find(d => d.id === rental.mortgageDebtId)?.principal).toBe(200000)
+    expect(next.orphanedPeople?.[0].pension).toEqual(input.partner?.pension)
+    expect(next.incomeSources.find(source => source.id === `${plan.people[1].id}:cpp`)).toMatchObject({ recipientId: null, annualAmount: { status: 'known', value: 7000 } })
+    expect(() => assertCanonicalPlan(next)).not.toThrow()
+    const edited = refreshCanonicalFromLegacy(next, { ...next.legacyProjection, annualSavings: 41000 })
+    expect(edited.orphanedPeople?.[0].pension).toEqual(input.partner?.pension)
+    expect(edited.incomeSources.find(source => source.id === `${plan.people[1].id}:cpp`)?.recipientId).toBeNull()
+  })
+  it('drops explicit FHSA and LIRA removals from both canonical and legacy inputs', () => {
+    const input = fixture()
+    const plan = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const next = refreshCanonicalFromLegacy(plan, { ...plan.legacyProjection, fhsa: null, lockedRetirement: null })
+    expect(next.accounts.filter(a => a.kind === 'fhsa' || a.kind === 'lira')).toEqual([])
+    expect(next.legacyProjection.fhsa).toBeNull()
+    expect(next.legacyProjection.lockedRetirement).toBeNull()
+    expect(next.accounts.reduce((sum, a) => sum + a.balance, 0)).toBe(690000)
+  })
   it('rejects malformed plans and unsupported future versions', () => {
     expect(() => migratePersistedPlan('{bad', 10, 2026)).toThrow()
     expect(() => migratePersistedPlan({ inputs: {} }, 10, 2026)).toThrow()
     expect(() => migratePersistedPlan({ inputs: { ...fixture(), balances: { tfsa: null, rrsp: 2, nonReg: 3 } } }, 10, 2026)).toThrow('balances.tfsa')
     expect(() => migratePersistedPlan({ inputs: fixture() }, 99, 2026)).toThrow()
+  })
+  it('validates complete v11 canonical shape and cross-references before hydration', () => {
+    const plan = migratePersistedPlan({ inputs: fixture(true) }, 10, 2026)
+    expect(() => assertCanonicalPlan(plan)).not.toThrow()
+    expect(() => assertCanonicalPlan({ schemaVersion: 2 })).toThrow()
+    const badOwner = structuredClone(plan)
+    badOwner.accounts[0].ownerId = 'missing-person'
+    expect(() => assertCanonicalPlan(badOwner)).toThrow('ownerId')
+    const badMortgage = structuredClone(plan)
+    badMortgage.properties.find(p => p.kind === 'investment')!.mortgageDebtId = 'missing-debt'
+    expect(() => assertCanonicalPlan(badMortgage)).toThrow('mortgageDebtId')
   })
   it('normalizes supported pre-v5 strategy and singular investment property', () => {
     const input = fixture()

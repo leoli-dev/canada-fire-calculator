@@ -142,8 +142,10 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   } : inputs
   const next = migratePersistedPlan({ inputs: normalized }, 10, previous?.baseYear ?? new Date().getFullYear())
   if (!previous) return next
+  const removedPartner = previous.people.find(person => person.role === 'partner' && !next.people.some(current => current.id === person.id))
+  const prior = removedPartner ? removePerson(previous, removedPartner.id) : previous
   const live = new Set(next.people.map(person => person.id))
-  const previousAccounts = new Map(previous.accounts.map(account => [account.id, account]))
+  const previousAccounts = new Map(prior.accounts.map(account => [account.id, account]))
   const lockedOwnerChanged = previous.legacyProjection.lockedRetirement?.owner !== inputs.lockedRetirement?.owner
   next.accounts = next.accounts.map(account => {
     const old = previousAccounts.get(account.id)
@@ -162,18 +164,19 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       accessibleAgeConfirmed: useExplicitLockedOwner ? false : old.accessibleAgeConfirmed,
     }
   })
-  const currentAccountIds = new Set(next.accounts.map(account => account.id))
-  // A removed side account with nonzero value cannot silently disappear.
-  for (const old of previous.accounts) if (!currentAccountIds.has(old.id) && old.balance !== 0) next.accounts.push({ ...old, ownerId: old.ownerId && live.has(old.ownerId) ? old.ownerId : null })
-  // Removed list entities are intentional deletions; never revive or reassign them by position.
+  // Side-account toggles and list removals are explicit deletions. Partner removal
+  // changes ownership references, never the existence of the legacy account.
   next.properties = next.properties.map(property => {
-    const old = previous.properties.find(item => item.id === property.id)
-    return old && old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
-      ? { ...property, taxableOwnerShares: old.taxableOwnerShares }
-      : property
+    const old = prior.properties.find(item => item.id === property.id)
+    if (!old) return property
+    return { ...property, taxableOwnerShares: old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
+      ? old.taxableOwnerShares : unknown('owner reference requires confirmation') }
   })
-  next.contributions = previous.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
-  next.migration = { ...previous.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') }
+  next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
+  next.orphanedPeople = prior.orphanedPeople
+  const nextIncomeIds = new Set(next.incomeSources.map(income => income.id))
+  next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
+  next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }
   return next
 }
 
@@ -189,6 +192,7 @@ export function removePerson(plan: InputsV2, personId: string): InputsV2 {
   return {
     ...plan,
     people: plan.people.filter(person => person.id !== personId),
+    orphanedPeople: [...(plan.orphanedPeople ?? []), ...plan.people.filter(person => person.id === personId)],
     accounts: plan.accounts.map(account => account.ownerId === personId || (account.taxableOwnerShares.status === 'known' && personId in account.taxableOwnerShares.shares)
       ? { ...account, ownerId: null, taxableOwnerShares: unknown('removed person owned this asset') } : account),
     contributions: plan.contributions.map(c => c.contributorId === personId ? { ...c, contributorId: null } : c),

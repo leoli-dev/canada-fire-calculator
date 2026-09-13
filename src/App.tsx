@@ -34,7 +34,7 @@ export default function App() {
   const canonical = useStore((s) => s.canonical)
   const storageIssue = getStorageReadOnlyReason()
   const unresolvedHousehold = canonical
-    ? canonical.accounts.some((account) => account.ownerId === null || account.taxableOwnerShares.status === 'unknown') || canonical.properties.some((property) => property.taxableOwnerShares.status === 'unknown')
+    ? canonical.accounts.some((account) => account.ownerId === null || account.taxableOwnerShares.status === 'unknown') || canonical.properties.some((property) => property.taxableOwnerShares.status === 'unknown') || !!canonical.orphanedPeople?.length || canonical.incomeSources.some((source) => source.recipientId === null)
     : !!inputs.partner
   const precision = canonical ? precisionGate(canonical) : null
   const ownershipAccounts = canonical?.accounts ?? []
@@ -97,6 +97,7 @@ export default function App() {
       {unresolvedHousehold && <div role="status" className="hint" data-testid="migration-gate">
         {t('migrationOwnershipWarning')}
         <ul>{ownershipAccounts.map((account) => <li key={account.id}>{account.kind}: {account.balance.toLocaleString()} CAD {account.ownerId === null ? t('migrationUnassigned') : t(canonical?.people.find((person) => person.id === account.ownerId)?.role === 'partner' ? 'migrationOwnerPartner' : 'migrationOwnerSelf')}{account.acb.status === 'known' ? `, ${t('migrationBasis')} ${account.acb.value.toLocaleString()} CAD` : ''}</li>)}</ul>
+        {canonical?.incomeSources.filter((source) => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0).map((source) => <p key={source.id}>{source.kind}: {source.annualAmount.status === 'known' ? source.annualAmount.value.toLocaleString() : ''} CAD {t('migrationUnassigned')}</p>)}
         {t('migrationSharedPlan')}
       </div>}
       {!unresolvedHousehold && precision && !precision.allowed && <div role="status" className="hint">{t('migrationApproximate')}</div>}

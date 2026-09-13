@@ -72,6 +72,33 @@ test('malformed Scenario A cannot make a valid v10 primary plan writable', async
   expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(malformed)
 })
 
+test('structurally shallow v11 canonical or Scenario A canonical cannot hydrate or overwrite', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  for (const target of ['canonical', 'scenarioACanonical'] as const) {
+    const original = await page.evaluate(target => {
+      const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+      if (target === 'scenarioACanonical') {
+        stored.state.scenarioA = structuredClone(stored.state.inputs)
+        stored.state.canonical ??= null
+      }
+      stored.state[target] = { schemaVersion: 2 }
+      const bytes = JSON.stringify(stored)
+      localStorage.setItem('fire-inputs', bytes)
+      return bytes
+    }, target)
+    await page.reload()
+    await expect(page.getByRole('alert')).toBeVisible()
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Download original saved plan' }).click()
+    expect(readFileSync((await (await downloadPromise).path())!, 'utf8')).toBe(original)
+    expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
+    await page.evaluate(() => localStorage.clear())
+    await page.reload()
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  }
+})
+
 test('unassigned couple has no precise quick answer or Monte Carlo in either mode', async ({ page }) => {
   await seedV10(page)
   await expect(page.getByTestId('migration-gate')).toBeVisible()
@@ -137,6 +164,63 @@ test('professional locked owner edit updates the same canonical owner seen after
   await expect(page.getByTestId('migration-gate')).toContainText('lira: 85,000 CAD partner')
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(state.canonical.accounts.find((a: { kind: string }) => a.kind === 'lira').ownerId).toBe(state.canonical.people[1].id)
+})
+
+test('professional couple to single keeps partner rental but makes its ownership unknown in both modes', async ({ page }) => {
+  await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.inputs.investmentProperties = [{ value: 900000, acb: 600000, appreciation: .03, sellAtAge: 75, mortgage: { balance: 300000, annualPayment: 22000, yearsRemaining: 18 } }]
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const before = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    const plan = stored.state.canonical
+    const rental = plan.properties.find((p: { kind: string }) => p.kind === 'investment')
+    rental.taxableOwnerShares = { status: 'known', shares: { [plan.people[1].id]: 1 } }
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+    return { propertyId: rental.id, mortgageId: rental.mortgageDebtId }
+  })
+  await page.reload()
+  await page.locator('label.field').filter({ hasText: 'Household' }).locator('select').selectOption('single')
+  await expect(page.getByTestId('migration-gate')).toBeVisible()
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.reload()
+  await expect(page.getByTestId('migration-gate')).toBeVisible()
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(after.canonical.people).toHaveLength(1)
+  expect(after.canonical.properties.find((p: { id: string }) => p.id === before.propertyId)).toMatchObject({
+    value: 900000, acb: { status: 'known', value: 600000 }, mortgageDebtId: before.mortgageId, taxableOwnerShares: { status: 'unknown' },
+  })
+  expect(after.canonical.debts.find((d: { id: string }) => d.id === before.mortgageId)?.principal).toBe(300000)
+})
+
+test('professional FHSA and LIRA toggles delete nonzero canonical assets through reload', async ({ page }) => {
+  await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.inputs.partner = null
+    stored.state.inputs.fhsa = { balance: 28000, annualContribution: 8000, openedYearsAgo: 3 }
+    stored.state.inputs.lockedRetirement = { balance: 85000, employeeContribution: 0, employerContribution: 0, accessibleAge: 55, jurisdiction: 'ON', owner: 'self' }
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await page.locator('label.field').filter({ hasText: 'Use a locked DC pension' }).locator('input').uncheck()
+  await page.locator('label.field').filter({ hasText: 'Use an FHSA' }).locator('input').uncheck()
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(state.inputs.fhsa).toBeNull()
+  expect(state.inputs.lockedRetirement).toBeNull()
+  expect(state.canonical.accounts.filter((a: { kind: string }) => a.kind === 'fhsa' || a.kind === 'lira')).toEqual([])
+  expect(state.canonical.accounts.reduce((sum: number, a: { balance: number }) => sum + a.balance, 0)).toBe(690000)
 })
 
 test('backup write failure leaves v10 original bytes intact', async ({ page }) => {
