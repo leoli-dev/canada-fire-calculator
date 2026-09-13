@@ -46,6 +46,12 @@ export interface AnnualStepValue { state: AnnualState; row: YearRow }
 const clone = <T>(value: T): T => structuredClone(value)
 const fail = (status: 'invalid' | 'unsupported', detail: string): KernelResult<never> => ({ status, issues: [{ code: status, detail }] })
 const finiteNonnegative = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+const validKnownAmount = (value: unknown, nonnegative = false): value is Known<number> => {
+  if (!value || typeof value !== 'object') return false
+  const fact = value as Known<number>
+  return fact.status === 'unknown' ? typeof fact.reason === 'string' && fact.reason.length > 0
+    : fact.status === 'known' && typeof fact.value === 'number' && Number.isFinite(fact.value) && (!nonnegative || fact.value >= 0)
+}
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
 export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
@@ -64,9 +70,11 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
   const byDebt = Object.fromEntries(plan.debts.map(debt => [debt.id, { principal: debt.principal, annualPayment: debt.annualPayment, yearsRemaining: debt.yearsRemaining, propertyId: debt.propertyId }]))
   const byDependent = Object.fromEntries(plan.dependents.map(dependent => [dependent.id, { age: dependent.ageInBaseYear }]))
   const byProperty = Object.fromEntries(plan.properties.map(property => [property.id, { value: property.value, held: property.plannedPurchaseAge === null, acb: clone(property.acb) }]))
-  return { status: 'ok', value: { year: plan.baseYear, baseYear: plan.baseYear, byPerson, byAccount, byDependent, byDebt, byProperty,
+  const state: AnnualState = { year: plan.baseYear, baseYear: plan.baseYear, byPerson, byAccount, byDependent, byDebt, byProperty,
     contributionHistory: plan.contributions.filter(c => c.calendarYear < plan.baseYear).map(c => ({ id: c.id, accountId: c.accountId, contributorId: c.contributorId, calendarYear: c.calendarYear, amount: c.amount, deductionYear: c.deductionYear })),
-    benefitIncomeLag: Object.fromEntries(plan.people.map(person => [person.id, { status: 'unknown', reason: 'benefit income basis not supplied' }])), unfundedEvents: [] } }
+    benefitIncomeLag: Object.fromEntries(plan.people.map(person => [person.id, { status: 'unknown', reason: 'benefit income basis not supplied' }])), unfundedEvents: [] }
+  const problem = snapshotProblem(plan, state)
+  return problem ? fail('invalid', problem) : { status: 'ok', value: state }
 }
 
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
@@ -82,6 +90,13 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
         Object.keys(opening.byProperty ?? {}).sort().join('|') !== plan.properties.map(p => p.id).sort().join('|')) return 'snapshot entity IDs'
     if (Object.values(opening.byAccount).some(a => !finiteNonnegative(a.balance)) ||
         Object.values(opening.byDebt).some(d => !finiteNonnegative(d.principal) || !finiteNonnegative(d.annualPayment) || !Number.isInteger(d.yearsRemaining) || d.yearsRemaining < 0 || (d.principal > 0 && d.yearsRemaining === 0))) return 'snapshot balance or debt term'
+    if (Object.values(opening.byPerson).some(p => !validKnownAmount(p.previousYearEarnedIncome) || !validKnownAmount(p.rrspRoom, true) || !validKnownAmount(p.tfsaRoom, true)) ||
+        Object.values(opening.byAccount).some(a => !validKnownAmount(a.acb, true) || !validKnownAmount(a.room, true) || !validKnownAmount(a.openedYear) || (a.openedYear.status === 'known' && !Number.isInteger(a.openedYear.value))) ||
+        Object.values(opening.byProperty).some(p => !finiteNonnegative(p.value) || !validKnownAmount(p.acb, true)) ||
+        Object.values(opening.benefitIncomeLag ?? {}).some(v => !validKnownAmount(v)) ||
+        Object.keys(opening.benefitIncomeLag ?? {}).sort().join('|') !== plan.people.map(p => p.id).sort().join('|') ||
+        !Array.isArray(opening.contributionHistory) || opening.contributionHistory.some(c => !finiteNonnegative(c.amount) || !Number.isInteger(c.calendarYear)) ||
+        !Array.isArray(opening.unfundedEvents) || opening.unfundedEvents.some(gap => !finiteNonnegative(gap.amount))) return 'snapshot nested amount'
     if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year)) ||
         plan.dependents.some(dependent => opening.byDependent[dependent.id].age !== dependent.ageInBaseYear + opening.year - plan.baseYear) ||
         plan.accounts.some(account => opening.byAccount[account.id].kind !== account.kind || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
@@ -102,7 +117,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
   if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
   if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
-  if (plan.accounts.some(account => account.kind === 'fhsa' && account.balance > 0 && account.openedYear.status === 'unknown')) return fail('unsupported', 'FHSA opening year unknown')
+  if (plan.accounts.some(account => account.kind === 'fhsa' && state.byAccount[account.id].openedYear.status === 'unknown' &&
+      (state.byAccount[account.id].balance > 0 || plan.recurringContributions.some(c => c.accountId === account.id && c.annualAmount > 0)))) return fail('unsupported', 'FHSA opening year unknown')
   if (plan.accounts.some(account => account.kind === 'fhsa' && account.openedYear.status === 'known' && year - account.openedYear.value >= 15)) return fail('unsupported', 'FHSA statutory rollover not yet wired')
   if (plan.contributions.some(contribution => contribution.calendarYear === year)) return fail('unsupported', 'scheduled contribution funding and deduction rule not yet wired')
   const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
@@ -121,6 +137,13 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
   const tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = sum(Object.values(personRows).map(p => p.spending))
+  // A savings budget is already net of living costs, tax/benefits and separately
+  // listed debt. Evaluated cash is a consistency check, never extra money.
+  if (plan.budget.kind !== 'savingsBudget' || plan.budget.debtIncluded.status !== 'known' || !plan.budget.debtIncluded.value ||
+      plan.budget.taxBenefitIncluded.status !== 'known' || !plan.budget.taxBenefitIncluded.value) return fail('unsupported', 'budget treatment not yet reconciled')
+  const cash = plan.budget.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
+  if (!Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
+  if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
   let debtPayments = 0
   for (const [id, debt] of Object.entries(state.byDebt)) {
     if (debt.principal <= 0 || debt.yearsRemaining <= 0) continue
@@ -131,8 +154,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     debt.principal = Math.max(0, debt.principal * (1 + rate) - due)
     debt.yearsRemaining -= 1
   }
-  const cash = income + benefits - tax - spending - debtPayments
-  if (cash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
+  const evaluatedCash = income + benefits - tax - spending - debtPayments
+  if (!Number.isFinite(evaluatedCash)) return fail('invalid', 'evaluated cash')
+  if (evaluatedCash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
+  if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
   const recurring = plan.recurringContributions.filter(c => state.byAccount[c.accountId])
   if (recurring.length !== plan.recurringContributions.length) return fail('invalid', 'recurring contribution account missing')
   const fhsa = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'fhsa' && c.funding === 'fromSavings').map(c => c.annualAmount))

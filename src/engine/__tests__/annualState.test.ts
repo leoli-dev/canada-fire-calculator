@@ -20,7 +20,7 @@ function plan(legacy = input()): InputsV2 {
   for (const person of result.people) { person.tfsaAvailableRoom = { status: 'known', value: 1000 }; person.rrspAvailableRoom = { status: 'known', value: 1000 } }
   return result
 }
-const providers = (income = 120): AnnualProviders => ({
+const providers = (income = 110): AnnualProviders => ({
   evaluate: ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, { income, earnedIncome: income, benefits: 0, tax: 20, spending: 50, taxableIncome: income, benefitIncomeForNextYear: { status: 'known' as const, value: income } }])) }),
   returns: () => .1,
 })
@@ -30,7 +30,7 @@ describe('BE-14 A nominal annual state kernel', () => {
   it('settles hand-calculated cash, debt, contributions, growth, ACB and ages once', () => {
     const canonical = plan()
     const opening = ok(initializeState(canonical))
-    const { state, row } = ok(annualStep(canonical, opening, providers()))
+    const { state, row } = ok(annualStep(canonical, opening, providers(120)))
     const tfsa = canonical.accounts.find(a => a.kind === 'tfsa')!.id
     const rrsp = canonical.accounts.find(a => a.kind === 'rrsp')!.id
     expect(row.cashLedger).toMatchObject({ income: 120, tax: 20, spending: 50, debtPayments: 10, voluntaryContributions: 40, unallocated: 0 })
@@ -49,7 +49,7 @@ describe('BE-14 A nominal annual state kernel', () => {
   })
 
   it('keeps P08 locked contributions separate from opening balance and employer money', () => {
-    const canonical = plan({ ...input(), annualSavings: 10000, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+    const canonical = plan({ ...input(), annualSavings: 10000, inflation: 0, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
       savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, debts: [],
       lockedRetirement: { balance: 100000, employeeContribution: 3000, employerContribution: 2000, accessibleAge: 60, jurisdiction: 'ON', owner: 'self' } })
     const initial = ok(initializeState(canonical))
@@ -66,7 +66,7 @@ describe('BE-14 A nominal annual state kernel', () => {
   })
 
   it('isolates evaluator and return candidates; age and previous-income lag advance before the next year', () => {
-    const canonical = plan({ ...input(), debts: [], children: [{ age: 10 }], savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    const canonical = plan({ ...input(), debts: [], inflation: 0, children: [{ age: 10 }], savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
     const initial = ok(initializeState(canonical))
     const seen: number[] = []
     const childAges: number[] = []
@@ -75,14 +75,14 @@ describe('BE-14 A nominal annual state kernel', () => {
         seen.push(state.byPerson[canonical.people[0].id].age)
         childAges.push(state.byDependent[canonical.dependents[0].id].age)
         state.byAccount[canonical.accounts[0].id].balance = 999999
-        return { byPerson: { [canonical.people[0].id]: { income: 100, earnedIncome: 70, benefits: 0, tax: 0, spending: 0, taxableIncome: 100, benefitIncomeForNextYear: { status: 'known', value: state.year === 2026 ? 30 : 40 } } } }
+        return { byPerson: { [canonical.people[0].id]: { income: 40, earnedIncome: 30, benefits: 0, tax: 0, spending: 0, taxableIncome: 40, benefitIncomeForNextYear: { status: 'known', value: state.year === 2026 ? 30 : 40 } } } }
       },
       returns: ({ state }) => { state.byAccount[canonical.accounts[0].id].balance = -999; return 0 },
     }
     const first = ok(annualStep(canonical, initial, isolated))
     expect(first.state.byAccount[canonical.accounts[0].id].balance).toBe(100)
     expect(first.state.benefitIncomeLag[canonical.people[0].id]).toEqual({ status: 'known', value: 30 })
-    expect(first.state.byPerson[canonical.people[0].id].previousYearEarnedIncome).toEqual({ status: 'known', value: 70 })
+    expect(first.state.byPerson[canonical.people[0].id].previousYearEarnedIncome).toEqual({ status: 'known', value: 30 })
     const second = ok(annualStep(canonical, first.state, isolated))
     expect(second.state.benefitIncomeLag[canonical.people[0].id]).toEqual({ status: 'known', value: 40 })
     expect(seen).toEqual([40, 41])
@@ -104,7 +104,7 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(initializeState(broken).status).toBe('invalid')
     const noPurchase = plan()
     const opening = ok(initializeState(noPurchase))
-    expect(annualStep(noPurchase, opening, { ...providers(), returns: () => Number.NaN }).status).toBe('invalid')
+    expect(annualStep(noPurchase, opening, { ...providers(120), returns: () => Number.NaN }).status).toBe('invalid')
     const corrupted = structuredClone(opening)
     corrupted.byPerson[noPurchase.people[0].id].age = 39
     expect(annualStep(noPurchase, corrupted, providers()).status).toBe('invalid')
@@ -134,7 +134,7 @@ describe('BE-14 A nominal annual state kernel', () => {
     const swapped = structuredClone(canonical)
     swapped.people.reverse()
     const evaluate: AnnualProviders['evaluate'] = ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
-      income: id === self.id ? 100 : 0, earnedIncome: id === self.id ? 100 : 0, benefits: 0, tax: 0, spending: 0, taxableIncome: id === self.id ? 100 : 0,
+      income: id === self.id ? 40 : 0, earnedIncome: id === self.id ? 40 : 0, benefits: 0, tax: 0, spending: 0, taxableIncome: id === self.id ? 40 : 0,
       benefitIncomeForNextYear: { status: 'unknown' as const, reason: 'AFNI not evaluated' },
     }])) })
     const providersA = { evaluate, returns: () => 0 }
@@ -150,10 +150,15 @@ describe('BE-14 A nominal annual state kernel', () => {
   })
 
   it('uses the same deterministic return interface for fixed and zero-volatility MC providers', () => {
-    const canonical = plan({ ...input(), debts: [], inflation: .02 })
+    const canonical = plan({ ...input(), debts: [], inflation: .02, annualSavings: 50 })
     const initial = ok(initializeState(canonical))
-    const fixed = ok(projectFromState(canonical, initial, 2, { ...providers(), returns: fixedReturnProvider }))
-    const zeroVol = ok(projectFromState(canonical, initial, 2, { ...providers(), returns: () => .122 }))
+    const balanced = { evaluate: ({ state }: { state: typeof initial }) => ({ byPerson: { [canonical.people[0].id]: {
+      income: 120 + state.year - canonical.baseYear, earnedIncome: 120 + state.year - canonical.baseYear,
+      benefits: 0, tax: 20, spending: 50, taxableIncome: 120 + state.year - canonical.baseYear,
+      benefitIncomeForNextYear: { status: 'unknown' as const, reason: 'not supplied' },
+    } } }) }
+    const fixed = ok(projectFromState(canonical, initial, 2, { ...balanced, returns: fixedReturnProvider }))
+    const zeroVol = ok(projectFromState(canonical, initial, 2, { ...balanced, returns: () => .122 }))
     for (let year = 0; year < 2; year++) for (const account of canonical.accounts) {
       expect(zeroVol.rows[year].byAccount[account.id].closing).toBeCloseTo(fixed.rows[year].byAccount[account.id].closing, 10)
     }
@@ -176,9 +181,53 @@ describe('BE-14 A nominal annual state kernel', () => {
       principalResidence: { value: 200, appreciation: .05, sellAtAge: 41 } })
     const initial = ok(initializeState(canonical))
     expect(sumNetWorth(initial)).toBe(300)
-    const first = ok(annualStep(canonical, initial, { ...providers(), returns: () => 0 }))
+    const first = ok(annualStep(canonical, initial, { ...providers(110), returns: () => 0 }))
     expect(first.state.byProperty[canonical.properties[0].id].value).toBeCloseTo(214.2, 8)
-    expect(sumNetWorth(first.state)).toBeCloseTo(364.2, 8)
+    expect(sumNetWorth(first.state)).toBeCloseTo(354.2, 8)
     expect(annualStep(canonical, first.state, providers()).status).toBe('unsupported')
+  })
+
+  it('does not invest evaluator cash beyond canonical net savings or deduct included debt twice', () => {
+    const noDebt = plan({ ...input(), debts: [], savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    const opening = ok(initializeState(noDebt))
+    const tooMuch = { evaluate: () => ({ byPerson: { [noDebt.people[0].id]: {
+      income: 100, earnedIncome: 100, benefits: 0, tax: 0, spending: 0, taxableIncome: 100,
+      benefitIncomeForNextYear: { status: 'unknown' as const, reason: 'not supplied' },
+    } } }), returns: () => 0 }
+    expect(annualStep(noDebt, opening, tooMuch).status).toBe('unsupported')
+    expect(opening.byAccount[noDebt.accounts[0].id].balance).toBe(100)
+    const withDebt = plan()
+    const debtOpening = ok(initializeState(withDebt))
+    const exact = ok(annualStep(withDebt, debtOpening, providers(120)))
+    expect(exact.row.cashLedger.debtPayments).toBe(10)
+    expect(exact.row.cashLedger.voluntaryContributions).toBe(40)
+    expect(annualStep(withDebt, debtOpening, providers(110)).status).toBe('unsupported')
+    if (withDebt.budget.kind === 'savingsBudget') withDebt.budget.debtIncluded = { status: 'known', value: false }
+    expect(annualStep(withDebt, debtOpening, providers(120)).status).toBe('unsupported')
+    if (withDebt.budget.kind === 'savingsBudget') {
+      withDebt.budget.debtIncluded = { status: 'known', value: true }
+      withDebt.budget.taxBenefitIncluded = { status: 'unknown', reason: 'not confirmed' }
+    }
+    expect(annualStep(withDebt, debtOpening, providers(120)).status).toBe('unsupported')
+    const deficit = plan({ ...input(), debts: [], annualSavings: -40, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    expect(annualStep(deficit, ok(initializeState(deficit)), providers(110))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('negative net savings') }] })
+  })
+
+  it('stops zero-balance FHSA contributions when opening year is unknown before evaluating cash', () => {
+    const canonical = plan({ ...input(), debts: [], fhsa: { balance: 0, annualContribution: 10, openedYearsAgo: 0 } })
+    const opening = ok(initializeState(canonical))
+    const evaluate = vi.fn(providers(110).evaluate)
+    expect(annualStep(canonical, opening, { evaluate, returns: () => 0 })).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('FHSA opening year') }] })
+    expect(evaluate).not.toHaveBeenCalled()
+  })
+
+  it('rejects nested NaN room before one-year stepping and zero-year continuation', () => {
+    const canonical = plan({ ...input(), debts: [], savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 } })
+    const opening = ok(initializeState(canonical))
+    const broken = structuredClone(opening)
+    broken.byAccount[canonical.accounts[0].id].room = { status: 'known', value: Number.NaN }
+    expect(annualStep(canonical, broken, providers(110)).status).toBe('invalid')
+    expect(projectFromState(canonical, broken, 0, providers(110)).status).toBe('invalid')
+    expect(projectFromState(canonical, broken, 1, providers(110)).status).toBe('invalid')
   })
 })
