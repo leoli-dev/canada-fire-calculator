@@ -69,7 +69,8 @@ export function TimingCard({ inputs }: { inputs: Inputs }) {
         ? <>{t('noFeasibleCandidate')} {ranking.candidates[0] && failure(ranking.candidates[0])}{' '}
           {gaps.length > 0 && t('smallestCandidateGap', { amount: cad(gaps[0].gap!), cpp: gaps[0].value.cppStartAge, oas: gaps[0].value.oasStartAge })}</>
         : ranking.status === 'unrankedObjective'
-          ? <>{t('unrankedObjective')} {unranked && failure(unranked)}</>
+          ? <>{ranking.candidates.some((row) => row.reason === 'lockedWithdrawalLimits')
+            ? t('lockedRecommendationUnranked') : t('unrankedObjective')} {unranked && failure(unranked)}</>
         : bestIsCurrent ? t('timingAlready') : <>
           <Jargon text={t('timingBestCombo', { cpp: best?.value.cppStartAge, oas: best?.value.oasStartAge })} />{' '}
           {best?.metric !== null && current?.metric !== null && current?.metric !== undefined && best!.metric! > current.metric &&

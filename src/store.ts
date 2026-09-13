@@ -194,11 +194,23 @@ export const useStore = create<Store>()(
       scenarioA: null,
       set: (patch) => {
         trackOnce('adjust_inputs')
-        set((s) => ({
-          inputs: { ...s.inputs, ...patch },
-          inputRevision: s.inputRevision + 1,
-          resultRevision: null,
-        }))
+        set((s) => {
+          const oldLocked = s.inputs.lockedRetirement
+          const newLocked = patch.lockedRetirement
+          const ownerChanged = newLocked !== undefined &&
+            (Boolean(oldLocked) !== Boolean(newLocked) ||
+              (!!oldLocked && !!newLocked && oldLocked.owner !== newLocked.owner))
+          const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
+          const ownerAnswer = s.answerMeta['lockedRetirement.owner']
+          return {
+            inputs: { ...s.inputs, ...patch },
+            inputRevision: s.inputRevision + 1,
+            resultRevision: null,
+            answerMeta: (ownerChanged || householdChanged) && ownerAnswer
+              ? { ...s.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
+              : s.answerMeta,
+          }
+        })
       },
       setDisplayMode: (m) => {
         track('display_mode_change', { mode: m })

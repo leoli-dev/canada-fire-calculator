@@ -431,6 +431,7 @@ details[open] summary { color: var(--ink); font-weight: 600; }
 }
 .summary .verdict { font-size: 1.18rem; font-weight: 650; margin: 2px 0 8px; color: var(--green); letter-spacing: -0.01em; }
 .summary.bad .verdict { color: var(--red); }
+.summary.uncertain .verdict { color: var(--ink); }
 .summary p { margin: 0; color: var(--ink-soft); }
 .summary p strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 

@@ -13,6 +13,7 @@ import { TaxChart } from './components/TaxChart'
 import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
 import { MonteCarloCard } from './components/MonteCarloCard'
+import { MC_RULE_VERSION } from './mcProtocol'
 import { StrategyCard } from './components/StrategyCard'
 import { TimingCard } from './components/TimingCard'
 import { ScenarioCard } from './components/ScenarioCard'
@@ -116,7 +117,8 @@ export default function App() {
           <YearTable result={result} inputs={inputs} />
           <StrategyCard inputs={inputs} />
           <TimingCard inputs={inputs} />
-          <MonteCarloCard inputs={inputs} scale={scale} />
+          <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
+            inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
           <ScenarioCard />
         </section>}
       </main>

@@ -16,32 +16,73 @@ import type { MonteCarloResult } from '../engine/monteCarlo'
 import { useCad, useCadCompact } from '../format'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
+import { matchesMcRequest, type McRequest, type McResponse } from '../mcProtocol'
 
-export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) => number }) {
+export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; ruleVersion: string; scale?: (age: number) => number }) {
   const { t } = useTranslation()
   const cad = useCad()
   const cadTick = useCadCompact()
   const workerRef = useRef<Worker | null>(null)
+  const activeRef = useRef<McRequest | null>(null)
   const [running, setRunning] = useState(false)
   const [mc, setMc] = useState<MonteCarloResult | null>(null)
+  const [error, setError] = useState(false)
 
-  // results are stale as soon as inputs change
-  useEffect(() => setMc(null), [props.inputs])
-  useEffect(() => () => workerRef.current?.terminate(), [])
+  const stop = () => {
+    activeRef.current = null
+    workerRef.current?.terminate()
+    workerRef.current = null
+    setRunning(false)
+  }
+  // The App key remounts this card on input/mode/rule changes. Cleanup also
+  // handles a result section disappearing before a worker has completed.
+  useEffect(() => () => {
+    activeRef.current = null
+    workerRef.current?.terminate()
+    workerRef.current = null
+  }, [])
 
   const run = () => {
+    stop()
     track('monte_carlo_run')
+    setMc(null)
+    setError(false)
     setRunning(true)
-    if (!workerRef.current) {
-      workerRef.current = new Worker(new URL('../mc.worker.ts', import.meta.url), {
+    const request: McRequest = {
+      requestId: crypto.randomUUID(),
+      inputRevision: props.inputRevision,
+      ruleVersion: props.ruleVersion,
+      seed: crypto.getRandomValues(new Uint32Array(1))[0],
+      inputs: props.inputs,
+      trials: 1000,
+    }
+    activeRef.current = request
+    try {
+      const worker = new Worker(new URL('../mc.worker.ts', import.meta.url), {
         type: 'module',
       })
+      workerRef.current = worker
+      worker.onmessage = (e: MessageEvent<McResponse>) => {
+        if (activeRef.current !== request) return
+        if (!e.data || !matchesMcRequest(e.data, request)) {
+          setError(true)
+          stop()
+          return
+        }
+        if (e.data.status === 'success') setMc(e.data.result)
+        else setError(true)
+        stop()
+      }
+      worker.onerror = worker.onmessageerror = () => {
+        if (activeRef.current !== request) return
+        setError(true)
+        stop()
+      }
+      worker.postMessage(request)
+    } catch {
+      setError(true)
+      stop()
     }
-    workerRef.current.onmessage = (e: MessageEvent<MonteCarloResult>) => {
-      setMc(e.data)
-      setRunning(false)
-    }
-    workerRef.current.postMessage({ inputs: props.inputs, trials: 1000 })
   }
 
   const k = props.scale ?? (() => 1)
@@ -62,12 +103,13 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
         <button className="primary" onClick={run} disabled={running}>
           {running ? t('mcRunning') : t('mcRun')}
         </button>
+        {running && <button type="button" onClick={stop}>{t('mcCancel')}</button>}
       </div>
       {mc && (
         <>
           <p className="mc-rate">
             {t('mcSuccess')}:{' '}
-            <strong className={mc.successRate >= 0.85 ? 'good' : mc.successRate >= 0.7 ? 'warn' : 'poor'}>
+            <strong>
               {Math.round(mc.successRate * 100)}%
             </strong>{' '}
             <span className="hint">({t('mcTrials', { n: mc.trials })})</span>
@@ -134,6 +176,7 @@ export function MonteCarloCard(props: { inputs: Inputs; scale?: (age: number) =>
         </>
       )}
       {!mc && !running && <p className="hint"><Jargon text={t('mcIdle')} /></p>}
+      {error && <p role="alert" className="hint">{t('mcError')}</p>}
     </div>
   )
 }

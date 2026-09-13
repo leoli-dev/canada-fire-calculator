@@ -19,13 +19,15 @@ export function guidedRequiredFields(inputs?: Inputs): string[] {
       'partner.oasStartAge', 'partner.oasAnnualAt65',
     ] : []),
     ...(inputs?.fhsa ? ['fhsa.balance', 'fhsa.annualContribution', 'fhsa.openedYearsAgo'] : []),
-    ...(inputs?.lockedRetirement ? ['lockedRetirement.balance', 'lockedRetirement.accessibleAge'] : []),
+    ...(inputs?.lockedRetirement ? ['lockedRetirement.balance', 'lockedRetirement.accessibleAge',
+      ...(inputs.partner ? ['lockedRetirement.owner'] : [])] : []),
   ]
   return [...GUIDED_REQUIRED_FIELDS, ...conditional]
 }
 
 export function guidedPlanReady(answerMeta: Record<string, AnswerMeta>, inputs?: Inputs): boolean {
-  return guidedRequiredFields(inputs).every((field) => answerIsUsable(answerMeta[field]))
+  return guidedRequiredFields(inputs).every((field) => answerIsUsable(answerMeta[field]) &&
+    (field !== 'lockedRetirement.owner' || answerMeta[field]?.status === 'confirmed'))
 }
 
 export interface AccountSummary {

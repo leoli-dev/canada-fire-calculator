@@ -3,6 +3,7 @@ import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSa
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
 import { validateInputs } from './validate'
+import { hasUnverifiedLockedWithdrawals } from './capabilities'
 import {
   ACCOUNT_TYPES,
   STRATEGIES,
@@ -169,7 +170,9 @@ function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
       continue
     }
     if (projection.success)
-      return outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
+      return hasUnverifiedLockedWithdrawals(inputs)
+        ? outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+        : outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
   }
   if (unsupportedProjection)
     return outcome('unsupported', null, assumptions, iterations ? cap : null, iterations,
@@ -267,10 +270,12 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
-  if (zero.success) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
   if (lockedBalance > 0 && b.tfsa + b.rrsp + b.nonReg === 0 &&
       inputs.fireAge < inputs.lockedRetirement!.accessibleAge)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'lockedOnlyBridge')
+  if (hasUnverifiedLockedWithdrawals(inputs))
+    return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+  if (zero.success) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
   let upper = evaluate(hi)
   if (upper.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, hi, iterations, cashResidual(upper), 'unfundedTransaction')
@@ -340,6 +345,13 @@ export function rankCandidates<T>(
       if (result.unfundedObligations.length > 0)
         return { ...common, status: 'unsupported', reason: 'unfundedTransaction' }
       if (!result.success) return { ...common, status: 'infeasible' }
+      // The projection releases locked DC/LIRA funds at an age boundary but
+      // does not check jurisdiction-specific LIF withdrawal ceilings. A
+      // funded modeled path is therefore not a verified recommendation.
+      if (hasUnverifiedLockedWithdrawals(inputs))
+        return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
+      if (result.terminalTaxStatus === 'unsupported')
+        return { ...common, status: 'unsupported', reason: 'terminalTax' }
       if (objective === 'maxSpending' && solver?.status !== 'solved')
         return { ...common, status: solver?.status ?? 'unsupported', reason: solver?.reason }
       const metric = objective === 'maxSpending' ? solver!.value : result.estateValue
@@ -377,6 +389,8 @@ function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
   if (!zero.success) return outcome('infeasible', null, assumptions, 0, iterations, cashResidual(zero), 'zeroSpendingFails')
+  if (hasUnverifiedLockedWithdrawals(inputs))
+    return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
   let lo = 0
   let hi = 50000
   let lower = zero
