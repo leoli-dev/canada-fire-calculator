@@ -13,6 +13,7 @@ import {
   type Bracket,
 } from './taxData'
 import type { Province } from './types'
+import { federalSpouseAmount2026, provincialSpouseAmount2026 } from './spouseCredit2026'
 
 export interface PersonCredits {
   /** the taxpayer's age — 65+ unlocks the age amount */
@@ -24,6 +25,8 @@ export interface PersonCredits {
    * senior credit, so under-65 RPP income gets the federal amount only.)
    */
   pensionIncome?: number
+  /** Only supplied after the claimant confirms support/cohabitation. */
+  spouseNetIncome?: number
 }
 
 function bracketTax(income: number, brackets: Bracket[]): number {
@@ -66,6 +69,8 @@ export function incomeTax(
   // the pension income amount has no age test of its own — eligibility by
   // income type is the caller's job (see PersonCredits.pensionIncome)
   fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * FEDERAL.brackets[0].rate
+  if (credits?.spouseNetIncome !== undefined)
+    fedCredit += federalSpouseAmount2026(credits.spouseNetIncome, federalBpa(taxable)) * FEDERAL.brackets[0].rate
   if (senior) {
     const ageAmt = Math.max(
       0,
@@ -86,6 +91,8 @@ export function incomeTax(
     provBpa = p.bpa - (p.bpa - min) * phase
   }
   let provCredit = provBpa * lowRate
+  if (credits?.spouseNetIncome !== undefined && province !== 'QC')
+    provCredit += (provincialSpouseAmount2026(province, credits.spouseNetIncome) ?? 0) * lowRate
   // provincial pension amounts (outside QC) have no age test either; QC's
   // equivalent stays inside the senior block below, folded into its combined
   // family-income-tested credit

@@ -118,6 +118,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
     ], savingsAllocation: { shares: { ...input.savingsSplit }, provenance: source }, projectionAssumptions: { nonRegDistributionYield: finite(input.nonRegDistributionYield), accumulationMarginalRate: finite(input.accumulationMarginalRate, .35), meltdownBracketCap: input.meltdownBracketCap ?? 'bracket1' }, properties, debts, incomeSources,
     dependents: (input.children ?? []).map((child, index) => ({ id: legacyId('dependent', index), ageInBaseYear: finite(child.age), provenance: source })),
     strategy: input.strategy, goal: input.goal ?? 'legacy', lifeExpectancy: finite(input.lifeExpectancy), targetAssets: input.fireTargetAssets == null ? unknown('target not supplied') : known(finite(input.fireTargetAssets)), legacyProjection: input,
+    taxProfile: { spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null },
     migration: { sourcePersistVersion: persistVersion, ownershipNeedsConfirmation: couple, ageBasisNeedsConfirmation: true, savingsBasisNeedsConfirmation: true },
   }
 }
@@ -181,6 +182,13 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   } : person)
   const removedPartner = previous.people.find(person => person.role === 'partner' && !next.people.some(current => current.id === person.id))
   const prior = removedPartner ? removePerson(previous, removedPartner.id) : previous
+  // Canonical tax facts are edited by the shared tax panel, not the legacy
+  // numeric form. Keep them across ordinary form edits and mode switches.
+  next.people = next.people.map(person => {
+    const old = prior.people.find(item => item.id === person.id)
+    return old ? { ...person, earnedIncome: old.earnedIncome,
+      previousYearEarnedIncome: old.previousYearEarnedIncome } : person
+  })
   const expandedHousehold = prior.people.length === 1 && next.people.length === 2
   const live = new Set(next.people.map(person => person.id))
   const previousAccounts = new Map(prior.accounts.map(account => [account.id, account]))
@@ -201,6 +209,8 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       acb: account.acb.status === 'unknown' ? old.acb : account.acb,
       contributionRoom: old.contributionRoom,
       openedYear: old.openedYear,
+      kind: old.kind === 'rrif' || old.kind === 'spousalRrsp' || old.kind === 'lif' ? old.kind : account.kind,
+      rrifAgeElection: old.rrifAgeElection,
       accessibleAgeConfirmed: useExplicitLockedOwner ? false : old.accessibleAgeConfirmed,
     }
   })
@@ -215,9 +225,12 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
+  next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {
+    spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null,
+  }
   const nextIncomeIds = new Set(next.incomeSources.map(income => income.id))
   next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
-  next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }
+  next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.kind !== 'nonReg' && a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }
   return next
 }
 
@@ -232,6 +245,7 @@ export function removePerson(plan: InputsV2, personId: string): InputsV2 {
   if (!plan.people.some(person => person.id === personId)) return plan
   return {
     ...plan,
+    taxProfile: { spouseSupported: unknown('household changed; spouse support requires review'), pensionSplit: null },
     people: plan.people.filter(person => person.id !== personId),
     orphanedPeople: [...(plan.orphanedPeople ?? []), ...plan.people.filter(person => person.id === personId)],
     accounts: plan.accounts.map(account => account.ownerId === personId || (account.taxableOwnerShares.status === 'known' && personId in account.taxableOwnerShares.shares)
@@ -253,6 +267,7 @@ export function completeCanonicalFacts(plan: InputsV2, inputs: Inputs): InputsV2
     savingsAllocation: plan.savingsAllocation ?? facts.savingsAllocation,
     recurringContributions: plan.recurringContributions ?? facts.recurringContributions,
     projectionAssumptions: plan.projectionAssumptions ?? facts.projectionAssumptions,
+    taxProfile: plan.taxProfile ?? facts.taxProfile,
     people: plan.people.map(person => ({ ...person, cppWork: person.cppWork === undefined ? facts.people.find(item => item.id === person.id)?.cppWork ?? null : person.cppWork })),
     orphanedPeople: plan.orphanedPeople?.map(person => ({ ...person, cppWork: person.cppWork ?? null })),
     accounts: plan.accounts.map(account => ({ ...account, openedYearsAgoAtBaseYear: account.openedYearsAgoAtBaseYear === undefined ? facts.accounts.find(item => item.id === account.id)?.openedYearsAgoAtBaseYear ?? null : account.openedYearsAgoAtBaseYear })),

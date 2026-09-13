@@ -16,7 +16,7 @@ export function migrationReview(plan: InputsV2 | null): MigrationReview | null {
   return {
     ownershipPending: gate.reasons.includes('ownershipUnknown') || gate.reasons.includes('recipientUnknown'),
     precisionAllowed: gate.allowed,
-    unassignedAccounts: plan.accounts.filter(account => account.ownerId === null || account.taxableOwnerShares.status === 'unknown'),
+    unassignedAccounts: plan.accounts.filter(account => account.kind !== 'nonReg' && account.ownerId === null || account.taxableOwnerShares.status === 'unknown'),
     unassignedProperties: plan.properties.filter(property => property.taxableOwnerShares.status === 'unknown'),
     unassignedIncome: plan.incomeSources.filter(source => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0),
     orphanedPeople: plan.orphanedPeople ?? [],

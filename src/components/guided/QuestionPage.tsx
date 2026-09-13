@@ -17,6 +17,7 @@ import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
 import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
+import { TaxFactsPanel } from '../TaxFactsPanel'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
@@ -155,6 +156,15 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
 
   let control: React.ReactNode
   switch (definition.id) {
+    case 'income.taxFacts':
+      control = <div>
+        <TaxFactsPanel />
+        <ChoiceGroup id={definition.id} value={answer} options={[
+          { value: 'reviewed', label: t('be11.reviewed') },
+          { value: 'unknown', label: t('be11.unknownStill') },
+        ]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
+      </div>
+      break
     case 'family.people':
       control = <ChoiceGroup id={definition.id} value={inputs.partner ? 'couple' : answer} options={[
         { value: 'single', label: t('single'), detail: t('questionnaire.choice.single') },

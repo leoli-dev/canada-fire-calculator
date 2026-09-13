@@ -1,5 +1,23 @@
 {
   "title": "🇨🇦 Canada FIRE Calculator",
+  "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
+  "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
+  "be11QcLimit": "Quebec person-level tax is not verified: family credits, FSS and RAMQ await BE-35. Tax advice and precise comparisons are unavailable.",
+  "be11ComparisonLimit": "Exact current versus Scenario A comparison requires verified person-level tax for both plans.",
+  "be11ComparisonEstimate": "This single-person comparison is an estimate using the prior tax model.",
+  "be11AuxiliaryEstimate": "The timing, strategy and Monte Carlo tools below still use the earlier single-person approximation; their rankings are estimates.",
+  "be11": {
+    "title": "Who receives and owns taxable income", "reviewed": "I reviewed these tax facts", "unknownStill": "I cannot confirm them yet; keep results as estimates",
+    "personLedger": "Tax by person and year", "ledgerLimit": "Annual tax uses the pinned 2026 real-dollar assumptions. Estate tax, other solvers and complex funding events require further person-owned rules.", "person": "Person", "grossIncome": "Gross income", "eligiblePension": "Eligible pension",
+    "explanation": "The same tax facts apply in Guided and Professional. Enter the legal recipient or taxable shares; a household total is never divided automatically. Working-year tax and unsupported asset events remain estimates.",
+    "unknown": "Not confirmed", "shared": "Shared taxable ownership", "self": "You", "partner": "Partner", "yes": "Yes", "no": "No",
+    "earned": "{{person}}: current annual employment income (CAD)",
+    "ownership": "Account and property tax ownership", "selfTaxShare": "Your taxable share (percent)", "propertyOwner": "Investment property owner",
+    "spouseSupport": "Do you support and live with your spouse for the spouse amount?",
+    "splitTransferor": "Elective eligible pension split: who transfers?", "noSplit": "No pension split", "splitAmount": "Annual amount transferred (CAD; at most 50% of eligible income)",
+    "registeredType": "Registered account type", "rrifOpenedYear": "RRIF opening year", "rrifAgeElection": "Age elected when RRIF opened", "noElection": "Use owner’s age",
+    "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35."
+  },
   "tagline": "Retire early, the Canadian way - TFSA, RRSP, CPP/QPP and OAS, modelled properly.",
   "profile": "Profile",
   "ruleAssumptionsTitle": "Tax and benefit rule snapshots",
@@ -683,6 +701,7 @@
       "preferences": { "essential": "Facts may be estimated; preferences must be chosen and confirmed by you.", "why": "Keeping spending fixed and exploring a maximum spending level answer different questions and carry different trade-offs.", "help": "Choose the comparison that reflects your intent. Unsupported legacy amounts and lifetime gifts remain disclosed wishes, not hidden engine constraints.", "example": "You can view a spending ceiling without applying it to your existing budget." }
     },
     "pages": {
+      "income_taxFacts": { "question": "Who receives each income and owns the taxable assets?" },
       "family_people": { "question": "Is this plan for you alone or for you and a partner?" }, "family_ages": { "question": "How old are the people in this plan today?" }, "family_children": { "question": "Are there children whose current age belongs in this household plan?" }, "family_province": { "question": "Which province should this plan use for income tax?" }, "time_work": { "question": "When would you stop full-time work, and do you have an asset target?" }, "time_horizon": { "question": "How far into the future should this plan test?" },
       "saving_method": { "question": "Is it easier to answer with a monthly or yearly saving amount?" }, "saving_amount": { "question": "How much new money do you actually add to savings and investments?" }, "work_after": { "question": "After full-time work ends, do you expect other work income?" }, "work_amount": { "question": "How much work income do you expect each year?" }, "work_period": { "question": "From what age until what age will that income continue?" },
       "assets_identify": { "question": "Which accounts contain money you intend to use for retirement?" }, "account_tfsa_balance": { "question": "What is the current total balance in your TFSA accounts?" }, "account_rrsp_balance": { "question": "What is the current total balance in your RRSP accounts?" }, "account_nonReg_balance": { "question": "What are your non-registered investments worth now, and what is their cost base?" }, "allocation_tfsa": { "question": "How will you divide future new savings among your accounts?" }, "fhsa_details": { "question": "What is in the FHSA now, and how much will you add each year?" }, "fhsa_open": { "question": "How long ago was the FHSA opened?" }, "locked_balance": { "question": "How much is currently in the locked retirement account?" }, "locked_access": { "question": "When can the locked money first be used, and whose plan is it?" }, "locked_contributions": { "question": "How much do you and the employer add to this plan each year?" },

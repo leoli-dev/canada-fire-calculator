@@ -18,7 +18,7 @@ import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 
-export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean }) {
+export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
@@ -72,11 +72,11 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
         : fireNumber?.reason === 'lockedWithdrawalLimits'
           ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
   const lockedWithdrawalUnverified = hasUnverifiedLockedWithdrawals(inputs)
-  const lastResultUnverified = result.success && (lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
+  const lastResultUnverified = result.success && (props.taxWarning || lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
   const quickResultUnverified = (mode === 'when' && earliest?.reason === 'lockedWithdrawalLimits') ||
     (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits')
   const targetResultUnverified = mode === 'target' && goal?.status === 'supported' && lockedWithdrawalUnverified
-  const resultUnverified = (mode === 'last' && lastResultUnverified) || quickResultUnverified || targetResultUnverified
+  const resultUnverified = props.taxWarning || props.taxEstimate || (mode === 'last' && lastResultUnverified) || quickResultUnverified || targetResultUnverified
 
   const ok =
     mode === 'last'
@@ -96,6 +96,17 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     </div>
   )
+
+  if (props.taxEstimate) return <div className="summary uncertain" data-testid="person-tax-estimate">
+    <p className="hint">{t('be11TaxLimit')}</p>
+    <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
+  </div>
+
+  if (props.personTax) return <div className="summary uncertain" data-testid="person-tax-summary">
+    <p className="verdict">{result.success ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }) : t('stratDepleted', { age: result.depletedAge })}</p>
+    <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
+    <p className="hint">{t('be11.ledgerLimit')}</p>
+  </div>
 
   return (
     <div className={`summary ${resultUnverified

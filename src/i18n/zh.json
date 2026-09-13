@@ -1,5 +1,23 @@
 {
   "title": "🇨🇦 加拿大 FIRE 计算器",
+  "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；税表、策略排名和精确比较暂不展示。",
+  "be11SingleEstimate": "单人计划的工作期或未支持事件仍沿用旧税额、图表和规划工具估算。",
+  "be11QcLimit": "魁省逐人税务尚未核实：家庭抵免、FSS 和 RAMQ 留待 BE-35。税务建议及精确比较暂不可用。",
+  "be11ComparisonLimit": "精确比较当前计划与方案 A，需要两份计划的逐人税务均已核实。",
+  "be11ComparisonEstimate": "此单人比较仍是沿用旧税务模型的估算。",
+  "be11AuxiliaryEstimate": "下方开领时机、策略和蒙特卡洛工具仍使用旧单人近似，其排名仅供估算。",
+  "be11": {
+    "title": "应税收入的领取人与归属", "reviewed": "我已核对这些税务事实", "unknownStill": "目前无法确认；结果保持为估算",
+    "personLedger": "逐人逐年税务表", "ledgerLimit": "年度税额沿用以2026年规则为基准的实际购买力假设。遗产税、其他求解器和复杂资金事件仍需逐人规则。", "person": "人员", "grossIncome": "总收入", "eligiblePension": "合格养老金",
+    "explanation": "引导与专业模式共用这些税务事实。请填写法定领取人或应税份额；家庭总额不会自动均分。工作期税务和未支持的资产事件仍属估算。",
+    "unknown": "未确认", "shared": "共同应税归属", "self": "本人", "partner": "伴侣", "yes": "是", "no": "否",
+    "earned": "{{person}}：当前年度工作收入（加元）",
+    "ownership": "账户及房产税务归属", "selfTaxShare": "本人的应税份额（百分比）", "propertyOwner": "投资房产所有者",
+    "spouseSupport": "您是否与伴侣同住并提供扶养，以申领配偶抵免？",
+    "splitTransferor": "合格养老金显式分拆：由谁转出？", "noSplit": "不分拆养老金", "splitAmount": "年度转出金额（加元；不超过合格收入的50%）",
+    "registeredType": "注册账户类型", "rrifOpenedYear": "RRIF 开户年份", "rrifAgeElection": "RRIF 开户时选用的年龄", "noElection": "使用账户持有人年龄",
+    "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。"
+  },
   "tagline": "加拿大式提前退休 —— 认真建模 TFSA、RRSP、CPP/QPP 和 OAS。",
   "profile": "基本信息",
   "ruleAssumptionsTitle": "税务与福利规则版本",
@@ -675,6 +693,7 @@
       "preferences": { "essential": "事实可以估算；偏好必须由你选择并确认。", "why": "维持支出比较遗产，与探索最高支出回答不同问题，也有不同取舍。", "help": "选择符合你意图的比较。未支持的固定遗产和生前赠与会明确披露，不会偷换成引擎约束。", "example": "你可以只查看支出上限，不把它应用到当前预算。" }
     },
     "pages": {
+      "income_taxFacts": { "question": "每项收入由谁领取，应税资产归谁？" },
       "family_people": { "question": "这份计划只看你自己，还是你和伴侣一起？" }, "family_ages": { "question": "这份计划里的每个人现在几岁？" }, "family_children": { "question": "是否有孩子的当前年龄需要纳入家庭计划？" }, "family_province": { "question": "这份计划按哪个省份估算所得税？" }, "time_work": { "question": "你想几岁停止全职工作，有个人资产目标吗？" }, "time_horizon": { "question": "希望把这份计划测试到多大年龄？" },
       "saving_method": { "question": "用每月还是全年金额回答更容易？" }, "saving_amount": { "question": "你实际会新增多少储蓄和投资？" }, "work_after": { "question": "停止全职工作后，还会有其他工作收入吗？" }, "work_amount": { "question": "预计每年有多少工作收入？" }, "work_period": { "question": "这笔收入从几岁持续到几岁？" },
       "assets_identify": { "question": "哪些账户里的钱准备留作退休使用？" }, "account_tfsa_balance": { "question": "你现在所有TFSA的总余额是多少？" }, "account_rrsp_balance": { "question": "你现在所有RRSP的总余额是多少？" }, "account_nonReg_balance": { "question": "非注册投资现在值多少，成本基础是多少？" }, "assets_allocation": { "question": "今后的储蓄准备怎样分到主要账户？" }, "fhsa_details": { "question": "FHSA现在有多少、以后每年投入多少？" }, "fhsa_open": { "question": "FHSA开户多久了？" }, "locked_access": { "question": "锁定资金最早何时可用、属于谁？" }, "locked_contributions": { "question": "你和单位每年分别投入多少？" },

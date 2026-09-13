@@ -98,6 +98,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('pension.partner', 'income', ['pensionKind'], ['partner.pension'], { applicableWhen: (i) => !!i.partner }),
   page('pension.partner.details', 'income', ['pensionAmount', 'pensionStart'], ['partner.pension.annualAmount', 'partner.pension.startAge'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
   page('pension.partner.indexing', 'income', ['pensionIndexing', 'pensionBridge'], ['partner.pension.indexation', 'partner.pension.bridgeAnnual'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
+  page('income.taxFacts', 'income', ['taxFacts'], [], { estimatePolicy: 'none' }),
 
   page('intent.legacy', 'preferences', ['legacyPreference'], [], { estimatePolicy: 'none' }),
   page('intent.spending', 'preferences', ['spendingPreference'], ['goal'], { estimatePolicy: 'none' }),
