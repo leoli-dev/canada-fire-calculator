@@ -22,6 +22,38 @@ async function seedV10(page: import('@playwright/test').Page) {
   return original
 }
 
+test('single balance edited then combined with partner stays unassigned in both modes and after reload', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const tfsa = page.locator('label.field').filter({ hasText: /^TFSA$/ }).locator('input').first()
+  await tfsa.fill('120000')
+  const scenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await scenario.locator('summary').click()
+  await scenario.getByRole('button', { name: 'Save current as A' }).click()
+  await page.locator('label.field').filter({ hasText: 'Household' }).locator('select').selectOption('couple')
+  await tfsa.fill('220000')
+  await expect(page.getByTestId('migration-gate')).toContainText('tfsa: 220,000 CAD unassigned')
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(page.getByTestId('migration-gate')).toContainText('tfsa: 220,000 CAD unassigned')
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(state.canonical.people).toHaveLength(2)
+  expect(state.canonical.accounts.find((a: { kind: string }) => a.kind === 'tfsa')).toMatchObject({ balance: 220000, ownerId: null, taxableOwnerShares: { status: 'unknown' } })
+  expect(state.canonical.migration.ownershipNeedsConfirmation).toBe(true)
+  expect(state.scenarioACanonical.people).toHaveLength(1)
+  expect(state.scenarioACanonical.accounts.find((a: { kind: string }) => a.kind === 'tfsa')).toMatchObject({ balance: 120000, ownerId: state.scenarioACanonical.people[0].id })
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const currentScenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await currentScenario.locator('summary').click()
+  await expect(currentScenario).toContainText('Legacy household estimate')
+  await currentScenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  await expect(page.getByTestId('migration-gate')).toHaveCount(0)
+  const restored = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(restored.canonical.people).toHaveLength(1)
+  expect(restored.canonical.accounts.find((a: { kind: string }) => a.kind === 'tfsa').ownerId).toBe(restored.canonical.people[0].id)
+})
+
 test('v10 couple and Scenario A migrate once with shared mode gate and round trip', async ({ page }) => {
   const original = await seedV10(page)
   await expect(page.getByTestId('migration-gate')).toContainText('120,000 CAD unassigned')

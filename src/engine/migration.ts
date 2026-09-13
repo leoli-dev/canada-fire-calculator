@@ -175,6 +175,7 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   } : person)
   const removedPartner = previous.people.find(person => person.role === 'partner' && !next.people.some(current => current.id === person.id))
   const prior = removedPartner ? removePerson(previous, removedPartner.id) : previous
+  const expandedHousehold = prior.people.length === 1 && next.people.length === 2
   const live = new Set(next.people.map(person => person.id))
   const previousAccounts = new Map(prior.accounts.map(account => [account.id, account]))
   const lockedOwnerChanged = previous.legacyProjection.lockedRetirement?.owner !== inputs.lockedRetirement?.owner
@@ -183,11 +184,13 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     if (!old) return account
     const useExplicitLockedOwner = account.kind === 'lira' && (lockedOwnerChanged || !!returningPartner)
     const sourceOwner = useExplicitLockedOwner ? account.ownerId : old.ownerId
-    const ownerId = sourceOwner && live.has(sourceOwner) ? sourceOwner : null
+    // The form's ordinary account values become household totals when a
+    // partner is added. A prior single-owner ID cannot attribute that total.
+    const ownerId = expandedHousehold && account.kind !== 'lira' ? null : sourceOwner && live.has(sourceOwner) ? sourceOwner : null
     return {
       ...account,
       ownerId,
-      taxableOwnerShares: useExplicitLockedOwner ? shares(ownerId) : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
+      taxableOwnerShares: expandedHousehold && account.kind !== 'lira' ? unknown('new combined household balance needs owner allocation') : useExplicitLockedOwner ? shares(ownerId) : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
         ? old.taxableOwnerShares : unknown('owner reference requires confirmation'),
       acb: account.acb.status === 'unknown' ? old.acb : account.acb,
       contributionRoom: old.contributionRoom,
@@ -200,7 +203,7 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.properties = next.properties.map(property => {
     const old = prior.properties.find(item => item.id === property.id)
     if (!old) return property
-    return { ...property, taxableOwnerShares: old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
+    return { ...property, taxableOwnerShares: expandedHousehold ? unknown('new combined household property needs owner allocation') : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
       ? old.taxableOwnerShares : unknown('owner reference requires confirmation') }
   })
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))

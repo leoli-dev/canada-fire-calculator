@@ -55,6 +55,28 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     expect(plan.incomeSources.filter(s => s.kind === 'cpp').map(s => s.annualAmount)).toEqual([{ status: 'known', value: 14000 }, { status: 'known', value: 7000 }])
     expect(plan.migration.ownershipNeedsConfirmation).toBe(true)
   })
+  it('does not attribute newly combined account and property amounts to the prior single owner', () => {
+    const input = fixture()
+    const single = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const edited = refreshCanonicalFromLegacy(single, { ...single.legacyProjection, balances: { ...input.balances, tfsa: 120000 } })
+    const combined = refreshCanonicalFromLegacy(edited, {
+      ...edited.legacyProjection,
+      partner: fixture(true).partner,
+      balances: { ...edited.legacyProjection.balances, tfsa: 220000 },
+      nonRegBook: 260000,
+      principalResidence: { ...input.principalResidence!, value: 900000, mortgage: { balance: 400000, annualPayment: 30000, yearsRemaining: 18 } },
+    } as Inputs)
+    expect(combined.people).toHaveLength(2)
+    expect(combined.accounts.find(a => a.kind === 'tfsa')).toMatchObject({ balance: 220000, ownerId: null, taxableOwnerShares: { status: 'unknown' } })
+    expect(combined.accounts.find(a => a.kind === 'nonReg')).toMatchObject({ acb: { status: 'known', value: 260000 }, ownerId: null, taxableOwnerShares: { status: 'unknown' } })
+    expect(combined.accounts.find(a => a.kind === 'lira')?.ownerId).toBe(single.people[0].id)
+    expect(combined.properties.every(property => property.taxableOwnerShares.status === 'unknown')).toBe(true)
+    expect(combined.debts.find(debt => debt.propertyId === 'legacy:property:principal')?.principal).toBe(400000)
+    expect(combined.migration.ownershipNeedsConfirmation).toBe(true)
+    expect(() => assertCanonicalPlan(combined)).not.toThrow()
+    const laterEdit = refreshCanonicalFromLegacy(combined, { ...combined.legacyProjection, balances: { ...combined.legacyProjection.balances, tfsa: 250000 } })
+    expect(laterEdit.accounts.find(a => a.kind === 'tfsa')).toMatchObject({ balance: 250000, ownerId: null })
+  })
   it('migrates Scenario A independently, including absence', () => {
     const current = migratePersistedPlan({ inputs: fixture(true) }, 10, 2026)
     const scenario = migratePersistedPlan({ inputs: { ...fixture(true), balances: { tfsa: 1, rrsp: 2, nonReg: 3 } } }, 10, 2026)
