@@ -133,6 +133,7 @@ test('the same funded purchase yields the same result after guided generation an
     } else if (id === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
     else if (id === 'saving.amount') await page.locator('[data-field="annualSavings"] input').fill('5000')
     else if (id === 'account.tfsa.balance') await page.locator('[data-field="balances.tfsa"] input').fill('5000000')
+    else if (id === 'account.rrsp.balance') await page.locator('[data-field="balances.rrsp"] input').fill('1000000')
     else if (id === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
     else if (id === 'assets.identify') {
       await page.getByRole('checkbox', { name: 'TFSA' }).check()
@@ -161,6 +162,9 @@ test('the same funded purchase yields the same result after guided generation an
   if (await generate.isDisabled()) throw new Error(await page.locator('.review-blockers').innerText())
   await generate.click()
   const guidedSummary = await page.locator('.summary').innerText()
+  expect(guidedSummary).toContain('Final-year taxable addition')
+  expect(guidedSummary).toContain('shared projected endpoint')
+  expect(guidedSummary).toMatch(/Added final-return tax and repayment (?!CA\$0\b)/)
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   expect(await page.locator('.summary').innerText()).toBe(guidedSummary)
 })

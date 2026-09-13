@@ -16,6 +16,7 @@ test('professional mode completes a representative household plan and scenario r
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
   await expect(page.locator('.results-column')).toBeVisible()
+  await expect(page.locator('.results-column')).toContainText('shared projected endpoint')
 
   await field(page, 'Current age').fill('36')
   await field(page, 'Target FIRE age').fill('46')

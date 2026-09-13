@@ -11,6 +11,7 @@ import {
 } from './types'
 import { incomeTax, probateTax } from './tax'
 import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
+import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
   allowanceAnnual,
@@ -102,6 +103,7 @@ interface WithdrawalOutcome {
   /** CCB received (tax-free, income-tested on taxable income incl. OAS) */
   ccb: number
   netCash: number
+  taxPeople: TerminalTaxPerson[]
 }
 
 /**
@@ -168,6 +170,7 @@ function evaluate(
   const share = pooledTaxable / persons
   let oasNet = 0
   let tax = 0
+  const taxPeople: TerminalTaxPerson[] = []
   for (let i = 0; i < persons; i++) {
     const personExtra = i === 0 ? extraIncome : 0
     const personTaxable = share + personExtra
@@ -177,10 +180,13 @@ function evaluate(
     // withdrawals only at 65+
     const pensionIncome =
       pension / persons + (agesPerPerson[i] >= 65 ? (w.rrsp + purchaseRrspWithdrawal) / persons : 0)
-    tax += incomeTax(personTaxable + personOas, inputs.province, {
+    const credits = {
       age: agesPerPerson[i],
       pensionIncome,
-    })
+    }
+    const taxableIncome = personTaxable + personOas
+    taxPeople.push({ taxableIncome, credits, oasGross: oasGrossPerPerson[i], oasNet: personOas })
+    tax += incomeTax(taxableIncome, inputs.province, credits)
   }
   // GIS: requires receiving OAS; income test is on combined household income
   // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
@@ -198,7 +204,7 @@ function evaluate(
     cpp + pension + oasNet + gis + ccb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
   const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   const taxablePerPerson = totalTaxable / persons
-  return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson }
+  return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson, taxPeople }
 }
 
 /** Binary-search the gross withdrawal needed to hit the spending target. */
@@ -257,12 +263,13 @@ export function pensionStartAge(inputs: Inputs): number {
 
 export function runProjection(inputs: Inputs, sample?: ReturnSampler): ProjectionResult {
   const bal: Record<AccountType, number> = { ...inputs.balances }
-  let nonRegBook = Math.min(inputs.nonRegBook, bal.nonReg)
+  let nonRegBook = inputs.nonRegBook
   const pensionAge = pensionStartAge(inputs)
   const partner = inputs.partner ?? null
   const rows: YearRow[] = []
   let depletedAge: number | null = null
   let rrspTaxTotal = 0
+  let finalYearPeople: TerminalTaxPerson[] = []
   const unfundedObligations: FundingGap[] = []
 
   // debt payments are fixed in nominal dollars — inflation erodes them in
@@ -330,7 +337,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let prValue = plannedPurchase ? 0 : pr && pr.mode !== 'planned' ? pr.value : 0
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
-    acb: Math.min(p.acb, p.value),
+    acb: p.acb,
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
     sold: false,
@@ -357,6 +364,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let accumulationSaleTax = 0
     const saleTaxObligations: { amount: number; propertyIdx: number }[] = []
     let taxablePerPerson = 0
+    let yearTaxPeople: TerminalTaxPerson[] = []
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let dpAccumTax = 0
@@ -740,6 +748,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         cpp, oas: oasGross,
         property: rent - rentMortgageInterest + saleGainsTaxable, extraIncome: 0, pension,
       }
+      // Salary is not modeled in accumulation. Preserve the prior known-
+      // income approximation for direct-engine callers of invalid plans, but
+      // mark it unsupported below rather than calling it an actual tax base.
+      const knownTaxable = Object.values(taxableBySource).reduce((sum, value) => sum + value, 0)
+      yearTaxPeople = agesPerPerson.map((personAge) => ({
+        taxableIncome: knownTaxable / agesPerPerson.length,
+        credits: { age: personAge, pensionIncome: pension / agesPerPerson.length },
+      }))
     } else {
       extraTaxable += dist + purchaseTaxable
 
@@ -792,6 +808,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         extraIncome, nUnder6, n6to17, steps, inputs, purchaseTaxPaid, purchaseRrspWithdrawal,
       )
       withdrawals = out.withdrawals
+      yearTaxPeople = out.taxPeople
       tax = out.tax
       rrspTaxTotal += out.rrspTax
       oas = out.oasNet
@@ -902,6 +919,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       debtPayment, debtBalance,
       taxablePerPerson, taxBySource, taxableBySource,
     })
+    finalYearPeople = yearTaxPeople
   }
 
   const ipTotal = ips.reduce((s, p) => s + p.value, 0)
@@ -920,14 +938,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + lockedBal + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
-  const persons = partner ? 2 : 1
-  const nonRegGain = Math.max(0, bal.nonReg - nonRegBook)
-  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? Math.max(0, p.value - p.acb) : 0), 0)
-  const deemedTaxable =
-    (bal.rrsp + lockedBal + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)) / persons
-  const estateTax = incomeTax(deemedTaxable, inputs.province) * persons
-  const deemedTotal = bal.rrsp + lockedBal + CAPITAL_GAINS_INCLUSION * (nonRegGain + ipGain)
-  const rrspEstateTax = deemedTotal > 0 ? estateTax * ((bal.rrsp + lockedBal) / deemedTotal) : 0
+  const nonRegGain = bal.nonReg > 0 ? bal.nonReg - nonRegBook : 0
+  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? p.value - p.acb : 0), 0)
+  const terminal = finalYearPeople.length > 0 ? terminalTax({
+    province: inputs.province,
+    people: finalYearPeople,
+    remainingRegistered: bal.rrsp + lockedBal,
+    nonRegisteredGain: nonRegGain,
+    investmentPropertyGain: ipGain,
+  }) : null
   // probate applies to the net value of non-registered holdings and unsold
   // real estate (a registered mortgage against the property reduces the
   // probatable estate); RRSP/RRIF/TFSA bypass it via named beneficiaries
@@ -941,9 +960,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
-    estateTax,
+    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' ? 'estimated' : 'unsupported',
+    estateTax: terminal?.incrementalTax ?? Number.NaN,
+    terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
+    terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,
+    terminalCapitalGainsIncome: terminal?.taxableCapitalGains ?? Number.NaN,
     probateFee,
-    estateValue: finalNetWorth - estateTax - probateFee,
-    rrspTax: rrspTaxTotal + rrspEstateTax,
+    estateValue: terminal ? finalNetWorth - terminal.incrementalTax - probateFee : Number.NaN,
+    rrspTax: terminal ? rrspTaxTotal + terminal.registeredTaxShare : Number.NaN,
   }
 }
