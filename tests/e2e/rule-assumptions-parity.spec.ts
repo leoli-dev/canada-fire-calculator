@@ -13,6 +13,9 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(professional).toContainText('CA-BC-tax-2026-legacy-v1')
   const text = await professional.innerText()
   const links = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+  expect(links).toHaveLength(6)
+  expect(links[0]).toContain('/2026/')
+  expect(links[4]).toContain('/2026/')
 
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
@@ -22,4 +25,12 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(guided).toContainText('not yet connected')
   expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
+
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.getByLabel('Province').selectOption('MB')
+  await expect(professional).toContainText('Manitoba\'s dedicated 2026 CRA guide')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/review')
+  await expect(guided).toContainText('Manitoba\'s dedicated 2026 CRA guide')
+  await expect(guided.locator('a')).toHaveCount(7)
 })

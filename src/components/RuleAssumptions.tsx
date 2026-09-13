@@ -12,8 +12,19 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
     <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id })}</p>
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
     <p>{t('ruleAssumptionsLimit')}</p>
-    <a href={tax.sourceURL} target="_blank" rel="noreferrer">{t('ruleTaxSource')}</a>{' · '}
-    {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{new URL(url).hostname}</a>{' · '}</span>)}
-    <a href={ccb.sourceURL} target="_blank" rel="noreferrer">{t('ruleCcbSource')}</a>
+    <div className="rule-sources">
+      {([
+        ['ruleFederalBracketsSource', tax.fieldSources.federalBrackets],
+        ['ruleFederalBpaSource', tax.fieldSources.federalBpa],
+        ['ruleProvincialBracketsSource', tax.fieldSources.provincialBrackets],
+        ['ruleProvincialBpaSource', tax.fieldSources.provincialBpa],
+        ['ruleCcbAmountsSource', ccb.fieldSources.amounts],
+        ['ruleCcbThresholdsSource', ccb.fieldSources.thresholds],
+      ] as const).map(([label, url]) => <span key={label}>
+        <a href={url} target="_blank" rel="noreferrer">{t(label)}</a>{' · '}
+      </span>)}
+      {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{t('ruleConflictingSource')}</a>{' · '}</span>)}
+    </div>
+    {tax.sourceConflict && <p>{t('ruleMbConflict')}</p>}
   </div>
 }

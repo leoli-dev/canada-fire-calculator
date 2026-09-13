@@ -40,4 +40,38 @@ describe('dated rule selection', () => {
   it('blocks publication without complete provenance and policy metadata', () => {
     expect(() => publishRulePack({ id: 'broken', jurisdiction: 'ON', taxYear: 2026 })).toThrow()
   })
+
+  it('rejects malformed pack content before publication', () => {
+    const valid = selectTaxRules('ON', 2026)
+    expect(() => publishRulePack({ ...valid, jurisdiction: 'ZZ' })).toThrow()
+    expect(() => publishRulePack({ ...valid, federal: { bpa: NaN, brackets: [] } })).toThrow()
+    expect(() => publishRulePack({ ...valid, effectiveDate: '2026-02-31' })).toThrow()
+    expect(() => publishRulePack({ ...valid, verifiedAt: '2026-13-01' })).toThrow()
+    expect(() => publishRulePack({ ...valid, fieldSources: { ...valid.fieldSources, federalBpa: '' } })).toThrow()
+    expect(() => publishRulePack({ ...valid, federal: { ...valid.federal, brackets: [
+      { upTo: Number.NaN, rate: 0.1 }, { upTo: Infinity, rate: 0.2 },
+    ] } })).toThrow()
+    expect(() => publishRulePack({ ...valid, provincial: { ...valid.provincial, brackets: [
+      { upTo: 1000, rate: 0.2 }, { upTo: 500, rate: 0.1 }, { upTo: Infinity, rate: 0.3 },
+    ] } })).toThrow()
+    expect(() => selectTaxRules('ON', 2027, { annualRate: -1 })).toThrow()
+    expect(() => selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: -1 })).toThrow()
+    const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
+    expect(() => publishRulePack({ ...ccb, paymentPeriod: '2026-07/2026-06' })).toThrow()
+    expect(() => publishRulePack({ ...ccb, values: { ...ccb.values, th1: Infinity } })).toThrow()
+  })
+
+  it('links each pinned field to dated official evidence and records MB conflict', () => {
+    const on25 = selectTaxRules('ON', 2025)
+    const on26 = selectTaxRules('ON', 2026)
+    expect(on25.fieldSources.federalBrackets).toContain('/2025/')
+    expect(on25.fieldSources.federalBpa).toContain('/2025/')
+    expect(on25.fieldSources.provincialBrackets).toContain('/2025/')
+    expect(on25.fieldSources.provincialBpa).toContain('/2025/')
+    expect(on26.fieldSources.federalBrackets).toContain('/2026/')
+    expect(on26.fieldSources.provincialBpa).toContain('/2026/')
+    expect(selectBenefitRules('CCB', '2025-07/2026-06').fieldSources.amounts).toContain('2025')
+    expect(selectBenefitRules('CCB', '2026-07/2027-06').fieldSources.amounts).toContain('/2026/')
+    expect(selectTaxRules('MB', 2026).sourceConflict).toContain('$47,564')
+  })
 })
