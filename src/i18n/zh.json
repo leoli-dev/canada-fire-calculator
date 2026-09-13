@@ -2,7 +2,7 @@
   "title": "🇨🇦 加拿大 FIRE 计算器",
   "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；税表、策略排名和精确比较暂不展示。",
   "be11SingleEstimate": "单人计划的工作期或未支持事件仍沿用旧税额、图表和规划工具估算。",
-  "be11QcLimit": "魁省逐人税务尚未核实：家庭抵免、FSS 和 RAMQ 留待 BE-35。税务建议及精确比较暂不可用。",
+  "be11QcLimit": "本计划的魁省税务精度受限。药保覆盖未知或使用公保时，仍需尚未公布的2026年附表K；其他未支持事件也保持估算。税务建议与精确比较暂不展示。",
   "be11ComparisonLimit": "精确比较当前计划与方案 A，需要两份计划的逐人税务均已核实。",
   "be11ComparisonEstimate": "此单人比较仍是沿用旧税务模型的估算。",
   "be11TerminalComparisonLimit": "两份计划的逐人终年税务尚未核实，税后遗产比较不可用。最终净资产不含遗产税，仅在比较受支持时显示。",
@@ -21,6 +21,7 @@
     "rrifFactorHelp": "选择类别前请核对金融机构的开户、转入和修订记录。仅凭开户年份不能确认资格；保持“未确认”时，精确最低提款额及税务结果会继续受限。", "rrifFactorSource": "CRA 法定因子表",
     "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。"
   },
+  "be35": {"qcSplitTransferor": "魁省附表Q选择：由谁转出？", "qcSplitAmount": "魁省年度退休收入转出额（加元）", "splitHelp": "魁省养老金转移选择与联邦分拆独立。转出人必须至少65岁；只有实际选择附表Q时才填写转移。", "coverageTitle": "魁省逐月处方药保险覆盖", "coverageHelp": "分别确认每人一月至十二月的私人、公保或已核实免缴状态。未来年份沿用此规划假设。只要有公保月份，2026年附表K公布前税额仍是估算。", "coveragePerson": "{{person}}的覆盖", "allMonths": "设置所有月份", "mixed": "各月不同", "unknown": "未确认", "private": "私人基本药保", "public": "RAMQ公共药保", "waived": "已核实免缴保费", "publicLimit": "公共保费取决于家庭收入和税年附表K；2026版尚未公布。七月至次年六月的RAMQ费率不能当作全年税额。", "ramqSource": "RAMQ费率期间", "limit": "魁省家庭抵免和FSS使用2026参数。公保保费待2026附表K核实；其他复杂税务事件仍属估算。", "fss": "FSS缴费", "ramq": "RAMQ保费", "scheduleB": "附表B抵免", "qcProvincialTax": "魁省所得税", "federalEligiblePension": "联邦合格养老金", "qcRetirementEligible": "魁省退休收入（122/123行）"},
   "tagline": "加拿大式提前退休 —— 认真建模 TFSA、RRSP、CPP/QPP 和 OAS。",
   "profile": "基本信息",
   "ruleAssumptionsTitle": "税务与福利规则版本",

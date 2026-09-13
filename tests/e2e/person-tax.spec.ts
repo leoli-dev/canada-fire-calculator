@@ -72,15 +72,85 @@ test('explicit DB pension election changes the normal person tax ledger in both 
   await expect(page.getByTestId('split-amount')).toHaveValue('20000')
 })
 
-test('QC family/FSS/RAMQ tax capability stays visibly limited in EN, FR and ZH', async ({ page }) => {
+test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private facts work in both modes', async ({ page }) => {
   await seed(page, { province: 'QC' })
   for (const [language, fragment] of [
-    ['EN', 'person-level tax'], ['FR', 'impôt individuel'], ['中文', '魁省逐人税务'],
+    ['EN', 'Schedule K'], ['FR', 'annexe K'], ['中文', '附表K'],
   ] as const) {
     await page.getByRole('button', { name: language, exact: true }).click()
     await expect(page.getByTestId('person-tax-limit')).toContainText(fragment)
     await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
   }
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await page.getByTestId('qc-coverage-all-self').selectOption('private')
+  await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
+  await expect(page.getByTestId('person-tax-table')).toBeVisible()
+  await page.getByTestId('person-tax-table').locator('summary').click()
+  await expect(page.getByTestId('person-tax-table')).toContainText('FSS contribution')
+  await expect(page.getByTestId('person-tax-table')).toContainText('RAMQ premium')
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await expect(page.getByTestId('person-tax-table')).toContainText('Cotisation FSS')
+  await page.getByRole('button', { name: '中文' }).click()
+  await expect(page.getByTestId('person-tax-table')).toContainText('FSS缴费')
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/income/income.taxFacts')
+  await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('private')
+  await page.getByTestId('qc-coverage-self-7').selectOption('public')
+  await page.reload()
+  await expect(page.getByTestId('qc-coverage-self-7')).toHaveValue('public')
+  await expect(page.getByTestId('qc-coverage-self-6')).toHaveValue('private')
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(saved.canonical.taxProfile.qcDrugCoverage['legacy:person:self'][6]).toBe('public')
+  expect(saved.resultRevision).toBeNull()
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
+test('QC spouse coverage is independent and the Quebec election is separate from federal', async ({ page }) => {
+  await seed(page, { couple: true, pension: true, province: 'QC' })
+  await page.getByTestId('qc-coverage-all-self').selectOption('private')
+  await page.getByTestId('qc-coverage-all-partner').selectOption('waived')
+  await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('private')
+  await expect(page.getByTestId('qc-coverage-all-partner')).toHaveValue('waived')
+  await page.getByTestId('split-transferor').selectOption('legacy:person:self')
+  await page.getByTestId('split-amount').fill('10000')
+  await page.getByTestId('split-amount').blur()
+  await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/income/income.taxFacts')
+  await expect(page.getByTestId('qc-coverage-all-partner')).toHaveValue('waived')
+  await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
+})
+
+test('current and Scenario A keep independent Quebec coverage facts', async ({ page }) => {
+  await seed(page, { province: 'QC' })
+  await page.getByTestId('qc-coverage-all-self').selectOption('private')
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+    saved.state.scenarioA = structuredClone(saved.state.inputs)
+    saved.state.scenarioACanonical = structuredClone(saved.state.canonical)
+    saved.state.scenarioACanonical.taxProfile.qcDrugCoverage['legacy:person:self'][6] = 'public'
+    localStorage.setItem('fire-inputs', JSON.stringify(saved))
+  })
+  await page.reload()
+  await expect(page.getByTestId('person-tax-table')).toBeVisible()
+  const scenario = page.getByTestId('scenario-comparison')
+  await scenario.locator('summary').click()
+  await expect(scenario.getByText('Comparison unavailable')).toHaveCount(2)
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+    const currentCoverage = saved.state.canonical.taxProfile.qcDrugCoverage['legacy:person:self']
+    const scenarioCoverage = saved.state.scenarioACanonical.taxProfile.qcDrugCoverage['legacy:person:self']
+    saved.state.canonical.taxProfile.qcDrugCoverage['legacy:person:self'] = scenarioCoverage
+    saved.state.scenarioACanonical.taxProfile.qcDrugCoverage['legacy:person:self'] = currentCoverage
+    localStorage.setItem('fire-inputs', JSON.stringify(saved))
+  })
+  await page.reload()
+  await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect(page.getByTestId('qc-coverage-self-7')).toHaveValue('public')
 })
 
 test('current and Scenario A each retain their own person-tax capability', async ({ page }) => {
@@ -97,7 +167,7 @@ test('current and Scenario A each retain their own person-tax capability', async
   await page.reload()
   const comparison = page.getByTestId('scenario-comparison')
   await comparison.locator('summary').click()
-  await expect(comparison).toContainText('Exact current versus Scenario A comparison requires')
+  await expect(comparison).toContainText('After-tax estate comparison is unavailable')
   await expect(comparison.getByText('Comparison unavailable')).toHaveCount(2)
   await page.evaluate(async () => {
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
@@ -111,7 +181,7 @@ test('current and Scenario A each retain their own person-tax capability', async
     localStorage.setItem('fire-inputs', JSON.stringify(saved))
   })
   await page.reload()
-  await expect(page.getByTestId('scenario-comparison')).toContainText('Exact current versus Scenario A comparison requires')
+  await expect(page.getByTestId('scenario-comparison')).toContainText('After-tax estate comparison is unavailable')
 })
 
 test('couple terminal tax cannot masquerade as final net worth in Scenario A comparison', async ({ page }) => {

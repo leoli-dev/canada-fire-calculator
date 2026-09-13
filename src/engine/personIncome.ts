@@ -93,11 +93,17 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
       if (event.kind === 'employment') person.earnedWork += gross
       if (event.kind === 'oas') person.oasGross += gross
       else person.gisIncomeBase += taxable
-      if (['rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension'].includes(event.kind)) person.fssIncomeBase += taxable
+      // Schedule F starts at total income and subtracts wages and OAS, among
+      // other specific items. CPP/QPP is not one of those exclusions.
+      if (['cpp', 'rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension'].includes(event.kind)) person.fssIncomeBase += taxable
       if (event.kind === 'dbPension' || (['rrifWithdrawal', 'lifWithdrawal'].includes(event.kind) && person.age >= 65)) {
         person.federalPensionEligible += taxable
-        if (plan.province !== 'QC' || person.age >= 65) person.provincialPensionEligible += taxable
+        if (plan.province !== 'QC') person.provincialPensionEligible += taxable
       }
+      // Québec Schedule B uses income on lines 122/123 even for under-65
+      // recipients; ordinary RRSP is line 122 but is not federal T1032 income.
+      if (plan.province === 'QC' && ['dbPension', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal'].includes(event.kind))
+        person.provincialPensionEligible += taxable
     }
   }
   return { status: 'ok', byPerson }

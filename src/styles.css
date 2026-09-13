@@ -654,3 +654,7 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .table-scroll { -webkit-overflow-scrolling: touch; }
 .table-scroll .compare-table { min-width: max-content; }
 .table-scroll .compare-table td, .table-scroll .compare-table th { white-space: nowrap; }
+
+.qc-month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin: 10px 0; }
+.qc-month-grid label { min-width: 0; }
+.qc-month-grid select { width: 100%; min-width: 0; }

@@ -2,7 +2,7 @@
   "title": "🇨🇦 Canada FIRE Calculator",
   "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
   "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
-  "be11QcLimit": "Quebec person-level tax is not verified: family credits, FSS and RAMQ await BE-35. Tax advice and precise comparisons are unavailable.",
+  "be11QcLimit": "Quebec tax precision is limited for this plan. Unknown or public prescription coverage needs the unpublished 2026 Schedule K; other unsupported events also remain estimates. Tax advice and exact comparisons are withheld.",
   "be11ComparisonLimit": "Exact current versus Scenario A comparison requires verified person-level tax for both plans.",
   "be11ComparisonEstimate": "This single-person comparison is an estimate using the prior tax model.",
   "be11TerminalComparisonLimit": "After-tax estate comparison is unavailable because individual terminal tax is not verified for both plans. Final net worth excludes estate tax and is shown only when the comparison is supported.",
@@ -21,6 +21,7 @@
     "rrifFactorHelp": "Check the provider’s opening, transfer and amendment records before choosing a category. Opening year alone does not prove qualification; leave it unconfirmed to keep the exact minimum and tax result limited.", "rrifFactorSource": "CRA prescribed-factor chart",
     "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35."
   },
+  "be35": {"qcSplitTransferor": "Quebec Schedule Q election: who transfers?", "qcSplitAmount": "Quebec annual retirement-income transfer (CAD)", "splitHelp": "The Quebec election is separate from the federal pension split. The transferor must be at least 65; choose no transfer unless the Schedule Q election is intended.", "coverageTitle": "Quebec prescription-drug coverage by month", "coverageHelp": "Confirm each person’s private, public or verified exempt coverage for January–December. The pattern is reused as a planning assumption for projected years. A public month remains a tax estimate until the 2026 Schedule K is published.", "coveragePerson": "{{person}} coverage", "allMonths": "Set all months", "mixed": "Different months", "unknown": "Not confirmed", "private": "Private basic plan", "public": "RAMQ public plan", "waived": "Verified premium exemption", "publicLimit": "Public premiums use family income and the tax-year Schedule K, which is not yet published for 2026. The July–June RAMQ tariffs are not a full-year tax amount.", "ramqSource": "RAMQ rate periods", "limit": "Quebec family credits and FSS use 2026 parameters. Public RAMQ months remain unverified until the 2026 Schedule K; other complex tax events remain estimates.", "fss": "FSS contribution", "ramq": "RAMQ premium", "scheduleB": "Schedule B credit", "qcProvincialTax": "Quebec income tax", "federalEligiblePension": "Federal eligible pension", "qcRetirementEligible": "Quebec retirement income (line 122/123)"},
   "tagline": "Retire early, the Canadian way - TFSA, RRSP, CPP/QPP and OAS, modelled properly.",
   "profile": "Profile",
   "ruleAssumptionsTitle": "Tax and benefit rule snapshots",

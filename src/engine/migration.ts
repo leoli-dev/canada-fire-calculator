@@ -228,6 +228,9 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {
     spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null,
+    qcPensionSplit: null,
+    qcDrugCoverage: prior.taxProfile?.qcDrugCoverage
+      ? Object.fromEntries(Object.entries(prior.taxProfile.qcDrugCoverage).filter(([id]) => live.has(id))) : undefined,
   }
   const nextIncomeIds = new Set(next.incomeSources.map(income => income.id))
   next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
@@ -246,7 +249,9 @@ export function removePerson(plan: InputsV2, personId: string): InputsV2 {
   if (!plan.people.some(person => person.id === personId)) return plan
   return {
     ...plan,
-    taxProfile: { spouseSupported: unknown('household changed; spouse support requires review'), pensionSplit: null },
+    taxProfile: { spouseSupported: unknown('household changed; spouse support requires review'), pensionSplit: null,
+      qcPensionSplit: null, qcDrugCoverage: plan.taxProfile?.qcDrugCoverage
+        ? Object.fromEntries(Object.entries(plan.taxProfile.qcDrugCoverage).filter(([id]) => id !== personId)) : undefined },
     people: plan.people.filter(person => person.id !== personId),
     orphanedPeople: [...(plan.orphanedPeople ?? []), ...plan.people.filter(person => person.id === personId)],
     accounts: plan.accounts.map(account => account.ownerId === personId || (account.taxableOwnerShares.status === 'known' && personId in account.taxableOwnerShares.shares)

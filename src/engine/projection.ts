@@ -1024,7 +1024,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
-    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
+    // The terminal allocator still calls legacy incomeTax(), whose Quebec
+    // Schedule F/K approximations cannot establish owner-specific closing tax.
+    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' && inputs.province !== 'QC' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
     estateTax: terminal?.incrementalTax ?? Number.NaN,
     terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
     terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,

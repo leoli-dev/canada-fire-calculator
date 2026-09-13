@@ -1,5 +1,7 @@
 export * from './types'
 export { incomeTax, marginalRate, probateTax, qcFssContribution, qcRamqPremium } from './tax'
+export { calculateQuebecTax, scheduleB2026, scheduleF2026, ramqPremium2026, ramqScheduleK2025,
+  ramqMonthlyPeriodMaximum, type QuebecTaxResult, type QuebecTaxRow } from './quebecTax'
 export {
   cppAnnual,
   oasAnnual,

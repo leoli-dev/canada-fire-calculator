@@ -14,11 +14,17 @@ export function PersonTaxTable({ plan, result }: { plan: InputsV2; result: Proje
     <p className="hint">{t('be11.ledgerLimit')}</p>
     <div className="table-scroll"><table className="compare-table">
       <thead><tr><th>{t('colAge')}</th><th>{t('be11.person')}</th><th>{t('be11.grossIncome')}</th>
-        <th>{t('colTaxable')}</th><th>{t('be11.eligiblePension')}</th><th>{t('taxLabel')}</th></tr></thead>
+        <th>{t('colTaxable')}</th><th>{t(plan.province === 'QC' ? 'be35.federalEligiblePension' : 'be11.eligiblePension')}</th>
+        {plan.province === 'QC' && <><th>{t('be35.qcRetirementEligible')}</th><th>{t('be35.scheduleB')}</th><th>{t('be35.qcProvincialTax')}</th><th>{t('be35.fss')}</th><th>{t('be35.ramq')}</th></>}
+        <th>{t('taxLabel')}</th></tr></thead>
       <tbody>{rows.flatMap(row => Object.values(row.byPersonTax!).map(person => <tr key={`${row.age}:${person.personId}`}>
         <td>{row.age}</td><td>{t(plan.people.find(item => item.id === person.personId)?.role === 'partner' ? 'be11.partner' : 'be11.self')}</td>
         <td className="num">{cad(person.grossIncome)}</td><td className="num">{cad(person.taxableIncome)}</td>
-        <td className="num">{cad(person.federalPensionEligible)}</td><td className="num">{cad(person.tax)}</td>
+        <td className="num">{cad(person.federalPensionEligible)}</td>
+        {plan.province === 'QC' && <><td className="num">{cad(person.provincialPensionEligible)}</td><td className="num">{cad(person.qc?.scheduleBCredit ?? 0)}</td>
+          <td className="num">{cad(person.qc?.provincialIncomeTax ?? 0)}</td><td className="num">{cad(person.qc?.fss ?? 0)}</td>
+          <td className="num">{cad(person.qc?.ramq ?? 0)}</td></>}
+        <td className="num">{cad(person.tax)}</td>
       </tr>))}</tbody>
     </table></div>
   </details>

@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import type { InputsV2 } from '../engine/model'
+import type { InputsV2, QcDrugCoverage } from '../engine/model'
 import { refreshCanonicalFromLegacy } from '../engine/migration'
 import { useStore } from '../store'
 
 /** One editor for both entry modes. Editing canonical facts is one store
  * transaction; the legacy form cannot turn an unknown owner into 50/50. */
 export function TaxFactsPanel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const plan = useStore(state => state.canonical)
   const inputs = useStore(state => state.inputs)
   const commitPlan = useStore(state => state.commitPlan)
@@ -14,6 +14,7 @@ export function TaxFactsPanel() {
   const people = current.people
   const self = people.find(person => person.role === 'self')
   const partner = people.find(person => person.role === 'partner')
+  const monthNames = Array.from({ length: 12 }, (_, index) => new Intl.DateTimeFormat(i18n.language, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, index, 1))))
   const edit = (change: (draft: InputsV2) => void) => {
     const state = useStore.getState()
     const draft = structuredClone(state.canonical ?? refreshCanonicalFromLegacy(null, state.inputs))
@@ -131,7 +132,62 @@ export function TaxFactsPanel() {
             edit(draft => { if (draft.taxProfile?.pensionSplit) draft.taxProfile.pensionSplit.amount = amount })
           }} />
       </label>}
+      {current.province === 'QC' && <>
+        <label>{t('be35.qcSplitTransferor')}
+          <select data-testid="qc-split-transferor" value={current.taxProfile?.qcPensionSplit?.transferorId ?? ''}
+            onChange={event => edit(draft => {
+              draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+              const transferorId = event.target.value
+              const recipientId = draft.people.find(item => item.id !== transferorId)?.id
+              draft.taxProfile.qcPensionSplit = transferorId && recipientId ? { transferorId, recipientId, amount: 0 } : null
+            })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
+        </label>
+        {current.taxProfile?.qcPensionSplit && <label>{t('be35.qcSplitAmount')}
+          <input type="number" min="0" step="1" data-testid="qc-split-amount"
+            key={`qc-split:${current.taxProfile.qcPensionSplit.transferorId}:${current.taxProfile.qcPensionSplit.amount}`}
+            defaultValue={current.taxProfile.qcPensionSplit.amount}
+            onBlur={event => {
+              const amount = Number(event.currentTarget.value)
+              if (!Number.isFinite(amount) || amount < 0 || amount === current.taxProfile?.qcPensionSplit?.amount) return
+              edit(draft => { if (draft.taxProfile?.qcPensionSplit) draft.taxProfile.qcPensionSplit.amount = amount })
+            }} />
+        </label>}
+        <p className="hint">{t('be35.splitHelp')}</p>
+      </>}
     </>}
+    {current.province === 'QC' && <div data-testid="qc-drug-coverage">
+      <h4>{t('be35.coverageTitle')}</h4>
+      <p>{t('be35.coverageHelp')}</p>
+      {people.map(person => {
+        const label = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
+        const months = current.taxProfile?.qcDrugCoverage?.[person.id] ?? Array<QcDrugCoverage>(12).fill('unknown')
+        const setCoverage = (index: number | null, value: QcDrugCoverage) => edit(draft => {
+          draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+          draft.taxProfile.qcDrugCoverage ??= {}
+          const next = [...(draft.taxProfile.qcDrugCoverage[person.id] ?? Array<QcDrugCoverage>(12).fill('unknown'))]
+          if (index === null) next.fill(value)
+          else next[index] = value
+          draft.taxProfile.qcDrugCoverage[person.id] = next
+        })
+        return <fieldset key={person.id}>
+          <legend>{t('be35.coveragePerson', { person: label })}</legend>
+          <label>{t('be35.allMonths')}
+            <select data-testid={`qc-coverage-all-${person.role}`} value={months.every(month => month === months[0]) ? months[0] : 'mixed'}
+              onChange={event => setCoverage(null, event.target.value as QcDrugCoverage)}>
+              <option value="mixed" disabled>{t('be35.mixed')}</option>
+              {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
+            </select>
+          </label>
+          <div className="qc-month-grid">{months.map((status, index) => <label key={index}>{monthNames[index]}
+            <select data-testid={`qc-coverage-${person.role}-${index + 1}`} value={status}
+              onChange={event => setCoverage(index, event.target.value as QcDrugCoverage)}>
+              {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
+            </select>
+          </label>)}</div>
+        </fieldset>
+      })}
+      <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>
+    </div>}
     {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind)).map(account => <div key={account.id}>
       <label>{t('be11.registeredType')}
         <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => edit(draft => {
@@ -176,6 +232,6 @@ export function TaxFactsPanel() {
         </label>}
       </>}
     </div>)}
-    <p>{t('be11.limit')}</p>
+    <p>{t(current.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
   </section>
 }

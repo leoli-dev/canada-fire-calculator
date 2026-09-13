@@ -197,10 +197,10 @@ export const ON_HEALTH_PREMIUM: { from: number; base: number; rate: number; cap:
 
 /**
  * Quebec: individual contribution to the Fonds des services de santé (FSS),
- * levied on retirement income, investment income and capital gains (OAS is
- * excluded) — not just for seniors, but our engine only prices non-employment
- * income through incomeTax(), which is exactly the FSS base. 2026 figures,
- * officially confirmed (Bulletin d'information 2026-1): min($150, 1% of the
+ * levied on Schedule F's source-specific base. The legacy incomeTax() caller
+ * still approximates that base using taxable income; the person-owned Quebec
+ * path calculates it from income events in quebecTax.ts. 2026 figures,
+ * officially confirmed (Quebec Finance 2026 Table 3): min($150, 1% of the
  * excess over $18,500) up to $64,355, then $150 + 1% of the excess over
  * $64,355, capped at $1,000.
  */
@@ -210,9 +210,9 @@ export const QC_FSS = { t1: 18500, t2: 64355, cap1: 150, cap2: 1000 }
  * Quebec: RAMQ public prescription-drug-insurance premium, settled via the
  * tax return (Schedule K) by adults without private drug coverage — the
  * common case for FIRE'd retirees who've left an employer group plan. Per
- * person. 2026 figures approximate: CFFP's verified 2025 table ($19,890
- * threshold, $755 max) indexed +2%; RAMQ's own site did not publish the
- * exact 2026 Schedule K brackets at time of writing (see devlog).
+ * person. These retained values are legacy preview approximations ONLY.
+ * Revenu Québec has not published the 2026 tax-year Schedule K; the
+ * person-owned Quebec path gates public coverage instead of using them.
  */
 export const QC_RAMQ = { threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 }
 
