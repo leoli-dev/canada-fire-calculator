@@ -144,6 +144,13 @@ export function planAnnualHousingFunding(age: number, cost: number, funds: Omit<
   return planPurchaseFunding(zeroHome, age, { ...funds, fhsaBalance: 0, firstYearCost: Math.max(0, cost) })
 }
 
+/** Reconcile a scheduled installment against cash actually available to pay it. */
+export function reconcileMortgagePayment(scheduled: number, available: number) {
+  const due = Math.max(0, scheduled)
+  const paid = Math.min(due, Math.max(0, available))
+  return { paid, unpaid: Math.max(0, due - paid) }
+}
+
 export interface ContributionAllocation {
   fhsa: number
   employee: number

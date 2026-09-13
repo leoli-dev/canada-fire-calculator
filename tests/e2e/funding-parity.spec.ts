@@ -16,9 +16,10 @@ test('planned-home financing gap follows guided and professional edits in both d
   await expect(guidedLoan).not.toContainText('missing financing')
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  const professionalLoan = page.locator('label.field').filter({ hasText: 'Payment ($/yr)' }).filter({ has: page.locator('em.field-issue.error') })
+  await page.locator('label.field').filter({ hasText: 'TFSA' }).locator('input').first().fill('5000000')
+  const professionalLoan = page.locator('label.field').filter({ hasText: 'Payment ($/yr)' })
   await expect(page.locator('.input-form')).toContainText('Planned purchase')
-  await expect(professionalLoan).toHaveCount(0)
+  await expect(professionalLoan).not.toContainText('missing financing')
   const payment = page.locator('label.field').filter({ hasText: 'Payment ($/yr)' }).locator('input').last()
   await payment.fill('')
   await payment.blur()
@@ -130,6 +131,8 @@ test('the same funded purchase yields the same result after guided generation an
       await confirmNumbers(page)
       await page.getByRole('radio', { name: 'I do not have a target yet' }).check()
     } else if (id === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+    else if (id === 'saving.amount') await page.locator('[data-field="annualSavings"] input').fill('5000')
+    else if (id === 'account.tfsa.balance') await page.locator('[data-field="balances.tfsa"] input').fill('5000000')
     else if (id === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
     else if (id === 'assets.identify') {
       await page.getByRole('checkbox', { name: 'TFSA' }).check()

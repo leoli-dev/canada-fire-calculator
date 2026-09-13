@@ -9,6 +9,89 @@ import audit from './fixtures/pending-audit.json'
 const fixture = (id: string) => audit.cases.find((entry) => entry.id === id)!.inputs as Inputs
 
 describe('BE-30 independently derived funding identities', () => {
+  it('retirement mortgage delinquency keeps principal outstanding while the home is held', () => {
+    const base = fixture('P03')
+    const input = {
+      ...base, fireAge: 51, lifeExpectancy: 52, annualSavings: 0, extraIncome: null,
+      balances: { tfsa: 140_000, rrsp: 0, nonReg: 0 },
+    } as Inputs
+    const result = runProjection(input)
+    expect(result.rows[0].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.rows[1].shortfall).toBeCloseTo(40_000, 2)
+    expect(result.rows[1].debtPayment).toBe(0)
+    expect(result.rows[1].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.rows[1].unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:51', amount: 40_000, reason: 'purchaseCost' }),
+    ]))
+    expect(result.rows[2].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.finalNetWorth).toBeCloseTo(140_000, 2)
+    expect(result.success).toBe(false)
+    expect(validateInputs(input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:51', amount: 40_000 }),
+    ]))
+  })
+
+  it('retirement mortgage delinquency is discharged from the next year-start sale', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 51, lifeExpectancy: 52, annualSavings: 0, extraIncome: null,
+      balances: { tfsa: 140_000, rrsp: 0, nonReg: 0 },
+      principalResidence: { ...base.principalResidence!, sellAtAge: 52 },
+    } as Inputs)
+    expect(result.rows[1].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.rows[2].debtPayment).toBe(0)
+    expect(result.rows[2].balances.nonReg).toBeCloseTo(140_000, 2)
+    expect(result.finalNetWorth).toBeCloseTo(140_000, 2)
+  })
+
+  it('retirement mortgage pays only the cash available and records the partial unpaid amount', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 51, lifeExpectancy: 51, annualSavings: 0, extraIncome: null,
+      balances: { tfsa: 160_000, rrsp: 0, nonReg: 0 },
+    } as Inputs)
+    const row = result.rows[1]
+    expect(row.debtPayment).toBeCloseTo(20_000, 2)
+    expect(row.debtBalance).toBeCloseTo(340_000, 2)
+    expect(row.unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:51', amount: 20_000 }),
+    ]))
+    expect(result.finalNetWorth).toBeCloseTo(160_000, 2)
+  })
+
+  it('retirement RRSP withdrawals cover the full installment and its tax without an arrears event', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 51, lifeExpectancy: 51, annualSavings: 0, extraIncome: null,
+      balances: { tfsa: 140_000, rrsp: 100_000, nonReg: 0 },
+    } as Inputs)
+    const row = result.rows[1]
+    expect(row.unfundedObligations).toEqual([])
+    expect(row.debtPayment).toBeCloseTo(40_000, 2)
+    expect(row.debtBalance).toBeCloseTo(320_000, 2)
+    expect(row.withdrawals.rrsp).toBeGreaterThan(40_000)
+    expect(row.taxBySource.rrsp).toBeGreaterThan(0)
+    expect(Object.values(row.taxBySource).reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(row.tax, 2)
+    expect(row.balances.rrsp).toBeGreaterThanOrEqual(0)
+  })
+
+  it('retirement-year purchase with only the down payment reports an unpaid first installment', () => {
+    const base = fixture('P03')
+    const input = {
+      ...base, fireAge: 50, lifeExpectancy: 50, annualSavings: 0, extraIncome: null,
+      balances: { tfsa: 100_000, rrsp: 0, nonReg: 0 },
+    } as Inputs
+    const result = runProjection(input)
+    expect(result.rows[0].debtPayment).toBe(0)
+    expect(result.rows[0].debtBalance).toBeCloseTo(400_000, 2)
+    expect(result.rows[0].unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:50', amount: 40_000 }),
+    ]))
+    expect(validateInputs(input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:50', amount: 40_000 }),
+    ]))
+    expect(result.success).toBe(false)
+  })
   it.each([
     { savings: 0, opening: 220_000, age51: 40_000 },
     { savings: 20_000, opening: 160_000, age51: 20_000 },

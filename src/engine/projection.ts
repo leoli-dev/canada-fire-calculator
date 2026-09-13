@@ -23,7 +23,7 @@ import {
 } from './benefits'
 import { rrifMinFactor } from './rrif'
 import { buildDebtStream, impliedRate } from './debts'
-import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, type FundingGap } from './funding'
+import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
 export type ReturnSampler = (age: number, account: AccountType) => number
@@ -601,7 +601,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
           yearGaps.push(plan.gap)
           const funded = (plan.allocation?.firstYearCostFromSavings ?? 0) +
             (plan.allocation?.firstYearCostFromOpening ?? 0)
-          const unpaidMortgage = Math.max(0, futureMortgagePayment - funded)
+          const { unpaid: unpaidMortgage } = reconcileMortgagePayment(futureMortgagePayment, funded)
           debtPayment -= unpaidMortgage
           unpaidPlannedMortgage += unpaidMortgage
           debtBalance += unpaidMortgage
@@ -761,6 +761,25 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       if (netCash < spendTarget - 0.01) {
         shortfall = spendTarget - netCash
         if (depletedAge === null) depletedAge = age
+      }
+
+      // The annual solver can exhaust the accounts before a planned-home
+      // installment is fully paid. Other annual costs take priority here;
+      // only cash left for this mortgage may reduce its principal. The
+      // existing total shortfall remains the all-costs spending deficit.
+      const plannedMortgagePayment = plannedPurchase && prValue > 0
+        ? (prMortgage?.payments[yearIdx] ?? 0) : 0
+      if (plannedMortgagePayment > 0) {
+        const cashForMortgage = netCash - (spendTarget - plannedMortgagePayment)
+        const { unpaid } = reconcileMortgagePayment(plannedMortgagePayment, cashForMortgage)
+        if (unpaid > 0.01) {
+          unpaidPlannedMortgage += unpaid
+          debtPayment -= unpaid
+          debtBalance += unpaid
+          yearGaps.push({ eventId: `purchase:${age}`,
+            field: 'principalResidence.annualMortgagePayment',
+            amount: unpaid, reason: 'purchaseCost' })
+        }
       }
 
       // reduce ACB proportionally to the non-registered withdrawal
