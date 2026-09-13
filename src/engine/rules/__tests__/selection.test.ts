@@ -18,7 +18,9 @@ describe('dated rule selection', () => {
     expect(on25.assumedFutureRule).toBe(false)
     expect(on26.assumedFutureRule).toBe(false)
     expect(selectBenefitRules('CCB', '2025-07/2026-06').values.maxUnder6).toBe(7997)
-    expect(selectBenefitRules('CCB', '2026-07/2027-06').values.maxUnder6).toBe(8157)
+    expect(selectBenefitRules('CCB', '2026-07/2027-06').values).toEqual({
+      maxUnder6: 8157, max6to17: 6883, th1: 38237, th2: 82847,
+    })
   })
 
   it('rejects unknown past periods and jurisdictions, marks future assumptions', () => {
@@ -33,6 +35,12 @@ describe('dated rule selection', () => {
     expect(selectTaxRules('ON', 2028, { annualRate: 0.02 })).toEqual(future)
     expect(future.basedOnRuleId).toBe('CA-ON-tax-2026-legacy-v1')
     expect(selectTaxRules('MB', 2028, { annualRate: 0.02 }).provincial.brackets[0].upTo).toBe(47000)
+    // The indexed second Ontario threshold must never overtake its frozen $150,000 successor.
+    const beforeCollision = selectTaxRules('ON', 2041, { annualRate: 0.021 })
+    expect(beforeCollision.provincial.brackets[1].upTo).toBe(Math.round(107785 * 1.021 ** 15))
+    expect(beforeCollision.provincial.brackets[2].upTo).toBe(150000)
+    expect(() => publishRulePack(beforeCollision)).not.toThrow()
+    expect(() => selectTaxRules('ON', 2042, { annualRate: 0.021 })).toThrow(/collision|overlap|ordered/i)
     expect(() => selectBenefitRules('CCB', '2024-07/2025-06')).toThrow()
     expect(selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: 0.02 }).values.maxUnder6).toBe(8320)
   })
@@ -48,6 +56,7 @@ describe('dated rule selection', () => {
     expect(() => publishRulePack({ ...valid, effectiveDate: '2026-02-31' })).toThrow()
     expect(() => publishRulePack({ ...valid, verifiedAt: '2026-13-01' })).toThrow()
     expect(() => publishRulePack({ ...valid, fieldSources: { ...valid.fieldSources, federalBpa: '' } })).toThrow()
+    expect(() => publishRulePack({ ...valid, fieldAdditionalSources: { federalBrackets: [''] } })).toThrow()
     expect(() => publishRulePack({ ...valid, federal: { ...valid.federal, brackets: [
       { upTo: Number.NaN, rate: 0.1 }, { upTo: Infinity, rate: 0.2 },
     ] } })).toThrow()
@@ -73,5 +82,18 @@ describe('dated rule selection', () => {
     expect(selectBenefitRules('CCB', '2025-07/2026-06').fieldSources.amounts).toContain('2025')
     expect(selectBenefitRules('CCB', '2026-07/2027-06').fieldSources.amounts).toContain('/2026/')
     expect(selectTaxRules('MB', 2026).sourceConflict).toContain('$47,564')
+    const bc = selectTaxRules('BC', 2026)
+    const nl = selectTaxRules('NL', 2026)
+    const pe = selectTaxRules('PE', 2026)
+    expect(bc.provincial.brackets[0].rate).toBe(0.056)
+    expect(bc.fieldSources.provincialBrackets).toContain('t4032bc-july')
+    expect(nl.provincial.bpa).toBe(13094)
+    expect(nl.fieldSources.provincialBpa).toContain('t4008nl-july')
+    expect(pe.provincial.brackets[3].upTo).toBe(142250)
+    expect(pe.provincial.brackets.at(-1)).toEqual({ upTo: Infinity, rate: 0.2 })
+    expect(pe.sourceConflict).toMatch(/142,250.*142,520.*200,000/s)
+    expect(pe.sourceURL).toBe('https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax')
+    expect(pe.additionalSourceURLs?.[0]).toContain('/2026/t4032-pe-1-26e.pdf')
+    expect(on25.fieldAdditionalSources?.federalBrackets).toContain(on25.fieldSources.federalBpa)
   })
 })

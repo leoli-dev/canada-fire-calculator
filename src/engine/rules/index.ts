@@ -22,6 +22,8 @@ export interface TaxRulePack extends Provenance {
   federal: TaxTable
   provincial: TaxTable
   fieldSources: { federalBrackets: string; federalBpa: string; provincialBrackets: string; provincialBpa: string }
+  /** Additional evidence for a field whose published value needs more than one document. */
+  fieldAdditionalSources?: Partial<Record<keyof TaxRulePack['fieldSources'], string[]>>
   /** Explicitly retained source disagreement awaiting a new legal-rule version. */
   sourceConflict?: string
   /** Exact thresholds in this list never receive future indexation. */
@@ -64,6 +66,9 @@ const TAX_2025_ON = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc
 const TAX_2026_PDF = (jurisdiction: string) => `https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-${jurisdiction.toLowerCase()}-1-26e.pdf`
 const QC_2026 = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
 const CRA_2026_RATES = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html'
+const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
+const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
+const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
 const TAX_PACKS: TaxRulePack[] = [
   {
     id: 'CA-ON-tax-2025-v1', jurisdiction: 'ON', taxYear: 2025,
@@ -71,6 +76,7 @@ const TAX_PACKS: TaxRulePack[] = [
     sourceURL: TAX_2025_FEDERAL, effectiveDate: '2025-01-01', verifiedAt: '2026-09-13',
     fieldSources: { federalBrackets: TAX_2025_FEDERAL, federalBpa: TAX_2025_ON,
       provincialBrackets: TAX_2025_ON, provincialBpa: TAX_2025_ON },
+    fieldAdditionalSources: { federalBrackets: [TAX_2025_ON] },
     indexationRule: 'cpi-assumption', rounding: 'nearest-dollar', coverage: 'estimated',
     limitation: 'Bracket/BPA snapshot only; other Ontario credits, tax reduction and benefits are not year-switched.',
     assumedFutureRule: false,
@@ -79,13 +85,15 @@ const TAX_PACKS: TaxRulePack[] = [
     id: `CA-${jurisdiction}-tax-2026-legacy-v1`, jurisdiction: jurisdiction as Province,
     taxYear: 2026, federal: FEDERAL_2026_SNAPSHOT, provincial,
     frozenProvincialBracketIndexes: jurisdiction === 'ON' ? [2, 3] : jurisdiction === 'YT' ? [3] : jurisdiction === 'MB' ? [0, 1] : [],
-    sourceURL: TAX_2026_PDF(jurisdiction), effectiveDate: '2026-01-01', verifiedAt: '2026-09-13',
+    sourceURL: jurisdiction === 'BC' ? BC_2026_JULY : jurisdiction === 'PE' ? PE_2026_GOV : TAX_2026_PDF(jurisdiction), effectiveDate: '2026-01-01', verifiedAt: '2026-09-13',
     fieldSources: { federalBrackets: TAX_2026_PDF(jurisdiction), federalBpa: TAX_2026_PDF(jurisdiction),
-      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : TAX_2026_PDF(jurisdiction),
-      provincialBpa: jurisdiction === 'QC' ? QC_2026 : TAX_2026_PDF(jurisdiction) },
-    additionalSourceURLs: jurisdiction === 'MB' ? [CRA_2026_RATES] : [],
+      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'BC' ? BC_2026_JULY : jurisdiction === 'PE' ? PE_2026_GOV : TAX_2026_PDF(jurisdiction),
+      provincialBpa: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'NL' ? NL_2026_JULY : TAX_2026_PDF(jurisdiction) },
+    additionalSourceURLs: jurisdiction === 'MB' ? [CRA_2026_RATES] : jurisdiction === 'PE' ? [TAX_2026_PDF(jurisdiction)] : [],
     sourceConflict: jurisdiction === 'MB'
       ? 'CRA generic 2026 rate page lists $47,564/$101,200; dedicated T4032-MB 2026 lists $47,000/$100,000 and $15,780 BPA, matching this retained legacy snapshot. BE-38 B must reconcile legal authority before changing calculations.'
+      : jurisdiction === 'PE'
+      ? 'Mixed-vintage legacy PE snapshot: the retained $142,250 fourth threshold appears in neither January T4032-PE 2026 nor the PE government 2026 table, which lists $142,520. The January guide ends at 19%; the PE government 2026 table adds a sixth bracket over $200,000 at 20%. BE-38 B must reconcile before changing calculations.'
       : undefined,
     indexationRule: jurisdiction === 'MB' ? 'frozen' : 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
@@ -170,6 +178,10 @@ export function publishRulePack<T extends TaxRulePack | BenefitRulePack>(candida
         new Set(p.frozenProvincialBracketIndexes).size !== p.frozenProvincialBracketIndexes.length ||
         p.frozenProvincialBracketIndexes.some(i => !Number.isInteger(i) || i < 0 || i >= p.provincial!.brackets.length - 1) ||
         !p.fieldSources || !Object.values(p.fieldSources).every(validURL) ||
+        (p.fieldAdditionalSources !== undefined && (!p.fieldAdditionalSources || typeof p.fieldAdditionalSources !== 'object' ||
+          Object.entries(p.fieldAdditionalSources).some(([key, urls]) =>
+            !['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa'].includes(key) ||
+            !Array.isArray(urls) || urls.length === 0 || urls.some(url => !validURL(url))))) ||
         !['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa'].every(k => validURL(p.fieldSources?.[k as keyof typeof p.fieldSources])))
       throw new Error('Tax pack lacks valid values, sources or scope')
   } else if ('program' in p) {
@@ -212,7 +224,7 @@ export function selectTaxRules(jurisdiction: string, taxYear: number, future?: {
     throw new Error('Unpublished tax year requires an explicit future indexation assumption')
   const years = taxYear - base.taxYear
   const rate = base.indexationRule === 'frozen' ? 0 : future.annualRate
-  return {
+  const projected: TaxRulePack = {
     ...base, id: `${base.id}+assumed-${taxYear}-${rate}`, taxYear,
     effectiveDate: `${taxYear}-01-01`,
     federal: projectTable(base.federal, years, future.annualRate, []),
@@ -220,6 +232,10 @@ export function selectTaxRules(jurisdiction: string, taxYear: number, future?: {
     assumedFutureRule: true, assumedAnnualRate: future.annualRate, basedOnRuleId: base.id,
     coverage: 'estimated',
   }
+  // Frozen upper bounds can be overtaken by earlier indexed bounds. Never return an invalid pack.
+  if (!validTable(projected.federal) || !validTable(projected.provincial))
+    throw new Error('Projected tax bracket collision or invalid indexed value')
+  return publishRulePack<TaxRulePack>(projected)
 }
 export function selectBenefitRules(program: 'CCB', period: string, future?: { annualRate: number }): BenefitRulePack {
   if (program !== 'CCB') throw new Error('Unknown benefit program')

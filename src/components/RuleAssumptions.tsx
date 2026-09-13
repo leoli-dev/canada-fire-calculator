@@ -25,6 +25,6 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       </span>)}
       {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{t('ruleConflictingSource')}</a>{' · '}</span>)}
     </div>
-    {tax.sourceConflict && <p>{t('ruleMbConflict')}</p>}
+    {tax.sourceConflict && <p>{t(province === 'PE' ? 'rulePeConflict' : 'ruleMbConflict')}</p>}
   </div>
 }
