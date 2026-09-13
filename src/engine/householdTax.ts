@@ -43,12 +43,17 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     from.taxableIncome -= election.amount
     to.netIncome += election.amount
     to.taxableIncome += election.amount
-    // T1032 Step 4, Note 1: under 65, the recipient may use the pension
-    // amount for the RPP life-annuity portion, not RRIF/LIF-derived split.
-    // Where both sources exist the form allocates the election in proportion
-    // to eligible source income; the taxable transfer itself remains whole.
-    const recipientCredit = to.age >= 65 ? election.amount :
-      election.amount === 0 ? 0 : election.amount * (from.bySource.dbPension ?? 0) / from.federalPensionEligible
+    // CRA T1032 Step 4 Note 1 excludes RRIF/LIF-derived split income from
+    // an under-65 recipient's pension amount. It does NOT allocate the credit
+    // pro rata: if qualifying RPP life-annuity income is at least $4,000,
+    // line 33 uses the elected amount (line 30), then the $2,000 tax-credit
+    // ceiling applies. Below $4,000 a recalculation is required; defer the
+    // mixed-source edge until those form details are represented explicitly.
+    const dbIncome = from.bySource.dbPension ?? 0
+    const otherEligible = from.federalPensionEligible - dbIncome
+    if (to.age < 65 && election.amount > 0 && dbIncome > 0 && dbIncome < 4_000 && otherEligible > 0)
+      return { status: 'unsupported', reason: 'under-65 mixed pension split below T1032 four-thousand threshold requires form recalculation' }
+    const recipientCredit = to.age >= 65 || dbIncome > 0 ? election.amount : 0
     from.federalPensionEligible -= election.amount
     to.federalPensionEligible += recipientCredit
     from.provincialPensionEligible -= election.amount

@@ -130,7 +130,7 @@ describe('BE-11 person-owned tax and elections', () => {
     } } })
   })
 
-  it('apportions mixed DB/RRIF split credit by source for an under-65 recipient', () => {
+  it('uses T1032 Step 4 full small-election credit with mixed DB/RRIF for an under-65 recipient', () => {
     const p = plan()
     const [a, b] = p.people.map(person => person.id)
     p.people[0].ageInBaseYear = 68
@@ -138,15 +138,50 @@ describe('BE-11 person-owned tax and elections', () => {
     p.people[0].pension = { annualAmount: 20_000, startAge: 60, indexation: 1, bridgeAnnual: 0 }
     const account = p.accounts.find(item => item.kind === 'rrsp')!
     account.kind = 'rrif'
-    p.taxProfile!.pensionSplit = { transferorId: a, recipientId: b, amount: 20_000 }
+    p.taxProfile!.pensionSplit = { transferorId: a, recipientId: b, amount: 2_000 }
     const result = calculateHouseholdTax(p, 2026, [
       { id: 'db', kind: 'dbPension', personId: a, amount: 20_000 },
       { id: 'rrif', kind: 'rrifWithdrawal', accountId: account.id, amount: 20_000 },
+      { id: 'wage', kind: 'employment', personId: b, amount: 40_000 },
     ])
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
-    expect(result.byPerson[b].taxableIncome).toBe(20_000)
-    expect(result.byPerson[b].federalPensionEligible).toBe(10_000)
+    expect(result.byPerson[b].taxableIncome).toBe(42_000)
+    expect(result.byPerson[b].federalPensionEligible).toBe(2_000)
+    expect(result.byPerson[b].provincialPensionEligible).toBe(2_000)
+    // Independent 2026 federal and ON brackets/credits; ON pension cap $1,796.
+    expect(result.byPerson[b].tax).toBeCloseTo(5_121.08, 2)
+    const belowThreshold = calculateHouseholdTax(p, 2026, [
+      { id: 'db', kind: 'dbPension', personId: a, amount: 3_000 },
+      { id: 'rrif', kind: 'rrifWithdrawal', accountId: account.id, amount: 20_000 },
+      { id: 'wage', kind: 'employment', personId: b, amount: 40_000 },
+    ])
+    expect(belowThreshold.status).toBe('unsupported')
+  })
+
+  it('feeds the full mixed-source pension credit into the normal cash and RRIF draw solve', () => {
+    const inputs: Inputs = { ...legacy, currentAge: 62, fireAge: 62, lifeExpectancy: 62,
+      retirementSpending: 75_000, strategy: 'rrspFirst',
+      balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
+      pension: undefined, extraIncome: { annual: 40_000, fromAge: 62, toAge: 62 },
+      partner: { ...legacy.partner!, currentAge: 68,
+        pension: { annualAmount: 20_000, startAge: 60, indexation: 1, bridgeAnnual: 0 } },
+    }
+    const p = migratePersistedPlan({ inputs }, 10, 2026)
+    p.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    p.accounts.forEach(account => { account.ownerId = p.people[1].id; account.taxableOwnerShares = { status: 'known', shares: { [p.people[1].id]: 1 } } })
+    const registered = p.accounts.find(account => account.kind === 'rrsp')!
+    registered.kind = 'rrif'
+    registered.openedYear = { status: 'known', value: 2025 }
+    p.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: { transferorId: p.people[1].id, recipientId: p.people[0].id, amount: 2_000 } }
+    const row = runProjection(inputs, undefined, p).rows[0]
+    expect(row.taxCapability).toBe('person')
+    expect(row.byPersonTax?.[p.people[0].id].federalPensionEligible).toBe(2_000)
+    expect(row.byPersonTax?.[p.people[0].id].provincialPensionEligible).toBe(2_000)
+    expect(row.byPersonTax?.[p.people[0].id].tax).toBeCloseTo(5_121.08, 2)
+    expect(row.tax).toBeCloseTo(Object.values(row.byPersonTax!).reduce((sum, person) => sum + person.tax, 0), 2)
+    expect(row.netCash).toBeCloseTo(75_000, 2)
+    expect(row.withdrawals.rrsp).toBeLessThan(23_789.31) // old pro-rata credit solved too large a draw
   })
 
   it('uses the elected pension split for OAS recovery in normal projection cash and tax', () => {

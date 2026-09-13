@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
 import { migratePersistedPlan } from '../migration'
 import { minimumForRrif, prescribedRrifFactor } from '../rrif'
+import { runProjection } from '../projection'
 
 const legacy: Inputs = {
   currentAge: 72, fireAge: 80, lifeExpectancy: 90, province: 'ON', annualSavings: 0,
@@ -36,5 +37,29 @@ describe('person-owned existing RRIF minimums', () => {
     expect(prescribedRrifFactor(71)).toBe(0.0528)
     expect(prescribedRrifFactor(72)).toBe(0.054)
     expect(prescribedRrifFactor(95)).toBe(0.2)
+  })
+
+  it('gates pre-1987 RRIFs without an amendment/qualification fact before forcing cash', () => {
+    const inputs: Inputs = { ...legacy, currentAge: 80, fireAge: 80, lifeExpectancy: 80,
+      balances: { tfsa: 0, rrsp: 1_000_000, nonReg: 0 }, partner: undefined,
+      strategy: 'rrspFirst' }
+    const plan = migratePersistedPlan({ inputs }, 10, 2026)
+    plan.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false,
+      ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    plan.accounts.forEach(account => { account.ownerId = plan.people[0].id;
+      account.taxableOwnerShares = { status: 'known', shares: { [plan.people[0].id]: 1 } } })
+    const rrif = plan.accounts.find(account => account.kind === 'rrsp')!
+    rrif.kind = 'rrif'
+    rrif.openedYear = { status: 'known', value: 1985 }
+    expect(minimumForRrif(rrif, plan.people, plan.baseYear, 2026).status).toBe('unsupported')
+    expect(minimumForRrif({ ...rrif, openedYear: { status: 'known', value: 1986 } },
+      plan.people, plan.baseYear, 2026).status).toBe('unsupported')
+    expect(minimumForRrif({ ...rrif, openedYear: { status: 'known', value: 1987 } },
+      plan.people, plan.baseYear, 2026)).toMatchObject({ status: 'ok', amount: 65_800 })
+    const result = runProjection(inputs, undefined, plan)
+    expect(result.taxCapability?.status).toBe('legacyEstimate')
+    expect(result.rows[0].taxCapability).toBe('legacyEstimate')
+    expect(result.rows[0].withdrawals.rrsp).toBe(0)
+    expect(result.rows[0].byPersonTax).toBeUndefined()
   })
 })

@@ -66,6 +66,9 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     if (gain) annualEvents.push({ id: `nonreg:gain:${f.year}`, kind: 'realizedGain', accountId: nonReg[0].id, amount: gain })
   }
   const registered = plan.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind))
+  if (registered.some(account => account.kind === 'rrif' && account.openedYear.status === 'known' &&
+      account.openedYear.value < 1987 && f.registeredBalance > 0))
+    return { status: 'unsupported', reason: 'pre-1987 RRIF factor qualification or revision unconfirmed' }
   if (f.withdrawals.rrsp && registered.length !== 1)
     return { status: 'unsupported', reason: 'multiple or missing registered accounts need BE-14 B allocation' }
   if (registered.length === 1 && f.registeredBalance > 0) {

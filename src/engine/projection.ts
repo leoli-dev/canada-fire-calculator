@@ -806,7 +806,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           const minimum = minimumForRrif(registered[0], canonical.people, canonical.baseYear,
             canonical.baseYear + yearIdx, bal.rrsp)
           if (minimum.status === 'ok') rrifMin = minimum.amount
-          else taxUnsupportedReason ??= minimum.reason
+          else {
+            taxUnsupportedReason ??= minimum.reason
+            // Do not invent a mandatory withdrawal from the legacy factor
+            // when the actual RRIF category/factor is unconfirmed.
+            rrifMin = 0
+          }
         } else if (registered.length === 1 && registered[0].kind === 'rrsp') {
           // Keep the old cash preview until the user confirms a legal
           // conversion. The person-tax capability gate rejects age 72+.

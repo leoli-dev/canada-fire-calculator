@@ -33,6 +33,11 @@ export function minimumForRrif(account: Account, people: Person[], baseYear: num
   if (openingBalance === 0) return { status: 'ok', amount: 0, factor: 0, agePersonId: account.ownerId }
   if (account.openedYear.status === 'unknown') return { status: 'unsupported', reason: 'RRIF opening year unknown' }
   if (!Number.isInteger(account.openedYear.value)) return { status: 'invalid', reason: 'invalid RRIF opening year' }
+  // CRA's prescribed-factor chart has a separate pre-March-1986 column;
+  // amendment/revision and later annuity holdings determine whether it still
+  // applies. Opening year alone cannot select a lawful factor.
+  if (account.openedYear.value < 1987)
+    return { status: 'unsupported', reason: 'pre-1987 RRIF factor qualification or revision unconfirmed' }
   if (year < account.openedYear.value) return { status: 'invalid', reason: 'RRIF exists before opening year' }
   if (year === account.openedYear.value) return { status: 'ok', amount: 0, factor: 0, agePersonId: account.ownerId }
   const agePersonId = account.rrifAgeElection?.electedAtOpening ? account.rrifAgeElection.personId : account.ownerId
