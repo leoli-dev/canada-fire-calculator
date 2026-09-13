@@ -35,7 +35,13 @@ function outcome(status: Exclude<SolverStatus, 'solved'>, value: null, assumptio
   lastVerifiedBound: number | null, iterations: number, residual: number | null, reason?: string): SolverResult<number>
 function outcome(status: SolverStatus, value: number | null, assumptions: string[],
   lastVerifiedBound: number | null, iterations: number, residual: number | null, reason?: string): SolverResult<number> {
-  return { status, value, assumptions, lastVerifiedBound, iterations, residual, reason } as SolverResult<number>
+  const finiteBound = lastVerifiedBound !== null && Number.isFinite(lastVerifiedBound) ? lastVerifiedBound : null
+  const finiteResidual = residual !== null && Number.isFinite(residual) ? residual : null
+  if (status === 'solved' && (value === null || !Number.isFinite(value)))
+    return { status: 'invalid', value: null, assumptions, lastVerifiedBound: finiteBound,
+      iterations, residual: finiteResidual, reason: 'nonFiniteResult' }
+  return { status, value, assumptions, lastVerifiedBound: finiteBound,
+    iterations, residual: finiteResidual, reason } as SolverResult<number>
 }
 
 const cashResidual = (result: ProjectionResult): number | null => {
@@ -45,34 +51,136 @@ const cashResidual = (result: ProjectionResult): number | null => {
   return Number.isFinite(gap) && gap > 0 ? -gap : null
 }
 
+const hasNonFiniteNumber = (value: unknown): boolean => {
+  if (typeof value === 'number') return !Number.isFinite(value)
+  if (Array.isArray(value)) return value.some(hasNonFiniteNumber)
+  if (value !== null && typeof value === 'object') return Object.values(value).some(hasNonFiniteNumber)
+  return false
+}
+
+const checkedProjection = (inputs: Inputs): ProjectionResult => {
+  const result = runProjection(inputs)
+  if (hasNonFiniteNumber(result)) throw new RangeError('nonFiniteProjection')
+  return result
+}
+
+/** Validate the complete numeric input tree before validation or projection can derive NaN/Infinity. */
+const numericInputIssue = (inputs: Inputs): string | null => {
+  const check = (value: unknown, path: string, required: string[], optional: string[] = []): string | null => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return path
+    const record = value as Record<string, unknown>
+    for (const key of required) {
+      if (typeof record[key] !== 'number' || !Number.isFinite(record[key])) return `${path}.${key}`
+    }
+    for (const key of optional) {
+      if (record[key] != null && (typeof record[key] !== 'number' || !Number.isFinite(record[key])))
+        return `${path}.${key}`
+    }
+    return null
+  }
+  const array = (value: unknown, path: string, validate: (item: unknown, path: string) => string | null): string | null => {
+    if (value == null) return null
+    if (!Array.isArray(value)) return path
+    for (let i = 0; i < value.length; i++) {
+      const issue = validate(value[i], `${path}.${i}`)
+      if (issue) return issue
+    }
+    return null
+  }
+  const mortgage = (value: unknown, path: string) => check(value, path, ['balance', 'annualPayment', 'yearsRemaining'])
+  const pension = (value: unknown, path: string) => check(value, path, ['annualAmount', 'startAge', 'indexation', 'bridgeAnnual'])
+  const cppWork = (value: unknown, path: string) => check(value, path, ['startWorkAge', 'retireAge'])
+  const root = check(inputs, 'inputs', [
+    'currentAge', 'fireAge', 'lifeExpectancy', 'annualSavings', 'retirementSpending',
+    'nonRegBook', 'cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65',
+  ], ['fees', 'nonRegDistributionYield', 'accumulationMarginalRate', 'inflation', 'fireTargetAssets'])
+  if (root) return root
+  for (const field of ['balances', 'returns', 'savingsSplit'] as const) {
+    const issue = check(inputs[field], field, ['tfsa', 'rrsp', 'nonReg'])
+    if (issue) return issue
+  }
+  if (inputs.volatilities != null) {
+    const issue = check(inputs.volatilities, 'volatilities', ['tfsa', 'rrsp', 'nonReg'])
+    if (issue) return issue
+  }
+  if (inputs.cppWork != null) { const issue = cppWork(inputs.cppWork, 'cppWork'); if (issue) return issue }
+  if (inputs.pension != null) { const issue = pension(inputs.pension, 'pension'); if (issue) return issue }
+  if (inputs.partner != null) {
+    const issue = check(inputs.partner, 'partner', ['currentAge', 'cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65'])
+    if (issue) return issue
+    if (inputs.partner.cppWork != null) { const nested = cppWork(inputs.partner.cppWork, 'partner.cppWork'); if (nested) return nested }
+    if (inputs.partner.pension != null) { const nested = pension(inputs.partner.pension, 'partner.pension'); if (nested) return nested }
+  }
+  if (inputs.extraIncome != null) {
+    const issue = check(inputs.extraIncome, 'extraIncome', ['annual', 'fromAge', 'toAge'])
+    if (issue) return issue
+  }
+  const residence = inputs.principalResidence
+  if (residence != null) {
+    const issue = residence.mode === 'planned'
+      ? check(residence, 'principalResidence', ['buyAtAge', 'price', 'downPayment', 'appreciation', 'netHoldingCostChange'], ['annualMortgagePayment', 'mortgageYears', 'sellAtAge'])
+      : check(residence, 'principalResidence', ['value', 'appreciation'], ['sellAtAge'])
+    if (issue) return issue
+    if (residence.mode !== 'planned' && residence.mortgage != null) {
+      const nested = mortgage(residence.mortgage, 'principalResidence.mortgage')
+      if (nested) return nested
+    }
+  }
+  const properties = array(inputs.investmentProperties, 'investmentProperties', (item, path) => {
+    const issue = check(item, path, ['value', 'acb', 'appreciation'], ['sellAtAge', 'annualRent'])
+    if (issue) return issue
+    const property = item as NonNullable<Inputs['investmentProperties']>[number]
+    return property.mortgage != null ? mortgage(property.mortgage, `${path}.mortgage`) : null
+  })
+  if (properties) return properties
+  const debts = array(inputs.debts, 'debts', mortgage)
+  if (debts) return debts
+  if (inputs.fhsa != null) { const issue = check(inputs.fhsa, 'fhsa', ['balance', 'annualContribution', 'openedYearsAgo']); if (issue) return issue }
+  if (inputs.lockedRetirement != null) {
+    const issue = check(inputs.lockedRetirement, 'lockedRetirement', ['balance', 'employeeContribution', 'employerContribution', 'accessibleAge'])
+    if (issue) return issue
+  }
+  return array(inputs.children, 'children', (item, path) => check(item, path, ['age']))
+}
+
 const invalidReason = (inputs: Inputs): string | null => {
+  const numeric = numericInputIssue(inputs)
+  if (numeric) return numeric
   const issue = validateInputs(inputs).find((x) => x.severity === 'error' && !x.eventId)
   if (issue) return issue.field
-  if (![inputs.currentAge, inputs.fireAge, inputs.lifeExpectancy, inputs.retirementSpending,
-    ...Object.values(inputs.balances), inputs.nonRegBook, ...Object.values(inputs.returns)].every(Number.isFinite))
-    return 'nonFiniteInput'
   return null
 }
 
 /** Mode "when can I retire": calendar-year linear scan, with fixed benefit estimates. */
-export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
+function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
   const assumptions = ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
   const cap = inputs.lifeExpectancy - 1
   let iterations = 0
   let lastProjection: ProjectionResult | null = null
+  let unsupportedProjection: ProjectionResult | null = null
   for (let age = inputs.currentAge; age <= cap; age++) {
-    const projection = runProjection({ ...inputs, fireAge: age })
+    const projection = checkedProjection({ ...inputs, fireAge: age })
     lastProjection = projection
     iterations++
-    if (projection.unfundedObligations.length > 0)
-      return outcome('unsupported', null, assumptions, age, iterations, cashResidual(projection), 'unfundedTransaction')
+    if (projection.unfundedObligations.length > 0) {
+      unsupportedProjection ??= projection
+      continue
+    }
     if (projection.success)
       return outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
   }
+  if (unsupportedProjection)
+    return outcome('unsupported', null, assumptions, iterations ? cap : null, iterations,
+      cashResidual(unsupportedProjection), 'unfundedTransaction')
   return outcome('infeasible', null, assumptions, iterations ? cap : null, iterations,
     lastProjection ? cashResidual(lastProjection) : null, 'noFeasibleAge')
+}
+
+export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
+  try { return findEarliestFireAgeImpl(inputs) }
+  catch { return outcome('invalid', null, ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan'], null, 0, null, 'projectionError') }
 }
 
 /**
@@ -81,7 +189,7 @@ export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
  * optional locked DC/LIRA side account) for the plan to
  * succeed with no further savings.
  */
-export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
+function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   const assumptions = ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -94,7 +202,7 @@ export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
   if ((inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
       (inputs.investmentProperties ?? []).some((p) => (p.sellAtAge ?? Infinity) < inputs.fireAge))
     return outcome('unsupported', null, assumptions, null, 0, null, 'preFireSale')
-  if (runProjection(inputs).unfundedObligations.length > 0)
+  if (checkedProjection(inputs).unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, null, 0, null, 'unfundedTransaction')
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
@@ -128,7 +236,7 @@ export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
       ? inputs.principalResidence
       : null
   const project = (T: number) =>
-    runProjection({
+    checkedProjection({
       ...inputs,
       currentAge: inputs.fireAge,
       fireAge: inputs.fireAge,
@@ -185,6 +293,11 @@ export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
   return outcome('solved', hi, assumptions, hi, iterations, upper.finalNetWorth)
 }
 
+export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
+  try { return requiredFireAssetsImpl(inputs) }
+  catch { return outcome('invalid', null, ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings'], null, 0, null, 'projectionError') }
+}
+
 export interface StrategyResult {
   strategy: Strategy
   result: ProjectionResult
@@ -199,7 +312,7 @@ export interface StrategyResult {
  * to life expectancy. Real dollars — constant spending already keeps pace
  * with inflation because returns are inflation-adjusted.
  */
-export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
+function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   const assumptions = ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -208,7 +321,7 @@ export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
   let iterations = 0
   const evaluate = (spending: number) => {
     iterations++
-    return runProjection({ ...inputs, retirementSpending: spending })
+    return checkedProjection({ ...inputs, retirementSpending: spending })
   }
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
@@ -242,6 +355,11 @@ export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
   // the exact, already-verified zero candidate at that numerical floor.
   if (lo < 0.01) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
   return outcome('solved', lo, assumptions, lo, iterations, lower.finalNetWorth)
+}
+
+export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
+  try { return maxSustainableSpendingImpl(inputs) }
+  catch { return outcome('invalid', null, ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation'], null, 0, null, 'projectionError') }
 }
 
 /** Deterministic comparison of the withdrawal strategies. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { maxSustainableSpending, requiredFireAssets } from '../solvers'
+import { findEarliestFireAge, maxSustainableSpending, requiredFireAssets } from '../solvers'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
 
@@ -13,6 +13,37 @@ const base: Inputs = {
 }
 
 describe('explicit solver outcomes', () => {
+  it('continues past an early purchase gap to the first feasible retirement year', () => {
+    const input: Inputs = { ...base, fireAge: 55, annualSavings: 100_000,
+      principalResidence: { mode: 'planned', buyAtAge: 60, price: 500_000,
+        downPayment: 500_000, appreciation: 0, netHoldingCostChange: 0, sellAtAge: null },
+    }
+    expect(runProjection({ ...input, fireAge: 50 }).unfundedObligations.length).toBeGreaterThan(0)
+    expect(runProjection({ ...input, fireAge: 55 }).success).toBe(true)
+    expect(findEarliestFireAge(input)).toMatchObject({ status: 'solved', value: 55, lastVerifiedBound: 55, iterations: 6 })
+  })
+
+  it.each([
+    ['annualSavings', { annualSavings: Number.NaN }],
+    ['cppAnnualAt65', { cppAnnualAt65: Infinity }],
+    ['fees', { fees: Infinity }],
+    ['finite overflow', { balances: { tfsa: 1e308, rrsp: 0, nonReg: 0 },
+      returns: { tfsa: 1e308, rrsp: 0, nonReg: 0 } }],
+    ['partner benefit', { partner: { currentAge: 50, cppStartAge: 65, cppAnnualAt65: Infinity,
+      oasStartAge: 65, oasAnnualAt65: 0 } }],
+    ['future rent', { investmentProperties: [{ value: 100_000, acb: 100_000,
+      appreciation: 0, sellAtAge: null, annualRent: Infinity }] }],
+    ['nested mortgage', { principalResidence: { value: 200_000, appreciation: 0,
+      sellAtAge: null, mortgage: { balance: 100_000, annualPayment: Infinity, yearsRemaining: 20 } } }],
+    ['missing balance', { balances: { tfsa: 0, rrsp: 0 } }],
+  ])('returns invalid without throwing for non-finite or incomplete %s', (_label, patch) => {
+    const input = { ...base, ...patch } as Inputs
+    for (const solve of [findEarliestFireAge, requiredFireAssets, maxSustainableSpending]) {
+      expect(() => solve(input)).not.toThrow()
+      expect(solve(input)).toMatchObject({ status: 'invalid', value: null, iterations: 0 })
+    }
+  })
+
   it('solves zero assets and zero spending at the verified zero bound', () => {
     const result = requiredFireAssets(base)
     expect(result).toMatchObject({ status: 'solved', value: 0, lastVerifiedBound: 0 })
