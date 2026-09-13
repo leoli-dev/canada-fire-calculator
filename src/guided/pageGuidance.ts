@@ -3,6 +3,7 @@ export type PageGuidance = { why: string; find: string; example: string }
 type Copy = [why: string, find: string, example: string]
 
 const en: Record<string, Copy> = {
+  'income.taxFacts': ['Tax depends on the actual recipient and taxable owner, not a household average.', 'Use pay, pension, account and property statements. An unknown answer stays unknown and limits precise tax advice.', 'If one spouse owns a RRIF, its withdrawal belongs to that spouse unless a legal pension split is explicitly elected.'],
   'family.people': ['Household size changes taxes, benefits and which incomes the plan includes.', 'Choose based on whose retirement finances you want to model; no document is needed.', 'Alex includes a partner because both people will rely on the same retirement plan.'],
   'family.ages': ['Current ages set the saving period and align each person’s future benefits.', 'Use dates of birth; enter ages today, not ages at retirement.', 'Alex is 40 and their partner is 38.'],
   'family.children': ['Children under 18 may add Canada Child Benefit income during early retirement.', 'Use each child’s current age; do not include planned or adult children.', 'A 7-year-old is included; a 20-year-old is not.'],
@@ -66,6 +67,7 @@ const en: Record<string, Copy> = {
 }
 
 const zh: Record<string, Copy> = {
+  'income.taxFacts': ['所得税按实际领取人和应税所有人计算，不按家庭均分。', '参考工资、养老金、账户及房产记录；未知事实保持未知，并限制精确税务建议。', '一方持有的 RRIF 提款归该方，只有明确且合法的养老金分拆选举才改变税基。'],
   'family.people': ['家庭人数会改变税额、福利，以及计划需要纳入哪些收入。', '按“谁会共同依赖这份退休计划”选择，不需要查文件。', 'Alex和伴侣共用退休资金，所以选择夫妻合并。'],
   'family.ages': ['当前年龄决定剩余储蓄年数，并对齐每个人未来领取福利的时间。', '按出生日期填写今天的年龄，不要填退休时年龄。', 'Alex现在40岁，伴侣38岁。'],
   'family.children': ['未满18岁的孩子可能让提前退休阶段获得加拿大儿童福利。', '按孩子生日填写当前年龄；不要纳入计划中的孩子或成年子女。', '7岁孩子需要纳入，20岁子女不纳入。'],
@@ -131,6 +133,7 @@ const zh: Record<string, Copy> = {
 // French copy stays page-specific as well; concise wording keeps the drawer readable.
 const fr: Record<string, Copy> = Object.fromEntries(Object.entries(en).map(([id, copy]) => [id, copy]))
 Object.assign(fr, {
+  'income.taxFacts': ['L’impôt suit le bénéficiaire et le propriétaire imposable, jamais une moyenne familiale.', 'Consultez les relevés de paie, pension, comptes et biens. Une donnée inconnue reste inconnue et limite le conseil fiscal précis.', 'Le retrait d’un FERR appartient à son titulaire, sauf fractionnement légal explicitement choisi.'],
   'family.people': ['La taille du ménage change l’impôt, les prestations et les revenus inclus.', 'Choisissez les personnes qui dépendront du même plan de retraite; aucun document requis.', 'Alex inclut son conjoint parce que les deux utiliseront le même plan.'],
   'family.ages': ['Les âges fixent la période d’épargne et alignent les prestations de chacun.', 'Utilisez les dates de naissance et l’âge actuel, pas l’âge à la retraite.', 'Alex a 40 ans et son conjoint 38 ans.'],
   'family.children': ['Les enfants de moins de 18 ans peuvent donner droit à l’Allocation canadienne pour enfants.', 'Utilisez l’âge actuel; excluez les enfants projetés ou adultes.', 'Un enfant de 7 ans est inclus; un enfant de 20 ans ne l’est pas.'],

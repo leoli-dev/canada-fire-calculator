@@ -37,6 +37,8 @@ export interface Account {
   taxableOwnerShares: TaxShares
   contributionRoom: Known<number>
   openedYear: Known<number>
+  /** CRA factor chart category; only a verified qualification history selects age-71 .0526/.0528. */
+  rrifFactorCategory?: Known<'qualifying' | 'allOther'>
   openedYearsAgoAtBaseYear: number | null
   jurisdiction?: Province | 'federal'
   accessibleAge?: number
@@ -121,6 +123,11 @@ export interface InputsV2 {
   properties: Property[]
   debts: Debt[]
   incomeSources: IncomeSource[]
+  /** Explicit tax elections; absence never implies a split or spouse support. */
+  taxProfile?: {
+    spouseSupported: Known<boolean>
+    pensionSplit: { transferorId: EntityId; recipientId: EntityId; amount: number } | null
+  }
   dependents: Dependent[]
   strategy: Strategy
   goal: Goal
@@ -133,7 +140,7 @@ export interface InputsV2 {
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
 export function precisionGate(plan: InputsV2): PrecisionGate {
   const reasons: string[] = []
-  if (plan.migration.ownershipNeedsConfirmation || plan.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || plan.properties.some(p => p.taxableOwnerShares.status === 'unknown')) reasons.push('ownershipUnknown')
+  if (plan.migration.ownershipNeedsConfirmation || plan.accounts.some(a => a.kind !== 'nonReg' && a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || plan.properties.some(p => p.taxableOwnerShares.status === 'unknown')) reasons.push('ownershipUnknown')
   if (plan.orphanedPeople?.length || plan.incomeSources.some(source => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0)) reasons.push('recipientUnknown')
   if (plan.migration.ageBasisNeedsConfirmation) reasons.push('ageBasisUnknown')
   if (plan.migration.savingsBasisNeedsConfirmation || (plan.migration.sourcePersistVersion <= 10 && plan.budget.kind === 'savingsBudget' && (plan.budget.debtIncluded.status === 'unknown' || plan.budget.taxBenefitIncluded.status === 'unknown'))) reasons.push('savingsBasisUnknown')

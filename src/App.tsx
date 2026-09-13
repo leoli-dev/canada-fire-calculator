@@ -23,6 +23,7 @@ import { GithubCorner } from './components/GithubCorner'
 import { hasUnusableSharedFields } from './forms/fieldState'
 import { migrationReview } from './engine/migrationReview'
 import { MigrationReview } from './components/MigrationReview'
+import { PersonTaxTable } from './components/PersonTaxTable'
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -40,7 +41,7 @@ export default function App() {
   const storageIssue = getStorageReadOnlyReason()
   const unresolvedHousehold = migrationReview(canonical)?.ownershipPending ?? !!inputs.partner
   const precision = canonical ? precisionGate(canonical) : null
-  const precisionBlocked = precision ? !precision.allowed : !!inputs.partner
+  const migrationBlocked = precision ? !precision.allowed : !!inputs.partner
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
   const setEntryMode = useStore((s) => s.setEntryMode)
@@ -49,7 +50,14 @@ export default function App() {
   const resultRevision = useStore((s) => s.resultRevision)
   const sharedFieldsPending = useStore(hasUnusableSharedFields)
   const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision && !sharedFieldsPending
-  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs, storageIssue, sharedFieldsPending])
+  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
+  const precisionBlocked = migrationBlocked
+  // Keep the existing single-person planning preview usable while BE-14 B
+  // wires working-year tax. Couples and QC never get a disguised pooled tax.
+  const singleLegacyPreview = !inputs.partner && (!canonical || canonical.people.length === 1) && inputs.province !== 'QC'
+  const taxBlocked = result?.taxCapability?.status !== 'person' && !singleLegacyPreview
+  const taxWarning = result?.taxCapability?.status !== 'person'
+  const oldSingleTools = singleLegacyPreview
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
     [inputs],
@@ -113,9 +121,11 @@ export default function App() {
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
-          <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold} />
+          <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
+            taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
           {precisionBlocked ? <ScenarioCard /> : <>
-          <WithdrawalOrderCard inputs={inputs} />
+          {taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
+          {!taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}
@@ -132,12 +142,15 @@ export default function App() {
             </p>
           )}
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
-          <TaxChart result={result} inputs={inputs} scale={scale} />
-          <YearTable result={result} inputs={inputs} />
-          <StrategyCard inputs={inputs} />
-          <TimingCard inputs={inputs} />
-          <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
+          {!taxBlocked && canonical && <PersonTaxTable plan={canonical} result={result} />}
+          {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
+          {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}
+          {oldSingleTools && result.taxCapability?.status === 'person' && <p className="hint">{t('be11AuxiliaryEstimate')}</p>}
+          {!taxBlocked && oldSingleTools && <StrategyCard inputs={inputs} />}
+          {!taxBlocked && oldSingleTools && <TimingCard inputs={inputs} />}
+          {!taxBlocked && oldSingleTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
+          }
           <ScenarioCard />
           </>}
         </section>}

@@ -2,7 +2,6 @@ import {
   ACCOUNT_TYPES,
   type AccountType,
   type Inputs,
-  type Pension,
   type Phase,
   type ProjectionResult,
   type Strategy,
@@ -22,7 +21,11 @@ import {
   oasAnnual,
   oasAfterClawback,
 } from './benefits'
-import { rrifMinFactor } from './rrif'
+import { minimumForRrif, rrifMinFactor } from './rrif'
+import type { InputsV2 } from './model'
+import { personProjectionTax } from './personProjectionTax'
+import { pensionPaid } from './pensionPaid'
+export { pensionPaid } from './pensionPaid'
 import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale } from './debts'
 import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
 
@@ -35,20 +38,6 @@ export type ReturnSampler = (age: number, account: AccountType) => number
  * loses real value every payment year: its nominal amount grows at only
  * indexation × CPI, so in this real-dollar frame it shrinks by the gap.
  */
-export function pensionPaid(
-  p: Pension | null | undefined,
-  personAge: number,
-  inflation: number,
-): number {
-  if (!p || personAge < p.startAge) return 0
-  const erosion = Math.pow(
-    (1 + inflation * p.indexation) / (1 + inflation),
-    personAge - p.startAge,
-  )
-  const bridge = personAge < 65 ? p.bridgeAnnual : 0
-  return (p.annualAmount + bridge) * erosion
-}
-
 /** Annual tax context for a withdrawal whose cash must exist at year start. */
 function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number): (taxable: number, rrspGross: number) => number {
   const partnerAge = inputs.partner ? inputs.partner.currentAge + age - inputs.currentAge : null
@@ -104,6 +93,8 @@ interface WithdrawalOutcome {
   ccb: number
   netCash: number
   taxPeople: TerminalTaxPerson[]
+  byPersonTax?: YearRow['byPersonTax']
+  taxUnsupportedReason?: string
 }
 
 /**
@@ -130,6 +121,7 @@ function evaluate(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
+  nonRegDistributions: number,
   rent: number,
   extraIncome: number,
   nUnder6: number,
@@ -138,6 +130,10 @@ function evaluate(
   inputs: Inputs,
   prepaidPurchaseTax: number,
   purchaseRrspWithdrawal: number,
+  purchaseNonRegTaxable: number,
+  propertySaleTaxable: number,
+  canonical?: InputsV2,
+  taxYear?: number,
 ): WithdrawalOutcome {
   const w: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
   let remaining = G
@@ -200,10 +196,41 @@ function evaluate(
   // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
-  const netCash =
+  let netCash =
     cpp + pension + oasNet + gis + ccb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
-  const rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
-  const taxablePerPerson = totalTaxable / persons
+  let rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
+  let taxablePerPerson = totalTaxable / persons
+  if (canonical && taxYear !== undefined) {
+    const person = personProjectionTax({ plan: canonical, inputs, year: taxYear,
+      selfAge: agesPerPerson[0], withdrawals: w, registeredBalance: balances.rrsp,
+      nonRegGainFraction: gainFraction,
+      nonRegDistributions, rent, otherWork: extraIncome,
+      oasGross: oasGrossPerPerson, purchaseRrspWithdrawal,
+      purchaseNonRegTaxable, propertySaleTaxable })
+    if (person.status === 'ok') {
+      tax = person.tax.total
+      oasNet = person.oasNet
+      const householdTaxable = Object.values(person.tax.byPerson).reduce((sum, row) => sum + row.taxableIncome, 0)
+      taxablePerPerson = householdTaxable / persons
+      rrspTax = householdTaxable > 0 ? tax * (w.rrsp / householdTaxable) : 0
+      taxPeople.length = 0
+      for (const row of Object.values(person.tax.byPerson)) {
+        const personAge = canonical.people.find(p => p.id === row.personId)!.ageInBaseYear + taxYear - canonical.baseYear
+        taxPeople.push({ taxableIncome: row.taxableIncome, credits: { age: personAge,
+          pensionIncome: row.federalPensionEligible },
+          oasGross: person.oasByPerson[row.personId]?.gross ?? 0,
+          oasNet: person.oasByPerson[row.personId]?.net ?? 0 })
+      }
+      const personGis = gisAnnual(receivingOas, person.taxableExOas, person.earnedWork) +
+        allowanceAnnual(receivingOas, agesPerPerson, person.taxableExOas)
+      const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
+      netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
+      return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, ccb: personCcb,
+        netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson }
+    }
+    return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson,
+      taxPeople, taxUnsupportedReason: person.reason }
+  }
   return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson, taxPeople }
 }
 
@@ -218,6 +245,7 @@ function solveWithdrawals(
   oasGrossPerPerson: number[],
   agesPerPerson: number[],
   extraTaxable: number,
+  nonRegDistributions: number,
   rent: number,
   extraIncome: number,
   nUnder6: number,
@@ -226,10 +254,14 @@ function solveWithdrawals(
   inputs: Inputs,
   prepaidPurchaseTax = 0,
   purchaseRrspWithdrawal = 0,
+  purchaseNonRegTaxable = 0,
+  propertySaleTaxable = 0,
+  canonical?: InputsV2,
+  taxYear?: number,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -261,7 +293,7 @@ export function pensionStartAge(inputs: Inputs): number {
   return start
 }
 
-export function runProjection(inputs: Inputs, sample?: ReturnSampler): ProjectionResult {
+export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?: InputsV2): ProjectionResult {
   const bal: Record<AccountType, number> = { ...inputs.balances }
   let nonRegBook = inputs.nonRegBook
   const pensionAge = pensionStartAge(inputs)
@@ -271,6 +303,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let rrspTaxTotal = 0
   let finalYearPeople: TerminalTaxPerson[] = []
   const unfundedObligations: FundingGap[] = []
+  let taxUnsupportedReason: string | undefined
+  if (canonical && inputs.fireAge > inputs.currentAge && canonical.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
+    taxUnsupportedReason = 'working RRIF minimum requires BE-14 B cash and tax settlement'
 
   // debt payments are fixed in nominal dollars — inflation erodes them in
   // this real-dollar frame. During accumulation they're assumed already
@@ -365,6 +400,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     const saleTaxObligations: { amount: number; propertyIdx: number }[] = []
     let taxablePerPerson = 0
     let yearTaxPeople: TerminalTaxPerson[] = []
+    let byPersonTax: YearRow['byPersonTax']
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let dpAccumTax = 0
@@ -763,7 +799,25 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       // spouse's age — always optimal (lower forced withdrawals, more tax
       // deferral), so auto-applied rather than exposed as an input
       const rrifAge = Math.min(...agesPerPerson)
-      const rrifMin = bal.rrsp * rrifMinFactor(rrifAge)
+      let rrifMin = bal.rrsp * rrifMinFactor(rrifAge)
+      if (canonical) {
+        const registered = canonical.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && account.balance > 0)
+        if (registered.length === 1 && registered[0].kind === 'rrif') {
+          const minimum = minimumForRrif(registered[0], canonical.people, canonical.baseYear,
+            canonical.baseYear + yearIdx, bal.rrsp)
+          if (minimum.status === 'ok') rrifMin = minimum.amount
+          else {
+            taxUnsupportedReason ??= minimum.reason
+            // Do not invent a mandatory withdrawal from the legacy factor
+            // when the actual RRIF category/factor is unconfirmed.
+            rrifMin = 0
+          }
+        } else if (registered.length === 1 && registered[0].kind === 'rrsp') {
+          // Keep the old cash preview until the user confirms a legal
+          // conversion. The person-tax capability gate rejects age 72+.
+        }
+        else if (registered.length > 1) taxUnsupportedReason ??= 'multiple registered accounts need BE-14 B funding allocation'
+      }
       const forcedRrsp = Math.min(bal.rrsp, rrifMin)
       // bracket-capped meltdown: the RRSP funds spending first, but only as
       // much as spending needs and never beyond the room left in the chosen
@@ -804,9 +858,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const spendTarget = inputs.retirementSpending + debtPayment + netHoldingCost
       const out = solveWithdrawals(
         spendTarget, bal, forcedRrsp, gainFraction, cpp, pension,
-        oasGrossPerPerson, agesPerPerson, extraTaxable, rent,
+        oasGrossPerPerson, agesPerPerson, extraTaxable, dist, rent,
         extraIncome, nUnder6, n6to17, steps, inputs, purchaseTaxPaid, purchaseRrspWithdrawal,
+        purchaseNonRegTaxable, saleGainsTaxable,
+        canonical, canonical ? canonical.baseYear + yearIdx : undefined,
       )
+      if (out.taxUnsupportedReason) taxUnsupportedReason ??= out.taxUnsupportedReason
+      byPersonTax = out.byPersonTax
+      if (canonical && (saleGainsTaxable || purchaseTaxable || purchaseNonRegTaxable || rentMortgageInterest))
+        taxUnsupportedReason ??= 'property sale, purchase or rental mortgage tax needs BE-14 B event settlement'
       withdrawals = out.withdrawals
       yearTaxPeople = out.taxPeople
       tax = out.tax
@@ -918,6 +978,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       lockedRetirementBalance: lockedBal,
       debtPayment, debtBalance,
       taxablePerPerson, taxBySource, taxableBySource,
+      byPersonTax,
+      taxCapability: canonical && !taxUnsupportedReason && phase !== 'accumulation' ? 'person' : 'legacyEstimate',
     })
     finalYearPeople = yearTaxPeople
   }
@@ -955,12 +1017,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     inputs.province,
   )
   return {
+    taxCapability: { status: canonical && !taxUnsupportedReason && inputs.fireAge <= inputs.currentAge ? 'person' : 'legacyEstimate',
+      reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
     rows,
     unfundedObligations,
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
-    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' ? 'estimated' : 'unsupported',
+    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
     estateTax: terminal?.incrementalTax ?? Number.NaN,
     terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
     terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,

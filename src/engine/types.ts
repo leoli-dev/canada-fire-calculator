@@ -386,9 +386,14 @@ export interface YearRow {
   taxBySource: TaxBySource
   /** this year's taxable income (household total), split by component */
   taxableBySource: TaxBySource
+  /** Legal-recipient tax ledger when canonical person attribution is available. */
+  byPersonTax?: Record<string, import('./householdTax').PersonTaxRow>
+  taxCapability?: 'person' | 'legacyEstimate'
 }
 
 export interface ProjectionResult {
+  /** An explicit limit prevents an old pooled preview from becoming advice. */
+  taxCapability?: { status: 'person' | 'legacyEstimate'; reason?: string }
   rows: YearRow[]
   unfundedObligations: import('./funding').FundingGap[]
   /** spending fully funded through life expectancy */

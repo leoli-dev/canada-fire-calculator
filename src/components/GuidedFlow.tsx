@@ -23,6 +23,9 @@ function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }
+  // Unknown tax facts are a valid saved state: guided users may still see a
+  // labelled legacy preview, while the person-tax capability remains gated.
+  if (definition.id === 'income.taxFacts') return true
   const choicePages = ['family.people', 'family.children', 'saving.method', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
   if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined
   const fields = requiredFields(definition, !!state.inputs.partner)
