@@ -43,7 +43,18 @@ export function minimumForRrif(account: Account, people: Person[], baseYear: num
   const agePersonId = account.rrifAgeElection?.electedAtOpening ? account.rrifAgeElection.personId : account.ownerId
   const agePerson = people.find(person => person.id === agePersonId)
   if (!agePerson) return { status: 'invalid', reason: 'RRIF age election person missing' }
-  const factor = prescribedRrifFactor(agePerson.ageInBaseYear + year - baseYear - 1)
+  const ageAtYearStart = agePerson.ageInBaseYear + year - baseYear - 1
+  // CRA has two post-1986 factors at age 71: qualifying RRIF .0526 and
+  // all-other RRIF .0528. A later direct transfer can still be qualifying,
+  // so opening year cannot infer this category.
+  if (ageAtYearStart === 71 && account.rrifFactorCategory?.status !== 'known')
+    return { status: 'unsupported', reason: 'RRIF age-71 factor category unconfirmed' }
+  if (ageAtYearStart === 71 && account.rrifFactorCategory?.status === 'known' &&
+      account.rrifFactorCategory.value !== 'qualifying' && account.rrifFactorCategory.value !== 'allOther')
+    return { status: 'invalid', reason: 'RRIF factor category invalid' }
+  const factor = ageAtYearStart === 71 && account.rrifFactorCategory?.status === 'known'
+    ? account.rrifFactorCategory.value === 'qualifying' ? .0526 : .0528
+    : prescribedRrifFactor(ageAtYearStart)
   if (!Number.isFinite(factor)) return { status: 'invalid', reason: 'invalid RRIF factor age' }
   return { status: 'ok', amount: openingBalance * factor, factor, agePersonId }
 }

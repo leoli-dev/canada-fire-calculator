@@ -113,3 +113,101 @@ test('current and Scenario A each retain their own person-tax capability', async
   await page.reload()
   await expect(page.getByTestId('scenario-comparison')).toContainText('Exact current versus Scenario A comparison requires')
 })
+
+test('couple terminal tax cannot masquerade as final net worth in Scenario A comparison', async ({ page }) => {
+  await page.goto('/')
+  const values = await page.evaluate(async () => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS, DEFAULT_PARTNER } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const { runProjection } = await import('/src/engine/projection.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 68, fireAge: 68, lifeExpectancy: 68,
+      retirementSpending: 0, annualSavings: 0, fees: 0,
+      balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 }, nonRegBook: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      cppAnnualAt65: 0, oasAnnualAt65: 0,
+      partner: { ...DEFAULT_PARTNER, currentAge: 68, cppAnnualAt65: 0, oasAnnualAt65: 0 } }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    canonical.accounts.forEach(account => { account.ownerId = canonical.people[0].id;
+      account.taxableOwnerShares = { status: 'known', shares: { [canonical.people[0].id]: 1 } } })
+    canonical.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false,
+      ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    canonical.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: null }
+    const result = runProjection(inputs, undefined, canonical)
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical,
+      scenarioA: structuredClone(inputs), scenarioACanonical: structuredClone(canonical),
+      entryMode: 'professional', inputRevision: 0, resultRevision: null } }))
+    return { tax: result.taxCapability?.status, terminal: result.terminalTaxStatus,
+      netWorth: result.finalNetWorth, estate: result.estateValue }
+  })
+  expect(values.tax).toBe('person')
+  expect(values.terminal).toBe('unsupported')
+  expect(values.netWorth).toBeGreaterThan(values.estate)
+  await page.reload()
+  const scenario = page.getByTestId('scenario-comparison')
+  await scenario.locator('summary').click()
+  await expect(scenario).toContainText('After-tax estate comparison is unavailable')
+  await expect(scenario.locator('tbody td.num')).toHaveText(['—', '—'])
+  await expect(scenario).not.toContainText(Math.round(values.estate).toLocaleString('en-CA'))
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await expect(scenario).toContainText('La comparaison des successions après impôt est indisponible')
+  await page.getByRole('button', { name: '中文' }).click()
+  await expect(scenario).toContainText('税后遗产比较不可用')
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await page.evaluate(async () => {
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+    const inputs = { ...saved.state.inputs, partner: null }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    saved.state.inputs = inputs
+    saved.state.canonical = canonical
+    saved.state.scenarioA = structuredClone(inputs)
+    saved.state.scenarioACanonical = structuredClone(canonical)
+    localStorage.setItem('fire-inputs', JSON.stringify(saved))
+  })
+  await page.reload()
+  const singleScenario = page.getByTestId('scenario-comparison')
+  await singleScenario.locator('summary').click()
+  await expect(singleScenario.getByRole('columnheader', { name: 'Final net worth' })).toBeVisible()
+  await expect(singleScenario.locator('tbody td.num')).toHaveText([/100,000/, /100,000/])
+})
+
+test('RRIF age-71 category is explicit and shared across Professional and Guided', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 72, fireAge: 72, lifeExpectancy: 72,
+      retirementSpending: 0, balances: { tfsa: 0, rrsp: 1_000_000, nonReg: 0 },
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      partner: null }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    const rrif = canonical.accounts.find(account => account.kind === 'rrsp')!
+    rrif.kind = 'rrif'
+    rrif.openedYear = { status: 'known', value: 1990 }
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical,
+      entryMode: 'professional', inputRevision: 0, resultRevision: null } }))
+  })
+  await page.reload()
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
+  const panel = page.getByTestId('person-tax-facts')
+  await expect(panel).toContainText('Opening year alone does not prove qualification')
+  await expect(panel.getByRole('link', { name: 'CRA prescribed-factor chart' }))
+    .toHaveAttribute('href', /canada\.ca\/.*chart-prescribed-factors/)
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await expect(panel).toContainText('L’année d’ouverture ne prouve pas la catégorie')
+  await page.getByRole('button', { name: '中文' }).click()
+  await expect(panel).toContainText('仅凭开户年份不能确认资格')
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  const category = page.getByTestId('rrif-factor-category-legacy:account:rrsp')
+  await category.selectOption('qualifying')
+  await expect(page.getByTestId('person-tax-table')).toBeVisible()
+  await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/income/income.taxFacts')
+  await expect(category).toHaveValue('qualifying')
+  await page.reload()
+  await expect(category).toHaveValue('qualifying')
+})

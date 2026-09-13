@@ -58,7 +58,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   const account = (id: string, kind: Account['kind'], balance: number, acb?: number, actualOwner?: string | null): Account => {
     const owner = actualOwner === undefined ? ownerId : actualOwner
     const returnKind = kind === 'tfsa' ? 'tfsa' : kind === 'nonReg' ? 'nonReg' : 'rrsp'
-    return { id, kind, ownerId: owner, balance: finite(balance), realReturn: finite(input.returns?.[returnKind]), volatility: input.volatilities?.[returnKind] ?? null, annualFee: finite(input.fees), acb: acb === undefined ? unknown('basis not supplied') : known(finite(acb)), taxableOwnerShares: shares(owner), contributionRoom: unknown('statement not supplied'), openedYear: unknown('opening year not supplied'), openedYearsAgoAtBaseYear: null, provenance: { balance: source, ownerId: owner ? source : { ...source, origin: 'unknown', note: 'Legacy household balance' }, acb: acb === undefined ? { origin: 'unknown', sourceYear: null } : source } }
+    return { id, kind, ownerId: owner, balance: finite(balance), realReturn: finite(input.returns?.[returnKind]), volatility: input.volatilities?.[returnKind] ?? null, annualFee: finite(input.fees), acb: acb === undefined ? unknown('basis not supplied') : known(finite(acb)), taxableOwnerShares: shares(owner), contributionRoom: unknown('statement not supplied'), openedYear: unknown('opening year not supplied'), rrifFactorCategory: unknown('RRIF qualification history not supplied'), openedYearsAgoAtBaseYear: null, provenance: { balance: source, ownerId: owner ? source : { ...source, origin: 'unknown', note: 'Legacy household balance' }, acb: acb === undefined ? { origin: 'unknown', sourceYear: null } : source } }
   }
   const accounts: Account[] = [
     account(legacyId('account:tfsa'), 'tfsa', input.balances.tfsa),
@@ -209,6 +209,7 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       acb: account.acb.status === 'unknown' ? old.acb : account.acb,
       contributionRoom: old.contributionRoom,
       openedYear: old.openedYear,
+      rrifFactorCategory: old.rrifFactorCategory,
       kind: old.kind === 'rrif' || old.kind === 'spousalRrsp' || old.kind === 'lif' ? old.kind : account.kind,
       rrifAgeElection: old.rrifAgeElection,
       accessibleAgeConfirmed: useExplicitLockedOwner ? false : old.accessibleAgeConfirmed,

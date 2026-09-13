@@ -37,6 +37,8 @@ export interface Account {
   taxableOwnerShares: TaxShares
   contributionRoom: Known<number>
   openedYear: Known<number>
+  /** CRA factor chart category; only a verified qualification history selects age-71 .0526/.0528. */
+  rrifFactorCategory?: Known<'qualifying' | 'allOther'>
   openedYearsAgoAtBaseYear: number | null
   jurisdiction?: Province | 'federal'
   accessibleAge?: number

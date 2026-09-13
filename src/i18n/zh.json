@@ -5,6 +5,7 @@
   "be11QcLimit": "魁省逐人税务尚未核实：家庭抵免、FSS 和 RAMQ 留待 BE-35。税务建议及精确比较暂不可用。",
   "be11ComparisonLimit": "精确比较当前计划与方案 A，需要两份计划的逐人税务均已核实。",
   "be11ComparisonEstimate": "此单人比较仍是沿用旧税务模型的估算。",
+  "be11TerminalComparisonLimit": "两份计划的逐人终年税务尚未核实，税后遗产比较不可用。最终净资产不含遗产税，仅在比较受支持时显示。",
   "be11AuxiliaryEstimate": "下方开领时机、策略和蒙特卡洛工具仍使用旧单人近似，其排名仅供估算。",
   "be11": {
     "title": "应税收入的领取人与归属", "reviewed": "我已核对这些税务事实", "unknownStill": "目前无法确认；结果保持为估算",
@@ -16,6 +17,8 @@
     "spouseSupport": "您是否与伴侣同住并提供扶养，以申领配偶抵免？",
     "splitTransferor": "合格养老金显式分拆：由谁转出？", "noSplit": "不分拆养老金", "splitAmount": "年度转出金额（加元；不超过合格收入的50%）",
     "registeredType": "注册账户类型", "rrifOpenedYear": "RRIF 开户年份", "rrifAgeElection": "RRIF 开户时选用的年龄", "noElection": "使用账户持有人年龄",
+    "rrifFactorCategory": "已核实的 RRIF 提款因子类别（请核对转入历史）", "rrifQualifying": "符合资格的 RRIF", "rrifAllOther": "其他 RRIF",
+    "rrifFactorHelp": "选择类别前请核对金融机构的开户、转入和修订记录。仅凭开户年份不能确认资格；保持“未确认”时，精确最低提款额及税务结果会继续受限。", "rrifFactorSource": "CRA 法定因子表",
     "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。"
   },
   "tagline": "加拿大式提前退休 —— 认真建模 TFSA、RRSP、CPP/QPP 和 OAS。",

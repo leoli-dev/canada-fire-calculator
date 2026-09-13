@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
-import { migratePersistedPlan } from '../migration'
+import { migratePersistedPlan, refreshCanonicalFromLegacy } from '../migration'
 import { minimumForRrif, prescribedRrifFactor } from '../rrif'
 import { runProjection } from '../projection'
 
@@ -22,6 +22,7 @@ describe('person-owned existing RRIF minimums', () => {
     rrif.ownerId = self.id
     rrif.balance = 1_000_000
     rrif.openedYear = { status: 'known', value: 2020 }
+    rrif.rrifFactorCategory = { status: 'known', value: 'allOther' }
     rrif.rrifAgeElection = { personId: partner.id, electedAtOpening: true }
     const younger = minimumForRrif(rrif, plan.people, plan.baseYear, 2026)
     expect(younger).toMatchObject({ status: 'ok', agePersonId: partner.id, amount: 1_000_000 / 29 })
@@ -61,5 +62,33 @@ describe('person-owned existing RRIF minimums', () => {
     expect(result.rows[0].taxCapability).toBe('legacyEstimate')
     expect(result.rows[0].withdrawals.rrsp).toBe(0)
     expect(result.rows[0].byPersonTax).toBeUndefined()
+  })
+
+  it('distinguishes a qualifying age-71 RRIF from an ordinary one in the annual solver', () => {
+    const inputs: Inputs = { ...legacy, currentAge: 72, fireAge: 72, lifeExpectancy: 72,
+      balances: { tfsa: 0, rrsp: 1_000_000, nonReg: 0 }, partner: undefined,
+      strategy: 'rrspFirst' }
+    const plan = migratePersistedPlan({ inputs }, 10, 2026)
+    plan.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false,
+      ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    plan.accounts.forEach(account => { account.ownerId = plan.people[0].id;
+      account.taxableOwnerShares = { status: 'known', shares: { [plan.people[0].id]: 1 } } })
+    const rrif = plan.accounts.find(account => account.kind === 'rrsp')!
+    rrif.kind = 'rrif'
+    rrif.openedYear = { status: 'known', value: 1990 }
+    expect(minimumForRrif(rrif, plan.people, plan.baseYear, 2026).status).toBe('unsupported')
+    expect(runProjection(inputs, undefined, plan).taxCapability?.status).toBe('legacyEstimate')
+    rrif.rrifFactorCategory = { status: 'known', value: 'qualifying' }
+    expect(minimumForRrif(rrif, plan.people, plan.baseYear, 2026)).toMatchObject({ status: 'ok', amount: 52_600 })
+    const qualifying = runProjection(inputs, undefined, plan)
+    expect(qualifying.taxCapability?.status).toBe('person')
+    expect(qualifying.rows[0].withdrawals.rrsp).toBeCloseTo(52_600, 2)
+    rrif.openedYear = { status: 'known', value: 2025 }
+    expect(minimumForRrif(rrif, plan.people, plan.baseYear, 2026)).toMatchObject({ status: 'ok', amount: 52_600 }) // direct qualifying transfer
+    rrif.rrifFactorCategory = { status: 'known', value: 'allOther' }
+    expect(minimumForRrif(rrif, plan.people, plan.baseYear, 2026)).toMatchObject({ status: 'ok', amount: 52_800 })
+    expect(runProjection(inputs, undefined, plan).rows[0].withdrawals.rrsp).toBeCloseTo(52_800, 2)
+    expect(refreshCanonicalFromLegacy(plan, inputs).accounts.find(account => account.id === rrif.id)?.rrifFactorCategory)
+      .toEqual({ status: 'known', value: 'allOther' })
   })
 })

@@ -5,6 +5,7 @@
   "be11QcLimit": "L’impôt individuel au Québec n’est pas vérifié : les crédits familiaux, la FSS et la RAMQ attendent BE-35. Le conseil fiscal et les comparaisons précises sont indisponibles.",
   "be11ComparisonLimit": "La comparaison exacte entre le plan actuel et le scénario A exige un impôt individuel vérifié pour les deux plans.",
   "be11ComparisonEstimate": "Cette comparaison d’une seule personne reste une estimation de l’ancien modèle fiscal.",
+  "be11TerminalComparisonLimit": "La comparaison des successions après impôt est indisponible : l’impôt final individuel n’est pas vérifié pour les deux plans. La valeur nette finale exclut l’impôt successoral et n’est affichée que si la comparaison est prise en charge.",
   "be11AuxiliaryEstimate": "Les outils de calendrier, stratégie et Monte Carlo ci-dessous utilisent encore l’ancienne approximation individuelle; leurs classements sont estimatifs.",
   "be11": {
     "title": "Bénéficiaire et propriétaire du revenu imposable", "reviewed": "J’ai vérifié ces données fiscales", "unknownStill": "Je ne peux pas encore les confirmer; garder des estimations",
@@ -16,6 +17,8 @@
     "spouseSupport": "Subvenez-vous aux besoins de votre conjoint avec qui vous vivez pour le montant pour conjoint?",
     "splitTransferor": "Fractionnement admissible de pension : qui transfère?", "noSplit": "Aucun fractionnement", "splitAmount": "Montant annuel transféré (CAD; au plus 50 % du revenu admissible)",
     "registeredType": "Type de compte enregistré", "rrifOpenedYear": "Année d’ouverture du FERR", "rrifAgeElection": "Âge choisi lors de l’ouverture du FERR", "noElection": "Âge du titulaire",
+    "rrifFactorCategory": "Catégorie vérifiée du facteur FERR (vérifier les transferts)", "rrifQualifying": "FERR admissible", "rrifAllOther": "Autres FERR",
+    "rrifFactorHelp": "Vérifiez les dossiers d’ouverture, de transfert et de modification du fournisseur avant de choisir. L’année d’ouverture ne prouve pas la catégorie; laissez-la non confirmée pour limiter le minimum et l’impôt précis.", "rrifFactorSource": "Tableau des facteurs prescrits de l’ARC",
     "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas. Les crédits familiaux, FSS et RAMQ du Québec attendent BE-35."
   },
   "tagline": "La retraite anticipée à la canadienne - CELI, REER, RPC/RRQ et SV, modélisés correctement.",

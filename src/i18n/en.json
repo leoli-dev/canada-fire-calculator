@@ -5,6 +5,7 @@
   "be11QcLimit": "Quebec person-level tax is not verified: family credits, FSS and RAMQ await BE-35. Tax advice and precise comparisons are unavailable.",
   "be11ComparisonLimit": "Exact current versus Scenario A comparison requires verified person-level tax for both plans.",
   "be11ComparisonEstimate": "This single-person comparison is an estimate using the prior tax model.",
+  "be11TerminalComparisonLimit": "After-tax estate comparison is unavailable because individual terminal tax is not verified for both plans. Final net worth excludes estate tax and is shown only when the comparison is supported.",
   "be11AuxiliaryEstimate": "The timing, strategy and Monte Carlo tools below still use the earlier single-person approximation; their rankings are estimates.",
   "be11": {
     "title": "Who receives and owns taxable income", "reviewed": "I reviewed these tax facts", "unknownStill": "I cannot confirm them yet; keep results as estimates",
@@ -16,6 +17,8 @@
     "spouseSupport": "Do you support and live with your spouse for the spouse amount?",
     "splitTransferor": "Elective eligible pension split: who transfers?", "noSplit": "No pension split", "splitAmount": "Annual amount transferred (CAD; at most 50% of eligible income)",
     "registeredType": "Registered account type", "rrifOpenedYear": "RRIF opening year", "rrifAgeElection": "Age elected when RRIF opened", "noElection": "Use owner’s age",
+    "rrifFactorCategory": "Verified RRIF factor category (check transfer history)", "rrifQualifying": "Qualifying RRIF", "rrifAllOther": "All other RRIFs",
+    "rrifFactorHelp": "Check the provider’s opening, transfer and amendment records before choosing a category. Opening year alone does not prove qualification; leave it unconfirmed to keep the exact minimum and tax result limited.", "rrifFactorSource": "CRA prescribed-factor chart",
     "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35."
   },
   "tagline": "Retire early, the Canadian way - TFSA, RRSP, CPP/QPP and OAS, modelled properly.",

@@ -152,6 +152,21 @@ export function TaxFactsPanel() {
                 ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
             }} />
         </label>
+        <label>{t('be11.rrifFactorCategory')}
+          <select data-testid={`rrif-factor-category-${account.id}`}
+            value={account.rrifFactorCategory?.status === 'known' ? account.rrifFactorCategory.value : 'unknown'}
+            onChange={event => edit(draft => { draft.accounts.find(item => item.id === account.id)!.rrifFactorCategory =
+              event.target.value === 'unknown' ? { status: 'unknown', reason: 'RRIF factor qualification not confirmed' }
+                : { status: 'known', value: event.target.value as 'qualifying' | 'allOther' } })}>
+            <option value="unknown">{t('be11.unknown')}</option>
+            <option value="qualifying">{t('be11.rrifQualifying')}</option>
+            <option value="allOther">{t('be11.rrifAllOther')}</option>
+          </select>
+        </label>
+        <p className="hint">{t('be11.rrifFactorHelp')}{' '}
+          <a href="https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/chart-prescribed-factors.html"
+            target="_blank" rel="noopener noreferrer">{t('be11.rrifFactorSource')}</a>
+        </p>
         {partner && <label>{t('be11.rrifAgeElection')}
           <select data-testid="rrif-age-election" value={account.rrifAgeElection?.personId ?? ''}
             onChange={event => edit(draft => { draft.accounts.find(item => item.id === account.id)!.rrifAgeElection = event.target.value
