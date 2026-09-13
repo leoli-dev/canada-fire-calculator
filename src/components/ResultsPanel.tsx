@@ -67,7 +67,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' ||
     result.unfundedObligations.length > 0 || earlySale || fireNumber !== null && fireNumber.status !== 'solved'
   const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
-    ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
+    ? t('plannedPurchaseQuickUnsupported') : goal?.reason === 'investmentPropertySale'
+      ? t('targetPropertySaleUnsupported') : fireNumber?.reason === 'nominalCapitalBasis'
+        ? t('solverReason_nominalCapitalBasis') : fireNumber?.reason === 'investmentPropertySale'
+          ? t('targetPropertySaleUnsupported') : result.unfundedObligations.length > 0
       ? t('fundingQuickUnsupported') : earlySale ? t('saleQuickUnsupported')
         : fireNumber?.reason === 'lockedWithdrawalLimits'
           ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)

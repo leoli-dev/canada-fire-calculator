@@ -80,7 +80,7 @@ test('timing comparison preserves unsupported spending-solver status for a funde
   await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })
 
-test('French solver boundaries use the actual checked age and native messages', async ({ page }) => {
+test('French solver boundary keeps the checked age and explains unavailable nominal basis', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await field(page, 'Life expectancy').first().fill('61')
   await field(page, 'Desired after-tax annual spending in retirement').first().fill('20000000')
@@ -88,9 +88,8 @@ test('French solver boundaries use the actual checked age and native messages', 
   await page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }).click()
   await expect(page.locator('.summary')).toContainText("jusqu'à 60 ans")
   await page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }).click()
-  await expect(page.locator('.summary')).toContainText('La limite de recherche a été atteinte')
-  await expect(page.locator('.summary')).toContainText("Vérification jusqu'à")
-  await expect(page.locator('.summary')).not.toContainText('The search limit was reached')
+  await expect(page.locator('.summary')).toContainText("ne peut pas conserver l'historique vérifié")
+  await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
 })
 
 test('timing comparison keeps search-limit status in rows and combined result', async ({ page }) => {

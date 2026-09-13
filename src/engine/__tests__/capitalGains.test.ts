@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buyHolding, disposeHolding, nominalFactor, settleHouseholdCapitalYear,
   settlePersonCapitalYear, toNominal, toReal } from '../capitalGains'
 import { runProjection } from '../projection'
+import { requiredFireAssets } from '../solvers'
 import { incomeTax } from '../tax'
 import { refreshCanonicalFromLegacy } from '../migration'
 import type { Inputs } from '../types'
@@ -116,5 +117,21 @@ describe('BE-23 nominal average-cost and capital-loss ledger', () => {
     expect(withoutFee.rows[0].balances.nonReg).toBeCloseTo(100_000)
     expect(withoutFee.rows[0].taxableBySource.property).toBeCloseTo(10_000)
     expect(withFee.taxCapability?.status).toBe('legacyEstimate')
+  })
+
+  it('a zero-gain investment-property disposition still cannot claim person-level tax precision', () => {
+    const input: Inputs = { currentAge: 60, fireAge: 60, lifeExpectancy: 60,
+      province: 'ON', inflation: 0, annualSavings: 0,
+      savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, retirementSpending: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppStartAge: 70, cppAnnualAt65: 0, oasStartAge: 70, oasAnnualAt65: 0,
+      strategy: 'nonRegFirst', investmentProperties: [{ value: 500_000, acb: 500_000,
+        appreciation: 0, sellAtAge: 60, annualRent: 0, saleExpenses: 0 }] }
+    const result = runProjection(input, undefined, refreshCanonicalFromLegacy(null, input))
+    expect(result.rows[0].taxableBySource.property).toBe(0)
+    expect(result.taxCapability?.status).toBe('legacyEstimate')
+    expect(requiredFireAssets(input)).toMatchObject({ status: 'unsupported', value: null,
+      reason: 'investmentPropertySale' })
   })
 })

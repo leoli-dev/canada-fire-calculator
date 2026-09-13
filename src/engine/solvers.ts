@@ -1,7 +1,6 @@
 import { pensionPaid, runProjection } from './projection'
 import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSale } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
-import { incomeTax } from './tax'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
 import {
@@ -128,7 +127,7 @@ const numericInputIssue = (inputs: Inputs): string | null => {
     }
   }
   const properties = array(inputs.investmentProperties, 'investmentProperties', (item, path) => {
-    const issue = check(item, path, ['value', 'acb', 'appreciation'], ['sellAtAge', 'annualRent'])
+    const issue = check(item, path, ['value', 'acb', 'appreciation'], ['sellAtAge', 'annualRent', 'saleExpenses'])
     if (issue) return issue
     const property = item as NonNullable<Inputs['investmentProperties']>[number]
     return property.mortgage != null ? mortgage(property.mortgage, `${path}.mortgage`) : null
@@ -205,6 +204,22 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   if ((inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
       (inputs.investmentProperties ?? []).some((p) => (p.sellAtAge ?? Infinity) < inputs.fireAge))
     return outcome('unsupported', null, assumptions, null, 0, null, 'preFireSale')
+  if ((inputs.investmentProperties ?? []).some(property => property.sellAtAge != null))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'investmentPropertySale')
+  if ((inputs.lockedRetirement?.balance ?? 0) > 0 &&
+      inputs.balances.tfsa + inputs.balances.rrsp + inputs.balances.nonReg === 0 &&
+      inputs.fireAge < inputs.lockedRetirement!.accessibleAge)
+    return outcome('unsupported', null, assumptions, 0, 0, null, 'lockedOnlyBridge')
+  if (hasUnverifiedLockedWithdrawals(inputs))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'lockedWithdrawalLimits')
+  // Re-basing currentAge to FIRE discards the real path of nominal ACB.
+  // Candidate T is a hypothetical FIRE-year portfolio, so neither a present
+  // holding nor future buys/reinvestments can be assigned a verified basis.
+  // The same limitation applies to an investment property carried forward.
+  if (inputs.fireAge > inputs.currentAge && (
+    inputs.balances.nonReg > 0 || inputs.annualSavings > 0 && inputs.savingsSplit.nonReg > 0 ||
+    (inputs.investmentProperties?.length ?? 0) > 0))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   if (checkedProjection(inputs).unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, null, 0, null, 'unfundedTransaction')
   const b = inputs.balances
@@ -270,11 +285,6 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
-  if (lockedBalance > 0 && b.tfsa + b.rrsp + b.nonReg === 0 &&
-      inputs.fireAge < inputs.lockedRetirement!.accessibleAge)
-    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'lockedOnlyBridge')
-  if (hasUnverifiedLockedWithdrawals(inputs))
-    return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
   if (zero.success) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
   let upper = evaluate(hi)
   if (upper.unfundedObligations.length > 0)
@@ -445,6 +455,7 @@ export function compareStrategies(
 
 export interface TargetReport {
   status: 'supported' | 'unsupported'
+  reason?: 'investmentPropertySale'
   /** investable assets entering the FIRE year */
   assetsAtFire: number
   /** age at which the target is first reached if savings continue; null = never */
@@ -454,9 +465,9 @@ export interface TargetReport {
 /**
  * Goal check: does accumulation alone reach the target? Savings are assumed
  * to continue past the planned FIRE age until the target is hit (delayed
- * FIRE). Planned property sales count toward investable assets (mirroring
- * the projection: principal residence tax-free, investment-property gain
- * taxed); unsold real estate does not. `assetsAtFire` is the total entering
+ * FIRE). Planned principal-residence sales count toward investable assets;
+ * investment-property sales need a verified tax event and are unsupported.
+ * Unsold real estate does not count. `assetsAtFire` is the total entering
  * the FIRE year (plus any sale landing that year), before any further
  * savings or growth. Whether the money then lasts for life is a separate
  * question (the other modes).
@@ -464,6 +475,11 @@ export interface TargetReport {
 export function targetReport(inputs: Inputs, target: number): TargetReport {
   if (inputs.principalResidence?.mode === 'planned')
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+  // This shortcut has no CCA/land-building history or a nominal owner tax
+  // settlement for investment-property dispositions. Withhold *all* target
+  // numbers rather than reusing its stale real-value ACB/fee approximation.
+  if ((inputs.investmentProperties ?? []).some(property => property.sellAtAge != null))
+    return { status: 'unsupported', reason: 'investmentPropertySale', assetsAtFire: Number.NaN, reachedAge: null }
   if (runProjection(inputs).unfundedObligations.length > 0)
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
   // This shortcut has no source/use ledger for a negative-equity discharge.
@@ -481,16 +497,12 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     : null
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
-    acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
-    sellAtAge: p.sellAtAge,
-    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], horizon, inflation)
       : null,
   }))
-  const persons = inputs.partner ? 2 : 1
   const marginal = inputs.accumulationMarginalRate ?? 0.35
 
   let lockedBal = inputs.lockedRetirement?.balance ?? 0
@@ -507,22 +519,6 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
       bal.nonReg += sale.proceeds
       prValue = 0
       prSold = true
-    }
-    for (const p of ips) {
-      if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
-        const sale = yearStartSale(p.value, p.mortgage, yearIdx)
-        if (sale.cashNeeded > 0)
-          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
-        const taxableGain = Math.max(0, p.value - p.acb) * 0.5
-        const gainTax = age < inputs.fireAge
-          ? taxableGain * marginal
-          : incomeTax(taxableGain / persons, inputs.province) * persons
-        if (gainTax > sale.proceeds)
-          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
-        bal.nonReg += sale.proceeds - gainTax
-        p.value = 0
-        p.sold = true
-      }
     }
     // assets entering FIRE plus any sale landing that year — snapshot before
     // this iteration adds a further year of savings and growth (recording at
@@ -569,9 +565,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
     }
     bal.nonReg += benefits * (1 - marginal)
-    const releasedPayments =
-      releasedMortgagePayment(prMortgage, prSold, yearIdx) +
-      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
+    const releasedPayments = releasedMortgagePayment(prMortgage, prSold, yearIdx)
     for (const t of ACCOUNT_TYPES) {
       bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)

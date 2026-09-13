@@ -54,21 +54,33 @@ describe('findEarliestFireAge', () => {
 })
 
 describe('requiredFireAssets', () => {
+  it('withholds a FIRE number when a future non-registered basis cannot be reconstructed from the candidate', () => {
+    const p06: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 60,
+      annualSavings: 0, retirementSpending: 500_000, inflation: .02,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 500_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      strategy: 'nonRegFirst' }
+    expect(runProjection(p06).rows.at(-1)?.shortfall).toBeCloseTo(16_018.249433, 2)
+    expect(requiredFireAssets(p06)).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
   it('returns a number that succeeds and whose 90% fails', () => {
-    const T = requiredFireAssets(base)
+    const safe: Inputs = { ...base, balances: { tfsa: 400_000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, nonRegDistributionYield: 0 }
+    const T = requiredFireAssets(safe)
     expect(T.status).toBe('solved')
     expect(T.value!).toBeGreaterThan(0)
-    const total = base.balances.tfsa + base.balances.rrsp + base.balances.nonReg
+    const total = safe.balances.tfsa + safe.balances.rrsp + safe.balances.nonReg
     const scale = (k: number) => ({
-      ...base,
-      currentAge: base.fireAge,
+      ...safe,
+      currentAge: safe.fireAge,
       annualSavings: 0,
       balances: {
-        tfsa: (k * base.balances.tfsa) / total,
-        rrsp: (k * base.balances.rrsp) / total,
-        nonReg: (k * base.balances.nonReg) / total,
+        tfsa: (k * safe.balances.tfsa) / total,
+        rrsp: (k * safe.balances.rrsp) / total,
+        nonReg: (k * safe.balances.nonReg) / total,
       },
-      nonRegBook: ((k * base.balances.nonReg) / total) * (base.nonRegBook / base.balances.nonReg),
+      nonRegBook: 0,
     })
     expect(runProjection(scale(T.value! * 1.01)).success).toBe(true)
     expect(runProjection(scale(T.value! * 0.9)).success).toBe(false)
@@ -163,6 +175,17 @@ describe('maxSustainableSpending (die with zero)', () => {
 })
 
 describe('targetReport', () => {
+  it('withholds a target verdict when a future rental sale needs nominal gain, fees and CCA facts', () => {
+    const input: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 60,
+      annualSavings: 0, retirementSpending: 0, inflation: .02,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      investmentProperties: [{ value: 500_000, acb: 500_000, appreciation: 0,
+        sellAtAge: 60, annualRent: 0, saleExpenses: 20_000 }] }
+    expect(runProjection(input).finalNetWorth).toBeCloseTo(467_096.75, 1)
+    expect(targetReport(input, 475_000)).toEqual({ status: 'unsupported', reason: 'investmentPropertySale', assetsAtFire: Number.NaN, reachedAge: null })
+  })
   it('reports assets at FIRE and an early reach age when the target is low', () => {
     const g = targetReport(base, 500000)
     expect(g.assetsAtFire).toBeGreaterThan(500000)
@@ -226,7 +249,7 @@ describe('targetReport', () => {
     expect(withEarlySale.status).toBe('unsupported')
   })
 
-  it('taxes the investment-property gain on sale in target mode', () => {
+  it('keeps an investment-property sale target unavailable while a principal-home sale remains supported', () => {
     const ipSale = targetReport(
       {
         ...base,
@@ -243,7 +266,10 @@ describe('targetReport', () => {
       },
       99_999_999,
     )
-    expect(prSale.assetsAtFire).toBeGreaterThan(ipSale.assetsAtFire)
+    expect(ipSale).toMatchObject({ status: 'unsupported', reason: 'investmentPropertySale', reachedAge: null })
+    expect(Number.isNaN(ipSale.assetsAtFire)).toBe(true)
+    expect(prSale.status).toBe('supported')
+    expect(prSale.assetsAtFire).toBeGreaterThan(0)
   })
 })
 

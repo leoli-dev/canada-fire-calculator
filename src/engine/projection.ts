@@ -561,6 +561,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
       const p = ips[propertyIdx]
       if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
+        taxUnsupportedReason ??= 'investment-property sale requires verified building/land and CCA tax facts'
         if (p.saleExpenses > p.value)
           taxUnsupportedReason ??= 'projected selling expenses exceed property value'
         const effectiveExpenses = Math.min(p.saleExpenses, p.value)
