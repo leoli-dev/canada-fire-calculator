@@ -46,6 +46,7 @@
   "lockedRetirementAge": "Âge minimal de retrait selon votre régime",
   "lockedRetirementJurisdiction": "Compétence d'origine du régime (conservée pour de futures règles)",
   "lockedRetirementOwner": "Titulaire du compte",
+  "lockedRetirementChooseOwner": "Choisir le titulaire du compte",
   "lockedJur_federal": "Fédéral",
   "lockedRetirementNote": "Avant cet âge, le solde croît mais ne peut pas financer les dépenses. À partir de cet âge, v1 le traite comme un compte enregistré imposable ordinaire. La compétence est conservée, mais v1 ne modélise ni minimum/maximum annuel de FRV, ni déblocage spécial, ni l'option de 50 %.",
   "lockedRetirementLabel": "CD / CRI bloqué",

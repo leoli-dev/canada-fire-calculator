@@ -131,7 +131,12 @@ test('scenario restore invalidates the running request without starting another'
   await expect(page.locator('.mc-rate')).toContainText('93%')
 })
 
-async function generateGuidedThroughUi(page: Page, locked = false) {
+async function generateGuidedThroughUi(page: Page, options: {
+  locked?: boolean
+  couple?: boolean
+  ownerChoice?: 'self' | 'partner'
+  stopAtReview?: boolean
+} = {}) {
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
@@ -142,7 +147,9 @@ async function generateGuidedThroughUi(page: Page, locked = false) {
     const id = await article.getAttribute('data-page-id')
     if (!id || visited.has(id)) throw new Error(`Unexpected guided page ${id}`)
     visited.add(id)
-    if (id === 'family.people') await page.getByRole('radio', { name: /Plan for me/ }).check()
+    if (id === 'family.people') await page.getByRole('radio', {
+      name: options.couple ? /Plan with my partner/ : /Plan for me/,
+    }).check()
     else if (id === 'family.children') await page.getByRole('radio', { name: /No children/ }).check()
     else if (id === 'family.province') await page.getByLabel('Province').selectOption('BC')
     else if (id === 'time.work') {
@@ -159,16 +166,26 @@ async function generateGuidedThroughUi(page: Page, locked = false) {
       await page.getByRole('checkbox', { name: 'TFSA' }).check()
       await page.getByRole('checkbox', { name: 'RRSP' }).check()
       await page.getByRole('checkbox', { name: /Non-registered/ }).check()
-      if (locked) await page.getByRole('checkbox', { name: /Locked retirement account/ }).check()
+      if (options.locked) await page.getByRole('checkbox', { name: /Locked retirement account/ }).check()
     }
     else if (id === 'locked.balance') await page.locator('[data-field="lockedRetirement.balance"] input').fill('500000')
+    else if (id === 'locked.access' && options.couple) {
+      const age = page.locator('[data-field="lockedRetirement.accessibleAge"] input')
+      const value = await age.inputValue()
+      await age.fill('')
+      await age.fill(value)
+      const owner = page.getByLabel('Account owner')
+      await expect(owner).toHaveValue('')
+      if (options.ownerChoice) await owner.selectOption(options.ownerChoice)
+    }
     else if (id === 'home.situation') await page.getByRole('radio', { name: 'Rent' }).check()
     else if (id === 'housing.other') {
       await page.getByRole('radio', { name: 'No rental property' }).check()
       await page.getByRole('radio', { name: 'No other loans' }).check()
     }
     else if (id === 'spending.method') await page.getByRole('radio', { name: /overall budget/ }).check()
-    else if (id === 'pension.self') await page.getByRole('radio', { name: 'No employer pension' }).check()
+    else if (id === 'pension.self' || id === 'pension.partner')
+      await page.getByRole('radio', { name: 'No employer pension' }).check()
     else if (id === 'intent.legacy') await page.getByRole('radio', { name: /do not need to reserve/ }).check()
     else if (id === 'intent.spending') await page.getByRole('radio', { name: /Keep my current/ }).check()
     else if (id === 'invest.mix') await page.getByRole('radio', { name: /Balanced 60\/40/ }).check()
@@ -187,6 +204,7 @@ async function generateGuidedThroughUi(page: Page, locked = false) {
   expect(visited.size).toBeGreaterThan(20)
   await expect(page.locator('.results-column')).toHaveCount(0)
   const generate = page.getByRole('button', { name: 'Generate my results' })
+  if (options.stopAtReview) return
   if (await generate.isDisabled()) throw new Error(await page.locator('.review-blockers').innerText())
   await generate.click()
   await expect(page.locator('.results-column')).toBeVisible()
@@ -249,7 +267,7 @@ test('known locked withdrawal gap blocks deterministic recommendations', async (
 
 test('guided locked account cannot regain a green quick answer', async ({ page }) => {
   test.setTimeout(90_000)
-  await generateGuidedThroughUi(page, true)
+  await generateGuidedThroughUi(page, { locked: true })
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
   await page.getByRole('tab', { name: 'When can I retire?' }).click()
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
@@ -259,6 +277,45 @@ test('guided locked account cannot regain a green quick answer', async ({ page }
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
   await expect(page.locator('.summary')).toContainText('Locked-account withdrawal limits are unverified')
   await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
+})
+
+for (const owner of ['self', 'partner'] as const) {
+  test(`guided couple explicitly confirms locked owner ${owner} and can generate results`, async ({ page }) => {
+    test.setTimeout(90_000)
+    await generateGuidedThroughUi(page, { locked: true, couple: true, ownerChoice: owner })
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+    expect(saved.inputs.lockedRetirement.owner).toBe(owner)
+    expect(saved.answerMeta['lockedRetirement.owner']).toMatchObject({ status: 'confirmed', origin: 'user' })
+    await expect(page.locator('.summary')).toHaveClass(/uncertain/)
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await expect(page.locator('.results-column')).toBeVisible()
+    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await expect(page.locator('.results-column')).toBeVisible()
+    if (owner === 'partner') {
+      await page.getByRole('button', { name: 'Professional', exact: true }).click()
+      await page.getByLabel('Account owner').selectOption('self')
+      await page.getByRole('button', { name: 'Guided', exact: true }).click()
+      await expect(page.locator('.results-column')).toHaveCount(0)
+      await page.goto('/#/guided/review')
+      await expect(page.getByRole('button', { name: 'Generate my results' })).toBeDisabled()
+      await page.goto('/#/guided/assets/locked.access')
+      await expect(page.getByLabel('Account owner')).toHaveValue('')
+      await page.getByLabel('Account owner').selectOption('self')
+      await page.goto('/#/guided/review')
+      await expect(page.getByRole('button', { name: 'Generate my results' })).toBeEnabled()
+    }
+  })
+}
+
+test('guided couple cannot accept default locked owner without choosing it', async ({ page }) => {
+  test.setTimeout(90_000)
+  await generateGuidedThroughUi(page, { locked: true, couple: true, stopAtReview: true })
+  await expect(page.getByRole('button', { name: 'Generate my results' })).toBeDisabled()
+  await expect(page.locator('.review-blockers')).toContainText('When can the locked money first be used')
+  await page.goto('/#/guided/assets/locked.access')
+  await page.getByLabel('Account owner').selectOption('self')
+  await page.goto('/#/guided/review')
+  await expect(page.getByRole('button', { name: 'Generate my results' })).toBeEnabled()
 })
 
 test('real worker completes a seeded request and re-enables Run', async ({ page }) => {

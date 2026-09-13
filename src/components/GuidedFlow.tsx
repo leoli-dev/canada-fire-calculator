@@ -27,6 +27,9 @@ function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof
   const fields = requiredFields(definition, !!state.inputs.partner)
   if (!fields.length) return true
   const fieldsAreUsable = fields.every((field) => answerIsUsable(state.answerMeta[field]) || Object.entries(state.answerMeta).some(([candidate, meta]) => candidate.startsWith(`${field}.`) && answerIsUsable(meta)))
+  if (definition.id === 'locked.access' && state.inputs.partner &&
+      (state.answerMeta['lockedRetirement.owner']?.status !== 'confirmed' ||
+        !answerIsUsable(state.answerMeta['lockedRetirement.owner']))) return false
   if (definition.id === 'allocation.tfsa') {
     const split = state.inputs.savingsSplit
     return fieldsAreUsable && Math.abs(split.tfsa + split.rrsp + split.nonReg - 1) <= 0.005

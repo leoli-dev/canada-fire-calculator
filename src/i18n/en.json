@@ -46,6 +46,7 @@
   "lockedRetirementAge": "Earliest withdrawal age from your plan",
   "lockedRetirementJurisdiction": "Original pension jurisdiction (saved for future rules)",
   "lockedRetirementOwner": "Account owner",
+  "lockedRetirementChooseOwner": "Choose the account owner",
   "lockedJur_federal": "Federal",
   "lockedRetirementNote": "Before the age above, this balance grows but cannot fund spending. From that age, v1 treats it like an ordinary taxable registered account. The selected jurisdiction is retained, but v1 does not model LIF annual minimums/maximums, special unlocking, or the 50% unlocking option.",
   "lockedRetirementLabel": "Locked DC / LIRA",

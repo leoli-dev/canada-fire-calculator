@@ -277,9 +277,27 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'locked.balance':
       control = <FactNumber field="lockedRetirement.balance" label={t('lockedRetirementBalance')} value={inputs.lockedRetirement!.balance} onValue={(balance) => set({ lockedRetirement: { ...inputs.lockedRetirement!, balance } })} />
       break
-    case 'locked.access':
-      control = <div className="question-pair"><FactNumber field="lockedRetirement.accessibleAge" label={t('lockedRetirementAge')} value={inputs.lockedRetirement!.accessibleAge} onValue={(accessibleAge) => set({ lockedRetirement: { ...inputs.lockedRetirement!, accessibleAge } })} />{inputs.partner && <label className="question-select"><span>{t('lockedRetirementOwner')}</span><select value={inputs.lockedRetirement!.owner} onChange={(e) => set({ lockedRetirement: { ...inputs.lockedRetirement!, owner: e.target.value as 'self' | 'partner' } })}><option value="self">{t('benefitsSelf')}</option><option value="partner">{t('partnerSection')}</option></select></label>}</div>
+    case 'locked.access': {
+      const ownerMeta = answerMeta['lockedRetirement.owner']
+      const confirmedOwner = ownerMeta?.status === 'confirmed' && ownerMeta.origin !== 'example'
+      control = <div className="question-pair">
+        <FactNumber field="lockedRetirement.accessibleAge" label={t('lockedRetirementAge')}
+          value={inputs.lockedRetirement!.accessibleAge}
+          onValue={(accessibleAge) => set({ lockedRetirement: { ...inputs.lockedRetirement!, accessibleAge } })} />
+        {inputs.partner && <label className="question-select">
+          <span>{t('lockedRetirementOwner')}</span>
+          <select value={confirmedOwner ? inputs.lockedRetirement!.owner : ''} onChange={(e) => {
+            set({ lockedRetirement: { ...inputs.lockedRetirement!, owner: e.target.value as 'self' | 'partner' } })
+            markAnswers(['lockedRetirement.owner'], 'confirmed')
+          }}>
+            <option value="" disabled>{t('lockedRetirementChooseOwner')}</option>
+            <option value="self">{t('benefitsSelf')}</option>
+            <option value="partner">{t('partnerSection')}</option>
+          </select>
+        </label>}
+      </div>
       break
+    }
     case 'locked.contributions':
       control = <div className="question-pair"><FactNumber field="lockedRetirement.employeeContribution" label={t('lockedRetirementEmployee')} value={inputs.lockedRetirement!.employeeContribution} onValue={(employeeContribution) => set({ lockedRetirement: { ...inputs.lockedRetirement!, employeeContribution } })} /><FactNumber field="lockedRetirement.employerContribution" label={t('lockedRetirementEmployer')} value={inputs.lockedRetirement!.employerContribution} onValue={(employerContribution) => set({ lockedRetirement: { ...inputs.lockedRetirement!, employerContribution } })} /></div>
       break

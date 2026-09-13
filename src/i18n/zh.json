@@ -46,6 +46,7 @@
   "lockedRetirementAge": "计划规定的最早提款年龄",
   "lockedRetirementJurisdiction": "原养老金适用辖区（为后续规则保留）",
   "lockedRetirementOwner": "账户持有人",
+  "lockedRetirementChooseOwner": "请选择账户持有人",
   "lockedJur_federal": "联邦",
   "lockedRetirementNote": "到达上述年龄前，余额会继续增长但绝不能用于支出；从该年龄起，v1 按普通全额应税注册账户处理。此处保存辖区，但 v1 不建模 LIF 年度最低/最高提款、特殊解锁或一次性 50% 解锁。",
   "lockedRetirementLabel": "锁定 DC / LIRA",
