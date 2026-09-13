@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
+async function expectComparisonUnavailableInThreeLanguages(page: import('@playwright/test').Page) {
+  for (const [language, label] of [
+    ['EN', 'Comparison unavailable'],
+    ['FR', 'Comparaison indisponible'],
+    ['中文', '比较暂不可用'],
+  ] as const) {
+    await page.getByRole('button', { name: language, exact: true }).click()
+    const rows = page.getByTestId('scenario-comparison').locator('.compare-table tbody tr')
+    await expect(rows).toHaveCount(2)
+    for (const row of await rows.all()) {
+      await expect(row.locator('td').nth(1)).toHaveText(label)
+      await expect(row.locator('td').nth(2)).toHaveText('—')
+    }
+  }
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+}
+
 async function seedV10(page: import('@playwright/test').Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
@@ -68,6 +85,134 @@ test('v10 couple and Scenario A migrate once with shared mode gate and round tri
   await page.reload()
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   expect(await page.evaluate(() => localStorage.getItem('fire-inputs:pre-v11-backup'))).toBe(original)
+})
+
+test('Scenario A ownership gate stays separate from a singly owned current plan across modes and refresh', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const original = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.scenarioA = structuredClone(stored.state.inputs)
+    stored.state.scenarioA.partner = { currentAge: 33, cppStartAge: 65, cppAnnualAt65: 6000, oasStartAge: 65, oasAnnualAt65: 8000 }
+    stored.state.scenarioA.balances.tfsa = 220000
+    localStorage.removeItem('fire-inputs:pre-v11-backup')
+    const bytes = JSON.stringify(stored)
+    localStorage.setItem('fire-inputs', bytes)
+    return bytes
+  })
+  await page.reload()
+  const gate = page.getByTestId('migration-gate')
+  await expect(gate.getByTestId('migration-current')).toContainText('Current')
+  await expect(gate.getByTestId('migration-current')).not.toContainText('220,000')
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('tfsa: 220,000 CAD unassigned')
+  const comparison = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await comparison.locator('summary').click()
+  await expect(comparison).toContainText('Precise Scenario A comparison is unavailable')
+  await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
+  await expect(comparison.getByRole('row', { name: /Current/ })).toContainText('—')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
+  await page.reload()
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
+  const state = await page.evaluate(() => ({ stored: JSON.parse(localStorage.getItem('fire-inputs')!), backup: localStorage.getItem('fire-inputs:pre-v11-backup') }))
+  expect(state.backup).toBe(original)
+  expect(state.stored.state.canonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').ownerId).not.toBeNull()
+  expect(state.stored.state.scenarioACanonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').ownerId).toBeNull()
+})
+
+test('single-person v10 age and savings uncertainty limits exact current advice in both modes', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.inputs.partner = null
+    stored.state.scenarioA = null
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(state.canonical.migration).toMatchObject({ ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: true, savingsBasisNeedsConfirmation: true })
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-current')).toContainText('estimates')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  await expect(page.getByTestId('legacy-estimate')).not.toContainText('ownership is unconfirmed')
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
+  await page.getByLabel('Annual after-tax savings').fill('42000')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.migration.sourcePersistVersion)).toBe(10)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.guidedView = 'results'
+    stored.state.resultRevision = stored.state.inputRevision
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-current')).toContainText('estimates')
+  await expect(page.getByTestId('legacy-estimate')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
+})
+
+test('age/savings-only legacy comparison uses neutral outcome labels in three languages', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.scenarioA = structuredClone(stored.state.inputs)
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const gate = page.getByTestId('migration-gate')
+  await expect(gate.getByTestId('migration-current')).toContainText('estimates')
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('estimates')
+  const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await card.locator('summary').click()
+  await expectComparisonUnavailableInThreeLanguages(page)
+})
+
+test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays gated through restore', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Save current as A' }).click()
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(before.canonical.migration.sourcePersistVersion).toBe(11)
+  expect(before.scenarioACanonical).toEqual(before.canonical)
+  expect(before.scenarioACanonical.budget).toMatchObject({ debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' } })
+  await expect(card).not.toContainText('Precise Scenario A comparison is unavailable')
+  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('CA$')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(page.getByTestId('migration-gate')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  await expect(page.getByRole('button', { name: 'Run 1,000 simulations' })).toBeVisible()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.scenarioACanonical = null
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
+  await expect(card).toContainText('Precise Scenario A comparison is unavailable')
+  await card.locator('summary').click()
+  await expectComparisonUnavailableInThreeLanguages(page)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await card.locator('summary').click()
+  await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  if ((await card.getAttribute('open')) === null) await card.locator('summary').click()
+  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('—')
 })
 
 test('future-version and corrupt bytes are not overwritten', async ({ page }) => {

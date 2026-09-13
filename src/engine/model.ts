@@ -136,6 +136,6 @@ export function precisionGate(plan: InputsV2): PrecisionGate {
   if (plan.migration.ownershipNeedsConfirmation || plan.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || plan.properties.some(p => p.taxableOwnerShares.status === 'unknown')) reasons.push('ownershipUnknown')
   if (plan.orphanedPeople?.length || plan.incomeSources.some(source => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0)) reasons.push('recipientUnknown')
   if (plan.migration.ageBasisNeedsConfirmation) reasons.push('ageBasisUnknown')
-  if (plan.budget.kind === 'savingsBudget' && (plan.budget.debtIncluded.status === 'unknown' || plan.budget.taxBenefitIncluded.status === 'unknown')) reasons.push('savingsBasisUnknown')
+  if (plan.migration.savingsBasisNeedsConfirmation || (plan.migration.sourcePersistVersion <= 10 && plan.budget.kind === 'savingsBudget' && (plan.budget.debtIncluded.status === 'unknown' || plan.budget.taxBenefitIncluded.status === 'unknown'))) reasons.push('savingsBasisUnknown')
   return { allowed: reasons.length === 0, reasons }
 }

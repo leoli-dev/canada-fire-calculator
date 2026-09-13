@@ -704,5 +704,16 @@
   "migrationOwnerSelf": "vous",
   "migrationOwnerPartner": "partenaire",
   "migrationLegacySummary": "Estimation familiale de l’ancien modèle : la propriété des comptes reste à confirmer; ce résultat n’est pas un conseil fiscal ou de retraite précis.",
-  "storageDownloadOriginal": "Télécharger le plan original"
+  "storageDownloadOriginal": "Télécharger le plan original",
+  "migrationStatusUnassigned": "Le propriétaire ou bénéficiaire n'est pas attribué. Ce plan reste une estimation familiale de l'ancien modèle.",
+  "migrationStatusReady": "La propriété est attribuée pour ce plan.",
+  "migrationNoScenario": "Aucun scénario A n'est enregistré.",
+  "migrationNoAutomaticSplit": "Le montant total du ménage est conservé. Aucune répartition entre partenaires n'a été supposée.",
+  "migrationProperty": "Propriété",
+  "migrationOrphanedPerson": "Personne retirée à examiner",
+  "migrationComparisonBlocked": "La comparaison précise avec le scénario A est indisponible tant que les deux plans ne satisfont pas aux contrôles de propriété et de migration.",
+  "migrationPrecisionWarning": "Certains faits du plan doivent être confirmés avant de fournir des conseils fiscaux, de retraite ou de stratégie précis.",
+  "migrationStatusUnverified": "Le statut de migration de ce plan ne peut pas être vérifié; aucune comparaison précise n'est disponible.",
+  "migrationSharedStatus": "Les modes guidé et professionnel utilisent le même statut pour chaque plan.",
+  "migrationComparisonUnavailableOutcome": "Comparaison indisponible"
 }

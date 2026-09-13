@@ -5,6 +5,7 @@ import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
+import { canComparePrecisely, migrationReview } from '../engine/migrationReview'
 
 function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolean }) {
   const { t } = useTranslation()
@@ -12,7 +13,7 @@ function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolea
   return (
     <>
       <td>
-        {props.legacyEstimate ? t('migrationUnassigned') : props.r.success
+        {props.legacyEstimate ? t('migrationComparisonUnavailableOutcome') : props.r.success
           ? t('stratOk')
           : t('stratDepleted', { age: props.r.depletedAge })}
       </td>
@@ -21,9 +22,13 @@ function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolea
   )
 }
 
-export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: boolean }) {
+export function ScenarioCard() {
   const { t } = useTranslation()
-  const { inputs, scenarioA, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const { inputs, canonical, scenarioA, scenarioACanonical, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const currentReview = migrationReview(canonical)
+  const scenarioReview = migrationReview(scenarioACanonical)
+  const comparisonBlocked = !!scenarioA && !canComparePrecisely(canonical, scenarioACanonical)
+  const ownershipPending = currentReview?.ownershipPending || scenarioReview?.ownershipPending
 
   const resultA = useMemo(
     () => (scenarioA ? runProjection(scenarioA) : null),
@@ -32,10 +37,10 @@ export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: bool
   const resultNow = useMemo(() => runProjection(inputs), [inputs])
 
   return (
-    <details className="chart-card collapsible"
+    <details className="chart-card collapsible" data-testid="scenario-comparison"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
-      {legacyEstimate && <p className="hint">{t('migrationLegacySummary')}</p>}
+      {comparisonBlocked && <p className="hint">{t('migrationComparisonBlocked')} {ownershipPending && t('migrationLegacySummary')}</p>}
       <div className="card-head">
         <div>
           <button onClick={saveScenarioA}>
@@ -66,11 +71,11 @@ export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: bool
           <tbody>
             <tr>
               <td>{t('scenarioA')}</td>
-              <Cell r={resultA} life={scenarioA.lifeExpectancy} legacyEstimate={legacyEstimate} />
+              <Cell r={resultA} life={scenarioA.lifeExpectancy} legacyEstimate={comparisonBlocked} />
             </tr>
             <tr className="current-row">
               <td>{t('scenarioCurrent')}</td>
-              <Cell r={resultNow} life={inputs.lifeExpectancy} legacyEstimate={legacyEstimate} />
+              <Cell r={resultNow} life={inputs.lifeExpectancy} legacyEstimate={comparisonBlocked} />
             </tr>
           </tbody>
         </table>
