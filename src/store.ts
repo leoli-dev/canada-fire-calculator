@@ -6,7 +6,7 @@ import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
-import { changeIntent, editField } from './forms/planCommands'
+import { changeAccountPresence, changeIntent, editField, reconcileDirectFields } from './forms/planCommands'
 import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
@@ -166,6 +166,7 @@ interface Store {
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
   editSharedField: (field: SharedFieldId, raw: string, unit?: 'canonical' | 'monthly', origin?: AnswerOrigin) => void
+  setAccountPresence: (account: 'tfsa' | 'rrsp' | 'nonReg', present: boolean) => void
   commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
@@ -301,17 +302,24 @@ export const useStore = create<Store>()(
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
           const inputs = { ...s.inputs, ...patch }
+          const reconciled = reconcileLegacyInputs(s, inputs)
+          const shared = reconcileDirectFields(s, patch, reconciled.inputs)
           return {
-            ...reconcileLegacyInputs(s, inputs),
+            ...reconciled,
+            draftByField: shared.draftByField,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
-              ? { ...s.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
-              : s.answerMeta,
+              ? { ...shared.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
+              : shared.answerMeta,
           }
         })
       },
       editSharedField: (field, raw, unit = 'canonical', origin = 'user') => {
         trackOnce('adjust_inputs')
         set((s) => editField(s, field, raw, unit, origin))
+      },
+      setAccountPresence: (account, present) => {
+        trackOnce('adjust_inputs')
+        set((s) => changeAccountPresence(s, account, present))
       },
       commitPlan: ({ inputs, canonical, answerMeta, draftByField }) => set((s) => ({
         inputs, canonical, answerMeta, draftByField,

@@ -137,7 +137,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   const cad = useCad()
   const {
     inputs, set, answerMeta, markAnswers, questionAnswers, setQuestionAnswer,
-    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset,
+    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence,
   } = useStore()
   const key = definition.contentKey
   const answer = questionAnswers[definition.id] as string | undefined
@@ -244,12 +244,13 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
               : inputs.balances[account as keyof typeof inputs.balances] > 0
           if (nonZero && !window.confirm(t('questionnaire.confirmRemoveValue'))) return
         }
-        const next = e.target.checked ? [...selected, account] : selected.filter((item) => item !== account)
-        setQuestionAnswer(definition.id, next)
-        if (account === 'fhsa') set({ fhsa: e.target.checked ? (inputs.fhsa ?? DEFAULT_FHSA) : null })
-        else if (account === 'locked') set({ lockedRetirement: e.target.checked ? (inputs.lockedRetirement ?? DEFAULT_LOCKED_RETIREMENT) : null })
-        else set({ balances: { ...inputs.balances, [account]: e.target.checked ? inputs.balances[account as keyof typeof inputs.balances] : 0 } })
-        markAnswers([account === 'locked' ? 'lockedRetirement' : account], e.target.checked ? 'estimated' : 'notApplicable')
+        if (account === 'fhsa' || account === 'locked') {
+          const next = e.target.checked ? [...selected, account] : selected.filter((item) => item !== account)
+          setQuestionAnswer(definition.id, next)
+          if (account === 'fhsa') set({ fhsa: e.target.checked ? (inputs.fhsa ?? DEFAULT_FHSA) : null })
+          else set({ lockedRetirement: e.target.checked ? (inputs.lockedRetirement ?? DEFAULT_LOCKED_RETIREMENT) : null })
+          markAnswers([account === 'locked' ? 'lockedRetirement' : account], e.target.checked ? 'estimated' : 'notApplicable')
+        } else setAccountPresence(account, e.target.checked)
         }} /><span><strong id={`${optionId}-name`}>{t(`questionnaire.accountNames.${account}`)}</strong><small id={`${optionId}-role`}>{t(`questionnaire.accountRoles.${account}`)}</small></span></label>
       })}</div>
       break

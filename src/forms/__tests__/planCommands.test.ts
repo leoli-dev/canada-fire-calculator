@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_INPUTS } from '../../store'
-import { applyEstimate, changeIntent, editField, type PlanFieldSnapshot } from '../planCommands'
+import { applyEstimate, changeAccountPresence, changeIntent, editField, reconcileDirectFields, type PlanFieldSnapshot } from '../planCommands'
 import { fieldState } from '../fieldState'
 import { parseField } from '../fieldRegistry'
 
@@ -47,5 +47,36 @@ describe('shared field commands', () => {
     expect(estimated.answerMeta.annualSavings).toMatchObject({ status: 'estimated', origin: 'default', assumptionValue: 24000 })
     const confirmed = { ...estimated, ...editField(estimated, 'annualSavings', '24000') } as PlanFieldSnapshot
     expect(confirmed.answerMeta.annualSavings).toMatchObject({ status: 'confirmed', origin: 'user' })
+  })
+
+  it('resolves a direct scalar patch without confirming unchanged sibling balances', () => {
+    const state = { ...initial(), ...editField(initial(), 'retirementSpending', '') } as PlanFieldSnapshot
+    state.answerMeta['balances.rrsp'] = { status: 'estimated', origin: 'default', updatedAt: '2026-01-01' }
+    const inputs = { ...state.inputs, retirementSpending: 2000, balances: { ...state.inputs.balances, tfsa: 10 } }
+    const reconciled = reconcileDirectFields(state, { retirementSpending: 2000, balances: inputs.balances }, inputs)
+    expect(reconciled.draftByField).not.toHaveProperty('retirementSpending')
+    expect(reconciled.answerMeta.retirementSpending.status).toBe('confirmed')
+    expect(reconciled.answerMeta['balances.tfsa'].status).toBe('confirmed')
+    expect(reconciled.answerMeta['balances.rrsp'].status).toBe('estimated')
+  })
+
+  it('marks explicit account absence usable while clearing its draft in one revision', () => {
+    const initialState = initial()
+    initialState.inputs.balances.tfsa = 0
+    const unknown = { ...initialState, ...editField(initialState, 'balances.tfsa', ''), questionAnswers: { 'assets.identify': ['tfsa'] } } as PlanFieldSnapshot & { questionAnswers: Record<string, string[]> }
+    const change = changeAccountPresence(unknown, 'tfsa', false)
+    const state = { ...unknown, ...change } as typeof unknown
+    expect(state.inputRevision).toBe(unknown.inputRevision + 1)
+    expect(Object.hasOwn(state.draftByField, 'balances.tfsa')).toBe(false)
+    expect(fieldState(state, 'balances.tfsa')).toMatchObject({ lastValid: 0, usable: true, meta: { status: 'notApplicable' } })
+    expect(state.questionAnswers['assets.identify']).toEqual([])
+  })
+
+  it('keeps a newly selected planned-home payment as an estimate, not a confirmation', () => {
+    const state = initial()
+    const principalResidence = { mode: 'planned' as const, buyAtAge: 40, price: 800000, downPayment: 200000, appreciation: 0.02, annualMortgagePayment: 42000, mortgageYears: 25, netHoldingCostChange: 0, sellAtAge: null }
+    const next = { ...state.inputs, principalResidence }
+    const reconciled = reconcileDirectFields(state, { principalResidence }, next)
+    expect(reconciled.answerMeta['principalResidence.annualMortgagePayment']).toMatchObject({ status: 'estimated', origin: 'default' })
   })
 })
