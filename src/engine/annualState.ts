@@ -145,6 +145,19 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const state = clone(opening)
   const year = opening.year
   // Rules not yet supplied by BE-11/12/23/38 must not masquerade as exact advice.
+  // These obligations follow the account holder's age, even when they remain
+  // employed. A does not compute minimums, conversions, or FHSA closure tax.
+  for (const account of plan.accounts) {
+    const current = state.byAccount[account.id]
+    const ownerAge = state.byPerson[account.ownerId!].age
+    const plannedContribution = plan.recurringContributions.some(item => item.accountId === account.id && item.annualAmount > 0) ||
+      plan.contributions.some(item => item.accountId === account.id && item.calendarYear === year && item.amount > 0) ||
+      (account.kind === 'rrsp' && plan.budget.kind === 'savingsBudget' && plan.budget.annualNetSavings > 0 && plan.savingsAllocation.shares.rrsp > 0)
+    if (current.balance <= 0 && !plannedContribution) continue
+    if (account.kind === 'rrif' || account.kind === 'lif') return fail('unsupported', `${account.kind.toUpperCase()} minimum withdrawal rule not yet wired: ${account.id}`)
+    if (ownerAge >= 71 && ['rrsp', 'spousalRrsp', 'lira'].includes(account.kind)) return fail('unsupported', `${account.kind === 'lira' ? 'LIRA' : 'RRSP'} age-71 conversion rule not yet wired: ${account.id}`)
+    if (ownerAge >= 71 && account.kind === 'fhsa') return fail('unsupported', `FHSA age-71 closure rule not yet wired: ${account.id}`)
+  }
   if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
   if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
   if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')

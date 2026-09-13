@@ -376,6 +376,55 @@ describe('BE-14 A nominal annual state kernel', () => {
     }
   })
 
+  it('withholds work-year projections needing registered account minimums or age-71 conversions', () => {
+    const older = (age: number) => plan({ ...input(), currentAge: age, fireAge: 80, lifeExpectancy: 90,
+      annualSavings: 0, debts: [], balances: { tfsa: 0, rrsp: 100000, nonReg: 0 },
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    const cases: Array<[string, InputsV2, string]> = [
+      ['RRIF minimum while working', (() => { const p = older(72); const a = p.accounts.find(a => a.kind === 'rrsp')!; a.kind = 'rrif'; a.openedYear = { status: 'known', value: 2020 }; return p })(), 'RRIF'],
+      ['LIF minimum while working', (() => { const p = older(72); p.accounts.find(a => a.kind === 'rrsp')!.kind = 'lif'; return p })(), 'LIF'],
+      ['RRSP at 71', older(71), 'RRSP'],
+      ['spousal RRSP at 71', (() => { const p = older(71); p.accounts.find(a => a.kind === 'rrsp')!.kind = 'spousalRrsp'; return p })(), 'RRSP'],
+      ['LIRA at 71', (() => { const p = older(71); p.accounts.find(a => a.kind === 'rrsp')!.kind = 'lira'; return p })(), 'LIRA'],
+      ['FHSA at 71', (() => { const p = older(71); const a = p.accounts.find(a => a.kind === 'rrsp')!; a.balance = 0; const fhsa = structuredClone(a); fhsa.id = 'older:fhsa'; fhsa.kind = 'fhsa'; fhsa.balance = 1000; fhsa.openedYear = { status: 'known', value: 2025 }; p.accounts.push(fhsa); return p })(), 'FHSA'],
+      ['FHSA at 72', (() => { const p = older(72); const a = p.accounts.find(a => a.kind === 'rrsp')!; a.balance = 0; const fhsa = structuredClone(a); fhsa.id = 'older:fhsa'; fhsa.kind = 'fhsa'; fhsa.balance = 1000; fhsa.openedYear = { status: 'known', value: 2025 }; p.accounts.push(fhsa); return p })(), 'FHSA'],
+    ]
+    for (const [name, canonical, capability] of cases) {
+      const opening = ok(initializeState(canonical))
+      const evaluate = vi.fn(providers(70).evaluate)
+      expect(annualStep(canonical, opening, { evaluate, returns: () => 0 }), name).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining(capability) }] })
+      expect(evaluate, name).not.toHaveBeenCalled()
+      expect(opening.year).toBe(canonical.baseYear)
+    }
+  })
+
+  it('uses account-owner age and allows empty older accounts and younger working accumulation', () => {
+    const couple = plan({ ...input(), currentAge: 40, fireAge: 80, lifeExpectancy: 90, annualSavings: 0,
+      debts: [], balances: { tfsa: 0, rrsp: 100000, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      partner: { currentAge: 72, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+    const partner = couple.people.find(person => person.role === 'partner')!
+    const self = couple.people.find(person => person.role === 'self')!
+    const account = couple.accounts.find(account => account.kind === 'rrsp')!
+    for (const item of couple.accounts) {
+      item.ownerId = self.id
+      item.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    account.ownerId = partner.id
+    account.taxableOwnerShares = { status: 'known', shares: { [partner.id]: 1 } }
+    expect(annualStep(couple, ok(initializeState(couple)), { ...providers(70), returns: () => 0 }).status).toBe('unsupported')
+    account.balance = 0
+    expect(annualStep(couple, ok(initializeState(couple)), { ...providers(70), returns: () => 0 }).status).toBe('ok')
+    const young = plan({ ...input(), debts: [] })
+    expect(annualStep(young, ok(initializeState(young)), providers(110)).status).toBe('ok')
+  })
+
+  it('blocks an age-71 RRSP contribution even when its opening balance is zero', () => {
+    const canonical = plan({ ...input(), currentAge: 71, fireAge: 80, lifeExpectancy: 90, debts: [],
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 1, nonReg: 0 } })
+    const opening = ok(initializeState(canonical))
+    expect(annualStep(canonical, opening, providers(110))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('RRSP') }] })
+  })
+
   it('samples every account return from one settled snapshot regardless of split, order, or provider mutation', () => {
     const make = (tfsa: number, rrsp: number) => plan({ ...input(), debts: [], annualSavings: 0,
       savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, balances: { tfsa, rrsp, nonReg: 0 },
