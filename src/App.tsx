@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
-import { useStore } from './store'
+import { downloadStoredPlan, getStorageReadOnlyReason, useStore } from './store'
+import { precisionGate } from './engine/model'
 import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
@@ -30,6 +31,15 @@ export default function App() {
   const { t, i18n } = useTranslation()
   const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
+  const canonical = useStore((s) => s.canonical)
+  const scenarioACanonical = useStore((s) => s.scenarioACanonical)
+  const storageIssue = getStorageReadOnlyReason()
+  const unresolvedHousehold = canonical
+    ? canonical.accounts.some((account) => account.ownerId === null || account.taxableOwnerShares.status === 'unknown') || canonical.properties.some((property) => property.taxableOwnerShares.status === 'unknown') || !!canonical.orphanedPeople?.length || canonical.incomeSources.some((source) => source.recipientId === null)
+    : !!inputs.partner
+  const precision = canonical ? precisionGate(canonical) : null
+  const scenarioOwnershipUnresolved = scenarioACanonical ? precisionGate(scenarioACanonical).reasons.some(reason => reason === 'ownershipUnknown' || reason === 'recipientUnknown') : false
+  const ownershipAccounts = canonical?.accounts ?? []
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
   const setEntryMode = useStore((s) => s.setEntryMode)
@@ -37,7 +47,7 @@ export default function App() {
   const inputRevision = useStore((s) => s.inputRevision)
   const resultRevision = useStore((s) => s.resultRevision)
   const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision
-  const result = useMemo(() => entryMode === 'professional' || showGuidedResults ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs])
+  const result = useMemo(() => !storageIssue && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs, storageIssue])
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
     [inputs],
@@ -82,6 +92,17 @@ export default function App() {
         </nav>
       </header>
 
+      {storageIssue && <div role="alert" className="hint">
+        {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
+        <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
+      </div>}
+      {unresolvedHousehold && <div role="status" className="hint" data-testid="migration-gate">
+        {t('migrationOwnershipWarning')}
+        <ul>{ownershipAccounts.map((account) => <li key={account.id}>{account.kind}: {account.balance.toLocaleString()} CAD {account.ownerId === null ? t('migrationUnassigned') : t(canonical?.people.find((person) => person.id === account.ownerId)?.role === 'partner' ? 'migrationOwnerPartner' : 'migrationOwnerSelf')}{account.acb.status === 'known' ? `, ${t('migrationBasis')} ${account.acb.value.toLocaleString()} CAD` : ''}</li>)}</ul>
+        {canonical?.incomeSources.filter((source) => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0).map((source) => <p key={source.id}>{source.kind}: {source.annualAmount.status === 'known' ? source.annualAmount.value.toLocaleString() : ''} CAD {t('migrationUnassigned')}</p>)}
+        {t('migrationSharedPlan')}
+      </div>}
+      {!unresolvedHousehold && precision && !precision.allowed && <div role="status" className="hint">{t('migrationApproximate')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
           <div className="entry-mode" aria-label={t('entryModeLabel')}>
@@ -92,10 +113,11 @@ export default function App() {
               {t('professionalMode')}
             </button>
           </div>
-          {entryMode === 'guided' ? <GuidedFlow /> : <InputForm />}
+          {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
-          <ResultsPanel inputs={inputs} result={result} />
+          <ResultsPanel inputs={inputs} result={result} legacyEstimate={unresolvedHousehold} />
+          {unresolvedHousehold ? <ScenarioCard legacyEstimate /> : <>
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
             result={result}
@@ -119,7 +141,8 @@ export default function App() {
           <TimingCard inputs={inputs} />
           <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
-          <ScenarioCard />
+          <ScenarioCard legacyEstimate={scenarioOwnershipUnresolved} />
+          </>}
         </section>}
       </main>
 

@@ -677,5 +677,16 @@
   "smallestCandidateGap": "Plus petit manque annuel : {{amount}} avec RPC/RRQ à {{cpp}} ans et SV à {{oas}} ans. Ce plan échoue tout de même.",
   "manualFailureExploration": "Cet ordre choisi manuellement est un scénario d’échec à explorer, et non une recommandation.",
   "manualFailureGap": "Plus grand manque annuel : {{amount}}.",
-  "candidateGap": "Plus grand manque annuel : {{amount}}."
+  "candidateGap": "Plus grand manque annuel : {{amount}}.",
+  "migrationOwnershipWarning": "La propriété des comptes du ménage doit être confirmée. La projection affichée est une estimation familiale de l’ancien modèle; les comparaisons fiscales et stratégiques précises sont indisponibles.",
+  "migrationSharedPlan": "Le même plan et les soldes non attribués apparaissent dans les deux modes.",
+  "migrationUnassigned": "non attribué",
+  "migrationBasis": "coût de base",
+  "migrationApproximate": "L’âge et l’épargne de l’ancien plan doivent être confirmés; les résultats sont des estimations.",
+  "storageFuture": "Ce plan a été enregistré par une version plus récente. Il est en lecture seule ici.",
+  "storageCorrupt": "Le plan enregistré ne peut pas être lu en toute sécurité. Les données originales n’ont pas été remplacées.",
+  "migrationOwnerSelf": "vous",
+  "migrationOwnerPartner": "partenaire",
+  "migrationLegacySummary": "Estimation familiale de l’ancien modèle : la propriété des comptes reste à confirmer; ce résultat n’est pas un conseil fiscal ou de retraite précis.",
+  "storageDownloadOriginal": "Télécharger le plan original"
 }

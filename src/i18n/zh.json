@@ -677,5 +677,16 @@
   "smallestCandidateGap": "最小年度缺口：{{amount}}（CPP/QPP {{cpp}} 岁、OAS {{oas}} 岁）；该方案仍失败。",
   "manualFailureExploration": "当前手动选择的顺序仅用于探索失败情景，并非推荐。",
   "manualFailureGap": "最大年度缺口：{{amount}}。",
-  "candidateGap": "最大年度缺口：{{amount}}。"
+  "candidateGap": "最大年度缺口：{{amount}}。",
+  "migrationOwnershipWarning": "家庭账户归属尚待确认。当前投影是旧版家庭估算，不能提供精确税务或策略比较。",
+  "migrationSharedPlan": "引导模式和专业模式显示同一计划及未分配余额。",
+  "migrationUnassigned": "未分配",
+  "migrationBasis": "成本基础",
+  "migrationApproximate": "旧计划的年龄与储蓄口径尚待确认；结果仅为估算。",
+  "storageFuture": "该计划由较新版本保存，此版本只能只读查看。",
+  "storageCorrupt": "无法安全读取已保存计划，原始存储未被覆盖。",
+  "migrationOwnerSelf": "本人",
+  "migrationOwnerPartner": "伴侣",
+  "migrationLegacySummary": "旧版家庭估算：账户归属尚未确认，不能作为精确税务或退休建议。",
+  "storageDownloadOriginal": "下载原始计划"
 }

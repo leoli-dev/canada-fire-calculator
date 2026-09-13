@@ -98,6 +98,8 @@ export const DEBT_KINDS: DebtKind[] = ['mortgage', 'carLoan', 'other']
  * inflation shrink the real weight of the payments over time.
  */
 export interface Debt {
+  /** Stable identity for canonical migration and list edits. */
+  id?: string
   kind: DebtKind
   /** outstanding balance today */
   balance: number
@@ -214,6 +216,8 @@ export interface Child {
 }
 
 export interface InvestmentProperty {
+  /** Stable identity for canonical migration and list edits. */
+  id?: string
   value: number
   /** adjusted cost base; gain above it is 50% taxable at sale */
   acb: number
