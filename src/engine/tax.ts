@@ -25,6 +25,8 @@ export interface PersonCredits {
    * senior credit, so under-65 RPP income gets the federal amount only.)
    */
   pensionIncome?: number
+  /** Provincial eligibility can differ from the federal pension amount. */
+  provincialPensionIncome?: number
   /** Only supplied after the claimant confirms support/cohabitation. */
   spouseNetIncome?: number
 }
@@ -64,6 +66,7 @@ export function incomeTax(
   if (taxable <= 0) return 0
   const senior = (credits?.age ?? 0) >= 65
   const pensionInc = credits?.pensionIncome ?? 0
+  const provincialPensionInc = credits?.provincialPensionIncome ?? pensionInc
 
   let fedCredit = federalBpa(taxable) * FEDERAL.brackets[0].rate
   // the pension income amount has no age test of its own — eligibility by
@@ -97,7 +100,7 @@ export function incomeTax(
   // equivalent stays inside the senior block below, folded into its combined
   // family-income-tested credit
   if (province !== 'QC') {
-    provCredit += Math.min(PROV_AGE_PENSION[province].pension, pensionInc) * lowRate
+    provCredit += Math.min(PROV_AGE_PENSION[province].pension, provincialPensionInc) * lowRate
   }
   if (senior) {
     const ap = PROV_AGE_PENSION[province]

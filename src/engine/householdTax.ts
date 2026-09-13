@@ -8,6 +8,7 @@ export interface PersonTaxRow {
   netIncome: number
   taxableIncome: number
   federalPensionEligible: number
+  provincialPensionEligible: number
   tax: number
   bySource: PersonIncome['bySource']
 }
@@ -42,10 +43,16 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     from.taxableIncome -= election.amount
     to.netIncome += election.amount
     to.taxableIncome += election.amount
+    // T1032 Step 4, Note 1: under 65, the recipient may use the pension
+    // amount for the RPP life-annuity portion, not RRIF/LIF-derived split.
+    // Where both sources exist the form allocates the election in proportion
+    // to eligible source income; the taxable transfer itself remains whole.
+    const recipientCredit = to.age >= 65 ? election.amount :
+      election.amount === 0 ? 0 : election.amount * (from.bySource.dbPension ?? 0) / from.federalPensionEligible
     from.federalPensionEligible -= election.amount
-    to.federalPensionEligible += election.amount
+    to.federalPensionEligible += recipientCredit
     from.provincialPensionEligible -= election.amount
-    to.provincialPensionEligible += election.amount
+    to.provincialPensionEligible += recipientCredit
   }
   const ids = Object.keys(people)
   const support = plan.taxProfile?.spouseSupported
@@ -60,9 +67,11 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     const other = ids.find(item => item !== id)
     const spouseNetIncome = claimant === id && other ? people[other].netIncome : undefined
     const tax = incomeTax(person.taxableIncome, plan.province, { age: person.age,
-      pensionIncome: person.federalPensionEligible, spouseNetIncome })
+      pensionIncome: person.federalPensionEligible,
+      provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome })
     byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
       taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
+      provincialPensionEligible: person.provincialPensionEligible,
       tax, bySource: person.bySource }
   }
   return { status: 'ok', total: Object.values(byPerson).reduce((sum, row) => sum + row.tax, 0),

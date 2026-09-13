@@ -88,8 +88,10 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
       return { status: 'unsupported', reason: 'rental allocation or mortgage deduction needs BE-14 B' }
     annualEvents.push({ id: `rent:${f.year}`, kind: 'rent', propertyId: rented[0].id, amount: f.rent })
   }
-  // OAS recovery is assessed on each recipient's own income before OAS.
-  const before = calculateHouseholdTax({ ...plan, taxProfile: { ...plan.taxProfile!, pensionSplit: null } }, f.year, annualEvents)
+  // OAS recovery uses each person's net income after the same elected pension
+  // split used by final tax, but before adding their own OAS event. CRA notes
+  // that the election changes individual OAS repayment.
+  const before = calculateHouseholdTax(plan, f.year, annualEvents)
   if (before.status !== 'ok') return before
   let oasNet = 0
   const oasByPerson: Record<string, { gross: number; net: number }> = {}

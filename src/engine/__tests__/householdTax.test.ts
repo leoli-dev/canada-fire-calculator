@@ -6,6 +6,7 @@ import { calculateHouseholdTax } from '../householdTax'
 import type { IncomeEvent } from '../personIncome'
 import { provincialSpouseAmount2026 } from '../spouseCredit2026'
 import { runProjection } from '../projection'
+import { incomeTax } from '../tax'
 
 const legacy: Inputs = {
   currentAge: 62, fireAge: 62, lifeExpectancy: 90, province: 'ON', annualSavings: 0,
@@ -98,6 +99,95 @@ describe('BE-11 person-owned tax and elections', () => {
     } })
     p.taxProfile!.pensionSplit.amount = 20_001
     expect(calculateHouseholdTax(p, 2026, events).status).toBe('invalid')
+  })
+
+  it('taxes RRIF split income to a 62-year-old without granting pension credits (CRA T1032 Step 4)', () => {
+    const p = plan()
+    const [a, b] = p.people.map(person => person.id)
+    p.people[0].ageInBaseYear = 68
+    p.people[1].ageInBaseYear = 62
+    const account = p.accounts.find(item => item.kind === 'rrsp')!
+    account.kind = 'rrif'
+    p.taxProfile!.pensionSplit = { transferorId: a, recipientId: b, amount: 10_000 }
+    const result = calculateHouseholdTax(p, 2026, [
+      { id: 'rrif', kind: 'rrifWithdrawal', accountId: account.id, amount: 20_000 },
+      { id: 'wage', kind: 'employment', personId: b, amount: 40_000 },
+    ])
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.byPerson[b].taxableIncome).toBe(50_000)
+    expect(result.byPerson[b].federalPensionEligible).toBe(0)
+    expect(result.byPerson[b].provincialPensionEligible).toBe(0)
+    // Independent 2026 ON fixture: 50k taxable, no pension amount, age 62.
+    expect(result.byPerson[b].tax).toBeCloseTo(7_165.78, 2)
+    p.people[1].ageInBaseYear = 65
+    const older = calculateHouseholdTax(p, 2026, [
+      { id: 'rrif', kind: 'rrifWithdrawal', accountId: account.id, amount: 20_000 },
+      { id: 'wage', kind: 'employment', personId: b, amount: 40_000 },
+    ])
+    expect(older).toMatchObject({ status: 'ok', byPerson: { [b]: {
+      federalPensionEligible: 10_000, provincialPensionEligible: 10_000,
+    } } })
+  })
+
+  it('apportions mixed DB/RRIF split credit by source for an under-65 recipient', () => {
+    const p = plan()
+    const [a, b] = p.people.map(person => person.id)
+    p.people[0].ageInBaseYear = 68
+    p.people[1].ageInBaseYear = 62
+    p.people[0].pension = { annualAmount: 20_000, startAge: 60, indexation: 1, bridgeAnnual: 0 }
+    const account = p.accounts.find(item => item.kind === 'rrsp')!
+    account.kind = 'rrif'
+    p.taxProfile!.pensionSplit = { transferorId: a, recipientId: b, amount: 20_000 }
+    const result = calculateHouseholdTax(p, 2026, [
+      { id: 'db', kind: 'dbPension', personId: a, amount: 20_000 },
+      { id: 'rrif', kind: 'rrifWithdrawal', accountId: account.id, amount: 20_000 },
+    ])
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.byPerson[b].taxableIncome).toBe(20_000)
+    expect(result.byPerson[b].federalPensionEligible).toBe(10_000)
+  })
+
+  it('uses the elected pension split for OAS recovery in normal projection cash and tax', () => {
+    const inputs: Inputs = { ...legacy, currentAge: 68, fireAge: 68, lifeExpectancy: 68,
+      pension: { annualAmount: 150_000, startAge: 65, indexation: 1, bridgeAnnual: 0 },
+      oasAnnualAt65: 8_000, partner: { ...legacy.partner!, currentAge: 68 },
+    }
+    const p = migratePersistedPlan({ inputs }, 10, 2026)
+    p.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    p.accounts.forEach(account => { account.ownerId = p.people[0].id; account.taxableOwnerShares = { status: 'known', shares: { [p.people[0].id]: 1 } } })
+    p.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: { transferorId: p.people[0].id, recipientId: p.people[1].id, amount: 50_000 } }
+    const row = runProjection(inputs, undefined, p).rows[0]
+    expect(row.taxCapability).toBe('person')
+    expect(row.oas).toBeCloseTo(8_000 - (100_000 + 8_000 - 95_323) * .15, 2)
+    expect(row.byPersonTax?.[p.people[0].id].netIncome).toBeCloseTo(100_000 + row.oas, 2)
+    expect(row.tax).toBeCloseTo(Object.values(row.byPersonTax!).reduce((sum, person) => sum + person.tax, 0), 2)
+    expect(row.netCash).toBeCloseTo(row.pension + row.oas - row.tax, 2)
+    const noElection = runProjection(inputs, undefined, { ...p, taxProfile: { ...p.taxProfile!, pensionSplit: null } }).rows[0]
+    expect(noElection.oas).toBe(0)
+    expect(row.netCash).toBeGreaterThan(noElection.netCash)
+  })
+
+  it('keeps a 62-year-old recipient RRIF split taxable but credit-ineligible in normal projection', () => {
+    const inputs: Inputs = { ...legacy, currentAge: 68, fireAge: 68, lifeExpectancy: 68,
+      retirementSpending: 40_000, balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
+      savingsSplit: { tfsa: 0, rrsp: 1, nonReg: 0 }, strategy: 'rrspFirst',
+      partner: { ...legacy.partner!, currentAge: 62, cppStartAge: 62, cppAnnualAt65: 40_000 },
+    }
+    const p = migratePersistedPlan({ inputs }, 10, 2026)
+    p.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    p.accounts.forEach(account => { account.ownerId = p.people[0].id; account.taxableOwnerShares = { status: 'known', shares: { [p.people[0].id]: 1 } } })
+    const registered = p.accounts.find(account => account.kind === 'rrsp')!
+    registered.kind = 'rrif'
+    registered.openedYear = { status: 'known', value: 2025 }
+    p.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: { transferorId: p.people[0].id, recipientId: p.people[1].id, amount: 5_000 } }
+    const row = runProjection(inputs, undefined, p).rows[0]
+    const recipient = row.byPersonTax?.[p.people[1].id]
+    expect(row.taxCapability).toBe('person')
+    expect(recipient?.taxableIncome).toBeGreaterThan(5_000)
+    expect(recipient?.federalPensionEligible).toBe(0)
+    expect(recipient?.tax).toBeCloseTo(incomeTax(recipient!.taxableIncome, 'ON', { age: 62, pensionIncome: 0 }), 2)
   })
 
   it('applies a confirmed spouse amount only to the claimant, with official 2026 ON limits', () => {
