@@ -1,0 +1,354 @@
+{
+  "schema": "qa30-pending-v1",
+  "cases": [
+    {
+      "id": "P01",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "Year-start sale: 500,000 property proceeds \u2212 400,000 opening mortgage = 100,000 cash. No current-year 40,000 principal payment.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P01-sale-mortgage-conservation"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-31",
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 50,
+        "lifeExpectancy": 50,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "principalResidence": {
+          "value": 500000,
+          "appreciation": 0,
+          "sellAtAge": 50,
+          "mortgage": {
+            "balance": 400000,
+            "annualPayment": 40000,
+            "yearsRemaining": 10
+          }
+        }
+      },
+      "expected": {
+        "finalNetWorth": 100000,
+        "debtPaymentAtSale": 0
+      }
+    },
+    {
+      "id": "P02",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "500,000 house \u2212 100,000 opening TFSA \u2212 0 mortgage proceeds = 400,000 unfunded consideration; no funded purchase can be recorded.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P02-missing-mortgage"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-30",
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 50,
+        "lifeExpectancy": 50,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 100000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "principalResidence": {
+          "mode": "planned",
+          "buyAtAge": 50,
+          "price": 500000,
+          "downPayment": 100000,
+          "appreciation": 0,
+          "netHoldingCostChange": 0,
+          "sellAtAge": null
+        }
+      },
+      "expected": {
+        "unfundedPurchasePrice": 400000,
+        "status": "infeasible"
+      }
+    },
+    {
+      "id": "P03",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "At age 50 opening liquid balance is zero; planned down payment is 100,000. Income in age 51 cannot fund an earlier purchase.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P03-unfunded-downpayment"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-30",
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 51,
+        "lifeExpectancy": 51,
+        "province": "ON",
+        "annualSavings": 40000,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "extraIncome": {
+          "annual": 60000,
+          "fromAge": 51,
+          "toAge": 51
+        },
+        "principalResidence": {
+          "mode": "planned",
+          "buyAtAge": 50,
+          "price": 500000,
+          "downPayment": 100000,
+          "appreciation": 0,
+          "netHoldingCostChange": 0,
+          "sellAtAge": null,
+          "annualMortgagePayment": 40000,
+          "mortgageYears": 10
+        }
+      },
+      "expected": {
+        "unfundedDownPaymentAtAge50": 100000,
+        "status": "infeasible"
+      }
+    },
+    {
+      "id": "P04",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "After-tax savings budget 10,000 \u2212 8,000 FHSA \u2212 8,000 employee DC = \u22126,000; the 6,000 must be prevented or explicitly recorded as unfunded.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P04-contributions-negative"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-30",
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 51,
+        "lifeExpectancy": 51,
+        "province": "ON",
+        "annualSavings": 10000,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "fhsa": {
+          "balance": 0,
+          "annualContribution": 8000,
+          "openedYearsAgo": 0
+        },
+        "lockedRetirement": {
+          "balance": 0,
+          "employeeContribution": 8000,
+          "employerContribution": 0,
+          "accessibleAge": 60,
+          "jurisdiction": "ON",
+          "owner": "self"
+        }
+      },
+      "expected": {
+        "unfundedEmployeeContributionsAtAge50": 6000,
+        "minimumAccountBalance": 0
+      }
+    },
+    {
+      "id": "P10",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "Child is 10 at current age 40, hence 20 at FIRE age 50 and CCB is zero. Two 6,000 retirement spending years require 12,000 tax-free liquid cash.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P10-fire-number-child-age"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-14",
+      "inputs": {
+        "currentAge": 40,
+        "fireAge": 50,
+        "lifeExpectancy": 51,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 6000,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 6000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0,
+        "children": [
+          {
+            "age": 10
+          }
+        ]
+      },
+      "expected": {
+        "childAgeAtFire": 20,
+        "ccbAtFire": 0,
+        "minimumTfsaForTwoYearsNoTaxNoGrowth": 12000
+      }
+    },
+    {
+      "id": "P17",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON baseline; no legal-rate claim beyond stated assumptions",
+      "source": {
+        "kind": "independent financial identity or feasibility rule",
+        "derivation": "Feasibility precedes estate ranking: 50,000 \u2212 20,000 at ages 60 and 61 leaves 10,000, so 70/70 has an age-62 cash deficit; 61/65 is a separately verified feasible candidate.",
+        "audit": "fire-model-reassessment-2026-09 \u00a73, diagnostics probe P17-timing-ranking"
+      },
+      "toleranceCad": 0.01,
+      "pendingFix": "BE-34",
+      "inputs": {
+        "currentAge": 60,
+        "fireAge": 60,
+        "lifeExpectancy": 95,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 20000,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 50000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 60,
+        "cppAnnualAt65": 18092,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 9024,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0
+      },
+      "expected": {
+        "recommendedPathMustBeFeasible": true,
+        "disqualify": {
+          "cppStartAge": 70,
+          "oasStartAge": 70
+        },
+        "knownFeasible": {
+          "cppStartAge": 61,
+          "oasStartAge": 65
+        }
+      }
+    }
+  ]
+}

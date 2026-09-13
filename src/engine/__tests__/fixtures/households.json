@@ -1,0 +1,200 @@
+{
+  "schema": "qa30-fixtures-v1",
+  "households": [
+    {
+      "id": "CASH-01-static-tfsa",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON; taxes and benefits disabled",
+      "source": {
+        "kind": "independent cash arithmetic",
+        "derivation": "Opening 12,000 + external cash 0 \u2212 consumption 0 + growth 0 = closing 12,000."
+      },
+      "toleranceCad": 0.01,
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 50,
+        "lifeExpectancy": 50,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 12000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0
+      },
+      "expected": {
+        "finalNetWorth": 12000,
+        "rowBalances": [
+          {
+            "tfsa": 12000,
+            "rrsp": 0,
+            "nonReg": 0
+          }
+        ],
+        "rowNetCash": [
+          0
+        ],
+        "rowShortfall": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "CASH-02-two-working-years",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON; taxes and benefits disabled",
+      "source": {
+        "kind": "independent cash arithmetic",
+        "derivation": "Opening 5,000 + two separate 10,000 after-tax work-year savings = 25,000 entering FIRE; FIRE year spends zero."
+      },
+      "toleranceCad": 0.01,
+      "inputs": {
+        "currentAge": 40,
+        "fireAge": 42,
+        "lifeExpectancy": 42,
+        "province": "ON",
+        "annualSavings": 10000,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 0,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 5000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0
+      },
+      "expected": {
+        "finalNetWorth": 25000,
+        "rowBalances": [
+          {
+            "tfsa": 15000,
+            "rrsp": 0,
+            "nonReg": 0
+          },
+          {
+            "tfsa": 25000,
+            "rrsp": 0,
+            "nonReg": 0
+          },
+          {
+            "tfsa": 25000,
+            "rrsp": 0,
+            "nonReg": 0
+          }
+        ],
+        "rowNetCash": [
+          0,
+          0,
+          0
+        ],
+        "rowShortfall": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "CASH-03-two-retirement-spends",
+      "inputVersion": "legacy-inputs-v1",
+      "taxPeriod": "2026 ON; taxes and benefits disabled",
+      "source": {
+        "kind": "independent cash arithmetic",
+        "derivation": "Opening 15,000 \u2212 6,000 at age 50 \u2212 6,000 at age 51 = closing 3,000; tax-free TFSA withdrawals exactly fund consumption."
+      },
+      "toleranceCad": 0.01,
+      "inputs": {
+        "currentAge": 50,
+        "fireAge": 50,
+        "lifeExpectancy": 51,
+        "province": "ON",
+        "annualSavings": 0,
+        "savingsSplit": {
+          "tfsa": 1,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "retirementSpending": 6000,
+        "returns": {
+          "tfsa": 0,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "balances": {
+          "tfsa": 15000,
+          "rrsp": 0,
+          "nonReg": 0
+        },
+        "nonRegBook": 0,
+        "cppStartAge": 65,
+        "cppAnnualAt65": 0,
+        "oasStartAge": 65,
+        "oasAnnualAt65": 0,
+        "strategy": "tfsaFirst",
+        "inflation": 0,
+        "fees": 0,
+        "nonRegDistributionYield": 0
+      },
+      "expected": {
+        "finalNetWorth": 3000,
+        "rowBalances": [
+          {
+            "tfsa": 9000,
+            "rrsp": 0,
+            "nonReg": 0
+          },
+          {
+            "tfsa": 3000,
+            "rrsp": 0,
+            "nonReg": 0
+          }
+        ],
+        "rowNetCash": [
+          6000,
+          6000
+        ],
+        "rowShortfall": [
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}
