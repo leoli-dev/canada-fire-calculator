@@ -22,7 +22,7 @@ import {
   oasAfterClawback,
 } from './benefits'
 import { rrifMinFactor } from './rrif'
-import { buildDebtStream, impliedRate, yearStartSale } from './debts'
+import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale } from './debts'
 import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
@@ -320,6 +320,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
   let lockedBal = inputs.lockedRetirement?.balance ?? 0
   let unpaidPlannedMortgage = 0
   let unpaidSaleDebt = 0
+  let prSold = false
   const plannedMortgageRate = plannedPurchase && plannedPurchase.mortgageYears && plannedPurchase.annualMortgagePayment
     ? impliedRate(plannedPurchase.price - plannedPurchase.downPayment,
       plannedPurchase.annualMortgagePayment, plannedPurchase.mortgageYears)
@@ -332,6 +333,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
+    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], years, inflation)
@@ -352,6 +354,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
     let shortfall = 0
     let extraTaxable = 0
     let saleGainsTaxable = 0
+    let accumulationSaleTax = 0
+    const saleTaxObligations: { amount: number; propertyIdx: number }[] = []
     let taxablePerPerson = 0
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
@@ -501,6 +505,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       const sale = yearStartSale(prValue, prMortgage, yearIdx, unpaidPlannedMortgage)
       settleSale(sale, 'principalResidence.sellAtAge')
       prValue = 0
+      prSold = true
       unpaidPlannedMortgage = 0
     }
     for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
@@ -512,6 +517,48 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         saleGainsTaxable += gain
         settleSale(sale, `investmentProperties.${propertyIdx}.sellAtAge`)
         p.value = 0
+        p.sold = true
+        if (phase === 'accumulation' && gain > 0) {
+          const amount = gain * (inputs.accumulationMarginalRate ?? 0.35)
+          accumulationSaleTax += amount
+          saleTaxObligations.push({ amount, propertyIdx })
+        }
+      }
+    }
+    const releasedPayments =
+      releasedMortgagePayment(prMortgage, prSold && !plannedPurchase, yearIdx) +
+      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
+    const workingSavings = inputs.annualSavings + releasedPayments
+    let savingsAfterSaleTax = workingSavings
+    // A same-year planned home's installment/holding cost already has a
+    // claim on these savings. Do not let sale tax spend that cash and then
+    // let the purchase ledger spend it again.
+    const committedHousingCost = plannedPurchase && prValue > 0
+      ? Math.max(0, (prMortgage?.payment[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange)
+      : 0
+    let freeSavingsForSaleTax = Math.max(0, workingSavings - committedHousingCost)
+    // Gains tax is an annual cash obligation. Current-year savings can pay
+    // it before new contributions; any remainder draws sale proceeds or
+    // other liquid assets through the BE-30 funding allocator. A final
+    // shortage remains a visible liability rather than negative cash.
+    for (const obligation of saleTaxObligations) {
+      const plan = planAnnualHousingFunding(age, obligation.amount, {
+        balances: bal, nonRegBook, annualSavings: freeSavingsForSaleTax,
+        marginalRate: inputs.accumulationMarginalRate ?? 0.35,
+      })
+      if (plan.allocation) {
+        Object.assign(bal, plan.allocation.balances)
+        nonRegBook = plan.allocation.nonRegBook
+        savingsAfterSaleTax -= plan.allocation.firstYearCostFromSavings
+        freeSavingsForSaleTax -= plan.allocation.firstYearCostFromSavings
+        dpAccumTax += plan.allocation.withdrawalTax
+        purchaseNonRegTaxable += plan.allocation.nonRegTaxable
+        purchaseRrspWithdrawal += plan.allocation.rrspWithdrawal
+      }
+      if (plan.gap) {
+        yearGaps.push({ ...plan.gap, eventId: `sale:${age}:tax:${obligation.propertyIdx}`,
+          field: `investmentProperties.${obligation.propertyIdx}.sellAtAge`, reason: 'saleTax' })
+        unpaidSaleDebt += plan.gap.amount
       }
     }
     // net rent from properties still held (stops the year a property sells);
@@ -604,7 +651,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
         // savings arrive before the payment; only then are liquid assets sold.
         const plan = planAnnualHousingFunding(age, housingCost, {
           balances: bal, nonRegBook, marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          annualSavings: inputs.annualSavings,
+          annualSavings: savingsAfterSaleTax,
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
@@ -630,7 +677,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
           debtBalance += unpaidMortgage
         }
       }
-      const budget = Math.max(0, inputs.annualSavings - housingCost)
+      const budget = Math.max(0, savingsAfterSaleTax - housingCost)
       const allocation = allocateContributions({
         age, budget,
         fhsa: fhsaActive && inputs.fhsa ? inputs.fhsa.annualContribution : 0,
@@ -676,7 +723,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       bal.nonReg += benefitBase - benefitTax
       nonRegBook += benefitBase - benefitTax
       oas = oasGross
-      tax = dragTax + rentTax + benefitTax + dpAccumTax
+      tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax
       const marginalPurchaseTax = inputs.accumulationMarginalRate ?? 0.35
       const rrspWithdrawalTax = purchaseRrspWithdrawal * marginalPurchaseTax
       const nonRegWithdrawalTax = purchaseNonRegTaxable * marginalPurchaseTax
@@ -686,12 +733,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler): Projectio
       taxBySource = {
         rrsp: rrspWithdrawalTax, nonReg: dragTax + nonRegWithdrawalTax,
         cpp: cppTax, oas: benefitTax - cppTax - pensionTax,
-        property: rentTax, extraIncome: 0, pension: pensionTax,
+        property: rentTax + accumulationSaleTax, extraIncome: 0, pension: pensionTax,
       }
       taxableBySource = {
         rrsp: purchaseRrspWithdrawal, nonReg: dist + purchaseNonRegTaxable,
         cpp, oas: oasGross,
-        property: rent - rentMortgageInterest, extraIncome: 0, pension,
+        property: rent - rentMortgageInterest + saleGainsTaxable, extraIncome: 0, pension,
       }
     } else {
       extraTaxable += dist + purchaseTaxable

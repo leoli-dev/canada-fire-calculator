@@ -1,5 +1,5 @@
 import { pensionPaid, runProjection } from './projection'
-import { buildDebtStream, rollDebtsForward, yearStartSale } from './debts'
+import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSale } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { incomeTax } from './tax'
 import {
@@ -185,6 +185,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
   // Planned purchases returned unsupported above.
   const pr = inputs.principalResidence
   let prValue = pr?.value ?? 0
+  let prSold = false
   const horizon = 100 - inputs.currentAge + 1
   const inflation = inputs.inflation ?? 0.021
   const prMortgage = pr?.mortgage
@@ -195,6 +196,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
+    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], horizon, inflation)
@@ -216,18 +218,22 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
       bal.nonReg += sale.proceeds
       prValue = 0
+      prSold = true
     }
     for (const p of ips) {
       if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
         const sale = yearStartSale(p.value, p.mortgage, yearIdx)
         if (sale.cashNeeded > 0)
           return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
-        const gainTax =
-          incomeTax((Math.max(0, p.value - p.acb) * 0.5) / persons, inputs.province) * persons
+        const taxableGain = Math.max(0, p.value - p.acb) * 0.5
+        const gainTax = age < inputs.fireAge
+          ? taxableGain * marginal
+          : incomeTax(taxableGain / persons, inputs.province) * persons
         if (gainTax > sale.proceeds)
           return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
         bal.nonReg += sale.proceeds - gainTax
         p.value = 0
+        p.sold = true
       }
     }
     // assets entering FIRE plus any sale landing that year — snapshot before
@@ -275,8 +281,11 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
     }
     bal.nonReg += benefits * (1 - marginal)
+    const releasedPayments =
+      releasedMortgagePayment(prMortgage, prSold, yearIdx) +
+      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
     for (const t of ACCOUNT_TYPES) {
-      bal[t] += inputs.annualSavings * (inputs.savingsSplit[t] ?? 0)
+      bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
     if (lockedBal > 0) {

@@ -218,6 +218,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
           : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
           : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
             : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
+            : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
             : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
         params: { amount: Math.ceil(gap.amount), age: Number(gap.eventId.split(':')[1]) },
         eventId: gap.eventId, amount: gap.amount,

@@ -113,6 +113,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
                 : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
                 : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
                   : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
+                  : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
                   : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}

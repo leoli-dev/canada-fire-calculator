@@ -102,3 +102,8 @@ export function yearStartSale(value: number, mortgage: DebtStream | null, yearId
   const owed = (mortgage?.openingBalance[yearIdx] ?? 0) + arrears
   return { owed, proceeds: Math.max(0, value - owed), cashNeeded: Math.max(0, owed - value) }
 }
+
+/** Existing linked payments were already subtracted from annualSavings. */
+export function releasedMortgagePayment(mortgage: DebtStream | null, sold: boolean, yearIdx: number) {
+  return sold ? (mortgage?.payment[yearIdx] ?? 0) : 0
+}

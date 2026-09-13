@@ -20,8 +20,10 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
   await page.goto('/#/guided/housing/mortgage.payment')
   await page.locator('[data-field="principalResidence.mortgage.annualPayment"] input').fill('40000')
   await page.locator('[data-field="principalResidence.mortgage.yearsRemaining"] input').fill('10')
+  await expect(page.locator('.question-page')).toContainText('Annual savings is after existing mortgage payments')
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.locator('.input-form')).toContainText('Annual savings is after existing mortgage payments')
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input').last()
   await expect(field('Current value')).toHaveValue('500,000')
   await expect(field('Sell at age')).toHaveValue('35')
@@ -50,9 +52,14 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
   await page.goto('/#/guided/housing/home.value')
   await expect(guidedSale).toHaveValue('35')
   await expect(page.locator('[data-field="principalResidence.sellAtAge"]')).toContainText('100000')
-  for (const [language, phrase] of [['FR', 'reste une dette'], ['中文', '仍计为债务'], ['EN', 'remains a debt']]) {
+  for (const [language, phrase, savingsHint] of [
+    ['FR', 'reste une dette', 'L’épargne annuelle'],
+    ['中文', '仍计为债务', '年储蓄已扣除'],
+    ['EN', 'remains a debt', 'Annual savings is after'],
+  ]) {
     await page.locator('.langs').getByRole('button', { name: language }).click()
     await expect(page.locator('[data-field="principalResidence.sellAtAge"]')).toContainText(phrase)
+    await expect(page.locator('.question-page')).toContainText(savingsHint)
   }
   const width = await page.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }))
   expect(width.content).toBeLessThanOrEqual(width.viewport)

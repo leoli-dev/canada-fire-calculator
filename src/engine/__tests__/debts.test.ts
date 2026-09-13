@@ -199,6 +199,88 @@ describe('property-linked mortgages', () => {
     cppAnnualAt65: 0, oasAnnualAt65: 0, nonRegDistributionYield: 0,
   }
 
+  it('review: a profitable rental sold before FIRE pays 35% of its $100k taxable gain', () => {
+    // $500k proceeds - 35% × 50% × ($500k - $300k) = $465k.
+    const input: Inputs = { ...isolated, fireAge: 52, lifeExpectancy: 52,
+      investmentProperties: [{ value: 500_000, acb: 300_000, appreciation: 0,
+        annualRent: 0, sellAtAge: 50 }] }
+    const projection = runProjection(input)
+    const sale = projection.rows[0]
+    expectCad(sale.tax, 35_000, .01)
+    expectCad(sale.taxBySource.property, 35_000, .01)
+    expectCad(sale.taxableBySource.property, 100_000, .01)
+    expectCad(sale.balances.nonReg, 465_000, .01)
+    expectCad(projection.rows[1].balances.nonReg, 465_000, .01)
+    const report = targetReport(input, 1_000_000)
+    expect(report.status).toBe('supported')
+    expectCad(report.assetsAtFire, 465_000, .01)
+  })
+
+  it('keeps unpaid sale-gain tax as a funding gap instead of negative cash', () => {
+    // $500k sale - $490k opening lien = $10k cash; taxable gain $100k
+    // creates $35k tax. The avoided $10k annual payment also pays tax,
+    // leaving a $15k liability after both cash sources are exhausted.
+    const input: Inputs = { ...isolated, fireAge: 52, lifeExpectancy: 52,
+      investmentProperties: [{ value: 500_000, acb: 300_000, appreciation: 0,
+        annualRent: 0, sellAtAge: 50,
+        mortgage: { balance: 490_000, annualPayment: 10_000, yearsRemaining: 50 } }] }
+    const result = runProjection(input)
+    expect(result.success).toBe(false)
+    expectCad(result.rows[0].tax, 35_000, .01)
+    expectCad(result.rows[0].balances.nonReg, 0, .01)
+    expectCad(result.rows[0].debtBalance, 15_000, .01)
+    expect(result.rows[0].unfundedObligations).toEqual([
+      expect.objectContaining({ reason: 'saleTax', amount: 15_000 }),
+    ])
+    expect(targetReport(input, 1_000_000).status).toBe('unsupported')
+  })
+
+  it('uses the released working-year installment once to fund sale tax', () => {
+    // $10k net sale cash + $49k freed payment - $35k gains tax = $24k.
+    const input: Inputs = { ...isolated, fireAge: 52, lifeExpectancy: 52,
+      investmentProperties: [{ value: 500_000, acb: 300_000, appreciation: 0,
+        annualRent: 0, sellAtAge: 50,
+        mortgage: { balance: 490_000, annualPayment: 49_000, yearsRemaining: 10 } }] }
+    const row = runProjection(input).rows[0]
+    expect(row.unfundedObligations).toEqual([])
+    expectCad(row.tax, 35_000, .01)
+    expectCad(Object.values(row.balances).reduce((sum, amount) => sum + amount, 0), 24_000, .01)
+    expectCad(row.debtBalance, 0, .01)
+  })
+
+  it('review: selling a mortgaged home releases its netted $40k payment into savings', () => {
+    // $100k opening sale equity + 2 × ($10k net savings + $40k avoided
+    // payment) = $200k entering FIRE at 52. No tax, inflation or return.
+    const input: Inputs = { ...isolated, fireAge: 52, lifeExpectancy: 52,
+      annualSavings: 10_000,
+      principalResidence: { value: 500_000, appreciation: 0, sellAtAge: 50,
+        mortgage: { balance: 400_000, annualPayment: 40_000, yearsRemaining: 10 } } }
+    const projection = runProjection(input)
+    const total = (age: number) => Object.values(projection.rows.find((row) => row.age === age)!.balances)
+      .reduce((sum, amount) => sum + amount, 0)
+    expectCad(total(50), 150_000, .01)
+    expectCad(total(51), 200_000, .01)
+    expectCad(projection.rows[0].debtPayment, 0, .01)
+    expectCad(projection.rows[1].debtPayment, 0, .01)
+    const report = targetReport(input, 1_000_000)
+    expect(report.status).toBe('supported')
+    expectCad(report.assetsAtFire, 200_000, .01)
+  })
+
+  it('releases only the remaining real installments after an inflation-adjusted sale', () => {
+    const input: Inputs = { ...isolated, fireAge: 53, lifeExpectancy: 53,
+      annualSavings: 10_000, inflation: .02,
+      principalResidence: { value: 500_000, appreciation: 0, sellAtAge: 51,
+        mortgage: { balance: 400_000, annualPayment: 40_000, yearsRemaining: 10 } } }
+    const result = runProjection(input)
+    const total = (age: number) => Object.values(result.rows.find((row) => row.age === age)!.balances)
+      .reduce((sum, amount) => sum + amount, 0)
+    expectCad(total(50), 10_000, .01)
+    expectCad(total(51) - total(50), 500_000 - 360_000 / 1.02 + 10_000 + 40_000 / 1.02 ** 2, .01)
+    expectCad(total(52) - total(51), 10_000 + 40_000 / 1.02 ** 3, .01)
+    expectCad(targetReport(input, 1_000_000).assetsAtFire, total(52), .01)
+  })
+
   it('uses the second-year opening balance, after only the first installment and 2% inflation', () => {
     const r = runProjection({ ...isolated, inflation: .02,
       balances: { tfsa: 50_000, rrsp: 0, nonReg: 0 },
@@ -266,6 +348,20 @@ describe('property-linked mortgages', () => {
     expect(row.debtBalance).toBe(90_000)
   })
 
+  it('releases only the sold rental mortgage from a working-year net savings budget', () => {
+    const input: Inputs = { ...isolated, fireAge: 52, lifeExpectancy: 52, annualSavings: 10_000,
+      investmentProperties: [
+        { value: 400_000, acb: 400_000, appreciation: 0, sellAtAge: 50,
+          mortgage: { balance: 300_000, annualPayment: 30_000, yearsRemaining: 10 } },
+        { value: 250_000, acb: 250_000, appreciation: 0, sellAtAge: null,
+          mortgage: { balance: 100_000, annualPayment: 10_000, yearsRemaining: 10 } },
+      ] }
+    const first = runProjection(input).rows[0]
+    expectCad(Object.values(first.balances).reduce((sum, amount) => sum + amount, 0), 140_000, .01)
+    expectCad(first.debtPayment, 10_000, .01)
+    expectCad(first.debtBalance, 90_000, .01)
+  })
+
   it('a mortgaged rental sold now earns no full-year rent, interest deduction or installment', () => {
     const r = runProjection({ ...isolated, lifeExpectancy: 50,
       investmentProperties: [{ value: 500_000, acb: 500_000, appreciation: .05,
@@ -314,7 +410,7 @@ describe('property-linked mortgages', () => {
     const projection = runProjection(input)
     expect(projection.rows.map((row) => row.debtPayment)).toEqual([0, 0, 0])
     expect(projection.rows.map((row) => row.rent)).toEqual([0, 0, 0])
-    expect(projection.rows[0].balances.nonReg).toBeCloseTo(108_000, 2) // $100k sale + $8k saved
+    expect(projection.rows[0].balances.nonReg).toBeCloseTo(116_000, 2) // $100k sale + 20% × ($40k savings + $40k freed payment)
     const report = targetReport(input, 1_000_000)
     expect(report.status).toBe('supported')
     expect(report.assetsAtFire).toBeCloseTo(projection.rows[1].balances.tfsa +
