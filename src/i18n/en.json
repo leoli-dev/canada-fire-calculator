@@ -681,5 +681,14 @@
   "smallestCandidateGap": "Smallest annual shortfall: {{amount}} at CPP {{cpp}} / OAS {{oas}}. This is still a failed plan.",
   "manualFailureExploration": "This manually selected order is a failed scenario for exploration, not a recommendation.",
   "manualFailureGap": "Largest annual shortfall: {{amount}}.",
-  "candidateGap": "Largest annual shortfall: {{amount}}."
+  "candidateGap": "Largest annual shortfall: {{amount}}.",
+  "migrationOwnershipWarning": "Household account ownership needs confirmation. The displayed projection is a legacy household estimate; precise tax and strategy comparisons are unavailable.",
+  "migrationSharedPlan": "The same plan and unassigned balances appear in guided and professional modes.",
+  "migrationUnassigned": "unassigned",
+  "migrationBasis": "basis",
+  "migrationApproximate": "Legacy age and savings assumptions need confirmation; results are estimates.",
+  "storageFuture": "This plan was saved by a newer version. It is read-only here.",
+  "storageCorrupt": "Saved plan could not be read safely. The original storage has not been replaced.",
+  "migrationOwnerSelf": "self",
+  "migrationOwnerPartner": "partner"
 }

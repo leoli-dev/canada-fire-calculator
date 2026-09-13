@@ -1,8 +1,10 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Partner, Pension } from './engine'
 import { blendedReturn, blendedVolatility } from './engine'
 import { track, trackOnce } from './analytics'
+import type { InputsV2 } from './engine/model'
+import { migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -133,6 +135,9 @@ function legacyAnswerMeta(): Record<string, AnswerMeta> {
 }
 
 interface Store {
+  canonical: InputsV2 | null
+  scenarioACanonical: InputsV2 | null
+  draftByField: Record<string, string>
   inputs: Inputs
   displayMode: DisplayMode
   entryMode: EntryMode
@@ -150,6 +155,7 @@ interface Store {
   worksheet: Record<string, number>
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
+  commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
   setActiveStep: (step: number) => void
@@ -167,9 +173,44 @@ interface Store {
   reset: () => void
 }
 
+
+const BACKUP_KEY = 'fire-inputs:pre-v11-backup'
+let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
+export const getStorageReadOnlyReason = () => storageReadOnlyReason
+const planStorage: PersistStorage<Store> = {
+  getItem(name) {
+    const original = localStorage.getItem(name)
+    if (original === null) return null
+    try {
+      const parsed = JSON.parse(original) as StorageValue<Store>
+      if (!parsed || typeof parsed !== 'object' || !('state' in parsed) || typeof parsed.version !== 'number') throw new Error('Invalid persisted envelope')
+      if (parsed.version > 11) { storageReadOnlyReason = 'futureVersion'; return null }
+      if (parsed.version < 11) {
+        // Validate before allowing any subsequent write, including a failed migration.
+        migratePersistedPlan(parsed.state, parsed.version, new Date().getFullYear())
+        // Write-once original bytes. If this fails, hydration aborts without replacing the plan.
+        if (localStorage.getItem(BACKUP_KEY) === null) localStorage.setItem(BACKUP_KEY, original)
+      }
+      return parsed
+    } catch {
+      if (!storageReadOnlyReason) storageReadOnlyReason = 'corrupt'
+      return null
+    }
+  },
+  setItem(name, value) {
+    if (storageReadOnlyReason) return
+    try { localStorage.setItem(name, JSON.stringify(value)) }
+    catch { storageReadOnlyReason = 'migrationFailed' }
+  },
+  removeItem(name) { if (!storageReadOnlyReason) localStorage.removeItem(name) },
+}
+
 export const useStore = create<Store>()(
   persist(
     (set) => ({
+      canonical: null,
+      scenarioACanonical: null,
+      draftByField: {},
       inputs: DEFAULT_INPUTS,
       displayMode: 'real',
       entryMode: 'guided',
@@ -202,8 +243,10 @@ export const useStore = create<Store>()(
               (!!oldLocked && !!newLocked && oldLocked.owner !== newLocked.owner))
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
+          const inputs = { ...s.inputs, ...patch }
           return {
-            inputs: { ...s.inputs, ...patch },
+            inputs,
+            canonical: refreshCanonicalFromLegacy(s.canonical, inputs),
             inputRevision: s.inputRevision + 1,
             resultRevision: null,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
@@ -212,6 +255,10 @@ export const useStore = create<Store>()(
           }
         })
       },
+      commitPlan: ({ inputs, canonical, answerMeta, draftByField }) => set((s) => ({
+        inputs, canonical, answerMeta, draftByField,
+        inputRevision: s.inputRevision + 1, resultRevision: null,
+      })),
       setDisplayMode: (m) => {
         track('display_mode_change', { mode: m })
         set({ displayMode: m })
@@ -281,6 +328,7 @@ export const useStore = create<Store>()(
         track('scenario_save')
         set((s) => ({
           scenarioA: structuredClone(s.inputs),
+          scenarioACanonical: structuredClone(s.canonical),
           scenarioAAnswerMeta: structuredClone(s.answerMeta),
         }))
       },
@@ -288,6 +336,7 @@ export const useStore = create<Store>()(
         track('scenario_restore')
         set((s) => (s.scenarioA ? {
           inputs: structuredClone(s.scenarioA),
+          canonical: structuredClone(s.scenarioACanonical ?? migratePersistedPlan({ inputs: s.scenarioA }, 10, new Date().getFullYear())),
           answerMeta: structuredClone(s.scenarioAAnswerMeta ?? legacyAnswerMeta()),
           inputRevision: s.inputRevision + 1,
           resultRevision: null,
@@ -295,12 +344,15 @@ export const useStore = create<Store>()(
       },
       clearScenarioA: () => {
         track('scenario_clear')
-        set({ scenarioA: null, scenarioAAnswerMeta: null })
+        set({ scenarioA: null, scenarioACanonical: null, scenarioAAnswerMeta: null })
       },
       reset: () => {
         track('reset_inputs')
         set({
           inputs: DEFAULT_INPUTS,
+          canonical: null,
+          scenarioACanonical: null,
+          draftByField: {},
           worksheet: DEFAULT_WORKSHEET,
           mixPresets: { tfsa: 'allStocks', rrsp: 'allStocks', nonReg: 'allStocks' },
           activeStep: 1,
@@ -316,9 +368,9 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'fire-inputs',
-      // v10: stable questionnaire page IDs, independent review/results state,
-      // planning intent, and revision-bound result snapshots.
-      version: 10,
+      // v11 adds canonical schema v2 beside the temporary legacy projection adapter.
+      version: 11,
+      storage: planStorage,
       // pass old state through untouched — field mapping happens in merge;
       // without this, a version bump silently discards the user's data
       migrate: (state, version) => {
@@ -332,6 +384,9 @@ export const useStore = create<Store>()(
           ]
           return {
             ...previous,
+            canonical: migratePersistedPlan(previous, version, new Date().getFullYear()),
+            scenarioACanonical: previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null,
+            draftByField: {},
             entryMode: version < 7 ? 'professional' : previous.entryMode,
             activeStep: previous.activeStep ?? 1,
             visitedSteps: previous.visitedSteps ?? [1],
@@ -351,6 +406,12 @@ export const useStore = create<Store>()(
             scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
           } as Store
         }
+        if (version === 10) return {
+          ...previous,
+          canonical: migratePersistedPlan(previous, version, new Date().getFullYear()),
+          scenarioACanonical: previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null,
+          draftByField: {},
+        } as Store
         return state as Store
       },
       merge: (persisted, current) => {
@@ -386,6 +447,9 @@ export const useStore = create<Store>()(
         return {
           ...current,
           ...p,
+          canonical: p.canonical ?? null,
+          scenarioACanonical: p.scenarioACanonical ?? null,
+          draftByField: p.draftByField ?? {},
           inputs: upgrade(p.inputs) ?? DEFAULT_INPUTS,
           scenarioA: upgrade(p.scenarioA as LegacyInputs | null),
           worksheet: { ...DEFAULT_WORKSHEET, ...(p.worksheet ?? {}) },
