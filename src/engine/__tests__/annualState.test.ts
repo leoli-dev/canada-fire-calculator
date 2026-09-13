@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Inputs } from '../types'
 import { migratePersistedPlan } from '../migration'
 import type { InputsV2 } from '../model'
+import { impliedRate } from '../debts'
 import { annualStep, fixedReturnProvider, initializeState, projectFromState, sumInvestableAssets, sumNetWorth, type AnnualProviders } from '../annualState'
 
 const input = (): Inputs => ({
@@ -423,6 +424,38 @@ describe('BE-14 A nominal annual state kernel', () => {
       balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 1, nonReg: 0 } })
     const opening = ok(initializeState(canonical))
     expect(annualStep(canonical, opening, providers(110))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('RRSP') }] })
+  })
+
+  it('settles only sub-cent final loan residue and resumes after a twenty-year payoff', () => {
+    const canonical = plan({ ...input(), fireAge: 80, lifeExpectancy: 90, inflation: 0,
+      annualSavings: 40, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      debts: [{ id: 'longLoan', kind: 'carLoan', balance: 200000, annualPayment: 15000, yearsRemaining: 20 }] })
+    const evaluate: AnnualProviders['evaluate'] = ({ state }) => {
+      const income = state.year < canonical.baseYear + 20 ? 15040 : 40
+      return { byPerson: { [canonical.people[0].id]: { income, earnedIncome: income,
+        benefits: 0, tax: 0, spending: 0, taxableIncome: income,
+        benefitIncomeForNextYear: { status: 'unknown', reason: 'not supplied' } } } }
+    }
+    const supplied = { evaluate, returns: () => 0 }
+    const opening = ok(initializeState(canonical))
+    const beforeFinal = ok(projectFromState(canonical, opening, 19, supplied))
+    expect(beforeFinal.state.byDebt.longLoan.yearsRemaining).toBe(1)
+    const lastDebt = beforeFinal.state.byDebt.longLoan
+    const accrued = lastDebt.principal * (1 + impliedRate(lastDebt.principal, lastDebt.annualPayment, lastDebt.yearsRemaining))
+    expect(accrued - Math.min(lastDebt.annualPayment, accrued)).toBeGreaterThan(0)
+    expect(accrued - Math.min(lastDebt.annualPayment, accrued)).toBeLessThan(0.005)
+    const final = ok(annualStep(canonical, beforeFinal.state, supplied))
+    expect(final.row.cashLedger.debtPayments).toBeCloseTo(15000, 8)
+    expect(final.row.cashLedger.voluntaryContributions).toBe(40)
+    expect(final.row.cashLedger.income - final.row.cashLedger.debtPayments).toBeCloseTo(40, 8)
+    expect(final.state.byDebt.longLoan).toMatchObject({ principal: 0, yearsRemaining: 0 })
+    expect(ok(projectFromState(canonical, final.state, 0, supplied)).state).toEqual(final.state)
+    expect(annualStep(canonical, final.state, supplied).status).toBe('ok')
+    const stillOwed = structuredClone(beforeFinal.state)
+    stillOwed.byDebt.longLoan.principal = stillOwed.byDebt.longLoan.annualPayment + 0.01
+    expect(annualStep(canonical, stillOwed, supplied).status).toBe('invalid')
+    expect(beforeFinal.state.byDebt.longLoan.yearsRemaining).toBe(1)
   })
 
   it('samples every account return from one settled snapshot regardless of split, order, or provider mutation', () => {

@@ -201,9 +201,15 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (debt.principal <= 0 || debt.yearsRemaining <= 0) continue
     const rate = impliedRate(debt.principal, debt.annualPayment, debt.yearsRemaining)
     if (debt.annualPayment * debt.yearsRemaining + 1e-8 < debt.principal) return fail('invalid', `debt cannot amortize: ${id}`)
-    const due = Math.min(debt.annualPayment, debt.principal * (1 + rate))
+    const accrued = debt.principal * (1 + rate)
+    const due = Math.min(debt.annualPayment, accrued)
     debtPayments += due
-    debt.principal = Math.max(0, debt.principal * (1 + rate) - due)
+    const remaining = Math.max(0, accrued - due)
+    // Settle only representational noise on the final payment. The cash ledger
+    // retains the actual due; a cent-scale shortfall must never disappear.
+    const numericalResidue = Math.min(0.005, 64 * Number.EPSILON * Math.max(1, accrued, due))
+    if (debt.yearsRemaining === 1 && remaining > numericalResidue) return fail('invalid', `debt unpaid at maturity: ${id}`)
+    debt.principal = debt.yearsRemaining === 1 ? 0 : remaining
     debt.yearsRemaining -= 1
   }
   const evaluatedCash = income + benefits - tax - spending - debtPayments
