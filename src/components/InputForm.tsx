@@ -27,6 +27,8 @@ import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 import { parseField, type SharedFieldId } from '../forms/fieldRegistry'
 import { RuleAssumptions } from './RuleAssumptions'
+import { contentForField, professionalContentApplies } from '../content/fieldContent'
+import { ProfessionalFieldHelp } from './FieldContentHelp'
 
 const PROVINCES: Province[] = [
   'ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU',
@@ -47,6 +49,8 @@ function Num(props: {
   const meta = useStore((s) => props.field ? s.answerMeta[props.field] : undefined)
   const missingMortgage = props.field === 'principalResidence.annualMortgagePayment' && meta?.status === 'unknown' && home?.mode === 'planned' && home.price > home.downPayment
   const editSharedField = useStore((s) => s.editSharedField)
+  const content = props.field ? contentForField(props.field) : undefined
+  const inputs = useStore((s) => s.inputs)
   return (
     <>
       <label className="field">
@@ -78,6 +82,7 @@ function Num(props: {
         )}
       </label>
       {meta && <small className="answer-status">{t(`guided.meta.${meta.origin === 'legacy' ? 'legacy' : meta.status}`)}</small>}
+      {content && professionalContentApplies(content, inputs) && <ProfessionalFieldHelp content={content} />}
     </>
   )
 }

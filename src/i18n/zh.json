@@ -715,5 +715,17 @@
   "migrationPrecisionWarning": "计划资料尚待确认，暂不能提供精确税务、退休或策略建议。",
   "migrationStatusUnverified": "无法核实该计划的迁移状态；暂不能显示精确比较。",
   "migrationSharedStatus": "引导和专业模式显示每份计划的相同状态。",
-  "migrationComparisonUnavailableOutcome": "比较暂不可用"
+  "migrationComparisonUnavailableOutcome": "比较暂不可用",
+  "fieldContent": {
+    "helpTitle": "字段含义与来源",
+    "unitYears": "年龄（岁）",
+    "unitAnnualCad": "按今天币值存储为年度加元；月度输入乘以 12",
+    "unitCad": "当前加元余额",
+    "unknownBlocksResults": "空白或无效输入保持未知，并暂停当前结果。",
+    "appliesAlways": "用于本计划",
+    "appliesSelectedAccount": "选择该账户后显示引导问题",
+    "appliesPlannedHome": "仅适用于计划购房",
+    "capabilityProjectionInput": "参与当前投影；仍可能有其他能力限制。",
+    "capabilityPlannedMortgage": "核对模型中的还款与融资；计划购房时不支持快捷 FIRE 资产数求解，也不代表贷款机构批准。"
+  }
 }

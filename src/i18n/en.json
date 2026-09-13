@@ -719,5 +719,17 @@
   "migrationPrecisionWarning": "Plan facts need confirmation before precise tax, retirement, and strategy advice is available.",
   "migrationStatusUnverified": "This plan's migration status cannot be verified; precise comparison is unavailable.",
   "migrationSharedStatus": "Guided and professional modes use the same status for each plan.",
-  "migrationComparisonUnavailableOutcome": "Comparison unavailable"
+  "migrationComparisonUnavailableOutcome": "Comparison unavailable",
+  "fieldContent": {
+    "helpTitle": "Field meaning and source",
+    "unitYears": "Age in years",
+    "unitAnnualCad": "Stored as annual CAD in today's dollars; monthly entries are converted ×12",
+    "unitCad": "Current CAD balance",
+    "unknownBlocksResults": "Blank or invalid entries remain unknown and withhold current results.",
+    "appliesAlways": "Used for this plan",
+    "appliesSelectedAccount": "Guided question appears when this account is selected",
+    "appliesPlannedHome": "Applies only to a planned home purchase",
+    "capabilityProjectionInput": "Feeds the current projection; other capability limits still apply.",
+    "capabilityPlannedMortgage": "Checks modeled payment and financing; the quick FIRE-number shortcut is unsupported for a planned purchase. This is not lender approval."
+  }
 }

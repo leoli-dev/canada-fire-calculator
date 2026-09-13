@@ -715,5 +715,17 @@
   "migrationPrecisionWarning": "Certains faits du plan doivent être confirmés avant de fournir des conseils fiscaux, de retraite ou de stratégie précis.",
   "migrationStatusUnverified": "Le statut de migration de ce plan ne peut pas être vérifié; aucune comparaison précise n'est disponible.",
   "migrationSharedStatus": "Les modes guidé et professionnel utilisent le même statut pour chaque plan.",
-  "migrationComparisonUnavailableOutcome": "Comparaison indisponible"
+  "migrationComparisonUnavailableOutcome": "Comparaison indisponible",
+  "fieldContent": {
+    "helpTitle": "Sens et source du champ",
+    "unitYears": "Âge en années",
+    "unitAnnualCad": "Enregistré en CAD annuels d'aujourd'hui; les montants mensuels sont multipliés par 12",
+    "unitCad": "Solde actuel en CAD",
+    "unknownBlocksResults": "Une valeur vide ou invalide reste inconnue et bloque les résultats actuels.",
+    "appliesAlways": "Utilisé pour ce plan",
+    "appliesSelectedAccount": "La question guidée apparaît si ce compte est sélectionné",
+    "appliesPlannedHome": "S'applique uniquement à un achat de logement prévu",
+    "capabilityProjectionInput": "Alimente la projection actuelle; d'autres limites peuvent s'appliquer.",
+    "capabilityPlannedMortgage": "Vérifie le paiement et le financement modélisés; le calcul rapide du capital FIRE n'est pas pris en charge pour un achat prévu. Ce n'est pas une approbation du prêteur."
+  }
 }
