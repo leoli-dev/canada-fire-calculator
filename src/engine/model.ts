@@ -1,4 +1,4 @@
-import type { Goal, Inputs, Pension, Province, Strategy } from './types'
+import type { AccountType, CppWork, Goal, Inputs, MeltdownCap, Pension, Province, Strategy } from './types'
 
 export type EntityId = string
 export type Known<T> = { status: 'known'; value: T } | { status: 'unknown'; reason: string }
@@ -19,6 +19,7 @@ export interface Person {
   oasAnnualAt65: number
   pensionAnnual: number
   pension: Pension | null
+  cppWork: CppWork | null
   provenance: Record<string, Provenance>
 }
 export const ageReachedInYear = (person: Person, baseYear: number, year: number) => person.ageInBaseYear + year - baseYear
@@ -36,6 +37,7 @@ export interface Account {
   taxableOwnerShares: TaxShares
   contributionRoom: Known<number>
   openedYear: Known<number>
+  openedYearsAgoAtBaseYear: number | null
   jurisdiction?: Province | 'federal'
   accessibleAge?: number
   accessibleAgeConfirmed?: boolean
@@ -51,6 +53,14 @@ export interface Contribution {
   deductionYear: number | null
   provenance: Provenance
 }
+export interface RecurringContribution {
+  id: EntityId
+  accountId: EntityId
+  contributorId: EntityId | null
+  annualAmount: number
+  funding: 'fromSavings' | 'employerAdditional'
+  provenance: Provenance
+}
 export interface Property {
   id: EntityId
   kind: 'principal' | 'investment'
@@ -61,6 +71,8 @@ export interface Property {
   sellAtAge: number | null
   plannedPurchaseAge: number | null
   plannedDownPayment: number | null
+  plannedMortgage: { principal: number; annualPayment: number | null; yearsRemaining: number | null } | null
+  annualHoldingCostChange: number
   taxableOwnerShares: TaxShares
   mortgageDebtId: EntityId | null
   provenance: Record<string, Provenance>
@@ -103,6 +115,9 @@ export interface InputsV2 {
   orphanedPeople?: Person[]
   accounts: Account[]
   contributions: Contribution[]
+  recurringContributions: RecurringContribution[]
+  savingsAllocation: { shares: Record<AccountType, number>; provenance: Provenance }
+  projectionAssumptions: { nonRegDistributionYield: number; accumulationMarginalRate: number; meltdownBracketCap: MeltdownCap }
   properties: Property[]
   debts: Debt[]
   incomeSources: IncomeSource[]

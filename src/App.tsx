@@ -32,11 +32,13 @@ export default function App() {
   const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
   const canonical = useStore((s) => s.canonical)
+  const scenarioACanonical = useStore((s) => s.scenarioACanonical)
   const storageIssue = getStorageReadOnlyReason()
   const unresolvedHousehold = canonical
     ? canonical.accounts.some((account) => account.ownerId === null || account.taxableOwnerShares.status === 'unknown') || canonical.properties.some((property) => property.taxableOwnerShares.status === 'unknown') || !!canonical.orphanedPeople?.length || canonical.incomeSources.some((source) => source.recipientId === null)
     : !!inputs.partner
   const precision = canonical ? precisionGate(canonical) : null
+  const scenarioOwnershipUnresolved = scenarioACanonical ? precisionGate(scenarioACanonical).reasons.some(reason => reason === 'ownershipUnknown' || reason === 'recipientUnknown') : false
   const ownershipAccounts = canonical?.accounts ?? []
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
@@ -139,7 +141,7 @@ export default function App() {
           <TimingCard inputs={inputs} />
           <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
-          <ScenarioCard />
+          <ScenarioCard legacyEstimate={scenarioOwnershipUnresolved} />
           </>}
         </section>}
       </main>

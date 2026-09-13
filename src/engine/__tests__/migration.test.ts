@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
-import { migratePersistedPlan, refreshCanonicalFromLegacy, removePerson, swapPersonRoles } from '../migration'
+import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy, removePerson, swapPersonRoles } from '../migration'
 import { ageReachedInYear } from '../model'
 import { assertCanonicalPlan } from '../modelValidation'
 
@@ -129,6 +129,43 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     expect(reunited.orphanedPeople ?? []).toEqual([])
     expect(() => assertCanonicalPlan(reunited)).not.toThrow()
     expect(reunited.people[1].pension).toEqual(input.partner?.pension)
+    expect(reunited.accounts.find(a => a.kind === 'lira')?.ownerId).toBe(original.people[1].id)
+  })
+  it('retains known recurring cash-flow instructions without relying on the legacy projection', () => {
+    const input = fixture()
+    input.savingsSplit = { tfsa: .1, rrsp: .2, nonReg: .7 }
+    input.lockedRetirement!.employerContribution = 6000
+    input.cppWork = { startWorkAge: 22, retireAge: 55 }
+    input.nonRegDistributionYield = .025
+    input.accumulationMarginalRate = .37
+    input.meltdownBracketCap = 'bracket2'
+    input.principalResidence = { mode: 'planned', buyAtAge: 60, price: 750000, downPayment: 150000, appreciation: .02, annualMortgagePayment: 30000, mortgageYears: 25, netHoldingCostChange: 12000, sellAtAge: null }
+    const plan = migratePersistedPlan({ inputs: input }, 10, 2026)
+    expect(plan.savingsAllocation.shares).toEqual(input.savingsSplit)
+    expect(plan.recurringContributions.map(c => [c.accountId, c.annualAmount, c.funding])).toEqual([
+      ['legacy:account:fhsa', 8000, 'fromSavings'],
+      ['legacy:account:locked', 4000, 'fromSavings'],
+      ['legacy:account:locked', 6000, 'employerAdditional'],
+    ])
+    expect(plan.properties[0]).toMatchObject({ annualHoldingCostChange: 12000, plannedMortgage: { annualPayment: 30000, yearsRemaining: 25 } })
+    expect(plan.accounts.find(a => a.kind === 'fhsa')?.openedYearsAgoAtBaseYear).toBe(3)
+    expect(plan.people[0].cppWork).toEqual(input.cppWork)
+    expect(plan.projectionAssumptions).toEqual({ nonRegDistributionYield: .025, accumulationMarginalRate: .37, meltdownBracketCap: 'bracket2' })
+    const edited = refreshCanonicalFromLegacy(plan, { ...plan.legacyProjection, savingsSplit: { tfsa: .2, rrsp: .3, nonReg: .5 }, fhsa: { ...input.fhsa!, annualContribution: 7000 } })
+    expect(edited.savingsAllocation.shares).toEqual({ tfsa: .2, rrsp: .3, nonReg: .5 })
+    expect(edited.recurringContributions[0].annualAmount).toBe(7000)
+    const older = structuredClone(plan) as typeof plan
+    delete (older as Partial<typeof plan>).savingsAllocation
+    delete (older as Partial<typeof plan>).recurringContributions
+    delete (older as Partial<typeof plan>).projectionAssumptions
+    older.properties[0].plannedMortgage = undefined as unknown as typeof older.properties[0]['plannedMortgage']
+    const completed = completeCanonicalFacts(older, input)
+    expect(completed.recurringContributions).toEqual(plan.recurringContributions)
+    expect(completed.properties[0].plannedMortgage).toEqual(plan.properties[0].plannedMortgage)
+    expect(() => assertCanonicalPlan(completed)).not.toThrow()
+  })
+  it('rejects malformed financial adapter input rather than treating null returns as zero', () => {
+    expect(() => migratePersistedPlan({ inputs: { ...fixture(), returns: null } }, 10, 2026)).toThrow()
   })
   it('drops explicit FHSA and LIRA removals from both canonical and legacy inputs', () => {
     const input = fixture()

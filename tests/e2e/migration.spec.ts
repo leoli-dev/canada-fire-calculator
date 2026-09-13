@@ -225,6 +225,15 @@ test('professional FHSA and LIRA toggles delete nonzero canonical assets through
 
 test('professional Couple to Single to Couple remains readable after reload', async ({ page }) => {
   await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.inputs.lockedRetirement = { balance: 85000, employeeContribution: 4000, employerContribution: 6000, accessibleAge: 55, jurisdiction: 'ON', owner: 'partner' }
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
   const household = page.locator('label.field').filter({ hasText: 'Household' }).locator('select')
   await household.selectOption('single')
   await household.selectOption('couple')
@@ -235,6 +244,119 @@ test('professional Couple to Single to Couple remains readable after reload', as
   expect(canonical.people).toHaveLength(2)
   expect(canonical.orphanedPeople ?? []).toEqual([])
   expect(new Set(canonical.people.map((p: { id: string }) => p.id)).size).toBe(2)
+  expect(canonical.accounts.find((a: { kind: string }) => a.kind === 'lira').ownerId).toBe(canonical.people[1].id)
+})
+
+test('null legacy returns in v10 or v11 recover without a blank document or overwritten bytes', async ({ page }) => {
+  for (const version of [10, 11]) {
+    await seedV10(page)
+    const original = await page.evaluate(version => {
+      const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+      stored.version = version
+      stored.state.inputs.returns = null
+      if (version === 10) { delete stored.state.canonical; delete stored.state.scenarioACanonical }
+      const bytes = JSON.stringify(stored)
+      localStorage.setItem('fire-inputs', bytes)
+      return bytes
+    }, version)
+    await page.reload()
+    await expect(page.getByRole('alert')).toBeVisible()
+    expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Download original saved plan' }).click()
+    expect(readFileSync((await (await downloadPromise).path())!, 'utf8')).toBe(original)
+    await page.evaluate(() => localStorage.clear())
+  }
+})
+
+test('v11 Scenario A malformed returns cannot hydrate or overwrite the save', async ({ page }) => {
+  await seedV10(page)
+  const original = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.scenarioA.returns = null
+    const bytes = JSON.stringify(stored)
+    localStorage.setItem('fire-inputs', bytes)
+    return bytes
+  })
+  await page.reload()
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
+})
+
+test('early v11 canonical snapshots load and carry new cash-flow facts through an edit', async ({ page }) => {
+  await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.inputs.lockedRetirement = { balance: 85000, employeeContribution: 4000, employerContribution: 6000, accessibleAge: 55, jurisdiction: 'ON', owner: 'partner' }
+    stored.state.canonical = null
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input').fill('41000')
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    for (const key of ['savingsAllocation', 'recurringContributions', 'projectionAssumptions']) delete stored.state.canonical[key]
+    for (const account of stored.state.canonical.accounts) delete account.openedYearsAgoAtBaseYear
+    for (const person of stored.state.canonical.people) delete person.cppWork
+    for (const property of stored.state.canonical.properties) { delete property.plannedMortgage; delete property.annualHoldingCostChange }
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.locator('.input-form')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input').fill('42000')
+  const canonical = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
+  expect(canonical.recurringContributions.map((c: { annualAmount: number }) => c.annualAmount)).toEqual([4000, 6000])
+  expect(canonical.accounts.find((a: { kind: string }) => a.kind === 'lira').ownerId).toBe(canonical.people[1].id)
+})
+
+test('v10 shallow embedded canonical cannot replace the validated migrated plan', async ({ page }) => {
+  await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.canonical = { schemaVersion: 2 }
+    delete stored.state.scenarioACanonical
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.locator('.input-form')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!))
+  expect(stored.version).toBe(11)
+  expect(stored.state.canonical.accounts[0].balance).toBe(120000)
+})
+
+test('single current and unassigned couple Scenario A cannot show an uncaveated outcome', async ({ page }) => {
+  await seedV10(page)
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.inputs.partner = null
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await card.locator('summary').click()
+  await expect(card).toContainText('Legacy household estimate')
+  await expect(card.getByRole('cell', { name: 'Scenario A' })).toBeVisible()
+  await expect(card.locator('.compare-table')).not.toContainText('Lasts')
+  await expect(card.locator('.compare-table')).not.toContainText('CA$')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.state.guidedView = 'results'
+    stored.state.resultRevision = stored.state.inputRevision
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(card.locator('summary')).toBeVisible()
+  await card.locator('summary').click()
+  await expect(card).toContainText('Legacy household estimate')
+  await expect(card.locator('.compare-table')).not.toContainText('Lasts')
+  await expect(card.locator('.compare-table')).not.toContainText('CA$')
 })
 
 test('professional TFSA mix preset synchronizes canonical and legacy projection after reload', async ({ page }) => {

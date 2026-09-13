@@ -4,8 +4,8 @@ import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Part
 import { blendedReturn, blendedVolatility } from './engine'
 import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
-import { migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
-import { assertCanonicalPlan } from './engine/modelValidation'
+import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
+import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -176,6 +176,15 @@ interface Store {
 
 
 const BACKUP_KEY = 'fire-inputs:pre-v11-backup'
+type LegacyInputs = Partial<Inputs> & { withdrawalOrder?: string[]; investmentProperty?: typeof DEFAULT_INVESTMENT_PROPERTY | null }
+function hydrateLegacyInputs(raw: unknown): Inputs {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid legacy inputs')
+  const input = raw as LegacyInputs
+  const strategy = input.strategy ?? (input.withdrawalOrder?.[0] === 'tfsa' ? 'tfsaFirst' : input.withdrawalOrder?.[0] === 'nonReg' ? 'nonRegFirst' : 'meltdownPaced')
+  const investmentProperties = input.investmentProperties ?? (input.investmentProperty ? [{ ...input.investmentProperty }] : [])
+  const { withdrawalOrder: _wo, investmentProperty: _ip, ...rest } = input
+  return { ...DEFAULT_INPUTS, ...rest, strategy, investmentProperties }
+}
 let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
 export const getStorageReadOnlyReason = () => storageReadOnlyReason
 export function downloadStoredPlan() {
@@ -197,15 +206,27 @@ const planStorage: PersistStorage<Store> = {
       if (!parsed || typeof parsed !== 'object' || !('state' in parsed) || typeof parsed.version !== 'number') throw new Error('Invalid persisted envelope')
       if (parsed.version > 11) { storageReadOnlyReason = 'futureVersion'; return null }
       const prior = parsed.state as Store
-      const migratedCurrent = migratePersistedPlan({ inputs: prior.inputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+      const currentInputs = hydrateLegacyInputs(prior.inputs)
+      assertLegacyInputs(currentInputs)
+      const migratedCurrent = migratePersistedPlan({ inputs: currentInputs }, Math.min(parsed.version, 10), new Date().getFullYear())
       assertCanonicalPlan(migratedCurrent)
       if (prior.scenarioA !== null && prior.scenarioA !== undefined) {
-        const migratedScenarioA = migratePersistedPlan({ inputs: prior.scenarioA }, Math.min(parsed.version, 10), new Date().getFullYear())
+        const scenarioInputs = hydrateLegacyInputs(prior.scenarioA)
+        assertLegacyInputs(scenarioInputs)
+        const migratedScenarioA = migratePersistedPlan({ inputs: scenarioInputs }, Math.min(parsed.version, 10), new Date().getFullYear())
         assertCanonicalPlan(migratedScenarioA)
       }
       if (parsed.version === 11) {
-        if (prior.canonical !== null) assertCanonicalPlan(prior.canonical)
-        if (prior.scenarioACanonical !== null) assertCanonicalPlan(prior.scenarioACanonical)
+        if (prior.canonical != null) {
+          prior.canonical = completeCanonicalFacts(prior.canonical, currentInputs)
+          assertCanonicalPlan(prior.canonical)
+        }
+        if (prior.scenarioACanonical != null) {
+          const scenarioInputs = hydrateLegacyInputs(prior.scenarioA)
+          assertLegacyInputs(scenarioInputs)
+          prior.scenarioACanonical = completeCanonicalFacts(prior.scenarioACanonical, scenarioInputs)
+          assertCanonicalPlan(prior.scenarioACanonical)
+        }
       }
       if (parsed.version < 11) {
         // The full envelope has been validated before any backup or upgraded write.
@@ -409,8 +430,8 @@ export const useStore = create<Store>()(
             'family.people', 'saving.amount', 'assets.identify', 'home.situation',
             'spending.total', 'benefits.self', 'intent.legacy',
           ]
-          const canonical = migratePersistedPlan(previous, version, new Date().getFullYear())
-          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null
+          const canonical = migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.inputs) }, version, new Date().getFullYear())
+          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.scenarioA) }, version, new Date().getFullYear()) : null
           return {
             ...previous,
             inputs: canonical.legacyProjection,
@@ -438,8 +459,8 @@ export const useStore = create<Store>()(
           } as Store
         }
         if (version === 10) {
-          const canonical = migratePersistedPlan(previous, version, new Date().getFullYear())
-          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: previous.scenarioA }, version, new Date().getFullYear()) : null
+          const canonical = migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.inputs) }, version, new Date().getFullYear())
+          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.scenarioA) }, version, new Date().getFullYear()) : null
           return {
           ...previous,
           inputs: canonical.legacyProjection,
@@ -456,31 +477,7 @@ export const useStore = create<Store>()(
           inputs?: Partial<Inputs> & { withdrawalOrder?: string[] }
           scenarioA?: Inputs | null
         }
-        type LegacyInputs = Partial<Inputs> & {
-          withdrawalOrder?: string[]
-          investmentProperty?: (typeof DEFAULT_INVESTMENT_PROPERTY) | null
-        }
-        const upgrade = (raw: LegacyInputs | null | undefined): Inputs | null => {
-          if (!raw) return null
-          // v2 → v3: withdrawalOrder array became a named strategy
-          const legacy = raw.withdrawalOrder
-          const strategy =
-            raw.strategy ??
-            (legacy?.[0] === 'rrsp'
-              ? 'meltdownPaced'
-              : legacy?.[0] === 'tfsa'
-                ? 'tfsaFirst'
-                : legacy?.[0] === 'nonReg'
-                  ? 'nonRegFirst'
-                  : DEFAULT_INPUTS.strategy)
-          // v4 → v5: singular investment property becomes a list
-          const investmentProperties =
-            raw.investmentProperties ??
-            (raw.investmentProperty ? [{ ...raw.investmentProperty }] : [])
-          // drop legacy keys so they don't re-persist forever
-          const { withdrawalOrder: _wo, investmentProperty: _ip, ...rest } = raw
-          return { ...DEFAULT_INPUTS, ...rest, strategy, investmentProperties }
-        }
+        const upgrade = (raw: LegacyInputs | null | undefined): Inputs | null => raw ? hydrateLegacyInputs(raw) : null
         return {
           ...current,
           ...p,

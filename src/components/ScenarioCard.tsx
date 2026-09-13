@@ -6,17 +6,17 @@ import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
 
-function Cell(props: { r: ProjectionResult; life: number }) {
+function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   return (
     <>
       <td>
-        {props.r.success
+        {props.legacyEstimate ? t('migrationUnassigned') : props.r.success
           ? t('stratOk')
           : t('stratDepleted', { age: props.r.depletedAge })}
       </td>
-      <td className="num">{cad(props.r.estateValue)}</td>
+      <td className="num">{props.legacyEstimate ? '—' : cad(props.r.estateValue)}</td>
     </>
   )
 }
@@ -66,11 +66,11 @@ export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: bool
           <tbody>
             <tr>
               <td>{t('scenarioA')}</td>
-              <Cell r={resultA} life={scenarioA.lifeExpectancy} />
+              <Cell r={resultA} life={scenarioA.lifeExpectancy} legacyEstimate={legacyEstimate} />
             </tr>
             <tr className="current-row">
               <td>{t('scenarioCurrent')}</td>
-              <Cell r={resultNow} life={inputs.lifeExpectancy} />
+              <Cell r={resultNow} life={inputs.lifeExpectancy} legacyEstimate={legacyEstimate} />
             </tr>
           </tbody>
         </table>
