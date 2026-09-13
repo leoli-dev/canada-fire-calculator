@@ -145,7 +145,8 @@ export interface PlannedResidence {
   /** real annual appreciation, same convention as OwnedResidence */
   appreciation: number
   /** fixed nominal payment (today's-dollar equivalent) on the auto-derived
-   * mortgage (balance = price − downPayment); 0/undefined = paid in cash */
+   * mortgage (balance = price − downPayment). Required when that balance is
+   * positive; zero/undefined is valid only for a full-price cash purchase. */
   annualMortgagePayment?: number
   mortgageYears?: number
   /** net $/year change in living costs once owned (can be negative if it's
@@ -320,6 +321,8 @@ export interface TaxBySource {
 export interface YearRow {
   age: number
   phase: Phase
+  /** Obligations that could not be funded at the event date. */
+  unfundedObligations: import('./funding').FundingGap[]
   /** end-of-year balances (after withdrawals/contributions and growth) */
   balances: Record<AccountType, number>
   withdrawals: Record<AccountType, number>
@@ -362,6 +365,7 @@ export interface YearRow {
 
 export interface ProjectionResult {
   rows: YearRow[]
+  unfundedObligations: import('./funding').FundingGap[]
   /** spending fully funded through life expectancy */
   success: boolean
   /** first age where spending could not be met, if any */

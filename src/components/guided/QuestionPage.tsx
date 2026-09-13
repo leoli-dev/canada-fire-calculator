@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, type DebtKind, type Goal, type Pension, type Province, type Strategy } from '../../engine'
+import { blendedReturn, validateInputs, type DebtKind, type Goal, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -32,6 +32,10 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
   const { t } = useTranslation()
   const markAnswers = useStore((s) => s.markAnswers)
   const meta = useStore((s) => s.answerMeta[props.field])
+  const inputs = useStore((s) => s.inputs)
+  const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution'
+    ? validateInputs(inputs).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
+    : undefined
   return <div className="question-answer" data-field={props.field}>
     <label htmlFor={`q-${props.field}`}>{props.label}</label>
     <NumberInput id={`q-${props.field}`} value={props.value} step={props.step} onChange={(value) => {
@@ -43,6 +47,7 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
       <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : (meta?.status ?? 'example')}`)}</small>
       <button type="button" onClick={() => markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
     </div>
+    {issue && <em className="field-issue error">{t(issue.key, issue.params)}</em>}
   </div>
 }
 
