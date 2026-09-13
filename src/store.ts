@@ -6,6 +6,8 @@ import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
+import { changeIntent, editField } from './forms/planCommands'
+import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -156,6 +158,7 @@ interface Store {
   worksheet: Record<string, number>
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
+  editSharedField: (field: SharedFieldId, raw: string, unit?: 'canonical' | 'monthly', origin?: AnswerOrigin) => void
   commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
@@ -164,6 +167,7 @@ interface Store {
   setGuidedView: (view: GuidedView) => void
   setQuestionAnswer: (questionId: string, value: string | boolean | string[]) => void
   setPlanningIntent: (patch: Partial<PlanningIntent>) => void
+  setGoalFromProfessional: (goal: 'legacy' | 'dieWithZero') => void
   generateGuidedResults: () => void
   markAnswers: (fields: string[], status: AnswerStatus, origin?: AnswerOrigin) => void
   applyMixPreset: (account: AccountType, preset: string) => void
@@ -304,6 +308,10 @@ export const useStore = create<Store>()(
           }
         })
       },
+      editSharedField: (field, raw, unit = 'canonical', origin = 'user') => {
+        trackOnce('adjust_inputs')
+        set((s) => editField(s, field, raw, unit, origin))
+      },
       commitPlan: ({ inputs, canonical, answerMeta, draftByField }) => set((s) => ({
         inputs, canonical, answerMeta, draftByField,
         inputRevision: s.inputRevision + 1, resultRevision: null,
@@ -327,16 +335,11 @@ export const useStore = create<Store>()(
       setGuidedView: (guidedView) => set({ guidedView }),
       setQuestionAnswer: (questionId, value) =>
         set((s) => ({ questionAnswers: { ...s.questionAnswers, [questionId]: value } })),
-      setPlanningIntent: (patch) =>
-        set((s) => ({
-          planningIntent: {
-            ...s.planningIntent,
-            ...patch,
-            understandingAcknowledged: patch.understandingAcknowledged ?? false,
-            confirmedIntentRevision: patch.confirmedIntentRevision ?? null,
-          },
-          resultRevision: null,
-        })),
+      setPlanningIntent: (patch) => set((s) => changeIntent(s, patch)),
+      setGoalFromProfessional: (goal) => set((s) => changeIntent(s, {
+        spendingPreference: goal === 'dieWithZero' ? 'exploreCeiling' : 'maintain',
+        understandingAcknowledged: false,
+      })),
       generateGuidedResults: () => set((s) => ({ guidedView: 'results', resultRevision: s.inputRevision })),
       markAnswers: (fields, status, origin = 'user') =>
         set((s) => {

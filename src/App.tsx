@@ -20,6 +20,7 @@ import { TimingCard } from './components/TimingCard'
 import { ScenarioCard } from './components/ScenarioCard'
 import { GlossaryDrawer } from './components/GlossaryDrawer'
 import { GithubCorner } from './components/GithubCorner'
+import { hasUnusableSharedFields } from './forms/fieldState'
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -46,8 +47,9 @@ export default function App() {
   const guidedView = useStore((s) => s.guidedView)
   const inputRevision = useStore((s) => s.inputRevision)
   const resultRevision = useStore((s) => s.resultRevision)
-  const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision
-  const result = useMemo(() => !storageIssue && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs, storageIssue])
+  const sharedFieldsPending = useStore(hasUnusableSharedFields)
+  const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision && !sharedFieldsPending
+  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs) : null, [entryMode, showGuidedResults, inputs, storageIssue, sharedFieldsPending])
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
     [inputs],
@@ -103,6 +105,7 @@ export default function App() {
         {t('migrationSharedPlan')}
       </div>}
       {!unresolvedHousehold && precision && !precision.allowed && <div role="status" className="hint">{t('migrationApproximate')}</div>}
+      {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
           <div className="entry-mode" aria-label={t('entryModeLabel')}>

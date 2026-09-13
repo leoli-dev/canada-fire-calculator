@@ -29,6 +29,7 @@ function sanitize(text: string, lang: string): string {
 /** "-1234.5" -> "-1,234.5" / "-1 234,5" depending on locale. No rounding. */
 function formatRaw(raw: string, lang: string): string {
   if (raw === '' || raw === '-') return raw
+  if (/[a-z]/i.test(raw)) return raw
   const { group, decimal } = seps(lang)
   const neg = raw.startsWith('-')
   const [int, frac] = (neg ? raw.slice(1) : raw).split('.')
@@ -42,14 +43,17 @@ function toRaw(value: number): string {
 }
 
 /**
- * Text-based numeric input: clearable with a local draft (an empty edit does
- * not enter the engine until blur), no leading zeros, live
+ * Text-based numeric input: clearable with a draft supplied by the field adapter
+ * when available, no leading zeros, live
  * locale-aware thousands separators, ArrowUp/Down stepping. Replaces
  * type="number" everywhere (user feedback #1/#2/#4).
  */
 export function NumberInput(props: {
   value: number | null
   onChange: (v: number | null) => void
+  draft?: string
+  onDraftChange?: (raw: string) => void
+  preserveInvalidDraft?: boolean
   step?: number
   className?: string
   placeholder?: string
@@ -64,7 +68,9 @@ export function NumberInput(props: {
 
   const display = focused
     ? formatRaw(text, lang)
-    : props.value === null
+    : props.draft !== undefined
+      ? formatRaw(props.draft, lang)
+      : props.value === null
       ? ''
       : formatRaw(toRaw(props.value), lang)
 
@@ -106,7 +112,7 @@ export function NumberInput(props: {
       placeholder={props.placeholder}
       value={display}
       onFocus={() => {
-        setText(props.value === null ? '' : toRaw(props.value))
+        setText(props.draft ?? (props.value === null ? '' : toRaw(props.value)))
         setFocused(true)
       }}
       onBlur={() => {
@@ -117,8 +123,9 @@ export function NumberInput(props: {
         const el = e.target
         const before = el.value.slice(0, el.selectionStart ?? el.value.length)
         caretUnits.current = sanitize(before, lang).length
-        const raw = sanitize(el.value, lang)
+        const raw = props.preserveInvalidDraft && /[a-z]/i.test(el.value) ? el.value : sanitize(el.value, lang)
         setText(raw)
+        props.onDraftChange?.(raw)
         if (raw !== '' && raw !== '-') commit(raw)
       }}
       onKeyDown={(e) => {

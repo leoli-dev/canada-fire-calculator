@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, validateInputs, type DebtKind, type Goal, type Pension, type Province, type Strategy } from '../../engine'
+import { blendedReturn, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -13,6 +13,7 @@ import { useCad } from '../../format'
 import type { QuestionDefinition } from '../../guided/schema'
 import { guidanceForPage } from '../../guided/pageGuidance'
 import { NumberInput } from '../NumberInput'
+import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
@@ -28,26 +29,35 @@ function QuestionHelp({ guidanceKey }: { guidanceKey: string }) {
   </details>
 }
 
-function FactNumber(props: { field: string; label: string; value: number; onValue: (value: number) => void; step?: number }) {
+function FactNumber(props: { field: string; label: string; value: number; onValue: (value: number) => void; step?: number; unit?: 'canonical' | 'monthly' }) {
   const { t } = useTranslation()
   const markAnswers = useStore((s) => s.markAnswers)
   const meta = useStore((s) => s.answerMeta[props.field])
+  const draft = useStore((s) => isSharedField(props.field) ? s.draftByField[props.field] : undefined)
+  const editSharedField = useStore((s) => s.editSharedField)
   const inputs = useStore((s) => s.inputs)
+  const missingMortgage = props.field === 'principalResidence.annualMortgagePayment' && meta?.status === 'unknown' && inputs.principalResidence?.mode === 'planned' && inputs.principalResidence.price > inputs.principalResidence.downPayment
   const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution' || props.field === 'fhsa.annualContribution'
     ? validateInputs(inputs).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
     : undefined
   return <div className="question-answer" data-field={props.field}>
     <label htmlFor={`q-${props.field}`}>{props.label}</label>
-    <NumberInput id={`q-${props.field}`} value={props.value} step={props.step} onChange={(value) => {
-      if (value == null) return markAnswers([props.field], 'unknown')
-      props.onValue(value)
-      markAnswers([props.field], 'confirmed')
-    }} className="question-number" />
+    <NumberInput id={`q-${props.field}`} value={props.value} draft={draft} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
+      onDraftChange={isSharedField(props.field) ? (raw) => {
+        if (parseField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit).status === 'draft') editSharedField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit)
+      } : undefined}
+      onChange={(value) => {
+        if (isSharedField(props.field)) { editSharedField(props.field, value == null ? (draft ?? '') : String(value), props.unit); return }
+        if (value == null) return markAnswers([props.field], 'unknown')
+        props.onValue(value)
+        markAnswers([props.field], 'confirmed')
+      }} className="question-number" />
     <div className="answer-actions">
       <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : (meta?.status ?? 'example')}`)}</small>
-      <button type="button" onClick={() => markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
+      <button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
     </div>
     {issue && <em className="field-issue error">{t(issue.key, issue.params)}</em>}
+    {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
   </div>
 }
 
@@ -134,10 +144,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     markAnswers([field], status)
   }
   const applyIntent = (legacyPreference: typeof planningIntent.legacyPreference, spendingPreference: typeof planningIntent.spendingPreference) => {
-    const goal: Goal = spendingPreference === 'exploreCeiling' ? 'dieWithZero' : 'legacy'
-    set({ goal })
     setPlanningIntent({ legacyPreference, spendingPreference, understandingAcknowledged: true, confirmedIntentRevision: Date.now() })
-    markAnswers(['goal'], 'confirmed')
   }
 
   let control: React.ReactNode
@@ -206,7 +213,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'saving.amount': {
       const monthly = questionAnswers['saving.method'] !== 'annual'
-      control = <><FactNumber field="annualSavings" label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
+      control = <><FactNumber field="annualSavings" unit={monthly ? 'monthly' : 'canonical'} label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
         <p className="answer-feedback">{t('questionnaire.savingFeedback', { monthly: cad(inputs.annualSavings / 12), annual: cad(inputs.annualSavings) })}</p></>
       break
     }
