@@ -718,5 +718,6 @@
   "migrationComparisonBlocked": "Precise Scenario A comparison is unavailable until both plans pass the ownership and migration gate.",
   "migrationPrecisionWarning": "Plan facts need confirmation before precise tax, retirement, and strategy advice is available.",
   "migrationStatusUnverified": "This plan's migration status cannot be verified; precise comparison is unavailable.",
-  "migrationSharedStatus": "Guided and professional modes use the same status for each plan."
+  "migrationSharedStatus": "Guided and professional modes use the same status for each plan.",
+  "migrationComparisonUnavailableOutcome": "Comparison unavailable"
 }

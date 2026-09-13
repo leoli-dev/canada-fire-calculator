@@ -714,5 +714,6 @@
   "migrationComparisonBlocked": "La comparaison précise avec le scénario A est indisponible tant que les deux plans ne satisfont pas aux contrôles de propriété et de migration.",
   "migrationPrecisionWarning": "Certains faits du plan doivent être confirmés avant de fournir des conseils fiscaux, de retraite ou de stratégie précis.",
   "migrationStatusUnverified": "Le statut de migration de ce plan ne peut pas être vérifié; aucune comparaison précise n'est disponible.",
-  "migrationSharedStatus": "Les modes guidé et professionnel utilisent le même statut pour chaque plan."
+  "migrationSharedStatus": "Les modes guidé et professionnel utilisent le même statut pour chaque plan.",
+  "migrationComparisonUnavailableOutcome": "Comparaison indisponible"
 }

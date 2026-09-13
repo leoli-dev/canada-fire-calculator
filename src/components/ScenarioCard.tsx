@@ -13,7 +13,7 @@ function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolea
   return (
     <>
       <td>
-        {props.legacyEstimate ? t('migrationUnassigned') : props.r.success
+        {props.legacyEstimate ? t('migrationComparisonUnavailableOutcome') : props.r.success
           ? t('stratOk')
           : t('stratDepleted', { age: props.r.depletedAge })}
       </td>
@@ -37,7 +37,7 @@ export function ScenarioCard() {
   const resultNow = useMemo(() => runProjection(inputs), [inputs])
 
   return (
-    <details className="chart-card collapsible"
+    <details className="chart-card collapsible" data-testid="scenario-comparison"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
       {comparisonBlocked && <p className="hint">{t('migrationComparisonBlocked')} {ownershipPending && t('migrationLegacySummary')}</p>}

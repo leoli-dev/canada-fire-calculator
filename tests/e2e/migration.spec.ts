@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
+async function expectComparisonUnavailableInThreeLanguages(page: import('@playwright/test').Page) {
+  for (const [language, label] of [
+    ['EN', 'Comparison unavailable'],
+    ['FR', 'Comparaison indisponible'],
+    ['中文', '比较暂不可用'],
+  ] as const) {
+    await page.getByRole('button', { name: language, exact: true }).click()
+    const rows = page.getByTestId('scenario-comparison').locator('.compare-table tbody tr')
+    await expect(rows).toHaveCount(2)
+    for (const row of await rows.all()) {
+      await expect(row.locator('td').nth(1)).toHaveText(label)
+      await expect(row.locator('td').nth(2)).toHaveText('—')
+    }
+  }
+  await page.getByRole('button', { name: 'EN', exact: true }).click()
+}
+
 async function seedV10(page: import('@playwright/test').Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
@@ -141,6 +158,26 @@ test('single-person v10 age and savings uncertainty limits exact current advice 
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
 })
 
+test('age/savings-only legacy comparison uses neutral outcome labels in three languages', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.scenarioA = structuredClone(stored.state.inputs)
+    localStorage.setItem('fire-inputs', JSON.stringify(stored))
+  })
+  await page.reload()
+  const gate = page.getByTestId('migration-gate')
+  await expect(gate.getByTestId('migration-current')).toContainText('estimates')
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('estimates')
+  const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await card.locator('summary').click()
+  await expectComparisonUnavailableInThreeLanguages(page)
+})
+
 test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays gated through restore', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
@@ -168,7 +205,7 @@ test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays
   await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
   await expect(card).toContainText('Precise Scenario A comparison is unavailable')
   await card.locator('summary').click()
-  await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('—')
+  await expectComparisonUnavailableInThreeLanguages(page)
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
