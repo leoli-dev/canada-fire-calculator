@@ -267,4 +267,54 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(projectFromState(canonical, final.state, 0, providers(110)).status).toBe('ok')
     expect(annualStep(canonical, final.state, providers(110)).status).toBe('invalid')
   })
+
+  it('rejects a forged held planned home in both zero-year reads and annual stepping', () => {
+    const canonical = plan({ ...input(), debts: [], balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      principalResidence: { mode: 'planned', buyAtAge: 40, price: 200000, downPayment: 200000, appreciation: 0, netHoldingCostChange: 0, sellAtAge: null } })
+    const opening = ok(initializeState(canonical))
+    const propertyId = canonical.properties[0].id
+    expect(opening.byProperty[propertyId].held).toBe(false)
+    expect(annualStep(canonical, opening, providers(110)).status).toBe('unsupported')
+    const forged = structuredClone(opening)
+    forged.byProperty[propertyId].held = true
+    expect(projectFromState(canonical, forged, 0, providers(110)).status).toBe('invalid')
+    expect(annualStep(canonical, forged, providers(110)).status).toBe('invalid')
+    expect(opening.byProperty[propertyId].held).toBe(false)
+    const owned = plan({ ...input(), debts: [], principalResidence: { value: 200000, appreciation: 0, sellAtAge: null } })
+    const ownedSnapshot = ok(initializeState(owned))
+    ownedSnapshot.byProperty[owned.properties[0].id].held = false
+    expect(projectFromState(owned, ownedSnapshot, 0, providers(110)).status).toBe('invalid')
+  })
+
+  it('does not treat account room as proof that an FHSA contribution is legally available', () => {
+    const canonical = plan({ ...input(), debts: [], annualSavings: 8000, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, fhsa: { balance: 80000, annualContribution: 8000, openedYearsAgo: 5 } })
+    const fhsa = canonical.accounts.find(account => account.kind === 'fhsa')!
+    fhsa.openedYear = { status: 'known', value: 2021 }
+    fhsa.contributionRoom = { status: 'known', value: 8000 }
+    canonical.contributions = [2021, 2022, 2023, 2024, 2025].map(year => ({
+      id: `fhsa:${year}`, accountId: fhsa.id, contributorId: canonical.people[0].id,
+      calendarYear: year, amount: 8000, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: year },
+    }))
+    const opening = ok(initializeState(canonical))
+    expect(opening.contributionHistory.reduce((sum, item) => sum + item.amount, 0)).toBe(40000)
+    const result = annualStep(canonical, opening, { evaluate: () => ({ byPerson: { [canonical.people[0].id]: {
+      income: 8000, earnedIncome: 8000, benefits: 0, tax: 0, spending: 0, taxableIncome: 8000,
+      benefitIncomeForNextYear: { status: 'unknown', reason: 'not supplied' },
+    } } }), returns: () => 0 })
+    expect(result).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('FHSA contribution') }] })
+    expect(opening.byAccount[fhsa.id].balance).toBe(80000)
+  })
+
+  it('does not let a base-year snapshot invent confirmed account opening or room facts', () => {
+    const canonical = plan({ ...input(), debts: [], fhsa: { balance: 0, annualContribution: 0, openedYearsAgo: 0 } })
+    const opening = ok(initializeState(canonical))
+    const fhsa = canonical.accounts.find(account => account.kind === 'fhsa')!
+    const forgedOpening = structuredClone(opening)
+    forgedOpening.byAccount[fhsa.id].openedYear = { status: 'known', value: 2020 }
+    expect(projectFromState(canonical, forgedOpening, 0, providers(110)).status).toBe('invalid')
+    const forgedRoom = structuredClone(opening)
+    forgedRoom.byAccount[fhsa.id].room = { status: 'known', value: 999999 }
+    expect(annualStep(canonical, forgedRoom, providers(110)).status).toBe('invalid')
+  })
 })

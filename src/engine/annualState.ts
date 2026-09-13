@@ -52,6 +52,9 @@ const validKnownAmount = (value: unknown, nonnegative = false): value is Known<n
   return fact.status === 'unknown' ? typeof fact.reason === 'string' && fact.reason.length > 0
     : fact.status === 'known' && typeof fact.value === 'number' && Number.isFinite(fact.value) && (!nonnegative || fact.value >= 0)
 }
+const sameKnown = (left: Known<number>, right: Known<number>) => left.status === right.status &&
+  (left.status === 'known' && right.status === 'known' ? left.value === right.value :
+    left.status === 'unknown' && right.status === 'unknown' && left.reason === right.reason)
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
 export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
@@ -100,6 +103,17 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
     if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year)) ||
         plan.dependents.some(dependent => opening.byDependent[dependent.id].age !== dependent.ageInBaseYear + opening.year - plan.baseYear) ||
         plan.accounts.some(account => opening.byAccount[account.id].kind !== account.kind || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
+    // A never executes purchase/sale or changes opening-year facts. A candidate
+    // cannot claim the property was acquired or a missing statement was verified.
+    if (plan.properties.some(property => opening.byProperty[property.id].held !== (property.plannedPurchaseAge === null)) ||
+        plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].openedYear, account.openedYear))) return 'snapshot event or opening fact'
+    if (opening.year === plan.baseYear && (
+      plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].room, account.contributionRoom)) ||
+      plan.people.some(person => !sameKnown(opening.byPerson[person.id].rrspRoom, person.rrspAvailableRoom) ||
+        !sameKnown(opening.byPerson[person.id].tfsaRoom, person.tfsaAvailableRoom) ||
+        !sameKnown(opening.byPerson[person.id].previousYearEarnedIncome, person.previousYearEarnedIncome)) ||
+      plan.people.some(person => !sameKnown(opening.benefitIncomeLag[person.id], { status: 'unknown', reason: 'benefit income basis not supplied' }))
+    )) return 'snapshot base-year facts'
     return null
   } catch { return 'damaged annual snapshot' }
 }
@@ -128,6 +142,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const opened = state.byAccount[account.id].openedYear
     return opened.status === 'known' && year - opened.value >= 15
   })) return fail('unsupported', 'FHSA statutory rollover not yet wired')
+  if (plan.recurringContributions.some(contribution => state.byAccount[contribution.accountId]?.kind === 'fhsa' && contribution.annualAmount > 0)) return fail('unsupported', 'FHSA contribution annual and lifetime rules not yet wired')
   if (plan.contributions.some(contribution => contribution.calendarYear === year)) return fail('unsupported', 'scheduled contribution funding and deduction rule not yet wired')
   const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
   let evaluation: AnnualEvaluation
@@ -198,7 +213,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (account.room.status !== 'known') return fail('unsupported', `contribution room unknown: ${id}`)
     if (row.contribution > account.room.value + 1e-8) return fail('unsupported', `contribution exceeds account room: ${id}`)
     const person = state.byPerson[account.ownerId]
-    const personRoom = account.kind === 'tfsa' ? person?.tfsaRoom : person?.rrspRoom
+    const personRoom = account.kind === 'fhsa' ? undefined : account.kind === 'tfsa' ? person?.tfsaRoom : person?.rrspRoom
     if (account.kind !== 'fhsa' && (!personRoom || personRoom.status !== 'known')) return fail('unsupported', `person contribution room unknown: ${account.ownerId}`)
     if (personRoom?.status === 'known' && row.contribution > personRoom.value + 1e-8) return fail('unsupported', `contribution exceeds person room: ${account.ownerId}`)
     account.room.value -= row.contribution
