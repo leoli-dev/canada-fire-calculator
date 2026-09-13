@@ -25,8 +25,11 @@ function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolea
 export function ScenarioCard() {
   const { t } = useTranslation()
   const { inputs, canonical, scenarioA, scenarioACanonical, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const currentReview = migrationReview(canonical)
+  const scenarioReview = migrationReview(scenarioACanonical)
   const comparisonBlocked = !!scenarioA && (
-    migrationReview(canonical)?.precisionAllowed === false || migrationReview(scenarioACanonical)?.precisionAllowed === false)
+    currentReview?.precisionAllowed === false || scenarioReview?.precisionAllowed === false)
+  const ownershipPending = currentReview?.ownershipPending || scenarioReview?.ownershipPending
 
   const resultA = useMemo(
     () => (scenarioA ? runProjection(scenarioA) : null),
@@ -38,7 +41,7 @@ export function ScenarioCard() {
     <details className="chart-card collapsible"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
-      {comparisonBlocked && <p className="hint">{t('migrationComparisonBlocked')} {t('migrationLegacySummary')}</p>}
+      {comparisonBlocked && <p className="hint">{t('migrationComparisonBlocked')} {ownershipPending && t('migrationLegacySummary')}</p>}
       <div className="card-head">
         <div>
           <button onClick={saveScenarioA}>
