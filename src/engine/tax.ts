@@ -52,8 +52,31 @@ function federalBpa(taxable: number): number {
   return bpa - (bpa - bpaMin) * phase
 }
 
+/** Components for the person-owned Québec return. Ordinary Québec tax omits
+ * Schedule B, Schedule F and Schedule K; the household calculator adds each
+ * from its actual family/source/coverage facts. */
+export function federalIncomeTax(taxable: number, credits?: PersonCredits, quebecAbatement = false): number {
+  if (taxable <= 0) return 0
+  let credit = federalBpa(taxable) * FEDERAL.brackets[0].rate
+  credit += Math.min(FED_PENSION_AMOUNT, credits?.pensionIncome ?? 0) * FEDERAL.brackets[0].rate
+  if (credits?.spouseNetIncome !== undefined)
+    credit += federalSpouseAmount2026(credits.spouseNetIncome, federalBpa(taxable)) * FEDERAL.brackets[0].rate
+  if ((credits?.age ?? 0) >= 65)
+    credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold)) * FEDERAL.brackets[0].rate
+  const amount = Math.max(0, bracketTax(taxable, FEDERAL.brackets) - credit)
+  return quebecAbatement ? amount * (1 - QC_ABATEMENT) : amount
+}
+
+export function ordinaryQuebecIncomeTax(taxable: number): number {
+  if (taxable <= 0) return 0
+  const qc = PROVINCIAL.QC
+  return Math.max(0, bracketTax(taxable, qc.brackets) - qc.bpa * qc.brackets[0].rate)
+}
+
 /**
- * Combined federal + provincial income tax on taxable income.
+ * Legacy combined federal + provincial income-tax preview on taxable income.
+ * For Quebec it cannot identify Schedule F source income or Schedule K
+ * coverage. Verified person-owned Quebec results use quebecTax.ts instead.
  * Optional retiree credits: the age amount (65+, income-tested) and the
  * pension income amount, both federal and provincial. Taxable income stands
  * in for net income in the phase-outs.

@@ -1,6 +1,7 @@
 import type { InputsV2 } from './model'
 import { incomeTax } from './tax'
 import { calculatePersonIncome, type IncomeEvent, type PersonIncome } from './personIncome'
+import { calculateQuebecTax } from './quebecTax'
 
 export interface PersonTaxRow {
   personId: string
@@ -10,6 +11,7 @@ export interface PersonTaxRow {
   federalPensionEligible: number
   provincialPensionEligible: number
   tax: number
+  qc?: import('./quebecTax').QuebecTaxRow
   bySource: PersonIncome['bySource']
 }
 export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record<string, PersonTaxRow>; ruleYear: 2026; coverage: 'estimated' } |
@@ -25,7 +27,6 @@ export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record
 export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[]): HouseholdTaxResult {
   const income = calculatePersonIncome(plan, year, events)
   if (income.status !== 'ok') return income
-  if (plan.province === 'QC') return { status: 'unsupported', reason: 'BE-35 QC family credits, FSS and RAMQ are not modeled by person' }
   const people = structuredClone(income.byPerson)
   const election = plan.taxProfile?.pensionSplit
   if (election) {
@@ -66,6 +67,21 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     return { status: 'unsupported', reason: 'spouse support/cohabitation not confirmed' }
   const claimant = ids.length === 2 && support?.status === 'known' && support.value
     ? ids.reduce((a, b) => people[a].netIncome >= people[b].netIncome ? a : b) : null
+  if (plan.province === 'QC') {
+    const qc = calculateQuebecTax(plan, income.byPerson, people)
+    if (qc.status !== 'ok') return qc
+    const byPerson: Record<string, PersonTaxRow> = {}
+    for (const id of ids) {
+      const person = people[id]
+      const row = qc.byPerson[id]
+      byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
+        taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
+        provincialPensionEligible: row.qcRetirementEligible,
+        tax: row.federalTax + row.provincialIncomeTax + row.fss + row.ramq,
+        bySource: person.bySource, qc: row }
+    }
+    return { status: 'ok', total: qc.total, byPerson, ruleYear: 2026, coverage: 'estimated' }
+  }
   const byPerson: Record<string, PersonTaxRow> = {}
   for (const id of ids) {
     const person = people[id]

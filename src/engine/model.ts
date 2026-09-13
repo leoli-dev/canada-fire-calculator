@@ -2,6 +2,8 @@ import type { AccountType, CppWork, Goal, Inputs, MeltdownCap, Pension, Province
 
 export type EntityId = string
 export type Known<T> = { status: 'known'; value: T } | { status: 'unknown'; reason: string }
+/** Calendar-month prescription coverage. A confirmed waiver is a tax fact, not an inferred low-income exemption. */
+export type QcDrugCoverage = 'public' | 'private' | 'waived' | 'unknown'
 export type Provenance = { origin: 'user' | 'legacy' | 'estimated' | 'unknown'; sourceYear: number | null; note?: string }
 export type TaxShares = { status: 'known'; shares: Record<EntityId, number> } | { status: 'unknown'; reason: string }
 export interface Person {
@@ -127,6 +129,10 @@ export interface InputsV2 {
   taxProfile?: {
     spouseSupported: Known<boolean>
     pensionSplit: { transferorId: EntityId; recipientId: EntityId; amount: number } | null
+    /** Québec line 245 is a separate election from federal T1032. */
+    qcPensionSplit?: { transferorId: EntityId; recipientId: EntityId; amount: number } | null
+    /** Missing months are unknown; indices 0–11 mean January–December of the projected tax year. */
+    qcDrugCoverage?: Record<EntityId, QcDrugCoverage[]>
   }
   dependents: Dependent[]
   strategy: Strategy
