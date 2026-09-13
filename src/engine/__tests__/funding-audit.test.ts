@@ -9,6 +9,105 @@ import audit from './fixtures/pending-audit.json'
 const fixture = (id: string) => audit.cases.find((entry) => entry.id === id)!.inputs as Inputs
 
 describe('BE-30 independently derived funding identities', () => {
+  it.each([
+    { savings: 0, opening: 220_000, age51: 40_000 },
+    { savings: 20_000, opening: 160_000, age51: 20_000 },
+  ])('uses remaining assets and savings for later mortgage installments ($savings savings)', ({ savings, opening, age51 }) => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 53, lifeExpectancy: 52, annualSavings: savings,
+      balances: { tfsa: opening, rrsp: 0, nonReg: 0 }, extraIncome: null,
+    } as Inputs)
+    expect(result.rows.map((row) => row.unfundedObligations)).toEqual([[], [], []])
+    expect(result.rows[1].balances.tfsa).toBeCloseTo(age51, 2)
+    expect(result.rows[2].balances.tfsa).toBeCloseTo(0, 2)
+    expect(result.rows[1].housingFunding).toMatchObject({
+      eventId: 'purchase:51', cost: 40_000, fromSavings: savings,
+      fromOpening: 40_000 - savings,
+    })
+    expect(result.rows.map((row) => row.debtBalance)).toEqual([360_000, 320_000, 280_000])
+    expect(result.finalNetWorth).toBeCloseTo(opening + 3 * savings, 2)
+    expect(result.success).toBe(true)
+  })
+
+  it('keeps unpaid principal in debt rather than creating equity when a later installment cannot be funded', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 53, lifeExpectancy: 52, annualSavings: 0,
+      balances: { tfsa: 140_000, rrsp: 0, nonReg: 0 }, extraIncome: null,
+    } as Inputs)
+    expect(result.rows[1].unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:51', amount: 40_000 }),
+    ]))
+    expect(result.rows[1].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.rows[1].debtPayment).toBe(0)
+    expect(result.rows[2].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.finalNetWorth).toBeCloseTo(140_000, 2)
+    expect(result.success).toBe(false)
+  })
+
+  it('discharges unpaid installments from sale proceeds without a sale-year phantom payment', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 54, lifeExpectancy: 53, annualSavings: 0,
+      balances: { tfsa: 140_000, rrsp: 0, nonReg: 0 }, extraIncome: null,
+      principalResidence: { ...base.principalResidence!, sellAtAge: 53 },
+    } as Inputs)
+    expect(result.rows[3].propertyValue).toBe(0)
+    expect(result.rows[3].debtPayment).toBe(0)
+    expect(result.rows[3].debtBalance).toBe(0)
+    expect(result.rows[3].balances.nonReg).toBeCloseTo(140_000, 2)
+    expect(result.finalNetWorth).toBeCloseTo(140_000, 2)
+  })
+
+  it('attributes a working-year RRSP-financed cash purchase to RRSP tax exactly once', () => {
+    const base = fixture('P02')
+    const result = runProjection({
+      ...base, fireAge: 51, lifeExpectancy: 50,
+      balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+    } as Inputs)
+    const row = result.rows[0]
+    expect(row.purchaseFunding?.grossWithdrawals.rrsp).toBeCloseTo(50_000 / 0.65, 2)
+    expect(row.tax).toBeCloseTo(50_000 / 0.65 * 0.35, 2)
+    expect(row.taxBySource.rrsp).toBeCloseTo(row.tax, 2)
+    expect(row.taxableBySource.rrsp).toBeCloseTo(50_000 / 0.65, 2)
+    expect(row.taxBySource.property).toBe(0)
+    expect(row.taxableBySource.property).toBe(0)
+    expect(result.rrspTax - result.estateTax).toBeCloseTo(row.tax, 2)
+  })
+
+  it('attributes non-registered purchase gains to their account and not property', () => {
+    const base = fixture('P02')
+    const result = runProjection({
+      ...base, fireAge: 51, lifeExpectancy: 50,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 100_000 }, nonRegBook: 0,
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+    } as Inputs)
+    const row = result.rows[0]
+    const gross = 50_000 / (1 - 0.5 * 0.35)
+    expect(row.purchaseFunding?.grossWithdrawals.nonReg).toBeCloseTo(gross, 2)
+    expect(row.taxableBySource.nonReg).toBeCloseTo(gross * 0.5, 2)
+    expect(row.taxBySource.nonReg).toBeCloseTo(gross * 0.5 * 0.35, 2)
+    expect(row.taxBySource.property).toBe(0)
+    expect(row.taxableBySource.property).toBe(0)
+    expect(Object.values(row.taxBySource).reduce((sum, value) => sum + value, 0)).toBeCloseTo(row.tax, 2)
+  })
+
+  it('grosses up a later mortgage installment funded from RRSP and reconciles the tax source', () => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, fireAge: 52, lifeExpectancy: 51, annualSavings: 0,
+      balances: { tfsa: 140_000, rrsp: 100_000, nonReg: 0 }, extraIncome: null,
+    } as Inputs)
+    const row = result.rows[1]
+    expect(row.unfundedObligations).toEqual([])
+    expect(row.housingFunding?.grossWithdrawals.rrsp).toBeCloseTo(40_000 / 0.65, 2)
+    expect(row.taxBySource.rrsp).toBeCloseTo(40_000 / 0.65 * 0.35, 2)
+    expect(row.taxableBySource.rrsp).toBeCloseTo(40_000 / 0.65, 2)
+    expect(row.taxBySource.property).toBe(0)
+    expect(row.debtBalance).toBeCloseTo(320_000, 2)
+  })
   it('year-start purchase cannot use a pension received later in that year', () => {
     const base = fixture('P02')
     const result = runProjection({

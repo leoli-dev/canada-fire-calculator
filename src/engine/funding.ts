@@ -120,20 +120,28 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   const firstYearCostFromSavings = Math.min(Math.max(0, funds.firstYearCost), Math.max(0, funds.annualSavings))
   const firstYearCostFromOpening = Math.max(0, funds.firstYearCost - firstYearCostFromSavings)
   const unpaidCost = drawNet(firstYearCostFromOpening)
-  if (unpaidCost > 0.01) return {
-    mortgagePrincipal: principal, allocation: null,
-    gap: { eventId: `purchase:${age}`, field: 'principalResidence.annualMortgagePayment',
-      amount: unpaidCost, reason: 'purchaseCost' },
-  }
+  const gap: FundingGap | null = unpaidCost > 0.01
+    ? { eventId: `purchase:${age}`, field: 'principalResidence.annualMortgagePayment',
+      amount: unpaidCost, reason: 'purchaseCost' }
+    : null
   return {
-    mortgagePrincipal: principal, gap: null,
+    mortgagePrincipal: principal, gap,
     allocation: {
       balances, grossWithdrawals, nonRegBook: book, taxableWithdrawal, nonRegTaxable, rrspWithdrawal,
       withdrawalTax: tax(taxableWithdrawal, rrspWithdrawal),
-      firstYearCostFromSavings, firstYearCostFromOpening,
+      firstYearCostFromSavings, firstYearCostFromOpening: firstYearCostFromOpening - unpaidCost,
       downPaymentFromFhsa, downPaymentFromAccounts,
     },
   }
+}
+
+/** Fund a later working-year home cost from that year's savings, then opening liquid assets. */
+export function planAnnualHousingFunding(age: number, cost: number, funds: Omit<PurchaseFunds, 'fhsaBalance' | 'firstYearCost'>) {
+  const zeroHome: PlannedResidence = {
+    mode: 'planned', buyAtAge: age, price: 0, downPayment: 0,
+    appreciation: 0, netHoldingCostChange: 0, sellAtAge: null,
+  }
+  return planPurchaseFunding(zeroHome, age, { ...funds, fhsaBalance: 0, firstYearCost: Math.max(0, cost) })
 }
 
 export interface ContributionAllocation {

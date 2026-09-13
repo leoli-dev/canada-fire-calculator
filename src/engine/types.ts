@@ -335,6 +335,15 @@ export interface YearRow {
     firstYearCostFromOpening: number
     withdrawalTax: number
   } | null
+  /** Source/use ledger for a later accumulation-year home installment. */
+  housingFunding: {
+    eventId: string
+    cost: number
+    fromSavings: number
+    fromOpening: number
+    grossWithdrawals: Record<AccountType, number>
+    withdrawalTax: number
+  } | null
   /** end-of-year balances (after withdrawals/contributions and growth) */
   balances: Record<AccountType, number>
   withdrawals: Record<AccountType, number>
