@@ -21,6 +21,8 @@ import { ScenarioCard } from './components/ScenarioCard'
 import { GlossaryDrawer } from './components/GlossaryDrawer'
 import { GithubCorner } from './components/GithubCorner'
 import { hasUnusableSharedFields } from './forms/fieldState'
+import { migrationReview } from './engine/migrationReview'
+import { MigrationReview } from './components/MigrationReview'
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -35,12 +37,8 @@ export default function App() {
   const canonical = useStore((s) => s.canonical)
   const scenarioACanonical = useStore((s) => s.scenarioACanonical)
   const storageIssue = getStorageReadOnlyReason()
-  const unresolvedHousehold = canonical
-    ? canonical.accounts.some((account) => account.ownerId === null || account.taxableOwnerShares.status === 'unknown') || canonical.properties.some((property) => property.taxableOwnerShares.status === 'unknown') || !!canonical.orphanedPeople?.length || canonical.incomeSources.some((source) => source.recipientId === null)
-    : !!inputs.partner
+  const unresolvedHousehold = migrationReview(canonical)?.ownershipPending ?? !!inputs.partner
   const precision = canonical ? precisionGate(canonical) : null
-  const scenarioOwnershipUnresolved = scenarioACanonical ? precisionGate(scenarioACanonical).reasons.some(reason => reason === 'ownershipUnknown' || reason === 'recipientUnknown') : false
-  const ownershipAccounts = canonical?.accounts ?? []
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
   const setEntryMode = useStore((s) => s.setEntryMode)
@@ -98,12 +96,7 @@ export default function App() {
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
         <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
       </div>}
-      {unresolvedHousehold && <div role="status" className="hint" data-testid="migration-gate">
-        {t('migrationOwnershipWarning')}
-        <ul>{ownershipAccounts.map((account) => <li key={account.id}>{account.kind}: {account.balance.toLocaleString()} CAD {account.ownerId === null ? t('migrationUnassigned') : t(canonical?.people.find((person) => person.id === account.ownerId)?.role === 'partner' ? 'migrationOwnerPartner' : 'migrationOwnerSelf')}{account.acb.status === 'known' ? `, ${t('migrationBasis')} ${account.acb.value.toLocaleString()} CAD` : ''}</li>)}</ul>
-        {canonical?.incomeSources.filter((source) => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0).map((source) => <p key={source.id}>{source.kind}: {source.annualAmount.status === 'known' ? source.annualAmount.value.toLocaleString() : ''} CAD {t('migrationUnassigned')}</p>)}
-        {t('migrationSharedPlan')}
-      </div>}
+      <MigrationReview current={canonical} scenarioA={scenarioACanonical} />
       {!unresolvedHousehold && precision && !precision.allowed && <div role="status" className="hint">{t('migrationApproximate')}</div>}
       {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
@@ -120,7 +113,7 @@ export default function App() {
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={unresolvedHousehold} />
-          {unresolvedHousehold ? <ScenarioCard legacyEstimate /> : <>
+          {unresolvedHousehold ? <ScenarioCard /> : <>
           <WithdrawalOrderCard inputs={inputs} />
           <ProjectionChart
             result={result}
@@ -144,7 +137,7 @@ export default function App() {
           <TimingCard inputs={inputs} />
           <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
-          <ScenarioCard legacyEstimate={scenarioOwnershipUnresolved} />
+          <ScenarioCard />
           </>}
         </section>}
       </main>

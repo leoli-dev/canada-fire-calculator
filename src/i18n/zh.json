@@ -704,5 +704,12 @@
   "migrationOwnerSelf": "本人",
   "migrationOwnerPartner": "伴侣",
   "migrationLegacySummary": "旧版家庭估算：账户归属尚未确认，不能作为精确税务或退休建议。",
-  "storageDownloadOriginal": "下载原始计划"
+  "storageDownloadOriginal": "下载原始计划",
+  "migrationStatusUnassigned": "所有者或领取人尚未分配；该计划仍是旧版家庭估算。",
+  "migrationStatusReady": "该计划的归属已分配。",
+  "migrationNoScenario": "尚未保存场景 A。",
+  "migrationNoAutomaticSplit": "家庭总额已保留；没有假设本人和配偶的分配比例。",
+  "migrationProperty": "房产",
+  "migrationOrphanedPerson": "待核对的已移除成员",
+  "migrationComparisonBlocked": "当前计划和场景 A 均通过归属与迁移核对前，不能显示精确场景比较。"
 }

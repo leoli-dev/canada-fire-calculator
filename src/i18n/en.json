@@ -708,5 +708,12 @@
   "migrationOwnerSelf": "self",
   "migrationOwnerPartner": "partner",
   "migrationLegacySummary": "Legacy household estimate: ownership is unconfirmed, so this is not a precise tax or FIRE recommendation.",
-  "storageDownloadOriginal": "Download original saved plan"
+  "storageDownloadOriginal": "Download original saved plan",
+  "migrationStatusUnassigned": "Ownership or recipient is unassigned. This plan remains a legacy household estimate.",
+  "migrationStatusReady": "Ownership is assigned for this plan.",
+  "migrationNoScenario": "No Scenario A has been saved.",
+  "migrationNoAutomaticSplit": "The full household amount is retained. No self/partner split has been assumed.",
+  "migrationProperty": "Property",
+  "migrationOrphanedPerson": "Removed person awaiting review",
+  "migrationComparisonBlocked": "Precise Scenario A comparison is unavailable until both plans pass the ownership and migration gate."
 }

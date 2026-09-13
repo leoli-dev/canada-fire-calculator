@@ -5,6 +5,7 @@ import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
 import { Jargon } from './Jargon'
+import { migrationReview } from '../engine/migrationReview'
 
 function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolean }) {
   const { t } = useTranslation()
@@ -21,9 +22,11 @@ function Cell(props: { r: ProjectionResult; life: number; legacyEstimate: boolea
   )
 }
 
-export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: boolean }) {
+export function ScenarioCard() {
   const { t } = useTranslation()
-  const { inputs, scenarioA, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const { inputs, canonical, scenarioA, scenarioACanonical, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const comparisonBlocked = !!scenarioA && (
+    migrationReview(canonical)?.precisionAllowed === false || migrationReview(scenarioACanonical)?.precisionAllowed === false)
 
   const resultA = useMemo(
     () => (scenarioA ? runProjection(scenarioA) : null),
@@ -35,7 +38,7 @@ export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: bool
     <details className="chart-card collapsible"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
-      {legacyEstimate && <p className="hint">{t('migrationLegacySummary')}</p>}
+      {comparisonBlocked && <p className="hint">{t('migrationComparisonBlocked')} {t('migrationLegacySummary')}</p>}
       <div className="card-head">
         <div>
           <button onClick={saveScenarioA}>
@@ -66,11 +69,11 @@ export function ScenarioCard({ legacyEstimate = false }: { legacyEstimate?: bool
           <tbody>
             <tr>
               <td>{t('scenarioA')}</td>
-              <Cell r={resultA} life={scenarioA.lifeExpectancy} legacyEstimate={legacyEstimate} />
+              <Cell r={resultA} life={scenarioA.lifeExpectancy} legacyEstimate={comparisonBlocked} />
             </tr>
             <tr className="current-row">
               <td>{t('scenarioCurrent')}</td>
-              <Cell r={resultNow} life={inputs.lifeExpectancy} legacyEstimate={legacyEstimate} />
+              <Cell r={resultNow} life={inputs.lifeExpectancy} legacyEstimate={comparisonBlocked} />
             </tr>
           </tbody>
         </table>

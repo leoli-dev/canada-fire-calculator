@@ -70,6 +70,42 @@ test('v10 couple and Scenario A migrate once with shared mode gate and round tri
   expect(await page.evaluate(() => localStorage.getItem('fire-inputs:pre-v11-backup'))).toBe(original)
 })
 
+test('Scenario A ownership gate stays separate from a singly owned current plan across modes and refresh', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const original = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    stored.state.scenarioA = structuredClone(stored.state.inputs)
+    stored.state.scenarioA.partner = { currentAge: 33, cppStartAge: 65, cppAnnualAt65: 6000, oasStartAge: 65, oasAnnualAt65: 8000 }
+    stored.state.scenarioA.balances.tfsa = 220000
+    localStorage.removeItem('fire-inputs:pre-v11-backup')
+    const bytes = JSON.stringify(stored)
+    localStorage.setItem('fire-inputs', bytes)
+    return bytes
+  })
+  await page.reload()
+  const gate = page.getByTestId('migration-gate')
+  await expect(gate.getByTestId('migration-current')).toContainText('Current')
+  await expect(gate.getByTestId('migration-current')).not.toContainText('220,000')
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('tfsa: 220,000 CAD unassigned')
+  const comparison = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await comparison.locator('summary').click()
+  await expect(comparison).toContainText('Precise Scenario A comparison is unavailable')
+  await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
+  await expect(comparison.getByRole('row', { name: /Current/ })).toContainText('—')
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
+  await page.reload()
+  await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
+  const state = await page.evaluate(() => ({ stored: JSON.parse(localStorage.getItem('fire-inputs')!), backup: localStorage.getItem('fire-inputs:pre-v11-backup') }))
+  expect(state.backup).toBe(original)
+  expect(state.stored.state.canonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').ownerId).not.toBeNull()
+  expect(state.stored.state.scenarioACanonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').ownerId).toBeNull()
+})
+
 test('future-version and corrupt bytes are not overwritten', async ({ page }) => {
   await page.goto('/')
   for (const value of ['{broken', JSON.stringify({ version: 999, state: { inputs: {} } })]) {
