@@ -31,6 +31,7 @@ export function requiredFireAssets(inputs: Inputs): number {
   // numeric answer would omit its cash outflow while keeping the rest of the
   // plan, so expose unsupported instead of a fabricated threshold.
   if (inputs.principalResidence?.mode === 'planned') return Number.NaN
+  if (runProjection(inputs).unfundedObligations.length > 0) return Number.NaN
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
   const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
@@ -170,6 +171,8 @@ export interface TargetReport {
  */
 export function targetReport(inputs: Inputs, target: number): TargetReport {
   if (inputs.principalResidence?.mode === 'planned')
+    return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+  if (runProjection(inputs).unfundedObligations.length > 0)
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
   const bal = { ...inputs.balances }
   // Planned purchases returned unsupported above.

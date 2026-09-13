@@ -33,7 +33,7 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
   const markAnswers = useStore((s) => s.markAnswers)
   const meta = useStore((s) => s.answerMeta[props.field])
   const inputs = useStore((s) => s.inputs)
-  const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution'
+  const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution' || props.field === 'fhsa.annualContribution'
     ? validateInputs(inputs).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
     : undefined
   return <div className="question-answer" data-field={props.field}>

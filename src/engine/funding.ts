@@ -5,7 +5,7 @@ export interface FundingGap {
   eventId: string
   field: string
   amount: number
-  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'purchaseCost' | 'invalidPurchase'
+  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase'
 }
 
 export interface PurchaseFunds {
@@ -13,15 +13,24 @@ export interface PurchaseFunds {
   fhsaBalance: number
   nonRegBook: number
   marginalRate: number
+  /** Tax increment from taxable withdrawals made to close the purchase. */
+  taxOnWithdrawal?: (taxable: number, rrspGross: number) => number
   annualSavings: number
   firstYearCost: number
 }
 
 export interface PurchaseAllocation {
   balances: Record<AccountType, number>
+  grossWithdrawals: Record<AccountType, number>
   nonRegBook: number
   taxableWithdrawal: number
+  nonRegTaxable: number
+  rrspWithdrawal: number
   withdrawalTax: number
+  firstYearCostFromSavings: number
+  firstYearCostFromOpening: number
+  downPaymentFromFhsa: number
+  downPaymentFromAccounts: number
 }
 
 /** Validate the consideration identity before any home or loan is booked. */
@@ -48,41 +57,81 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     },
   }
   if (!funds) return { mortgagePrincipal: principal, gap: null, allocation: null }
-  if (funds.firstYearCost > funds.annualSavings + 0.01) return {
-    mortgagePrincipal: principal, allocation: null,
-    gap: { eventId: `purchase:${age}`, field: 'principalResidence.annualMortgagePayment',
-      amount: funds.firstYearCost - funds.annualSavings, reason: 'purchaseCost' },
-  }
 
   const balances = { ...funds.balances }
   const excessFhsa = Math.max(0, funds.fhsaBalance - home.downPayment)
   balances.nonReg += excessFhsa
   let book = funds.nonRegBook + excessFhsa
-  let remaining = Math.max(0, home.downPayment - funds.fhsaBalance)
-  const tfsa = Math.min(remaining, Math.max(0, balances.tfsa))
-  balances.tfsa -= tfsa
-  remaining -= tfsa
-  const gainFraction = balances.nonReg > 0 ? Math.max(0, (balances.nonReg - book) / balances.nonReg) : 0
-  const nonRegNetRatio = Math.max(0.01, 1 - gainFraction * CAPITAL_GAINS_INCLUSION * funds.marginalRate)
-  const nonReg = Math.min(Math.max(0, balances.nonReg), remaining / nonRegNetRatio)
-  const nonRegGain = nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
-  if (balances.nonReg > 0) book -= (nonReg / balances.nonReg) * book
-  balances.nonReg -= nonReg
-  remaining -= nonReg - nonRegGain * funds.marginalRate
-  const rrspNetRatio = Math.max(0.01, 1 - funds.marginalRate)
-  const rrsp = Math.min(Math.max(0, balances.rrsp), Math.max(0, remaining) / rrspNetRatio)
-  balances.rrsp -= rrsp
-  remaining -= rrsp * rrspNetRatio
+  let taxableWithdrawal = 0
+  let nonRegTaxable = 0
+  let rrspWithdrawal = 0
+  const grossWithdrawals: Record<AccountType, number> = { tfsa: 0, nonReg: 0, rrsp: 0 }
+  const tax = funds.taxOnWithdrawal ?? ((taxable: number) => taxable * funds.marginalRate)
+  const takeTaxable = (capacity: number, taxablePerGross: number, need: number, isRrsp: boolean) => {
+    const net = (gross: number) => gross - (tax(
+      taxableWithdrawal + gross * taxablePerGross,
+      rrspWithdrawal + (isRrsp ? gross : 0),
+    ) - tax(taxableWithdrawal, rrspWithdrawal))
+    const max = Math.max(0, capacity)
+    if (net(max) <= need) return max
+    let lo = 0
+    let hi = max
+    for (let i = 0; i < 55; i++) {
+      const mid = (lo + hi) / 2
+      if (net(mid) < need) lo = mid
+      else hi = mid
+    }
+    return hi
+  }
+  const drawNet = (need: number) => {
+    let remaining = Math.max(0, need)
+    const tfsa = Math.min(remaining, Math.max(0, balances.tfsa))
+    balances.tfsa -= tfsa
+    grossWithdrawals.tfsa += tfsa
+    remaining -= tfsa
+    const gainFraction = balances.nonReg > 0 ? Math.max(0, (balances.nonReg - book) / balances.nonReg) : 0
+    const nonRegTaxablePerGross = gainFraction * CAPITAL_GAINS_INCLUSION
+    const nonReg = takeTaxable(balances.nonReg, nonRegTaxablePerGross, remaining, false)
+    const nonRegGain = nonReg * nonRegTaxablePerGross
+    const nonRegTax = tax(taxableWithdrawal + nonRegGain, rrspWithdrawal) - tax(taxableWithdrawal, rrspWithdrawal)
+    if (balances.nonReg > 0) book -= (nonReg / balances.nonReg) * book
+    balances.nonReg -= nonReg
+    grossWithdrawals.nonReg += nonReg
+    remaining -= nonReg - nonRegTax
+    taxableWithdrawal += nonRegGain
+    nonRegTaxable += nonRegGain
+    const rrsp = takeTaxable(balances.rrsp, 1, Math.max(0, remaining), true)
+    const rrspTax = tax(taxableWithdrawal + rrsp, rrspWithdrawal + rrsp) - tax(taxableWithdrawal, rrspWithdrawal)
+    balances.rrsp -= rrsp
+    grossWithdrawals.rrsp += rrsp
+    remaining -= rrsp - rrspTax
+    taxableWithdrawal += rrsp
+    rrspWithdrawal += rrsp
+    return Math.max(0, remaining)
+  }
+  const downPaymentFromFhsa = Math.min(home.downPayment, funds.fhsaBalance)
+  const downPaymentFromAccounts = home.downPayment - downPaymentFromFhsa
+  const remaining = drawNet(downPaymentFromAccounts)
   if (remaining > 0.01) return {
     mortgagePrincipal: principal, allocation: null,
     gap: { eventId: `purchase:${age}`, field: 'principalResidence.downPayment',
       amount: remaining, reason: 'downPayment' },
   }
+  const firstYearCostFromSavings = Math.min(Math.max(0, funds.firstYearCost), Math.max(0, funds.annualSavings))
+  const firstYearCostFromOpening = Math.max(0, funds.firstYearCost - firstYearCostFromSavings)
+  const unpaidCost = drawNet(firstYearCostFromOpening)
+  if (unpaidCost > 0.01) return {
+    mortgagePrincipal: principal, allocation: null,
+    gap: { eventId: `purchase:${age}`, field: 'principalResidence.annualMortgagePayment',
+      amount: unpaidCost, reason: 'purchaseCost' },
+  }
   return {
     mortgagePrincipal: principal, gap: null,
     allocation: {
-      balances, nonRegBook: book, taxableWithdrawal: nonRegGain + rrsp,
-      withdrawalTax: (nonRegGain + rrsp) * funds.marginalRate,
+      balances, grossWithdrawals, nonRegBook: book, taxableWithdrawal, nonRegTaxable, rrspWithdrawal,
+      withdrawalTax: tax(taxableWithdrawal, rrspWithdrawal),
+      firstYearCostFromSavings, firstYearCostFromOpening,
+      downPaymentFromFhsa, downPaymentFromAccounts,
     },
   }
 }
@@ -92,7 +141,7 @@ export interface ContributionAllocation {
   employee: number
   employer: number
   voluntary: Record<AccountType, number>
-  gap: FundingGap | null
+  gaps: FundingGap[]
 }
 
 /** FHSA then mandatory employee DC, then the configured voluntary split. */
@@ -116,12 +165,15 @@ export function allocateContributions(args: {
     // The model has no cash account: hold any unassigned savings in nonReg.
     nonReg: remaining * (nonRegWeight / divisor + Math.max(0, 1 - weightSum)),
   }
-  const gapAmount = Math.max(0, args.employee - employee)
+  const employeeGap = Math.max(0, args.employee - employee)
+  const fhsaGap = Math.max(0, args.fhsa - fhsa)
   return {
     fhsa, employee, employer: Math.max(0, args.employer), voluntary,
-    gap: gapAmount > 0.01 ? {
-      eventId: `contributions:${args.age}`, field: 'lockedRetirement.employeeContribution',
-      amount: gapAmount, reason: 'employeeContribution',
-    } : null,
+    gaps: [
+      ...(fhsaGap > 0.01 ? [{ eventId: `contributions:${args.age}`, field: 'fhsa.annualContribution',
+        amount: fhsaGap, reason: 'fhsaContribution' as const }] : []),
+      ...(employeeGap > 0.01 ? [{ eventId: `contributions:${args.age}`, field: 'lockedRetirement.employeeContribution',
+        amount: employeeGap, reason: 'employeeContribution' as const }] : []),
+    ],
   }
 }

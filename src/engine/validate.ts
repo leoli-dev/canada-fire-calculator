@@ -176,8 +176,6 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     const fhsaLimit = 8000 * persons
     if (fhsa.annualContribution > fhsaLimit)
       warn('fhsa.annualContribution', 'valFhsaContribHigh', { max: fhsaLimit })
-    if (fhsa.annualContribution > 0 && inputs.annualSavings < fhsa.annualContribution)
-      err('fhsa.annualContribution', 'valFhsaExceedsSavings')
   }
 
   const children = inputs.children
@@ -217,6 +215,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
         field: gap.field, severity: 'error',
         key: gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
           : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
+          : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
           : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
             : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
         params: { amount: Math.ceil(gap.amount), age: Number(gap.eventId.split(':')[1]) },

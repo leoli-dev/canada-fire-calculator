@@ -9,6 +9,77 @@ import audit from './fixtures/pending-audit.json'
 const fixture = (id: string) => audit.cases.find((entry) => entry.id === id)!.inputs as Inputs
 
 describe('BE-30 independently derived funding identities', () => {
+  it('year-start purchase cannot use a pension received later in that year', () => {
+    const base = fixture('P02')
+    const result = runProjection({
+      ...base,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+      pension: { annualAmount: 100_000, startAge: 50, indexation: 1, bridgeAnnual: 0 },
+    } as Inputs)
+    expect(result.success).toBe(false)
+    expect(result.rows[0].propertyValue).toBe(0)
+    expect(result.rows[0].unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'purchase:50', amount: 50_000 }),
+    ]))
+  })
+
+  it.each([50, 65])('uses only opening RRSP funds at age %i and does not charge purchase tax twice', (age) => {
+    const base = fixture('P02')
+    const result = runProjection({
+      ...base, currentAge: age, fireAge: age, lifeExpectancy: age,
+      balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
+      principalResidence: { ...base.principalResidence!, buyAtAge: age, price: 50_000, downPayment: 50_000 },
+    } as Inputs)
+    const row = result.rows[0]
+    const funding = row.purchaseFunding!
+    expect(funding.grossWithdrawals.rrsp).toBeGreaterThan(50_000)
+    expect(funding.grossWithdrawals.rrsp - funding.withdrawalTax).toBeCloseTo(50_000, 2)
+    expect(row.tax).toBeCloseTo(funding.withdrawalTax, 2)
+    expect(row.netCash).toBeCloseTo(0, 2)
+    expect(Object.values(row.taxBySource).reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(row.tax, 2)
+    expect(result.finalNetWorth).toBeCloseTo(100_000 - row.tax, 2)
+  })
+
+  it('records unmet FHSA contribution instead of silently shrinking it', () => {
+    const base = fixture('P04')
+    const input = { ...base, annualSavings: 5_000, lockedRetirement: null } as Inputs
+    const result = runProjection(input)
+    expect(result.success).toBe(false)
+    expect(result.rows[0].fhsaBalance).toBe(5_000)
+    expect(result.rows[0].unfundedObligations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'contributions:50', amount: 3_000, reason: 'fhsaContribution' }),
+    ]))
+    expect(validateInputs(input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventId: 'contributions:50', amount: 3_000 }),
+    ]))
+    expect(targetReport(input, 100_000).status).toBe('unsupported')
+    expect(Number.isNaN(requiredFireAssets(input))).toBe(true)
+    expect(Number.isNaN(maxSustainableSpending(input))).toBe(true)
+  })
+
+  it.each([
+    { savings: 0, opening: 140_000 },
+    { savings: 20_000, opening: 120_000 },
+  ])('can pay a first mortgage installment with leftover opening TFSA plus $savings savings', ({ savings, opening }) => {
+    const base = fixture('P03')
+    const result = runProjection({
+      ...base, annualSavings: savings, extraIncome: null,
+      balances: { tfsa: opening, rrsp: 0, nonReg: 0 },
+    } as Inputs)
+    expect(result.rows[0].unfundedObligations).toEqual([])
+    expect(result.rows[0].propertyValue).toBe(500_000)
+    expect(result.rows[0].debtBalance).toBeCloseTo(360_000, 2)
+    expect(result.rows[0].balances.tfsa).toBeCloseTo(0, 2)
+    expect(result.rows[0].purchaseFunding).toMatchObject({
+      eventId: 'purchase:50', price: 500_000, mortgagePrincipal: 400_000,
+      downPaymentFromAccounts: 100_000, firstYearCostFromSavings: savings,
+      firstYearCostFromOpening: 40_000 - savings,
+      grossWithdrawals: { tfsa: opening, rrsp: 0, nonReg: 0 },
+    })
+    expect(result.rows[0].propertyValue - result.rows[0].debtBalance + result.rows[0].balances.tfsa)
+      .toBeCloseTo(opening + savings, 2)
+  })
   it('P02: cannot buy a 500,000 home with only 100,000 and no mortgage', () => {
     const result = runProjection(fixture('P02'))
     expect(result.success).toBe(false)

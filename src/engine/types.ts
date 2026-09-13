@@ -323,6 +323,18 @@ export interface YearRow {
   phase: Phase
   /** Obligations that could not be funded at the event date. */
   unfundedObligations: import('./funding').FundingGap[]
+  /** Funding actually committed for a year-start home purchase, if any. */
+  purchaseFunding: {
+    eventId: string
+    price: number
+    mortgagePrincipal: number
+    downPaymentFromFhsa: number
+    downPaymentFromAccounts: number
+    grossWithdrawals: Record<AccountType, number>
+    firstYearCostFromSavings: number
+    firstYearCostFromOpening: number
+    withdrawalTax: number
+  } | null
   /** end-of-year balances (after withdrawals/contributions and growth) */
   balances: Record<AccountType, number>
   withdrawals: Record<AccountType, number>

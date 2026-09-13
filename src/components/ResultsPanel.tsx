@@ -61,7 +61,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     () => (mode === 'target' && target > 0 ? targetReport(inputs, target) : null),
     [mode, inputs, target],
   )
-  const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned'
+  const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' || result.unfundedObligations.length > 0
+  const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
+    ? t('plannedPurchaseQuickUnsupported') : t('fundingQuickUnsupported')
 
   const ok =
     mode === 'last'
@@ -104,6 +106,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
               {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
                 : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
+                : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
                 : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
                   : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
@@ -154,7 +157,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
 
       {mode === 'number' && (
         <>
-          {quickEstimateUnsupported ? <p className="verdict">{t('plannedPurchaseQuickUnsupported')}</p> : <>
+          {quickEstimateUnsupported ? <p className="verdict">{quickEstimateMessage}</p> : <>
           <p className="verdict">
             {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber ?? 0) })}
           </p>
@@ -193,7 +196,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             />
           </label>
           {!goal && <p className="hint">{t('targetUnset')}</p>}
-          {goal?.status === 'unsupported' && <p className="verdict">{t('plannedPurchaseQuickUnsupported')}</p>}
+          {goal?.status === 'unsupported' && <p className="verdict">{quickEstimateMessage}</p>}
           {goal?.status === 'supported' && (
             <p className="verdict">
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge
