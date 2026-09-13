@@ -130,10 +130,11 @@ describe('compareStrategies / scanBenefitTiming', () => {
 
   it('best timing is at least as good as the current timing', () => {
     const { best, current } = scanBenefitTiming(base)
+    expect(best).not.toBeNull()
     if (current.result.success) {
-      expect(best.result.estateValue).toBeGreaterThanOrEqual(current.result.estateValue)
+      expect(best!.result.estateValue).toBeGreaterThanOrEqual(current.result.estateValue)
     } else {
-      expect(best.result.success || (best.result.depletedAge ?? 0) >= (current.result.depletedAge ?? 0)).toBe(true)
+      expect(best!.result.success).toBe(true)
     }
   })
 })

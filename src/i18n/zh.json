@@ -664,5 +664,11 @@
       "cpp_self": { "question": "你预计CPP/QPP领多少，准备几岁开始？" }, "oas_self": { "question": "你预计OAS领多少，准备几岁开始？" }, "cpp_partner": { "question": "伴侣预计CPP/QPP领多少？" }, "oas_partner": { "question": "伴侣预计OAS领多少？" }, "pension_partner": { "question": "伴侣的单位养老金属于哪一种？" }, "pension_partner_details": { "question": "伴侣终身养老金每年多少，何时开始？" }, "pension_partner_indexing": { "question": "伴侣的养老金会随物价上涨吗，另有过渡金吗？" },
       "intent_legacy": { "question": "保障退休生活后，你想为他人或公益预留什么吗？" }, "intent_spending": { "question": "如果计划还有余力，你想探索提高支出，还是维持预算？" }, "invest_mix": { "question": "哪种大类投资配置最接近你的计划？" }, "invest_fees": { "question": "采用多少投资费用和通胀假设？" }, "invest_tax": { "question": "非注册投资每年产生多少应税收入？按什么税率估算？" }, "invest_strategy": { "question": "退休支出应按什么顺序从账户提款？" }
     }
-  }
+  },
+  "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",
+  "unrankedObjective": "至少有一个候选能支付计划支出，但当前快算结果无法按此目标排序，因此没有可应用的推荐。",
+  "smallestCandidateGap": "最小年度缺口：{{amount}}（CPP/QPP {{cpp}} 岁、OAS {{oas}} 岁）；该方案仍失败。",
+  "manualFailureExploration": "当前手动选择的顺序仅用于探索失败情景，并非推荐。",
+  "manualFailureGap": "最大年度缺口：{{amount}}。",
+  "candidateGap": "最大年度缺口：{{amount}}。"
 }

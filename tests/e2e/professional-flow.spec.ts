@@ -74,8 +74,10 @@ test('timing comparison preserves unsupported spending-solver status for a funde
   await expect(page.locator('.results-column')).toBeVisible()
   const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
   await timing.locator('summary').click()
-  await expect(timing).toContainText("outside the quick solver's supported assumptions")
-  await expect(timing).not.toContainText('No feasible answer exists')
+  await expect(timing).toContainText('A future home purchase is not supported')
+  await expect(timing.locator('.combo')).toContainText('funds the planned spending')
+  await expect(timing.locator('.combo')).toContainText('A future home purchase is not supported')
+  await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })
 
 test('French solver boundaries use the actual checked age and native messages', async ({ page }) => {
@@ -98,6 +100,6 @@ test('timing comparison keeps search-limit status in rows and combined result', 
   const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
   await timing.locator('summary').click()
   await expect(timing.locator('tbody tr').first()).toContainText('search limit was reached')
-  await expect(timing.locator('.combo')).toContainText('search limit was reached')
-  await expect(timing).not.toContainText('No feasible answer exists')
+  await expect(timing.locator('.combo')).toContainText('funds the planned spending')
+  await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })

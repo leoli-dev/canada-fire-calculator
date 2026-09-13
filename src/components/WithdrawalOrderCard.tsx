@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next'
 import {
   MELTDOWN_CAPS,
   STRATEGIES,
+  rankCandidates,
+  runProjection,
   type Inputs,
   type MeltdownCap,
   type Strategy,
@@ -14,6 +16,7 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
   const { t } = useTranslation()
   const set = useStore((s) => s.set)
   const { inputs } = props
+  const selected = rankCandidates([{ value: inputs.strategy, inputs, result: runProjection(inputs) }], 'estate').candidates[0]
 
   return (
     <div className="chart-card withdrawal-order-card">
@@ -31,6 +34,8 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
           ))}
         </select>
       </label>
+      {selected.status !== 'feasible' && <p className="hint">{t('manualFailureExploration')}{' '}
+        {selected.gap !== null && t('manualFailureGap', { amount: new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(selected.gap) })}</p>}
       {inputs.strategy === 'meltdownPaced' && (
         <>
           <p className="hint"><Jargon text={t('meltdownNote')} /></p>

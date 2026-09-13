@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { compareStrategies, type Inputs } from '../engine'
+import { compareStrategies, rankCandidates, type Inputs } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
@@ -11,17 +11,14 @@ export function StrategyCard(props: { inputs: Inputs }) {
   const cad = useCad()
   const set = useStore((s) => s.set)
   const dwz = (props.inputs.goal ?? 'legacy') === 'dieWithZero'
-  const rows = useMemo(
-    () => compareStrategies(props.inputs, { maxSpending: dwz }),
+  const { rows, ranking } = useMemo(
+    () => {
+      const rows = compareStrategies(props.inputs, { maxSpending: dwz })
+      return { rows, ranking: rankCandidates(rows.map((row) => ({
+        value: row.strategy, inputs: { ...props.inputs, strategy: row.strategy }, result: row.result, solver: row.maxSpending,
+      })), dwz ? 'maxSpending' : 'estate') }
+    },
     [props.inputs, dwz],
-  )
-
-  const score = (r: (typeof rows)[number]) =>
-    dwz ? r.maxSpending?.status === 'solved' ? r.maxSpending.value : null
-      : r.result.success && Number.isFinite(r.result.estateValue) ? r.result.estateValue : null
-  const bestScore = Math.max(
-    ...rows.map(score).filter((value): value is number => value !== null),
-    -Infinity,
   )
 
   return (
@@ -42,7 +39,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
         </thead>
         <tbody>
           {rows.map((r) => {
-            const isBest = score(r) !== null && score(r) === bestScore
+            const assessed = ranking.candidates.find((candidate) => candidate.value === r.strategy)!
+            const isBest = assessed.status === 'feasible' && assessed.metric === ranking.best?.metric
             const isCurrent = r.strategy === props.inputs.strategy
             return (
               <tr key={r.strategy} className={isCurrent ? 'current-row' : ''}>
@@ -52,19 +50,19 @@ export function StrategyCard(props: { inputs: Inputs }) {
                   {isBest && <span className="tag best">{t('best')}</span>}
                 </td>
                 <td>
-                  {r.result.success
+                  {assessed.status === 'feasible'
                     ? t('stratOk')
-                    : t('stratDepleted', { age: r.result.depletedAge })}
+                    : <>{assessed.status === 'infeasible' ? t('stratDepleted', { age: r.result.depletedAge })
+                      : t(`solver_${assessed.status}`)}{' '}
+                      {assessed.gap !== null && t('candidateGap', { amount: cad(assessed.gap) })}</>}
                 </td>
                 <td className="num">{cad(r.totalTax)}</td>
                 <td className="num">{cad(r.result.rrspTax)}</td>
                 <td className="num">
-                  {dwz ? r.maxSpending?.status === 'solved' && r.maxSpending.value !== null
-                    ? cad(r.maxSpending.value) : t(`solver_${r.maxSpending?.status ?? 'unsupported'}`)
-                    : Number.isFinite(r.result.estateValue) ? cad(r.result.estateValue) : '—'}
+                  {assessed.metric !== null ? cad(assessed.metric) : '—'}
                 </td>
                 <td className="num">
-                  {!isCurrent && (
+                  {!isCurrent && assessed.status === 'feasible' && (
                     <button
                       type="button"
                       className="use-strategy"
@@ -83,6 +81,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
         </tbody>
       </table>
       </div>
+      {ranking.status === 'noFeasibleCandidate' && <p className="hint">{t('noFeasibleCandidate')}</p>}
+      {ranking.status === 'unrankedObjective' && <p className="hint">{t('unrankedObjective')}</p>}
       <p className="hint"><Jargon text={dwz ? t('strategyNoteDwz') : t('strategyNote')} /></p>
     </details>
   )

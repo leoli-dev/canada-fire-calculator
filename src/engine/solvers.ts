@@ -307,6 +307,56 @@ export interface StrategyResult {
   maxSpending?: SolverResult<number>
 }
 
+export type CandidateStatus = 'feasible' | 'infeasible' | 'invalid' | 'unsupported' | 'searchLimit'
+export type CandidateRankingStatus = 'ranked' | 'noFeasibleCandidate' | 'unrankedObjective'
+export interface RankedCandidate<T> {
+  value: T
+  inputs: Inputs
+  result: ProjectionResult | null
+  solver?: SolverResult<number>
+  status: CandidateStatus
+  metric: number | null
+  /** Largest unpaid annual amount; useful for comparing failures, never a ranking score. */
+  gap: number | null
+  reason?: string
+}
+
+/** Assess obligations and support before an objective is allowed to rank a candidate. */
+export function rankCandidates<T>(
+  candidates: { value: T; inputs: Inputs; result?: ProjectionResult; solver?: SolverResult<number> }[],
+  objective: 'estate' | 'maxSpending',
+): { status: CandidateRankingStatus; best: RankedCandidate<T> | null; candidates: RankedCandidate<T>[] } {
+  const assessed = candidates.map((candidate): RankedCandidate<T> => {
+    const { value, inputs, solver } = candidate
+    const base = { value, inputs, result: null as ProjectionResult | null, solver, metric: null as number | null,
+      gap: null as number | null }
+    const invalid = invalidReason(inputs)
+    if (invalid) return { ...base, status: 'invalid', reason: invalid }
+    try {
+      const result = candidate.result ?? checkedProjection(inputs)
+      const gap = Math.max(0, ...result.rows.map((row) => row.shortfall),
+        ...result.unfundedObligations.map((item) => item.amount))
+      const common = { ...base, result, gap: Number.isFinite(gap) && gap > 0 ? gap : null }
+      if (result.unfundedObligations.length > 0)
+        return { ...common, status: 'unsupported', reason: 'unfundedTransaction' }
+      if (!result.success) return { ...common, status: 'infeasible' }
+      if (objective === 'maxSpending' && solver?.status !== 'solved')
+        return { ...common, status: solver?.status ?? 'unsupported', reason: solver?.reason }
+      const metric = objective === 'maxSpending' ? solver!.value : result.estateValue
+      if (metric === null || !Number.isFinite(metric))
+        return { ...common, status: 'invalid', reason: 'nonFiniteResult' }
+      return { ...common, status: 'feasible', metric }
+    } catch {
+      return { ...base, status: 'invalid', reason: 'projectionError' }
+    }
+  })
+  // Stable tie: preserve the caller's candidate order.
+  const best = assessed.reduce<RankedCandidate<T> | null>((winner, row) =>
+    row.status === 'feasible' && (!winner || row.metric! > winner.metric!) ? row : winner, null)
+  const funded = assessed.some((row) => row.result?.success && row.result.unfundedObligations.length === 0)
+  return { status: best ? 'ranked' : funded ? 'unrankedObjective' : 'noFeasibleCandidate', best, candidates: assessed }
+}
+
 /**
  * Die with Zero: the highest stable real annual spending the plan sustains
  * to life expectancy. Real dollars — constant spending already keeps pace
@@ -535,31 +585,37 @@ export interface TimingResult {
   result: ProjectionResult
 }
 
-const better = (a: ProjectionResult, b: ProjectionResult) =>
-  a.success !== b.success
-    ? a.success
-    : a.success
-      ? a.estateValue > b.estateValue
-      : (a.depletedAge ?? 0) > (b.depletedAge ?? 0)
-
 /** Scan the primary person's CPP and OAS start ages for the best outcome. */
-export function scanBenefitTiming(inputs: Inputs): { best: TimingResult; current: TimingResult } {
-  let best: TimingResult | null = null
+export function scanBenefitTiming(inputs: Inputs): {
+  status: CandidateRankingStatus
+  best: TimingResult | null
+  current: TimingResult
+  candidates: RankedCandidate<{ cppStartAge: number; oasStartAge: number }>[]
+} {
   const cppCap = inputs.province === 'QC' ? 72 : 70 // QPP defers to 72
+  const objective = (inputs.goal ?? 'legacy') === 'dieWithZero' ? 'maxSpending' : 'estate'
+  const candidates: { value: { cppStartAge: number; oasStartAge: number }; inputs: Inputs; result: ProjectionResult; solver?: SolverResult<number> }[] = []
   for (let cppAge = 60; cppAge <= cppCap; cppAge++) {
     for (const oasAge of [65, 66, 67, 68, 69, 70]) {
-      const result = runProjection({ ...inputs, cppStartAge: cppAge, oasStartAge: oasAge })
-      if (!best || better(result, best.result)) {
-        best = { cppStartAge: cppAge, oasStartAge: oasAge, result }
-      }
+      const variant = { ...inputs, cppStartAge: cppAge, oasStartAge: oasAge }
+      const result = runProjection(variant)
+      candidates.push({ value: { cppStartAge: cppAge, oasStartAge: oasAge }, inputs: variant, result,
+        solver: objective === 'maxSpending' && result.success && result.unfundedObligations.length === 0
+          ? maxSustainableSpending(variant) : undefined })
     }
   }
+  const current = { cppStartAge: inputs.cppStartAge, oasStartAge: inputs.oasStartAge, result: runProjection(inputs) }
+  const currentIndex = candidates.findIndex((candidate) => candidate.value.cppStartAge === current.cppStartAge && candidate.value.oasStartAge === current.oasStartAge)
+  if (currentIndex >= 0) candidates.unshift(candidates.splice(currentIndex, 1)[0])
+  else
+    candidates.push({ value: { cppStartAge: current.cppStartAge, oasStartAge: current.oasStartAge }, inputs,
+      result: current.result, solver: objective === 'maxSpending' && current.result.success
+        ? maxSustainableSpending(inputs) : undefined })
+  const ranked = rankCandidates(candidates, objective)
   return {
-    best: best!,
-    current: {
-      cppStartAge: inputs.cppStartAge,
-      oasStartAge: inputs.oasStartAge,
-      result: runProjection(inputs),
-    },
+    status: ranked.status,
+    best: ranked.best?.result ? { ...ranked.best.value, result: ranked.best.result } : null,
+    current,
+    candidates: ranked.candidates,
   }
 }

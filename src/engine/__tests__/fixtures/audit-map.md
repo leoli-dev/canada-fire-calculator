@@ -20,7 +20,7 @@ This is the A slice only. `households.json` is executable now; `pending-audit.js
 | P14 | Owner 80/20 ordinary RRSP is taxed by owner, not 50/50; BE-10/11 | Mapped pending |
 | P15 | 2026 Q3 GIS + Allowance category-specific published monthly amounts; BE-26 | Mapped pending |
 | P16 | QC 2026 senior credit uses household net-income test; BE-35 | Mapped pending |
-| P17 | 70/70 has a 10k shortfall at age 62 and cannot rank as feasible; independent full-life candidate feasibility schedule still needed in BE-34 | Negative-path pending fixture; positive path unverified |
+| P17 | 70/70 has a 10k shortfall at age 62 and cannot rank as feasible; independent full-life candidate feasibility schedule still needed in BE-34 | Negative path and early bridge active in candidate-ranking.test.ts; full-life independent positive schedule pending BE-34 B |
 | P18 | FIRE number includes planned 100k cash purchase; BE-14 | Mapped pending |
 
 | Household tax test | Fixture/contract to activate | Status here |
