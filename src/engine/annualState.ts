@@ -221,15 +221,25 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
   if (Math.abs(totalContributions - cash - employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
+  // Every provider evaluates the same settled, pre-growth portfolio. Neither
+  // account order nor a provider mutating its own context may affect peers.
   for (const [id, account] of Object.entries(state.byAccount)) {
-    let rate: number
-    try { rate = providers.returns(view(), id) } catch { return fail('invalid', `return provider failed: ${id}`) }
-    if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
-    const beforeGrowth = account.balance + accountRows[id].contribution
-    accountRows[id].returnAmount = beforeGrowth * rate
-    account.balance = beforeGrowth + accountRows[id].returnAmount
-    accountRows[id].closing = account.balance
+    account.balance += accountRows[id].contribution
     if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
+  }
+  const settled = clone(state)
+  if (Object.values(settled.byAccount).some(account => !finiteNonnegative(account.balance))) return fail('invalid', 'pre-growth account balance')
+  const rates: Record<string, number> = {}
+  for (const id of Object.keys(settled.byAccount)) {
+    let rate: number
+    try { rate = providers.returns({ plan: clone(plan), state: clone(settled) }, id) } catch { return fail('invalid', `return provider failed: ${id}`) }
+    if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
+    rates[id] = rate
+  }
+  for (const [id, account] of Object.entries(state.byAccount)) {
+    accountRows[id].returnAmount = account.balance * rates[id]
+    account.balance += accountRows[id].returnAmount
+    accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
   for (const property of plan.properties) if (state.byProperty[property.id].held) {

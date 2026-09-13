@@ -317,4 +317,41 @@ describe('BE-14 A nominal annual state kernel', () => {
     forgedRoom.byAccount[fhsa.id].room = { status: 'known', value: 999999 }
     expect(annualStep(canonical, forgedRoom, providers(110)).status).toBe('invalid')
   })
+
+  it('samples every account return from one settled snapshot regardless of split, order, or provider mutation', () => {
+    const make = (tfsa: number, rrsp: number) => plan({ ...input(), debts: [], annualSavings: 0,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 }, balances: { tfsa, rrsp, nonReg: 0 },
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 } })
+    const evaluate: AnnualProviders['evaluate'] = ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
+      income: 0, earnedIncome: 0, benefits: 0, tax: 0, spending: 0, taxableIncome: 0,
+      benefitIncomeForNextYear: { status: 'unknown' as const, reason: 'not supplied' },
+    }])) })
+    const run = (canonical: InputsV2) => {
+      const opening = ok(initializeState(canonical))
+      const seenTotals: number[] = []
+      const returns: AnnualProviders['returns'] = context => {
+        const total = sumInvestableAssets(context.state)
+        seenTotals.push(total)
+        for (const account of Object.values(context.state.byAccount)) account.balance = 999999
+        return total <= 205 ? .1 : .2
+      }
+      const result = ok(annualStep(canonical, opening, { evaluate, returns }))
+      expect(seenTotals).toEqual([200, 200, 200])
+      expect(sumInvestableAssets(opening)).toBe(200)
+      return result
+    }
+    expect(sumInvestableAssets(run(make(200, 0)).state)).toBeCloseTo(220, 8)
+    const split = run(make(100, 100))
+    expect(sumInvestableAssets(split.state)).toBeCloseTo(220, 8)
+    expect(Object.values(split.row.byAccount).map(row => row.returnAmount).sort((a, b) => a - b)).toEqual([0, 10, 10])
+    const ordered = make(50, 150)
+    const reversed = structuredClone(ordered)
+    reversed.accounts.reverse()
+    expect(sumInvestableAssets(run(ordered).state)).toBeCloseTo(220, 8)
+    expect(sumInvestableAssets(run(reversed).state)).toBeCloseTo(220, 8)
+    const invalid = make(100, 100)
+    const opening = ok(initializeState(invalid))
+    expect(annualStep(invalid, opening, { evaluate, returns: (_context, id) => id === invalid.accounts[1].id ? Number.NaN : .1 }).status).toBe('invalid')
+    expect(sumInvestableAssets(opening)).toBe(200)
+  })
 })
