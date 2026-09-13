@@ -61,16 +61,19 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     () => (mode === 'target' && target > 0 ? targetReport(inputs, target) : null),
     [mode, inputs, target],
   )
+  const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' || result.unfundedObligations.length > 0
+  const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
+    ? t('plannedPurchaseQuickUnsupported') : t('fundingQuickUnsupported')
 
   const ok =
     mode === 'last'
       ? result.success
       : mode === 'when'
         ? earliest !== null
-        : mode === 'target'
-          ? goal !== null && goal.reachedAge !== null && goal.reachedAge <= inputs.fireAge
+      : mode === 'target'
+          ? goal !== null && goal.status === 'supported' && goal.reachedAge !== null && goal.reachedAge <= inputs.fireAge
           : mode === 'number'
-            ? projectedAtFire !== null && fireNumber !== null && projectedAtFire >= fireNumber
+            ? !quickEstimateUnsupported && projectedAtFire !== null && fireNumber !== null && projectedAtFire >= fireNumber
             : true
 
   return (
@@ -99,12 +102,22 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
               ? t('success', { age: inputs.lifeExpectancy })
               : t('depleted', { age: result.depletedAge })}
           </p>
+          {result.unfundedObligations.length > 0 && <ul className="funding-gaps">
+            {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
+              {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
+                : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
+                : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
+                : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
+                  : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
+              { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
+            </li>)}
+          </ul>}
           <p>
             {t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong>
             {' · '}
             {t('estateValue')}: <strong>{cad(result.estateValue)}</strong>
           </p>
-          {dwzSpending !== null && (
+          {dwzSpending !== null && Number.isFinite(dwzSpending) && (
             <>
               <p>
                 {t('dwzSpending')}: <strong>{cad(dwzSpending)}</strong>
@@ -144,6 +157,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
 
       {mode === 'number' && (
         <>
+          {quickEstimateUnsupported ? <p className="verdict">{quickEstimateMessage}</p> : <>
           <p className="verdict">
             {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber ?? 0) })}
           </p>
@@ -162,6 +176,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
           <p className="hint">
             <Jargon text={t('numberExplain', { age: inputs.fireAge, life: inputs.lifeExpectancy })} />
           </p>
+          </>}
         </>
       )}
 
@@ -181,7 +196,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             />
           </label>
           {!goal && <p className="hint">{t('targetUnset')}</p>}
-          {goal && (
+          {goal?.status === 'unsupported' && <p className="verdict">{quickEstimateMessage}</p>}
+          {goal?.status === 'supported' && (
             <p className="verdict">
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge
                 ? t('targetReachedEarly', {

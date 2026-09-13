@@ -1,5 +1,7 @@
 import type { Inputs, Mortgage } from './types'
 import { CPP_MAX_AT_65, OAS_FULL_AT_65 } from './benefits'
+import { runProjection } from './projection'
+import type { FundingGap } from './funding'
 
 export type Severity = 'error' | 'warning'
 
@@ -10,6 +12,8 @@ export interface ValidationIssue {
   /** i18n message key (val*) */
   key: string
   params?: Record<string, string | number>
+  eventId?: string
+  amount?: number
 }
 
 const AGE_MIN = 18
@@ -154,13 +158,6 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     const mortgageYears = pr.mortgageYears ?? 0
     if (principal > 0 && payment > 0 && payment * mortgageYears < principal)
       err('principalResidence.annualMortgagePayment', 'valDebtUnpayable')
-    // rough heuristic: today's liquid assets vs. the down payment — a real
-    // check would need to project growth to the purchase year, but this
-    // flags the common case (not enough saved up at all) cheaply
-    const liquidAssets =
-      inputs.balances.tfsa + inputs.balances.rrsp + inputs.balances.nonReg + (inputs.fhsa?.balance ?? 0)
-    if (pr.downPayment > liquidAssets)
-      warn('principalResidence.downPayment', 'valDownPaymentExceedsAssets')
     if (Math.abs(pr.netHoldingCostChange) > 50000)
       warn('principalResidence.netHoldingCostChange', 'valHoldingCostImplausible')
   } else if (pr) {
@@ -179,8 +176,6 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     const fhsaLimit = 8000 * persons
     if (fhsa.annualContribution > fhsaLimit)
       warn('fhsa.annualContribution', 'valFhsaContribHigh', { max: fhsaLimit })
-    if (fhsa.annualContribution > 0 && inputs.annualSavings < fhsa.annualContribution)
-      err('fhsa.annualContribution', 'valFhsaExceedsSavings')
   }
 
   const children = inputs.children
@@ -204,6 +199,30 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
       warn(at('sellAtAge'), 'valSellBeforeFire')
     checkMortgage(ip.mortgage, at('mortgage'))
   })
+
+  // Use the same event ledger as projection. Current assets alone are not a
+  // valid proxy for purchase-year funds: growth and earlier contributions matter.
+  if ((pr?.mode === 'planned' || inputs.lockedRetirement || inputs.fhsa) &&
+      inputs.lifeExpectancy >= inputs.currentAge && inputs.lifeExpectancy <= AGE_MAX &&
+      inputs.fireAge >= inputs.currentAge &&
+      Object.values(inputs.balances).every(Number.isFinite)) {
+    const firstByField = new Map<string, FundingGap>()
+    for (const gap of runProjection(inputs).unfundedObligations) {
+      if (!firstByField.has(gap.field)) firstByField.set(gap.field, gap)
+    }
+    for (const gap of firstByField.values()) {
+      issues.push({
+        field: gap.field, severity: 'error',
+        key: gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
+          : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
+          : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
+          : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
+            : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
+        params: { amount: Math.ceil(gap.amount), age: Number(gap.eventId.split(':')[1]) },
+        eventId: gap.eventId, amount: gap.amount,
+      })
+    }
+  }
 
   return issues
 }

@@ -27,6 +27,11 @@ export function findEarliestFireAge(inputs: Inputs): number | null {
  * succeed with no further savings.
  */
 export function requiredFireAssets(inputs: Inputs): number {
+  // This quick FIRE-year estimator does not replay a future purchase. A
+  // numeric answer would omit its cash outflow while keeping the rest of the
+  // plan, so expose unsupported instead of a fabricated threshold.
+  if (inputs.principalResidence?.mode === 'planned') return Number.NaN
+  if (runProjection(inputs).unfundedObligations.length > 0) return Number.NaN
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
   const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
@@ -50,12 +55,10 @@ export function requiredFireAssets(inputs: Inputs): number {
   // a principal residence sold BEFORE the FIRE age is already cash inside the
   // investable balances the user compares this number against — passing it
   // through would count the house twice (IP sales are clamped to FIRE, so
-  // they can't double up the same way). A planned future purchase isn't
-  // modelled by this quick estimator (it needs the funding/mortgage-origin
-  // logic in the full projection) — excluded here, a conservative omission.
+  // they can't double up the same way). Planned purchases returned
+  // unsupported above because this snapshot estimator cannot replay them.
   const pr =
     inputs.principalResidence &&
-    inputs.principalResidence.mode !== 'planned' &&
     (inputs.principalResidence.sellAtAge === null ||
       inputs.principalResidence.sellAtAge >= inputs.fireAge)
       ? inputs.principalResidence
@@ -113,6 +116,7 @@ export interface StrategyResult {
  */
 export function maxSustainableSpending(inputs: Inputs): number {
   const ok = (s: number) => runProjection({ ...inputs, retirementSpending: s }).success
+  if (!ok(0)) return Number.NaN
   let lo = 0
   let hi = 50000
   while (ok(hi) && hi < 50_000_000) {
@@ -148,6 +152,7 @@ export function compareStrategies(
 }
 
 export interface TargetReport {
+  status: 'supported' | 'unsupported'
   /** investable assets entering the FIRE year */
   assetsAtFire: number
   /** age at which the target is first reached if savings continue; null = never */
@@ -165,11 +170,13 @@ export interface TargetReport {
  * question (the other modes).
  */
 export function targetReport(inputs: Inputs, target: number): TargetReport {
+  if (inputs.principalResidence?.mode === 'planned')
+    return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+  if (runProjection(inputs).unfundedObligations.length > 0)
+    return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
   const bal = { ...inputs.balances }
-  // a planned future purchase isn't modelled by this quick estimator
-  const pr = inputs.principalResidence && inputs.principalResidence.mode !== 'planned'
-    ? inputs.principalResidence
-    : null
+  // Planned purchases returned unsupported above.
+  const pr = inputs.principalResidence
   let prValue = pr?.value ?? 0
   const horizon = 100 - inputs.currentAge + 1
   const inflation = inputs.inflation ?? 0.021
@@ -273,7 +280,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     if (reachedAge === null && total >= target) reachedAge = age
     if (age >= inputs.fireAge && reachedAge !== null) break
   }
-  return { assetsAtFire, reachedAge }
+  return { status: 'supported', assetsAtFire, reachedAge }
 }
 
 export interface TimingResult {

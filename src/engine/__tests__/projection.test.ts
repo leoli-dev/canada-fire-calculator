@@ -881,21 +881,25 @@ describe('planned home purchase', () => {
     )
   })
 
-  it('a down payment beyond FHSA+TFSA draws from non-registered/RRSP and is taxed pre-FIRE', () => {
-    const bigDownPayment = { ...planned, downPayment: 3000000 }
+  it('a funded down payment beyond TFSA/non-registered gross-ups RRSP for working-year tax', () => {
+    const bigDownPayment = { ...planned, price: 900000, downPayment: 500000 }
     const r = runProjection({ ...base, principalResidence: bigDownPayment })
+    expect(r.rows.find((x) => x.age === 40)!.unfundedObligations).toEqual([])
     const at39 = r.rows.find((x) => x.age === 39)!.balances.rrsp
     const at40 = r.rows.find((x) => x.age === 40)!.balances.rrsp
     expect(at40).toBeLessThan(at39)
   })
 
-  it('the down payment residual during retirement is funded and taxed via the normal solver', () => {
+  it('the retirement-year down payment is funded and taxed via the normal solver', () => {
+    const home = { ...planned, price: 900000, downPayment: 500000 }
     const r = runProjection({
       ...base,
       fireAge: 40,
-      principalResidence: { ...planned, downPayment: 3000000 },
+      balances: { ...base.balances, rrsp: 1000000 },
+      principalResidence: home,
     })
     const at40 = r.rows.find((x) => x.age === 40)!
+    expect(at40.propertyValue).toBeGreaterThan(0)
     expect(at40.tax).toBeGreaterThan(0)
   })
 
