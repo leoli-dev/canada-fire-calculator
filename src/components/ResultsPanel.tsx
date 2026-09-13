@@ -69,6 +69,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
     ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
       ? t('fundingQuickUnsupported') : earlySale ? t('saleQuickUnsupported')
         : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
+  const lockedWithdrawalUnverified = !!inputs.lockedRetirement && (
+    inputs.lockedRetirement.balance > 0 || inputs.lockedRetirement.employeeContribution > 0 ||
+    inputs.lockedRetirement.employerContribution > 0)
+  const lastResultUnverified = result.success && (lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
 
   const ok =
     mode === 'last'
@@ -83,7 +87,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
             : true
 
   return (
-    <div className={`summary ${mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
+    <div className={`summary ${mode === 'last' && lastResultUnverified ? 'uncertain' : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
       <div className="mode-tabs" role="tablist">
         {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
           <button
@@ -105,9 +109,11 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult }
         <>
           <p className="verdict">
             {result.success
-              ? t('success', { age: inputs.lifeExpectancy })
+              ? lastResultUnverified ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy })
+                : t('success', { age: inputs.lifeExpectancy })
               : t('depleted', { age: result.depletedAge })}
           </p>
+          {lockedWithdrawalUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
           {result.unfundedObligations.length > 0 && <ul className="funding-gaps">
             {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
               {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'

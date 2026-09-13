@@ -104,3 +104,17 @@ describe('shared candidate ranking', () => {
     expect(ranking.candidates.some((row) => row.result?.success && row.solver?.status === 'unsupported')).toBe(true)
   })
 })
+
+describe('known unsupported recommendation boundary', () => {
+  it('keeps a funded locked balance as an unranked model path', () => {
+    const plan: Inputs = { ...DEFAULT_INPUTS,
+      balances: { tfsa: 2_000_000, rrsp: 0, nonReg: 0 },
+      lockedRetirement: { balance: 500_000, employeeContribution: 0,
+        employerContribution: 0, accessibleAge: 55, jurisdiction: 'ON', owner: 'self' } }
+    expect(runProjection(plan).success).toBe(true)
+    const ranking = scanBenefitTiming(plan)
+    expect(ranking.status).toBe('unrankedObjective')
+    expect(ranking.best).toBeNull()
+    expect(ranking.candidates.some((row) => row.reason === 'lockedWithdrawalLimits')).toBe(true)
+  })
+})

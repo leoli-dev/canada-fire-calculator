@@ -82,7 +82,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
       </table>
       </div>
       {ranking.status === 'noFeasibleCandidate' && <p className="hint">{t('noFeasibleCandidate')}</p>}
-      {ranking.status === 'unrankedObjective' && <p className="hint">{t('unrankedObjective')}</p>}
+      {ranking.status === 'unrankedObjective' && <p className="hint">{ranking.candidates.some((row) => row.reason === 'lockedWithdrawalLimits')
+        ? t('lockedRecommendationUnranked') : t('unrankedObjective')}</p>}
       <p className="hint"><Jargon text={dwz ? t('strategyNoteDwz') : t('strategyNote')} /></p>
     </details>
   )

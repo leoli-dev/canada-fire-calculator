@@ -340,6 +340,14 @@ export function rankCandidates<T>(
       if (result.unfundedObligations.length > 0)
         return { ...common, status: 'unsupported', reason: 'unfundedTransaction' }
       if (!result.success) return { ...common, status: 'infeasible' }
+      // The projection releases locked DC/LIRA funds at an age boundary but
+      // does not check jurisdiction-specific LIF withdrawal ceilings. A
+      // funded modeled path is therefore not a verified recommendation.
+      if (inputs.lockedRetirement && (inputs.lockedRetirement.balance > 0 ||
+          inputs.lockedRetirement.employeeContribution > 0 || inputs.lockedRetirement.employerContribution > 0))
+        return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
+      if (result.terminalTaxStatus === 'unsupported')
+        return { ...common, status: 'unsupported', reason: 'terminalTax' }
       if (objective === 'maxSpending' && solver?.status !== 'solved')
         return { ...common, status: solver?.status ?? 'unsupported', reason: solver?.reason }
       const metric = objective === 'maxSpending' ? solver!.value : result.estateValue
