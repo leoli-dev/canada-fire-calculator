@@ -64,7 +64,10 @@ function Num(props: {
           } : undefined}
           onChange={(v) => {
             if (props.field) { editSharedField(props.field, v === null ? (draft ?? '') : String(v)); return }
-            if (v !== null) props.onChange(v)
+            // Until FE-14 B registers the remaining fields, retain their
+            // existing clear semantics (including optional values mapped by
+            // the caller), rather than silently keeping stale inputs.
+            props.onChange(v ?? 0)
           }}
         />
         {missingMortgage && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
