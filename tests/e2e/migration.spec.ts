@@ -223,6 +223,85 @@ test('professional FHSA and LIRA toggles delete nonzero canonical assets through
   expect(state.canonical.accounts.reduce((sum: number, a: { balance: number }) => sum + a.balance, 0)).toBe(690000)
 })
 
+test('professional Couple to Single to Couple remains readable after reload', async ({ page }) => {
+  await seedV10(page)
+  const household = page.locator('label.field').filter({ hasText: 'Household' }).locator('select')
+  await household.selectOption('single')
+  await household.selectOption('couple')
+  await page.reload()
+  await expect(page.locator('.input-form')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  const canonical = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
+  expect(canonical.people).toHaveLength(2)
+  expect(canonical.orphanedPeople ?? []).toEqual([])
+  expect(new Set(canonical.people.map((p: { id: string }) => p.id)).size).toBe(2)
+})
+
+test('professional TFSA mix preset synchronizes canonical and legacy projection after reload', async ({ page }) => {
+  await seedV10(page)
+  const mix = page.locator('details').filter({ hasText: 'Asset mix per account' })
+  await mix.locator('summary').click()
+  await mix.locator('label.field').filter({ hasText: 'TFSA' }).locator('select').selectOption('gic')
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(state.inputs.returns.tfsa).toBe(.008)
+  expect(state.canonical.accounts.find((a: { kind: string }) => a.kind === 'tfsa').realReturn).toBe(.008)
+  expect(state.canonical.legacyProjection.returns.tfsa).toBe(.008)
+})
+
+test('guided mix preset synchronizes every account and legacy projection after reload', async ({ page }) => {
+  await seedV10(page)
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/preferences/invest.mix')
+  await page.getByRole('radio', { name: /GIC/ }).check()
+  await page.reload()
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  for (const kind of ['tfsa', 'rrsp', 'nonReg']) {
+    expect(state.inputs.returns[kind]).toBe(.008)
+    expect(state.canonical.accounts.find((a: { kind: string }) => a.kind === kind).realReturn).toBe(.008)
+    expect(state.canonical.legacyProjection.returns[kind]).toBe(.008)
+  }
+})
+
+test('invalid v10 rental sale age stays read-only on first load, before any v11 write', async ({ page }) => {
+  await seedV10(page)
+  const original = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.inputs.investmentProperties = [{ value: 900000, acb: 600000, appreciation: .03, sellAtAge: 'bad', mortgage: { balance: 300000, annualPayment: 22000, yearsRemaining: 18 } }]
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    const bytes = JSON.stringify(stored)
+    localStorage.setItem('fire-inputs', bytes)
+    return bytes
+  })
+  await page.reload()
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download original saved plan' }).click()
+  expect(readFileSync((await (await downloadPromise).path())!, 'utf8')).toBe(original)
+})
+
+test('invalid v10 Scenario A sale age also blocks backup and upgraded commit', async ({ page }) => {
+  await seedV10(page)
+  const original = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
+    stored.version = 10
+    stored.state.scenarioA.investmentProperties = [{ value: 900000, acb: 600000, appreciation: .03, sellAtAge: 'bad', mortgage: { balance: 300000, annualPayment: 22000, yearsRemaining: 18 } }]
+    delete stored.state.canonical
+    delete stored.state.scenarioACanonical
+    localStorage.removeItem('fire-inputs:pre-v11-backup')
+    const bytes = JSON.stringify(stored)
+    localStorage.setItem('fire-inputs', bytes)
+    return bytes
+  })
+  await page.reload()
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
+  expect(await page.evaluate(() => localStorage.getItem('fire-inputs:pre-v11-backup'))).toBeNull()
+})
+
 test('backup write failure leaves v10 original bytes intact', async ({ page }) => {
   const original = await seedV10(page)
   await page.evaluate(original => {

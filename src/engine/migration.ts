@@ -135,8 +135,19 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       return { ...item, id }
     })
   }
+  const returningPartner = inputs.partner && previous?.orphanedPeople?.find(person => person.role === 'partner')
+  const restoredPartner = returningPartner && inputs.partner ? {
+    ...inputs.partner,
+    currentAge: returningPartner.ageInBaseYear,
+    cppAnnualAt65: returningPartner.cppAnnualAt65,
+    oasAnnualAt65: returningPartner.oasAnnualAt65,
+    pension: returningPartner.pension,
+    cppStartAge: previous?.incomeSources.find(source => source.id === `${returningPartner.id}:cpp`)?.startAge ?? inputs.partner.cppStartAge,
+    oasStartAge: previous?.incomeSources.find(source => source.id === `${returningPartner.id}:oas`)?.startAge ?? inputs.partner.oasStartAge,
+  } : inputs.partner
   const normalized: Inputs = previous ? {
     ...inputs,
+    partner: restoredPartner,
     investmentProperties: attachIds(inputs.investmentProperties ?? [], previous.legacyProjection.investmentProperties ?? [], 'property:investment'),
     debts: attachIds(inputs.debts ?? [], previous.legacyProjection.debts ?? [], 'debt:other'),
   } : inputs
@@ -173,7 +184,7 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       ? old.taxableOwnerShares : unknown('owner reference requires confirmation') }
   })
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
-  next.orphanedPeople = prior.orphanedPeople
+  next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   const nextIncomeIds = new Set(next.incomeSources.map(income => income.id))
   next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
   next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }

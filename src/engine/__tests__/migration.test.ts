@@ -120,6 +120,16 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     expect(edited.orphanedPeople?.[0].pension).toEqual(input.partner?.pension)
     expect(edited.incomeSources.find(source => source.id === `${plan.people[1].id}:cpp`)?.recipientId).toBeNull()
   })
+  it('reconciles a returning partner without duplicate live/orphan IDs', () => {
+    const input = fixture(true)
+    const original = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const single = refreshCanonicalFromLegacy(original, { ...original.legacyProjection, partner: null })
+    const reunited = refreshCanonicalFromLegacy(single, { ...single.legacyProjection, partner: input.partner })
+    expect(reunited.people.map(person => person.id)).toEqual(original.people.map(person => person.id))
+    expect(reunited.orphanedPeople ?? []).toEqual([])
+    expect(() => assertCanonicalPlan(reunited)).not.toThrow()
+    expect(reunited.people[1].pension).toEqual(input.partner?.pension)
+  })
   it('drops explicit FHSA and LIRA removals from both canonical and legacy inputs', () => {
     const input = fixture()
     const plan = migratePersistedPlan({ inputs: input }, 10, 2026)

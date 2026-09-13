@@ -197,9 +197,11 @@ const planStorage: PersistStorage<Store> = {
       if (!parsed || typeof parsed !== 'object' || !('state' in parsed) || typeof parsed.version !== 'number') throw new Error('Invalid persisted envelope')
       if (parsed.version > 11) { storageReadOnlyReason = 'futureVersion'; return null }
       const prior = parsed.state as Store
-      migratePersistedPlan({ inputs: prior.inputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+      const migratedCurrent = migratePersistedPlan({ inputs: prior.inputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+      assertCanonicalPlan(migratedCurrent)
       if (prior.scenarioA !== null && prior.scenarioA !== undefined) {
-        migratePersistedPlan({ inputs: prior.scenarioA }, Math.min(parsed.version, 10), new Date().getFullYear())
+        const migratedScenarioA = migratePersistedPlan({ inputs: prior.scenarioA }, Math.min(parsed.version, 10), new Date().getFullYear())
+        assertCanonicalPlan(migratedScenarioA)
       }
       if (parsed.version === 11) {
         if (prior.canonical !== null) assertCanonicalPlan(prior.canonical)
@@ -222,6 +224,16 @@ const planStorage: PersistStorage<Store> = {
     catch { storageReadOnlyReason = 'migrationFailed' }
   },
   removeItem(name) { if (!storageReadOnlyReason) localStorage.removeItem(name) },
+}
+
+function reconcileLegacyInputs(state: Store, inputs: Inputs) {
+  const canonical = refreshCanonicalFromLegacy(state.canonical, inputs)
+  return {
+    inputs: canonical.legacyProjection,
+    canonical,
+    inputRevision: state.inputRevision + 1,
+    resultRevision: null,
+  }
 }
 
 export const useStore = create<Store>()(
@@ -263,12 +275,8 @@ export const useStore = create<Store>()(
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
           const inputs = { ...s.inputs, ...patch }
-          const canonical = refreshCanonicalFromLegacy(s.canonical, inputs)
           return {
-            inputs: canonical.legacyProjection,
-            canonical,
-            inputRevision: s.inputRevision + 1,
-            resultRevision: null,
+            ...reconcileLegacyInputs(s, inputs),
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
               ? { ...s.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
               : s.answerMeta,
@@ -323,18 +331,17 @@ export const useStore = create<Store>()(
         set((s) => {
           const mix = MIX_PRESETS[preset]
           if (!mix) return { mixPresets: { ...s.mixPresets, [account]: preset } }
+          const inputs = {
+            ...s.inputs,
+            returns: { ...s.inputs.returns, [account]: blendedReturn(mix) },
+            volatilities: {
+              ...(s.inputs.volatilities ?? DEFAULT_INPUTS.volatilities!),
+              [account]: blendedVolatility(mix),
+            },
+          }
           return {
             mixPresets: { ...s.mixPresets, [account]: preset },
-            inputs: {
-              ...s.inputs,
-              returns: { ...s.inputs.returns, [account]: blendedReturn(mix) },
-              volatilities: {
-                ...(s.inputs.volatilities ?? DEFAULT_INPUTS.volatilities!),
-                [account]: blendedVolatility(mix),
-              },
-            },
-            inputRevision: s.inputRevision + 1,
-            resultRevision: null,
+            ...reconcileLegacyInputs(s, inputs),
           }
         })
       },
