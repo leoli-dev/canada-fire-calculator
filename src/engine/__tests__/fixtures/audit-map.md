@@ -20,7 +20,7 @@ This is the A slice only. `households.json` is executable now; `pending-audit.js
 | P14 | Owner 80/20 ordinary RRSP is taxed by owner, not 50/50; BE-10/11 | Mapped pending |
 | P15 | 2026 Q3 GIS + Allowance category-specific published monthly amounts; BE-26 | Mapped pending |
 | P16 | QC 2026 senior credit uses household net-income test; BE-35 | Mapped pending |
-| P17 | A failed 70/70 timing path cannot outrank feasible 61/65; BE-34 | Correct pending fixture |
+| P17 | 70/70 has a 10k shortfall at age 62 and cannot rank as feasible; independent full-life candidate feasibility schedule still needed in BE-34 | Negative-path pending fixture; positive path unverified |
 | P18 | FIRE number includes planned 100k cash purchase; BE-14 | Mapped pending |
 
 | Household tax test | Fixture/contract to activate | Status here |
@@ -41,7 +41,7 @@ This is the A slice only. `households.json` is executable now; `pending-audit.js
 | T14 | Seed, zero volatility, account split, side assets | Mapped pending BE-14; simple zero-volatility executable |
 | T15 | Shared snapshot for target and FIRE asset solvers | Mapped pending BE-14; simple boundary executable |
 | T16 | No improvement/unknown room/unknown ownership suppresses definitive advice | Mapped pending BE-37/15 |
-| T17 | Exchange all self/partner references: household aggregate stable | Mapped pending BE-10/11; zero-benefit case executable |
+| T17 | Exchange all self/partner references: household aggregate stable | Mapped pending BE-10/11; only same-age nonzero CPP source swap executable |
 | T18 | Thirteen jurisdictions, spouse-credit edges, official tax vectors | Mapped pending BE-11/35 |
 
 The bounded deterministic generator (0–3 accounts, age gap, part retirement, purchases/sales, fees and room boundaries) belongs after the corresponding annual state and room fields exist. A generator against today's shared-bucket schema would certify missing concepts as zeros. The independent small-search enumerator also activates with typed feasible candidates in BE-40/37.

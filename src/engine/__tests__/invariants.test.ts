@@ -25,6 +25,7 @@ describe('QA-30 A: money identities', () => {
 
   it('live no-tax accumulation and withdrawals satisfy sources = uses to one cent', () => {
     for (const fixture of households.households as MoneyFixture[]) {
+      expect(fixture.toleranceCad).toBeLessThanOrEqual(0.01)
       const projection = runProjection(fixture.inputs)
       let opening = Object.values(fixture.inputs.balances).reduce((sum, amount) => sum + amount, 0)
       for (const row of projection.rows) {

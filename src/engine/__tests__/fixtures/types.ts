@@ -2,6 +2,8 @@ import type { Inputs } from '../../types'
 
 export interface MoneyFixture {
   id: string
+  baselineRevision: string
+  provenanceRef: string
   inputVersion: string
   taxPeriod: string
   source: { kind: string; derivation: string }

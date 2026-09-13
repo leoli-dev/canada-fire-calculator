@@ -57,7 +57,9 @@
         "rowShortfall": [
           0
         ]
-      }
+      },
+      "baselineRevision": "718a6297d7a972de557525d7d5f3ed6337bcd877",
+      "provenanceRef": "QA-30-A/independent-hand-calculation/CASH-01-static-tfsa"
     },
     {
       "id": "CASH-02-two-working-years",
@@ -129,7 +131,9 @@
           0,
           0
         ]
-      }
+      },
+      "baselineRevision": "718a6297d7a972de557525d7d5f3ed6337bcd877",
+      "provenanceRef": "QA-30-A/independent-hand-calculation/CASH-02-two-working-years"
     },
     {
       "id": "CASH-03-two-retirement-spends",
@@ -194,7 +198,9 @@
           0,
           0
         ]
-      }
+      },
+      "baselineRevision": "718a6297d7a972de557525d7d5f3ed6337bcd877",
+      "provenanceRef": "QA-30-A/independent-hand-calculation/CASH-03-two-retirement-spends"
     }
   ]
 }
