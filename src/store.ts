@@ -195,7 +195,30 @@ function hydrateLegacyInputs(raw: unknown): Inputs {
   const strategy = input.strategy ?? (input.withdrawalOrder?.[0] === 'tfsa' ? 'tfsaFirst' : input.withdrawalOrder?.[0] === 'nonReg' ? 'nonRegFirst' : 'meltdownPaced')
   const investmentProperties = input.investmentProperties ?? (input.investmentProperty ? [{ ...input.investmentProperty }] : [])
   const { withdrawalOrder: _wo, investmentProperty: _ip, ...rest } = input
-  return { ...DEFAULT_INPUTS, ...rest, strategy, investmentProperties }
+  // The legacy adapter needs a finite scalar, but an absent ACB is no fact.
+  // Use a neutral placeholder only behind the unknown draft/canonical gate;
+  // never inherit the example plan's $80,000 basis for a saved holding.
+  return { ...DEFAULT_INPUTS, ...rest, nonRegBook: legacyBasisMissing(raw) ? 0 : rest.nonRegBook as number,
+    strategy, investmentProperties }
+}
+function legacyBasisMissing(raw: unknown): boolean {
+  return !!raw && typeof raw === 'object' && !Object.prototype.hasOwnProperty.call(raw, 'nonRegBook')
+}
+function migrateLegacyStoredPlan(raw: unknown, version: number): InputsV2 {
+  const plan = migratePersistedPlan({ inputs: hydrateLegacyInputs(raw) }, version, new Date().getFullYear())
+  if (legacyBasisMissing(raw)) {
+    const account = plan.accounts.find(item => item.kind === 'nonReg')
+    if (account) {
+      account.acb = { status: 'unknown', reason: 'basis not supplied in saved plan' }
+      account.provenance.acb = { origin: 'unknown', sourceYear: null }
+    }
+  }
+  return plan
+}
+function migratedBasisMeta(raw: unknown, prior?: Record<string, AnswerMeta>): Record<string, AnswerMeta> {
+  const meta = { ...legacyAnswerMeta(), ...prior }
+  if (legacyBasisMissing(raw)) meta.nonRegBook = { status: 'unknown', origin: 'legacy', updatedAt: new Date().toISOString() }
+  return meta
 }
 let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
 export const getStorageReadOnlyReason = () => storageReadOnlyReason
@@ -220,12 +243,12 @@ const planStorage: PersistStorage<Store> = {
       const prior = parsed.state as Store
       const currentInputs = hydrateLegacyInputs(prior.inputs)
       assertLegacyInputs(currentInputs)
-      const migratedCurrent = migratePersistedPlan({ inputs: currentInputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+      const migratedCurrent = migrateLegacyStoredPlan(prior.inputs, Math.min(parsed.version, 10))
       assertCanonicalPlan(migratedCurrent)
       if (prior.scenarioA !== null && prior.scenarioA !== undefined) {
         const scenarioInputs = hydrateLegacyInputs(prior.scenarioA)
         assertLegacyInputs(scenarioInputs)
-        const migratedScenarioA = migratePersistedPlan({ inputs: scenarioInputs }, Math.min(parsed.version, 10), new Date().getFullYear())
+        const migratedScenarioA = migrateLegacyStoredPlan(prior.scenarioA, Math.min(parsed.version, 10))
         assertCanonicalPlan(migratedScenarioA)
       }
       if (parsed.version === 11) {
@@ -404,6 +427,8 @@ export const useStore = create<Store>()(
           inputs: structuredClone(s.scenarioA),
           canonical: structuredClone(s.scenarioACanonical ?? migratePersistedPlan({ inputs: s.scenarioA }, 10, new Date().getFullYear())),
           answerMeta: structuredClone(s.scenarioAAnswerMeta ?? legacyAnswerMeta()),
+          draftByField: s.scenarioAAnswerMeta?.nonRegBook?.status === 'unknown'
+            ? { nonRegBook: '' } : {} as Record<string, string>,
           inputRevision: s.inputRevision + 1,
           resultRevision: null,
         } : {}))
@@ -449,15 +474,15 @@ export const useStore = create<Store>()(
             'family.people', 'saving.amount', 'assets.identify', 'home.situation',
             'spending.total', 'benefits.self', 'intent.legacy',
           ]
-          const canonical = migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.inputs) }, version, new Date().getFullYear())
-          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.scenarioA) }, version, new Date().getFullYear()) : null
+          const canonical = migrateLegacyStoredPlan(previous.inputs, version)
+          const scenarioACanonical = previous.scenarioA ? migrateLegacyStoredPlan(previous.scenarioA, version) : null
           return {
             ...previous,
             inputs: canonical.legacyProjection,
             scenarioA: scenarioACanonical?.legacyProjection ?? null,
             canonical,
             scenarioACanonical,
-            draftByField: {},
+            draftByField: legacyBasisMissing(previous.inputs) ? { nonRegBook: '' } : {},
             entryMode: version < 7 ? 'professional' : previous.entryMode,
             activeStep: previous.activeStep ?? 1,
             visitedSteps: previous.visitedSteps ?? [1],
@@ -467,20 +492,22 @@ export const useStore = create<Store>()(
             planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
             inputRevision: 0,
             resultRevision: null,
-            answerMeta: legacyAnswerMeta(),
-            scenarioAAnswerMeta: previous.scenarioA ? legacyAnswerMeta() : null,
+            answerMeta: migratedBasisMeta(previous.inputs),
+            scenarioAAnswerMeta: previous.scenarioA ? migratedBasisMeta(previous.scenarioA) : null,
           } as Store
         }
         if (version === 10) {
-          const canonical = migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.inputs) }, version, new Date().getFullYear())
-          const scenarioACanonical = previous.scenarioA ? migratePersistedPlan({ inputs: hydrateLegacyInputs(previous.scenarioA) }, version, new Date().getFullYear()) : null
+          const canonical = migrateLegacyStoredPlan(previous.inputs, version)
+          const scenarioACanonical = previous.scenarioA ? migrateLegacyStoredPlan(previous.scenarioA, version) : null
           return {
           ...previous,
           inputs: canonical.legacyProjection,
           scenarioA: scenarioACanonical?.legacyProjection ?? null,
           canonical,
           scenarioACanonical,
-          draftByField: {},
+          draftByField: legacyBasisMissing(previous.inputs) ? { nonRegBook: '' } : {},
+          answerMeta: migratedBasisMeta(previous.inputs, previous.answerMeta),
+          scenarioAAnswerMeta: previous.scenarioA ? migratedBasisMeta(previous.scenarioA, previous.scenarioAAnswerMeta ?? undefined) : null,
           } as Store
         }
         return state as Store

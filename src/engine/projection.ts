@@ -307,6 +307,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   let finalYearPeople: TerminalTaxPerson[] = []
   const unfundedObligations: FundingGap[] = []
   let taxUnsupportedReason: string | undefined
+  let investmentSaleTaxUnsupported = false
   if (canonical && inputs.fireAge > inputs.currentAge && canonical.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
     taxUnsupportedReason = 'working RRIF minimum requires BE-14 B cash and tax settlement'
 
@@ -561,6 +562,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
       const p = ips[propertyIdx]
       if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
+        investmentSaleTaxUnsupported = true
         taxUnsupportedReason ??= 'investment-property sale requires verified building/land and CCA tax facts'
         if (p.saleExpenses > p.value)
           taxUnsupportedReason ??= 'projected selling expenses exceed property value'
@@ -1029,7 +1031,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     disposeHolding({ marketValue: toNominal(p.value, finalFactor), acb: p.acb }, toNominal(p.value, finalFactor)))
   const terminalBasisUnknown = canonical?.accounts.some(account => account.kind === 'nonReg' && account.balance > 0 && account.acb.status !== 'known') ?? false
   const terminalCapitalUnsupported = terminalNonReg?.status !== 'ok' && terminalNonReg !== null ||
-    terminalBasisUnknown || terminalProperties.some(item => item.status !== 'ok') || ips.some(p => p.value > 0)
+    terminalBasisUnknown || terminalProperties.some(item => item.status !== 'ok') ||
+    ips.some(p => p.value > 0) || investmentSaleTaxUnsupported
   const nonRegGain = terminalNonReg?.status === 'ok' ? toReal(terminalNonReg.value.gain, finalFactor)
     : bal.nonReg > 0 ? bal.nonReg - toReal(nonRegBook, finalFactor) : 0
   const ipGain = ips.reduce((sum, p) => sum + (p.value > 0 ? p.value - toReal(p.acb, finalFactor) : 0), 0)

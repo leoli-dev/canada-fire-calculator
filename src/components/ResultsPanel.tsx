@@ -23,14 +23,15 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
   const { inputs, result } = props
+  const canonical = useStore((s) => s.canonical)
 
   const earliest = useMemo(
     () => (mode === 'when' ? findEarliestFireAge(inputs) : null),
     [mode, inputs],
   )
   const fireNumber = useMemo(
-    () => (mode === 'number' ? requiredFireAssets(inputs) : null),
-    [mode, inputs],
+    () => (mode === 'number' ? requiredFireAssets(inputs, canonical) : null),
+    [mode, inputs, canonical],
   )
   const projectedAtFire = useMemo(
     () =>

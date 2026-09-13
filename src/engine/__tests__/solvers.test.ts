@@ -9,6 +9,7 @@ import {
 } from '../solvers'
 import { runMonteCarlo } from '../monteCarlo'
 import { runProjection } from '../projection'
+import { refreshCanonicalFromLegacy } from '../migration'
 import { blendedReturn, blendedVolatility } from '../assets'
 import type { Inputs } from '../types'
 
@@ -54,6 +55,20 @@ describe('findEarliestFireAge', () => {
 })
 
 describe('requiredFireAssets', () => {
+  it('withholds same-year non-registered quick answers for unknown or loss basis but keeps verified basis', () => {
+    const sameYear: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 60,
+      annualSavings: 0, retirementSpending: 500_000, inflation: 0,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 500_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      strategy: 'nonRegFirst' }
+    const canonical = refreshCanonicalFromLegacy(null, sameYear)
+    const account = canonical.accounts.find(a => a.kind === 'nonReg')!
+    account.acb = { status: 'unknown', reason: 'broker record unavailable' }
+    expect(requiredFireAssets(sameYear, canonical)).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+    expect(requiredFireAssets({ ...sameYear, nonRegBook: 700_000 })).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+    expect(requiredFireAssets(sameYear, refreshCanonicalFromLegacy(null, sameYear)).status).toBe('solved')
+  })
   it('withholds a FIRE number when a future non-registered basis cannot be reconstructed from the candidate', () => {
     const p06: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 60,
       annualSavings: 0, retirementSpending: 500_000, inflation: .02,

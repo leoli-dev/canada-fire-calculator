@@ -3,6 +3,7 @@ import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSa
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
+import type { InputsV2 } from './model'
 import {
   ACCOUNT_TYPES,
   STRATEGIES,
@@ -191,7 +192,7 @@ export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
  * optional locked DC/LIRA side account) for the plan to
  * succeed with no further savings.
  */
-function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
+function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -219,6 +220,16 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   if (inputs.fireAge > inputs.currentAge && (
     inputs.balances.nonReg > 0 || inputs.annualSavings > 0 && inputs.savingsSplit.nonReg > 0 ||
     (inputs.investmentProperties?.length ?? 0) > 0))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
+  // A same-year snapshot can reuse a verified basis, but the scalar legacy
+  // adapter is only a last-valid value. Unknown canonical ACB is not a tax
+  // fact, and an unrealized loss needs unmodeled eligibility/carry treatment.
+  const nonRegAccounts = canonical?.accounts.filter(account => account.kind === 'nonReg' && account.balance > 0) ?? []
+  if (inputs.balances.nonReg > 0 && (inputs.nonRegBook > inputs.balances.nonReg ||
+    nonRegAccounts.some(account => account.acb.status !== 'known') ||
+    nonRegAccounts.length > 1 ||
+    nonRegAccounts.length === 1 && (nonRegAccounts[0].balance !== inputs.balances.nonReg ||
+      nonRegAccounts[0].acb.status === 'known' && nonRegAccounts[0].acb.value !== inputs.nonRegBook)))
     return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   if (checkedProjection(inputs).unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, null, 0, null, 'unfundedTransaction')
@@ -308,8 +319,8 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   return outcome('solved', hi, assumptions, hi, iterations, upper.finalNetWorth)
 }
 
-export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
-  try { return requiredFireAssetsImpl(inputs) }
+export function requiredFireAssets(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return requiredFireAssetsImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings'], null, 0, null, 'projectionError') }
 }
 
