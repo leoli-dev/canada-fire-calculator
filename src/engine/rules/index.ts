@@ -43,6 +43,29 @@ export interface BenefitRulePack extends Provenance {
   assumedAnnualRate?: number
   basedOnRuleId?: string
 }
+/**
+ * BE-36: the two FHSA limits that a contribution-room ledger needs and cannot
+ * read off a statement. Both are statutory dollar amounts, not a tax table, so
+ * they get their own small pack rather than being hardcoded in the ledger.
+ */
+export interface FhsaRulePack extends Provenance {
+  id: string
+  /** The most that can be contributed or transferred in one participation year. */
+  annualLimit: number
+  /** The most that can be contributed or transferred in a lifetime. */
+  lifetimeLimit: number
+  /**
+   * The most unused participation room one year can carry into the next
+   * ("FHSA participation room carryforward" is the lesser of $8,000 and a
+   * contribution-adjusted figure). Without this bound a ledger would let idle
+   * years accumulate unlimited room.
+   */
+  participationRoomCarryForwardLimit: number
+  fieldSources: { annualLimit: string; lifetimeLimit: string; participationRoomCarryForwardLimit: string }
+  assumedFutureRule: boolean
+  assumedAnnualRate?: number
+  basedOnRuleId?: string
+}
 
 const FED_2025: TaxTable = {
   bpa: 16129, bpaMin: 14538,
@@ -128,6 +151,33 @@ const BENEFIT_PACKS: BenefitRulePack[] = [
   },
 ]
 
+const FHSA_PARTICIPATING = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/contributing-your-fhsa.html'
+const FHSA_DEFINITIONS = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/definitions.html'
+/**
+ * The FHSA annual and lifetime limits are fixed dollar amounts in the statute
+ * with no indexation, so this pack needs no tax year. It is one pack, not one
+ * per province: an FHSA is federal.
+ */
+const FHSA_PACKS: FhsaRulePack[] = [
+  {
+    id: 'CA-FHSA-limit-v1',
+    annualLimit: 8000,
+    lifetimeLimit: 40000,
+    participationRoomCarryForwardLimit: 8000,
+    sourceURL: FHSA_PARTICIPATING,
+    fieldSources: {
+      annualLimit: FHSA_PARTICIPATING,
+      lifetimeLimit: FHSA_DEFINITIONS,
+      participationRoomCarryForwardLimit: FHSA_DEFINITIONS,
+    },
+    additionalSourceURLs: [FHSA_DEFINITIONS],
+    effectiveDate: '2023-04-01', verifiedAt: '2026-02-05', indexationRule: 'frozen',
+    rounding: 'nearest-dollar', coverage: 'modeled',
+    limitation: 'The $8,000 annual limit, the $40,000 lifetime limit and the $8,000 participation-room carryforward maximum are statutory federal figures and are not indexed. The year\u2019s spendable room is the published annual limit plus at most the carryforward maximum (the CRA participation-room formula is unused re-participation room plus the lesser of $8,000 plus participation-room carryforward less the prior excess, or $40,000 less prior contributions and transfers), and the lifetime limit bounds that whole total, so a carried-in room can never be spent on top of the remaining lifetime room. The ledger does not add back FHSA re-participation room, designated amounts or taxable withdrawals, and does not model the excess-FHSA-amount tax, so those unmodelled amounts can only reduce the room it reports; it never reports room the published limits would not allow.',
+    assumedFutureRule: false,
+  },
+]
+
 function validDate(value: unknown): boolean {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const [year, month, day] = value.split('-').map(Number)
@@ -160,8 +210,8 @@ function validTable(value: unknown): value is TaxTable {
   }
   return true
 }
-export function publishRulePack<T extends TaxRulePack | BenefitRulePack>(candidate: unknown): T {
-  const p = candidate as Partial<TaxRulePack & BenefitRulePack>
+export function publishRulePack<T extends TaxRulePack | BenefitRulePack | FhsaRulePack>(candidate: unknown): T {
+  const p = candidate as Partial<TaxRulePack & BenefitRulePack & FhsaRulePack>
   if (!p || typeof p.id !== 'string' || !p.id.trim() || !validURL(p.sourceURL) ||
       !validDate(p.effectiveDate) || !validDate(p.verifiedAt) ||
       !['cpi-assumption', 'frozen'].includes(p.indexationRule ?? '') ||
@@ -169,7 +219,7 @@ export function publishRulePack<T extends TaxRulePack | BenefitRulePack>(candida
       typeof p.limitation !== 'string' || !p.limitation.trim() || typeof p.assumedFutureRule !== 'boolean' ||
       (p.additionalSourceURLs !== undefined && (!Array.isArray(p.additionalSourceURLs) || p.additionalSourceURLs.some(url => !validURL(url)))) ||
       (p.assumedFutureRule && (!amount(p.assumedAnnualRate) || p.assumedAnnualRate > 1 || !p.basedOnRuleId)) ||
-      ('jurisdiction' in p) === ('program' in p)) throw new Error('Rule pack lacks publication metadata')
+      Number('jurisdiction' in p) + Number('program' in p) + Number('annualLimit' in p) !== 1) throw new Error('Rule pack lacks publication metadata')
   if ('jurisdiction' in p) {
     if (typeof p.jurisdiction !== 'string' || !Object.hasOwn(PROVINCIAL_2026_SNAPSHOT, p.jurisdiction) ||
         !Number.isInteger(p.taxYear) || (p.taxYear ?? 0) < 1900 ||
@@ -194,11 +244,19 @@ export function publishRulePack<T extends TaxRulePack | BenefitRulePack>(candida
         (p.values.th1 ?? 0) >= (p.values.th2 ?? 0) ||
         !p.fieldSources || !validURL(p.fieldSources.amounts) || !validURL(p.fieldSources.thresholds))
       throw new Error('Benefit pack lacks valid values, sources or period')
+  } else if ('annualLimit' in p) {
+    if (!amount(p.annualLimit) || !amount(p.lifetimeLimit) || !amount(p.participationRoomCarryForwardLimit) ||
+        p.annualLimit <= 0 || p.lifetimeLimit < p.annualLimit ||
+        p.participationRoomCarryForwardLimit <= 0 || !p.fieldSources ||
+        !validURL(p.fieldSources.annualLimit) || !validURL(p.fieldSources.lifetimeLimit) ||
+        !validURL(p.fieldSources.participationRoomCarryForwardLimit))
+      throw new Error('FHSA pack lacks valid limits or sources')
   }
   return candidate as T
 }
 TAX_PACKS.forEach(pack => publishRulePack(pack))
 BENEFIT_PACKS.forEach(pack => publishRulePack(pack))
+FHSA_PACKS.forEach(pack => publishRulePack(pack))
 
 function indexed(value: number, years: number, rate: number): number {
   return Number.isFinite(value) ? Math.round(value * (1 + rate) ** years) : value
@@ -256,3 +314,12 @@ export function selectBenefitRules(program: 'CCB', period: string, future?: { an
   return publishRulePack<BenefitRulePack>(projected)
 }
 export const publishedTaxCoverage = TAX_PACKS.map(p => ({ jurisdiction: p.jurisdiction, taxYear: p.taxYear, coverage: p.coverage, limitation: p.limitation }))
+
+/**
+ * BE-36: the FHSA limits are frozen statute, so there is no year to select and
+ * no future projection. A caller that wants a different figure must publish a
+ * new pack rather than passing a number in.
+ */
+export function selectFhsaRules(): FhsaRulePack {
+  return structuredClone(FHSA_PACKS[0])
+}

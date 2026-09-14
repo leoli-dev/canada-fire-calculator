@@ -1,5 +1,6 @@
 import type { Inputs, InvestmentProperty } from './types'
 import type { Account, Debt, IncomeSource, InputsV2, Person, Property, Provenance, TaxShares } from './model'
+import { fhsaPlanRowId } from './fhsaPlan'
 import { assertLegacyInputs } from './modelValidation'
 
 const unknown = (reason: string): { status: 'unknown'; reason: string } => ({ status: 'unknown', reason })
@@ -18,8 +19,16 @@ const normalizeListIds = <T extends { id?: string }>(items: T[], kind: string): 
 export const derivedAccountId = (baseId: string): string => `${baseId}:partner`
 
 /** Base account ids whose household total can be recorded per person. */
-const SPLIT_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:locked'] as const
-const SPLIT_KINDS: readonly Account['kind'][] = ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira']
+const SPLIT_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:locked', 'legacy:account:fhsa'] as const
+/**
+ * The registered kinds whose household total can be recorded per person.
+ * An FHSA belongs here for the same reason an RRSP does: it is one person's
+ * account, never jointly owned, so a household total that two people hold is
+ * two accounts. BE-36 A prices at most one active FHSA, so a recorded two-way
+ * split is refused with its own typed reason by the ledger, not silently
+ * attributed to one holder.
+ */
+const SPLIT_KINDS: readonly Account['kind'][] = ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira', 'fhsa']
 const userOrigin: Provenance = { origin: 'user', sourceYear: null }
 
 const assertSplitAmounts = (selfAmount: number, partnerAmount: number): void => {
@@ -313,7 +322,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
     schemaVersion: 2, baseYear, province: input.province, inflation: finite(input.inflation, 0.021),
     budget: { kind: 'savingsBudget', annualNetSavings: finite(input.annualSavings), retirementSpending: finite(input.retirementSpending), debtIncluded: unknown('legacy savings/debt treatment needs confirmation'), taxBenefitIncluded: unknown('legacy tax benefit treatment needs confirmation') },
     people, accounts, contributions: [], recurringContributions: [
-      ...(input.fhsa ? [{ id: legacyId('contribution:fhsa'), accountId: legacyId('account:fhsa'), contributorId: couple ? null : selfId, annualAmount: input.fhsa.annualContribution, funding: 'fromSavings' as const, provenance: source }] : []),
+      ...(input.fhsa ? [{ id: fhsaPlanRowId(legacyId('account:fhsa')), accountId: legacyId('account:fhsa'), contributorId: couple ? null : selfId, annualAmount: input.fhsa.annualContribution, funding: 'fromSavings' as const, provenance: source }] : []),
       ...(input.lockedRetirement ? [
         { id: legacyId('contribution:lira:employee'), accountId: legacyId('account:locked'), contributorId: input.lockedRetirement.owner === 'partner' ? (couple ? partnerId : null) : selfId, annualAmount: input.lockedRetirement.employeeContribution, funding: 'fromSavings' as const, provenance: source },
         { id: legacyId('contribution:lira:employer'), accountId: legacyId('account:locked'), contributorId: input.lockedRetirement.owner === 'partner' ? (couple ? partnerId : null) : selfId, annualAmount: input.lockedRetirement.employerContribution, funding: 'employerAdditional' as const, provenance: source },
@@ -462,7 +471,65 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   // recorded contributions it describes; an ordinary form edit or a mode
   // switch must not drop it back to unknown.
   next.spousalHistory = prior.spousalHistory ? structuredClone(prior.spousalHistory) : undefined
+  // BE-36 A: an FHSA's opening year, participation-room statement line and
+  // contribution history are canonical statement facts entered by the shared
+  // tax panel, exactly like the CRA RRSP statement lines above. The legacy form
+  // carries only a balance and a years-ago count, so an ordinary form edit or a
+  // mode switch must re-apply the recorded canonical facts instead of resetting
+  // them to unknown. A legacy account with no recorded calendar opening year
+  // keeps that unknown: a years-ago count is not an opening year.
+  next.fhsaStatementHistory = prior.fhsaStatementHistory ? structuredClone(prior.fhsaStatementHistory) : undefined
+  if (prior.fhsaStatementHistory) {
+    next.fhsaStatementHistory = Object.fromEntries(Object.entries(next.fhsaStatementHistory ?? {})
+      .filter(([accountId]) => next.accounts.some(account => account.id === accountId)))
+  }
+  for (const account of next.accounts) {
+    if (account.kind !== 'fhsa') continue
+    const old = previousAccounts.get(account.id)
+    if (!old) continue
+    account.openedYear = old.openedYear
+    account.contributionRoom = old.contributionRoom
+  }
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
+  // BE-36 A: the legacy form mirrors exactly one FHSA account, so a recorded
+  // per-person split's partner-owned account has no legacy field to rebuild its
+  // plan from. Its rows are canonical facts the form cannot express; carry them
+  // over so an unrelated legacy or shared-field edit cannot silently drop a
+  // recorded plan (the account itself is restored by `reconcileOwnershipSplit`).
+  const mirroredRecurringAccounts = new Set(next.recurringContributions.map(row => row.accountId))
+  const carriedFhsaRows = prior.recurringContributions.filter(row =>
+    !mirroredRecurringAccounts.has(row.accountId) &&
+    next.accounts.some(account => account.id === row.accountId && account.kind === 'fhsa'))
+  if (carriedFhsaRows.length > 0) next.recurringContributions.push(...carriedFhsaRows.map(row => ({
+    ...row,
+    contributorId: row.contributorId && live.has(row.contributorId) ? row.contributorId : null,
+    provenance: { ...row.provenance },
+  })))
+  // BE-36 A: exactly one recorded FHSA plan per account, under the canonical id
+  // the shared tax panel writes. Migration already emits that id, so a
+  // panel-recorded plan survives an unrelated legacy or shared-field edit. A
+  // plan saved by an earlier build could carry two rows for one account (a
+  // legacy mirror plus the recorded row); the recorded row is the plan, so the
+  // duplicate is dropped and the legacy mirror is rewritten to the recorded
+  // amount. The two can then never both be priced and the recorded amount is
+  // not lost on the next edit.
+  const recordedFhsaOverrides = new Map<string, number>()
+  for (const account of next.accounts) {
+    if (account.kind !== 'fhsa') continue
+    const rows = prior.recurringContributions.filter(item => item.accountId === account.id)
+    const recorded = rows.find(item => item.id === fhsaPlanRowId(account.id))
+    if (recorded && rows.length > 1) recordedFhsaOverrides.set(account.id, recorded.annualAmount)
+  }
+  if (recordedFhsaOverrides.size > 0) {
+    next.recurringContributions = next.recurringContributions.map(item => {
+      const recorded = recordedFhsaOverrides.get(item.accountId)
+      return recorded === undefined ? item : { ...item, id: fhsaPlanRowId(item.accountId), annualAmount: recorded }
+    })
+    const legacyFhsaId = legacyId('account:fhsa')
+    const recordedLegacy = recordedFhsaOverrides.get(legacyFhsaId)
+    if (recordedLegacy !== undefined && next.legacyProjection?.fhsa)
+      next.legacyProjection = { ...next.legacyProjection, fhsa: { ...next.legacyProjection.fhsa, annualContribution: recordedLegacy } }
+  }
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {
     spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null,

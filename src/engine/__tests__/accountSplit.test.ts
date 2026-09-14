@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Inputs } from '../types'
 import { derivedAccountId, migratePersistedPlan, recordAccountSplit, recordPropertySplit,
   refreshCanonicalFromLegacy, removePerson } from '../migration'
+import { activeFhsaAccounts, ownFhsaAccount } from '../fhsa'
+import { fhsaPlanRowId, plannedFhsaContribution } from '../fhsaPlan'
 import { precisionGate } from '../model'
 import { assertCanonicalPlan } from '../modelValidation'
 import { personProjectionTax } from '../personProjectionTax'
@@ -449,5 +451,91 @@ describe('FE-35 A Scenario A save/restore durability', () => {
     const saved = useStore.getState()
     expect(saved.scenarioACanonical!.accounts.find(account => account.kind === 'lira'))
       .toMatchObject({ id: 'legacy:account:locked', ownerId: partnerId(lira) })
+  })
+})
+
+/**
+ * BE-36 A round 3: an FHSA is one person's account, exactly like an RRSP, so a
+ * couple's household total must be recordable per person. Before this the panel
+ * offered the FHSA ownership row while `applyAccountSplit` rejected the kind,
+ * so the control threw (`account kind cannot be split: fhsa`) and no couple
+ * could attribute an FHSA at all. A genuine two-way split is two FHSAs, which
+ * BE-36 A refuses with the typed multiple-active reason instead of pricing one.
+ */
+describe('BE-36 A couple FHSA ownership is recorded per person', () => {
+  /** Couple with a 20,000 household FHSA total and nothing contributed yet. */
+  const fhsaCouple = (): Inputs => ({ ...couple(),
+    fhsa: { balance: 20000, annualContribution: 0, openedYearsAgo: 0 } })
+  const fhsaPlan = () => migratePersistedPlan({ inputs: fhsaCouple() }, 10, 2026)
+  const fhsaRow = (p: ReturnType<typeof fhsaPlan>) => p.accounts.filter(account => account.kind === 'fhsa')
+  const balanceOf = (p: ReturnType<typeof fhsaPlan>) => (id: string) =>
+    p.accounts.find(account => account.id === id)?.balance ?? 0
+
+  it('attributes the household FHSA total to one holder instead of throwing', () => {
+    const base = fhsaPlan()
+    // Selecting a holder is a 100/0 record: one account, that person's owner.
+    const selfOnly = recordAccountSplit(base, 'legacy:account:fhsa', 20000, 0)
+    expect(fhsaRow(selfOnly)).toMatchObject([
+      { id: 'legacy:account:fhsa', balance: 20000, ownerId: selfId(selfOnly) }])
+    expect(ownFhsaAccount(selfOnly, selfId(selfOnly))).toEqual({ accountId: 'legacy:account:fhsa', ambiguous: false })
+    expect(ownFhsaAccount(selfOnly, partnerId(selfOnly))).toEqual({ accountId: null, ambiguous: false })
+    // The partner is a valid holder too, and keeps the base id so the row's
+    // canonical contribution references stay live.
+    const partnerOnly = recordAccountSplit(base, 'legacy:account:fhsa', 0, 20000)
+    expect(fhsaRow(partnerOnly)).toMatchObject([
+      { id: 'legacy:account:fhsa', balance: 20000, ownerId: partnerId(partnerOnly) }])
+    expect(ownFhsaAccount(partnerOnly, partnerId(partnerOnly))).toEqual({ accountId: 'legacy:account:fhsa', ambiguous: false })
+    expect(partnerOnly.ownershipAmounts?.['legacy:account:fhsa']).toEqual(
+      { [selfId(partnerOnly)]: 0, [partnerId(partnerOnly)]: 20000 })
+    expect(() => assertCanonicalPlan(partnerOnly)).not.toThrow()
+  })
+
+  it('records a holder for a zero-balance FHSA — the form action that used to throw', () => {
+    // A couple adds an FHSA with no balance yet and picks who holds it.
+    const empty = migratePersistedPlan({ inputs: { ...fhsaCouple(),
+      fhsa: { balance: 0, annualContribution: 0, openedYearsAgo: 0 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 } } }, 10, 2026)
+    const next = recordAccountSplit(empty, 'legacy:account:fhsa', 0, 0, { zeroOwnerId: selfId(empty) })
+    expect(fhsaRow(next)).toMatchObject([{ id: 'legacy:account:fhsa', balance: 0, ownerId: selfId(empty) }])
+    expect(next.ownershipAmounts?.['legacy:account:fhsa']).toEqual(
+      { [selfId(next)]: 0, [partnerId(next)]: 0 })
+    expect(ownFhsaAccount(next, selfId(next)).accountId).toBe('legacy:account:fhsa')
+    expect(() => assertCanonicalPlan(next)).not.toThrow()
+  })
+
+  it('a genuine two-way split is two active FHSAs, which BE-36 A refuses by type', () => {
+    const split = recordAccountSplit(fhsaPlan(), 'legacy:account:fhsa', 12000, 8000)
+    expect(fhsaRow(split).map(account => [account.id, account.balance, account.ownerId]).sort())
+      .toEqual([['legacy:account:fhsa', 12000, selfId(split)],
+        [derivedAccountId('legacy:account:fhsa'), 8000, partnerId(split)]].sort())
+    // Money is conserved: the two accounts add back to the household total.
+    expect(fhsaRow(split).reduce((sum, account) => sum + account.balance, 0)).toBe(20000)
+    expect(ownFhsaAccount(split, selfId(split)).accountId).toBe('legacy:account:fhsa')
+    expect(ownFhsaAccount(split, partnerId(split)).accountId).toBe(derivedAccountId('legacy:account:fhsa'))
+    // Both are active, which is exactly the typed refusal the kernel and the
+    // panel measure with this one function.
+    expect(activeFhsaAccounts(split, 2026, balanceOf(split)).map(account => account.id).sort())
+      .toEqual(['legacy:account:fhsa', derivedAccountId('legacy:account:fhsa')].sort())
+    expect(() => assertCanonicalPlan(split)).not.toThrow()
+  })
+
+  it('a recorded FHSA split and the partner plan survive an unrelated legacy edit', () => {
+    const split = recordAccountSplit(fhsaPlan(), 'legacy:account:fhsa', 12000, 8000)
+    const derived = derivedAccountId('legacy:account:fhsa')
+    const partner = partnerId(split)
+    // The panel records the partner's own plan on the derived account. The
+    // legacy form has one FHSA field and cannot mirror it, so it is a canonical
+    // fact that must be carried across the rebuild.
+    split.recurringContributions.push({ id: fhsaPlanRowId(derived), accountId: derived,
+      contributorId: partner, annualAmount: 3000, funding: 'fromSavings',
+      provenance: { origin: 'user', sourceYear: 2026 } })
+    const refreshed = refreshCanonicalFromLegacy(split, { ...split.legacyProjection, annualSavings: 41000 })
+    expect(fhsaRow(refreshed).map(account => [account.id, account.balance, account.ownerId]).sort())
+      .toEqual([['legacy:account:fhsa', 12000, selfId(refreshed)],
+        [derived, 8000, partnerId(refreshed)]].sort())
+    expect(fhsaRow(refreshed).reduce((sum, account) => sum + account.balance, 0)).toBe(20000)
+    expect(plannedFhsaContribution(refreshed, derived)).toBe(3000)
+    expect(refreshed.recurringContributions.filter(row => row.accountId === derived)).toHaveLength(1)
+    expect(() => assertCanonicalPlan(refreshed)).not.toThrow()
   })
 })

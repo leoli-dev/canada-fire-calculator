@@ -174,6 +174,14 @@ export interface InputsV2 {
    * paid every premium. See BE-12 B.
    */
   spousalHistory?: Record<EntityId, SpousalHistoryStatus>
+  /**
+   * Per FHSA account, the CRA statement facts that the participation-room
+   * ledger needs and that no other field can supply: every contribution and
+   * RRSP transfer made before the base year. Absent means the history is not
+   * confirmed, so no FHSA contribution is priced and a balance is never
+   * treated as evidence of room. See BE-36 A.
+   */
+  fhsaStatementHistory?: Record<EntityId, { cumulativePriorContributions: Known<number>; provenance: Provenance }>
   migration: { sourcePersistVersion: number; ownershipNeedsConfirmation: boolean; ageBasisNeedsConfirmation: boolean; savingsBasisNeedsConfirmation: boolean }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }

@@ -8,25 +8,72 @@
   "be11TerminalComparisonLimit": "After-tax estate comparison is unavailable because individual terminal tax is not verified for both plans. Final net worth excludes estate tax and is shown only when the comparison is supported.",
   "be11AuxiliaryEstimate": "The timing, strategy and Monte Carlo tools below still use the earlier single-person approximation; their rankings are estimates.",
   "be11": {
-    "title": "Who receives and owns taxable income", "reviewed": "I reviewed these tax facts", "unknownStill": "I cannot confirm them yet; keep results as estimates",
-    "personLedger": "Tax by person and year", "ledgerLimit": "Annual tax uses the pinned 2026 real-dollar assumptions. Estate tax, other solvers and complex funding events require further person-owned rules.", "person": "Person", "grossIncome": "Gross income", "eligiblePension": "Eligible pension",
+    "title": "Who receives and owns taxable income",
+    "reviewed": "I reviewed these tax facts",
+    "unknownStill": "I cannot confirm them yet; keep results as estimates",
+    "personLedger": "Tax by person and year",
+    "ledgerLimit": "Annual tax uses the pinned 2026 real-dollar assumptions. Estate tax, other solvers and complex funding events require further person-owned rules.",
+    "person": "Person",
+    "grossIncome": "Gross income",
+    "eligiblePension": "Eligible pension",
     "explanation": "The same tax facts apply in Guided and Professional. Enter each person's own balance (registered accounts stay individually owned); the amounts must add up to the household total. Nothing is divided automatically. Working-year tax and unsupported asset events remain estimates.",
-    "unknown": "Not confirmed", "shared": "Shared taxable ownership", "splitOwners": "Owned separately (split recorded)", "self": "You", "partner": "Partner", "yes": "Yes", "no": "No",
+    "unknown": "Not confirmed",
+    "shared": "Shared taxable ownership",
+    "splitOwners": "Owned separately (split recorded)",
+    "self": "You",
+    "partner": "Partner",
+    "yes": "Yes",
+    "no": "No",
     "earned": "{{person}}: current annual employment income (CAD)",
-    "ownership": "Account and property tax ownership", "selfTaxShare": "Your taxable share (percent)", "propertyOwner": "Investment property owner",
-    "selfAmount": "Your amount (CAD)", "partnerAmount": "Partner's amount (CAD)",
+    "ownership": "Account and property tax ownership",
+    "selfTaxShare": "Your taxable share (percent)",
+    "propertyOwner": "Investment property owner",
+    "selfAmount": "Your amount (CAD)",
+    "partnerAmount": "Partner's amount (CAD)",
     "splitSum": "Your amount + partner's amount: {{sum}} of {{total}} CAD",
     "splitMismatch": "These two amounts must add up to the account's {{total}} CAD balance. Ownership stays unconfirmed until they match.",
     "splitHelp": "Registered accounts are owned by one person each: enter each person's balance, and the two amounts must add up to the household total. Non-registered accounts and properties record each person's share; nothing is divided automatically.",
     "lockedOwnerResetHelp": "Changing the locked-in account's owner in the main form re-records the split as 100% to that owner.",
     "spouseSupport": "Do you support and live with your spouse for the spouse amount?",
-    "splitTransferor": "Elective eligible pension split: who transfers?", "noSplit": "No pension split", "splitAmount": "Annual amount transferred (CAD; at most 50% of eligible income)",
-    "registeredType": "Registered account type", "rrifOpenedYear": "RRIF opening year", "rrifAgeElection": "Age elected when RRIF opened", "noElection": "Use owner’s age",
-    "rrifFactorCategory": "Verified RRIF factor category (check transfer history)", "rrifQualifying": "Qualifying RRIF", "rrifAllOther": "All other RRIFs",
-    "rrifFactorHelp": "Check the provider’s opening, transfer and amendment records before choosing a category. Opening year alone does not prove qualification; leave it unconfirmed to keep the exact minimum and tax result limited.", "rrifFactorSource": "CRA prescribed-factor chart",
+    "splitTransferor": "Elective eligible pension split: who transfers?",
+    "noSplit": "No pension split",
+    "splitAmount": "Annual amount transferred (CAD; at most 50% of eligible income)",
+    "registeredType": "Registered account type",
+    "rrifOpenedYear": "RRIF opening year",
+    "rrifAgeElection": "Age elected when RRIF opened",
+    "noElection": "Use owner’s age",
+    "rrifFactorCategory": "Verified RRIF factor category (check transfer history)",
+    "rrifQualifying": "Qualifying RRIF",
+    "rrifAllOther": "All other RRIFs",
+    "rrifFactorHelp": "Check the provider’s opening, transfer and amendment records before choosing a category. Opening year alone does not prove qualification; leave it unconfirmed to keep the exact minimum and tax result limited.",
+    "rrifFactorSource": "CRA prescribed-factor chart",
     "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35."
   },
-  "be35": {"qcSplitTransferor": "Quebec Schedule Q election: who transfers?","qcSplitAmount": "Quebec annual retirement-income transfer (CAD)","splitHelp": "The Quebec election is separate from the federal pension split. The transferor must be at least 65; choose no transfer unless the Schedule Q election is intended.","coverageTitle": "Québec prescription-drug insurance coverage","coverageHelp": "This affects only the Québec prescription-drug premium (TP-1 line 447) in each person’s Québec tax row — nothing else. It applies to Québec residents covered by the public RAMQ plan, an eligible private plan, or a verified exemption. Choose one status for the whole year; the month detail is only needed if coverage actually changed mid-year. A year containing a public month stays a labelled estimate until the 2026 Schedule K is published.","coveragePerson": "{{person}} coverage","mixed": "Different months","unknown": "Not confirmed","private": "Private basic plan","public": "RAMQ public plan","waived": "Verified premium exemption","publicLimit": "Public premiums use family income and the tax-year Schedule K, which is not yet published for 2026. The July–June RAMQ tariffs are not a full-year tax amount.","ramqSource": "RAMQ rate periods","limit": "Quebec family credits and FSS use 2026 parameters. Public RAMQ months remain unverified until the 2026 Schedule K; other complex tax events remain estimates.","fss": "FSS contribution","ramq": "RAMQ premium","scheduleB": "Schedule B credit","qcProvincialTax": "Quebec income tax","federalEligiblePension": "Federal eligible pension","qcRetirementEligible": "Quebec retirement income (line 122/123)","annualStatus": "Coverage for the whole year","changedDuringYear": "Coverage changed during the year","monthDetailHelp": "Only needed when coverage changed mid-year. The tax-year premium (Schedule K) reconciles the January–June and July–December periods separately, so the month of a change can matter — the RAMQ maximum rose on 1 July 2026. A public month keeps the Québec tax a labelled estimate until the 2026 Schedule K is published."},
+  "be35": {
+    "qcSplitTransferor": "Quebec Schedule Q election: who transfers?",
+    "qcSplitAmount": "Quebec annual retirement-income transfer (CAD)",
+    "splitHelp": "The Quebec election is separate from the federal pension split. The transferor must be at least 65; choose no transfer unless the Schedule Q election is intended.",
+    "coverageTitle": "Québec prescription-drug insurance coverage",
+    "coverageHelp": "This affects only the Québec prescription-drug premium (TP-1 line 447) in each person’s Québec tax row — nothing else. It applies to Québec residents covered by the public RAMQ plan, an eligible private plan, or a verified exemption. Choose one status for the whole year; the month detail is only needed if coverage actually changed mid-year. A year containing a public month stays a labelled estimate until the 2026 Schedule K is published.",
+    "coveragePerson": "{{person}} coverage",
+    "mixed": "Different months",
+    "unknown": "Not confirmed",
+    "private": "Private basic plan",
+    "public": "RAMQ public plan",
+    "waived": "Verified premium exemption",
+    "publicLimit": "Public premiums use family income and the tax-year Schedule K, which is not yet published for 2026. The July–June RAMQ tariffs are not a full-year tax amount.",
+    "ramqSource": "RAMQ rate periods",
+    "limit": "Quebec family credits and FSS use 2026 parameters. Public RAMQ months remain unverified until the 2026 Schedule K; other complex tax events remain estimates.",
+    "fss": "FSS contribution",
+    "ramq": "RAMQ premium",
+    "scheduleB": "Schedule B credit",
+    "qcProvincialTax": "Quebec income tax",
+    "federalEligiblePension": "Federal eligible pension",
+    "qcRetirementEligible": "Quebec retirement income (line 122/123)",
+    "annualStatus": "Coverage for the whole year",
+    "changedDuringYear": "Coverage changed during the year",
+    "monthDetailHelp": "Only needed when coverage changed mid-year. The tax-year premium (Schedule K) reconciles the January–June and July–December periods separately, so the month of a change can matter — the RAMQ maximum rose on 1 July 2026. A public month keeps the Québec tax a labelled estimate until the 2026 Schedule K is published."
+  },
   "tagline": "Retire early, the Canadian way - TFSA, RRSP, CPP/QPP and OAS, modelled properly.",
   "profile": "Profile",
   "ruleAssumptionsTitle": "Tax and benefit rule snapshots",
@@ -640,17 +687,77 @@
   "guidedBasedOnAssumptions": "Based on the assumptions you reviewed",
   "guidedResultSuccess": "The projection funds the plan through age {{age}}. This is a model result, not a guarantee.",
   "guidedResultShortfall": "The first cash shortfall is at age {{age}}: the plan needs {{need}}, provides {{available}}, and is short {{shortfall}}.",
-  "guided": { "meta": {
-    "confirmed": "confirmed", "estimated": "estimate", "unknown": "unknown", "notApplicable": "not applicable", "legacy": "imported", "example": "sample"
-  }, "steps": {
-    "household": { "short": "Household", "title": "Household and goal", "help": "Start with the timeline you want to test.", "question": "What kind of retirement are you planning?", "why": "Ages define how long you save, how long investments must fund life, and when benefits can begin. Stopping work and starting benefits are separate decisions.", "how": "Use current ages and the province where you expect to live for tax purposes.", "example": "Sam is 40, stops full-time work at 55, starts CPP at 65, and tests the plan through age 95." },
-    "income": { "short": "Income", "title": "Income and savings", "help": "Translate your real saving habit into one annual amount.", "question": "How much do you actually add to investments?", "why": "New deposits grow the portfolio before retirement. Salary alone does not tell us what remains after tax and daily life.", "how": "Compare account statements over the past 12 months and add deposits, excluding investment growth and transfers.", "example": "$2,000 deposited each month becomes $24,000 per year." },
-    "accounts": { "short": "Accounts", "title": "Accounts and contributions", "help": "Identify the tax wrappers that hold your investments.", "question": "Where is your retirement money today?", "why": "TFSA, RRSP and non-registered accounts can hold the same funds, but withdrawals and taxes behave differently.", "how": "Use current market balances from bank or brokerage statements. Do not enter contribution room, your home, RESP assets or future benefits here.", "example": "A $100,000 investment worth $80,000 when purchased has a $20,000 unrealized loss; cost is not the same as market value." },
-    "housing": { "short": "Housing", "title": "Property and debt", "help": "Separate a valuable home from cash available for spending.", "question": "How will housing affect retirement cash flow?", "why": "A home contributes to net worth, but only a sale produces spendable portfolio cash. Mortgages and rent affect annual spending.", "how": "Choose renting, owning, or a planned purchase. Enter a mortgage with its property only once.", "example": "An $800,000 home kept for life adds net worth but does not automatically fund groceries." },
-    "spending": { "short": "Spending", "title": "Retirement spending", "help": "Express the life you want in today’s purchasing power.", "question": "What would one retirement year cost?", "why": "This target drives withdrawals. The engine separately calculates tax and account funding needed to deliver it.", "how": "Start from monthly essentials and add irregular annual travel, health and home costs. Exclude loans already entered elsewhere.", "example": "$3,000 per month becomes $36,000 per year before separately modelled debt payments." },
-    "benefits": { "short": "Benefits", "title": "Benefits and assumptions", "help": "Connect government and employer income to the timeline.", "question": "What income arrives after work stops?", "why": "CPP/QPP and OAS can reduce portfolio withdrawals later, but the portfolio must bridge the years before they begin.", "how": "Use the annual age-65 estimate from My Service Canada Account or Retraite Québec. Multiply a monthly age-65 amount by 12; do not enter an already early/late-adjusted payment as the age-65 base.", "example": "$1,000 per month at age 65 is a $12,000 annual age-65 estimate." },
-    "review": { "short": "Review", "title": "Review and read results", "help": "Check the core inputs and any warnings, then read the plan conclusion before exploring detailed charts and scenarios." }
-  }},
+  "guided": {
+    "meta": {
+      "confirmed": "confirmed",
+      "estimated": "estimate",
+      "unknown": "unknown",
+      "notApplicable": "not applicable",
+      "legacy": "imported",
+      "example": "sample"
+    },
+    "steps": {
+      "household": {
+        "short": "Household",
+        "title": "Household and goal",
+        "help": "Start with the timeline you want to test.",
+        "question": "What kind of retirement are you planning?",
+        "why": "Ages define how long you save, how long investments must fund life, and when benefits can begin. Stopping work and starting benefits are separate decisions.",
+        "how": "Use current ages and the province where you expect to live for tax purposes.",
+        "example": "Sam is 40, stops full-time work at 55, starts CPP at 65, and tests the plan through age 95."
+      },
+      "income": {
+        "short": "Income",
+        "title": "Income and savings",
+        "help": "Translate your real saving habit into one annual amount.",
+        "question": "How much do you actually add to investments?",
+        "why": "New deposits grow the portfolio before retirement. Salary alone does not tell us what remains after tax and daily life.",
+        "how": "Compare account statements over the past 12 months and add deposits, excluding investment growth and transfers.",
+        "example": "$2,000 deposited each month becomes $24,000 per year."
+      },
+      "accounts": {
+        "short": "Accounts",
+        "title": "Accounts and contributions",
+        "help": "Identify the tax wrappers that hold your investments.",
+        "question": "Where is your retirement money today?",
+        "why": "TFSA, RRSP and non-registered accounts can hold the same funds, but withdrawals and taxes behave differently.",
+        "how": "Use current market balances from bank or brokerage statements. Do not enter contribution room, your home, RESP assets or future benefits here.",
+        "example": "A $100,000 investment worth $80,000 when purchased has a $20,000 unrealized loss; cost is not the same as market value."
+      },
+      "housing": {
+        "short": "Housing",
+        "title": "Property and debt",
+        "help": "Separate a valuable home from cash available for spending.",
+        "question": "How will housing affect retirement cash flow?",
+        "why": "A home contributes to net worth, but only a sale produces spendable portfolio cash. Mortgages and rent affect annual spending.",
+        "how": "Choose renting, owning, or a planned purchase. Enter a mortgage with its property only once.",
+        "example": "An $800,000 home kept for life adds net worth but does not automatically fund groceries."
+      },
+      "spending": {
+        "short": "Spending",
+        "title": "Retirement spending",
+        "help": "Express the life you want in today’s purchasing power.",
+        "question": "What would one retirement year cost?",
+        "why": "This target drives withdrawals. The engine separately calculates tax and account funding needed to deliver it.",
+        "how": "Start from monthly essentials and add irregular annual travel, health and home costs. Exclude loans already entered elsewhere.",
+        "example": "$3,000 per month becomes $36,000 per year before separately modelled debt payments."
+      },
+      "benefits": {
+        "short": "Benefits",
+        "title": "Benefits and assumptions",
+        "help": "Connect government and employer income to the timeline.",
+        "question": "What income arrives after work stops?",
+        "why": "CPP/QPP and OAS can reduce portfolio withdrawals later, but the portfolio must bridge the years before they begin.",
+        "how": "Use the annual age-65 estimate from My Service Canada Account or Retraite Québec. Multiply a monthly age-65 amount by 12; do not enter an already early/late-adjusted payment as the age-65 base.",
+        "example": "$1,000 per month at age 65 is a $12,000 annual age-65 estimate."
+      },
+      "review": {
+        "short": "Review",
+        "title": "Review and read results",
+        "help": "Check the core inputs and any warnings, then read the plan conclusion before exploring detailed charts and scenarios."
+      }
+    }
+  },
   "questionnaire": {
     "strategyIntro": "This sets the model's order for funding each year's after-tax spending. Required RRIF minimums come first. There is no best order for everyone; compare the outcomes in your results.",
     "strategyDetails": {
@@ -659,21 +766,85 @@
       "tfsaFirst": "After the RRIF minimum, use TFSA → non-registered → RRSP. TFSA withdrawals generally add no taxable income now, but use tax-free assets sooner and may shift RRSP tax to later years.",
       "rrspFirst": "After the RRIF minimum, use RRSP/RRIF for spending before non-registered → TFSA. Reduces registered balances earlier, but larger taxable withdrawals may raise tax and income-tested benefit reductions."
     },
-    "strategySourceLabel": "Tax-rule sources:", "strategySourceRrsp": "RRSP withdrawals", "strategySourceTfsa": "TFSA treatment", "strategySourceCapital": "Capital gains", "strategySourceRrif": "RRIF minimums", "strategySourceOas": "OAS recovery tax",
+    "strategySourceLabel": "Tax-rule sources:",
+    "strategySourceRrsp": "RRSP withdrawals",
+    "strategySourceTfsa": "TFSA treatment",
+    "strategySourceCapital": "Capital gains",
+    "strategySourceRrif": "RRIF minimums",
+    "strategySourceOas": "OAS recovery tax",
     "targetQuestion": "Do you have a personal investable-assets target for that age?",
     "targetExplanation": "Optional: this is the line used by ‘Will I hit my target?’. It does not determine the FIRE amount needed to fund your lifestyle; the calculator estimates that separately.",
     "targetExampleNote": "The $1,000,000 shown is only an example. Enter your own amount in today's dollars to confirm it.",
-    "directory": "Questionnaire directory", "categoryCount": "Category {{current}} of {{total}}", "closeDirectory": "Close directory", "chooseOne": "Choose one",
-    "helpTitle": "Why we ask and where to look", "findLabel": "Where to look:", "exampleLabel": "Fictional example:",
-    "reviewAnswers": "Review answers", "backToQuestions": "Back to questionnaire", "reviewTitle": "Review your answers", "reviewIntro": "Review your inputs and projection assumptions here. Edit anything that does not fit, then generate the results.",
-    "needsAttention": "Complete or review these items", "generateResults": "Generate my results", "modifyAnswers": "Modify answers", "resultsTitle": "Your retirement projection", "resultsIntro": "These results use the values and assumptions you entered or selected. Estimates do not guarantee future outcomes.",
-    "nextCategory": "Next category", "pendingSaved": "Marked to revisit. You can continue and resolve it from Review.", "hasHome": "Home included", "notApplicable": "This question is not applicable to the current path.",
-    "monthlySavings": "Average new savings each month", "savingFeedback": "{{monthly}} per month becomes {{annual}} per year.", "spendingFeedback": "{{monthly}} per month becomes {{annual}} per year in today’s dollars.",
-    "housingOtherLimit": "Rental properties and other debts are included through their own follow-up pages.", "confirmRemoveValue": "This item contains a non-zero saved amount. Remove it from the plan?",
-    "intentRecommendationLabel": "Based on your choices, the results will compare:", "intentUnsupported": "A fixed legacy target or lifetime gift is saved as a wish, but this engine does not yet enforce it as a cash-flow constraint.",
-    "reviewAssumptionsTitle": "Assumptions used in this projection", "reviewAssumptionsIntro": "These are the current values. A row marked “Needs review” still contains examples or an unmade choice; complete it before generating results.", "reviewAssumptionSet": "Set", "reviewAssumptionEstimated": "Includes estimates", "reviewAssumptionPending": "Needs review", "reviewEditAssumption": "Edit {{topic}}", "reviewNotChosen": "Not chosen yet", "reviewMixTitle": "Investment mix and return", "reviewMixValue": "{{mix}}; expected average annual real return {{real}}; modelled annual volatility {{volatility}}", "reviewFeesTitle": "Fees and inflation", "reviewFeesValue": "Total investment fees {{fees}} per year; long-run inflation {{inflation}} per year", "reviewTaxTitle": "Non-registered investments and pre-retirement tax", "reviewTaxValue": "Taxable distributions {{distributions}} per year; marginal tax rate {{rate}}", "reviewStrategyTitle": "Retirement withdrawal order", "reviewPacedStrategy": "Paced RRSP withdrawals", "reviewStrategyWithCap": "{{strategy}}; income ceiling: {{cap}}", "reviewAssumptionsNote": "Real returns already exclude inflation; investment fees are deducted separately. Volatility models year-to-year market swings, not extra return. These are planning estimates, not guarantees.",
-    "mixReturnExplanation": "Each percentage below is a long-term expected average annual real return: inflation has already been removed, while investment fees (MER) are deducted separately on the next page. It is not last year’s performance or a guaranteed return.", "mixExpectedReturn": "Expected average annual real return: {{value}}%", "mixNames": { "allStocks": "100% stocks", "aggressive": "Aggressive 80/20", "balanced": "Balanced 60/40", "conservative": "Conservative 40/60", "gic": "GIC ladder" },
-    "feeTotalLabel": "Total annual investment fees (%)", "feePresetIntro": "Choose an example based on how your investments are managed, or enter your own total. Include fund MER and any ongoing advisory fee once, not twice.", "feePresetGroup": "Example investment fee rates", "feePreset": { "etf": "Self-directed ETF · 0.2%", "managed": "Managed ETF portfolio · 0.65%", "mutual": "Traditional mutual fund · 2.1%" }, "feePresetSource": "Illustrative product fees (check your own statements):", "inflationPresetIntro": "Choose a long-term planning assumption or enter your own. The higher-inflation option is a stress test, not a forecast.", "inflationPresetGroup": "Example annual inflation assumptions", "inflationPreset": { "fpCanada": "FP Canada 2026 · 2.1%", "bankTarget": "Bank of Canada target · 2.0%", "stress": "Higher-inflation scenario · 3.0%" }, "inflationPresetSource": "Planning guidelines and target:",
+    "directory": "Questionnaire directory",
+    "categoryCount": "Category {{current}} of {{total}}",
+    "closeDirectory": "Close directory",
+    "chooseOne": "Choose one",
+    "helpTitle": "Why we ask and where to look",
+    "findLabel": "Where to look:",
+    "exampleLabel": "Fictional example:",
+    "reviewAnswers": "Review answers",
+    "backToQuestions": "Back to questionnaire",
+    "reviewTitle": "Review your answers",
+    "reviewIntro": "Review your inputs and projection assumptions here. Edit anything that does not fit, then generate the results.",
+    "needsAttention": "Complete or review these items",
+    "generateResults": "Generate my results",
+    "modifyAnswers": "Modify answers",
+    "resultsTitle": "Your retirement projection",
+    "resultsIntro": "These results use the values and assumptions you entered or selected. Estimates do not guarantee future outcomes.",
+    "nextCategory": "Next category",
+    "pendingSaved": "Marked to revisit. You can continue and resolve it from Review.",
+    "hasHome": "Home included",
+    "notApplicable": "This question is not applicable to the current path.",
+    "monthlySavings": "Average new savings each month",
+    "savingFeedback": "{{monthly}} per month becomes {{annual}} per year.",
+    "spendingFeedback": "{{monthly}} per month becomes {{annual}} per year in today’s dollars.",
+    "housingOtherLimit": "Rental properties and other debts are included through their own follow-up pages.",
+    "confirmRemoveValue": "This item contains a non-zero saved amount. Remove it from the plan?",
+    "intentRecommendationLabel": "Based on your choices, the results will compare:",
+    "intentUnsupported": "A fixed legacy target or lifetime gift is saved as a wish, but this engine does not yet enforce it as a cash-flow constraint.",
+    "reviewAssumptionsTitle": "Assumptions used in this projection",
+    "reviewAssumptionsIntro": "These are the current values. A row marked “Needs review” still contains examples or an unmade choice; complete it before generating results.",
+    "reviewAssumptionSet": "Set",
+    "reviewAssumptionEstimated": "Includes estimates",
+    "reviewAssumptionPending": "Needs review",
+    "reviewEditAssumption": "Edit {{topic}}",
+    "reviewNotChosen": "Not chosen yet",
+    "reviewMixTitle": "Investment mix and return",
+    "reviewMixValue": "{{mix}}; expected average annual real return {{real}}; modelled annual volatility {{volatility}}",
+    "reviewFeesTitle": "Fees and inflation",
+    "reviewFeesValue": "Total investment fees {{fees}} per year; long-run inflation {{inflation}} per year",
+    "reviewTaxTitle": "Non-registered investments and pre-retirement tax",
+    "reviewTaxValue": "Taxable distributions {{distributions}} per year; marginal tax rate {{rate}}",
+    "reviewStrategyTitle": "Retirement withdrawal order",
+    "reviewPacedStrategy": "Paced RRSP withdrawals",
+    "reviewStrategyWithCap": "{{strategy}}; income ceiling: {{cap}}",
+    "reviewAssumptionsNote": "Real returns already exclude inflation; investment fees are deducted separately. Volatility models year-to-year market swings, not extra return. These are planning estimates, not guarantees.",
+    "mixReturnExplanation": "Each percentage below is a long-term expected average annual real return: inflation has already been removed, while investment fees (MER) are deducted separately on the next page. It is not last year’s performance or a guaranteed return.",
+    "mixExpectedReturn": "Expected average annual real return: {{value}}%",
+    "mixNames": {
+      "allStocks": "100% stocks",
+      "aggressive": "Aggressive 80/20",
+      "balanced": "Balanced 60/40",
+      "conservative": "Conservative 40/60",
+      "gic": "GIC ladder"
+    },
+    "feeTotalLabel": "Total annual investment fees (%)",
+    "feePresetIntro": "Choose an example based on how your investments are managed, or enter your own total. Include fund MER and any ongoing advisory fee once, not twice.",
+    "feePresetGroup": "Example investment fee rates",
+    "feePreset": {
+      "etf": "Self-directed ETF · 0.2%",
+      "managed": "Managed ETF portfolio · 0.65%",
+      "mutual": "Traditional mutual fund · 2.1%"
+    },
+    "feePresetSource": "Illustrative product fees (check your own statements):",
+    "inflationPresetIntro": "Choose a long-term planning assumption or enter your own. The higher-inflation option is a stress test, not a forecast.",
+    "inflationPresetGroup": "Example annual inflation assumptions",
+    "inflationPreset": {
+      "fpCanada": "FP Canada 2026 · 2.1%",
+      "bankTarget": "Bank of Canada target · 2.0%",
+      "stress": "Higher-inflation scenario · 3.0%"
+    },
+    "inflationPresetSource": "Planning guidelines and target:",
     "taxIntro": "This page estimates taxable income paid out by non-registered investments each year and a simplified tax rate before you stop full-time work. It is not your total investment return or your retirement tax rate.",
     "taxDistributionLabel": "Annual taxable distributions as a share of non-registered investments (%)",
     "taxDistributionMeaning": "Include interest, taxable dividends and fund / ETF distributions, even when automatically reinvested. Exclude unsold increases in market value.",
@@ -686,9 +857,26 @@
     "taxRateSource": "CRA tax brackets",
     "taxWorkedExample": "For example, with {{balance}} in non-registered investments, your inputs imply about {{distribution}} in yearly distributions and an estimated {{tax}} in pre-retirement tax drag.",
     "taxModelNote": "Model simplification: this rate also estimates pre-retirement tax on net rent and any CPP / OAS / employer pension already received. Dividend credits, capital gains and return of capital are not modelled by distribution type. This is a planning estimate, not a tax bill.",
-    "categories": { "family": "Family and timing", "saving": "Everyday saving", "assets": "Money you already have", "housing": "Housing and loans", "spending": "Retirement life", "income": "Other retirement income", "preferences": "Preferences and assumptions" },
-    "status": { "answered": "answered", "pending": "to do" },
-    "accountNames": { "tfsa": "TFSA", "rrsp": "RRSP / RRIF", "nonReg": "Non-registered account", "fhsa": "FHSA", "locked": "Locked retirement account" },
+    "categories": {
+      "family": "Family and timing",
+      "saving": "Everyday saving",
+      "assets": "Money you already have",
+      "housing": "Housing and loans",
+      "spending": "Retirement life",
+      "income": "Other retirement income",
+      "preferences": "Preferences and assumptions"
+    },
+    "status": {
+      "answered": "answered",
+      "pending": "to do"
+    },
+    "accountNames": {
+      "tfsa": "TFSA",
+      "rrsp": "RRSP / RRIF",
+      "nonReg": "Non-registered account",
+      "fhsa": "FHSA",
+      "locked": "Locked retirement account"
+    },
     "accountRoles": {
       "tfsa": "After-tax money grows and can be withdrawn tax-free—useful for flexible retirement spending.",
       "rrsp": "Contributions may reduce tax now; growth is tax-deferred and RRSP/RRIF withdrawals are taxable income.",
@@ -702,27 +890,275 @@
     "allocationRemaining": "Allocate the remaining {{difference}} percentage points.",
     "allocationOver": "Reduce the total by {{difference}} percentage points.",
     "choice": {
-      "single": "Plan for me", "couple": "Plan with my partner", "noChildren": "No children in this plan", "hasChildren": "Include children", "monthly": "I know the monthly amount", "annual": "I know the yearly amount", "noWork": "No work income after full-time work", "someWork": "I expect some work income", "undecided": "I have not decided", "no": "No", "yes": "Yes", "noRental": "No rental property", "hasRental": "Include a rental property", "noDebt": "No other loans", "hasDebt": "Include another loan", "knowBudget": "I know my overall budget", "estimateBudget": "Help me build it from categories", "unknown": "I need to come back to this", "noPension": "No employer pension", "dbPension": "My employer will pay me regularly", "dbDetail": "A defined-benefit pension pays income over time.", "dcPension": "I have an account balance", "dcDetail": "Put a DC/LIRA balance in the locked-account section.", "indexedFull": "It fully rises with inflation", "indexedPartial": "Only part rises with inflation", "indexedFixed": "The payment stays fixed", "leaveMore": "Keep my planned lifestyle and compare what may remain", "noLegacy": "I do not need to reserve a specific legacy", "fixedLegacy": "I want to leave a particular amount", "lifetimeGifts": "I prefer helping people while I am alive", "unsupported": "We will record this wish and explain the current limitation.", "maintainSpending": "Keep my current retirement budget", "exploreCeiling": "Show the theoretical spending ceiling", "hasTarget": "I have my own asset target", "noTarget": "I do not have a target yet"
+      "single": "Plan for me",
+      "couple": "Plan with my partner",
+      "noChildren": "No children in this plan",
+      "hasChildren": "Include children",
+      "monthly": "I know the monthly amount",
+      "annual": "I know the yearly amount",
+      "noWork": "No work income after full-time work",
+      "someWork": "I expect some work income",
+      "undecided": "I have not decided",
+      "no": "No",
+      "yes": "Yes",
+      "noRental": "No rental property",
+      "hasRental": "Include a rental property",
+      "noDebt": "No other loans",
+      "hasDebt": "Include another loan",
+      "knowBudget": "I know my overall budget",
+      "estimateBudget": "Help me build it from categories",
+      "unknown": "I need to come back to this",
+      "noPension": "No employer pension",
+      "dbPension": "My employer will pay me regularly",
+      "dbDetail": "A defined-benefit pension pays income over time.",
+      "dcPension": "I have an account balance",
+      "dcDetail": "Put a DC/LIRA balance in the locked-account section.",
+      "indexedFull": "It fully rises with inflation",
+      "indexedPartial": "Only part rises with inflation",
+      "indexedFixed": "The payment stays fixed",
+      "leaveMore": "Keep my planned lifestyle and compare what may remain",
+      "noLegacy": "I do not need to reserve a specific legacy",
+      "fixedLegacy": "I want to leave a particular amount",
+      "lifetimeGifts": "I prefer helping people while I am alive",
+      "unsupported": "We will record this wish and explain the current limitation.",
+      "maintainSpending": "Keep my current retirement budget",
+      "exploreCeiling": "Show the theoretical spending ceiling",
+      "hasTarget": "I have my own asset target",
+      "noTarget": "I do not have a target yet"
     },
-    "intentSummary": { "legacy": "Keep annual spending near {{spending}} and compare remaining after-tax assets.", "spending": "Keep the current budget unchanged while separately showing a theoretical spending ceiling.", "sustainability": "Check whether the current plan is sustainable without claiming an estate preference." },
+    "intentSummary": {
+      "legacy": "Keep annual spending near {{spending}} and compare remaining after-tax assets.",
+      "spending": "Keep the current budget unchanged while separately showing a theoretical spending ceiling.",
+      "sustainability": "Check whether the current plan is sustainable without claiming an estate preference."
+    },
     "guidance": {
-      "family": { "essential": "Start with who the plan covers and the timeline you want to examine.", "why": "Ages set saving years, retirement years and when income can begin. Province affects the tax estimate.", "help": "Use current ages and the province used for tax. The planning horizon is a range to test, not a prediction of lifespan.", "example": "Alex is 40, stops full-time work at 55 and tests the plan through age 95." },
-      "saving": { "essential": "Count money newly added after tax, daily costs and existing loan payments.", "why": "New deposits grow the portfolio before retirement; salary or market growth is not the same as savings.", "help": "Review 12 months of deposits, subtract money taken back out, and exclude transfers between your own accounts.", "example": "$2,000 a month of net new deposits equals $24,000 a year." },
-      "assets": { "essential": "First identify the account type, then use today’s balance—not contribution room.", "why": "TFSA, RRSP and non-registered are tax wrappers; funds and stocks are investments held inside them.", "help": "Use a recent bank or brokerage market value. Exclude RESP, your home and future government benefits.", "example": "A $100,000 non-registered balance with $80,000 cost has a $20,000 unrealized gain, not a $20,000 tax bill." },
-      "housing": { "essential": "Describe where you expect to live before entering property values or loans.", "why": "A home adds net worth but cannot pay bills unless sold. Loan payments reduce annual cash flow.", "help": "Use the latest mortgage statement and enter each loan only once with the related property.", "example": "A home kept for life remains net worth; its $2,000 monthly mortgage is a separate cash-flow cost." },
-      "spending": { "essential": "Use today’s prices. Loan payments already entered elsewhere stay outside this budget.", "why": "This is the after-tax lifestyle the portfolio must fund; the engine separately estimates withdrawals and tax.", "help": "Start with recent spending and adjust categories that genuinely change after work ends.", "example": "$3,000 a month is $36,000 a year before separately modelled loans." },
-      "income": { "essential": "Identify whether income is a government benefit, lifetime employer pension, or account balance.", "why": "Income starting later reduces withdrawals later, while investments must bridge the years before it begins.", "help": "Use age-65 CPP/QPP estimates from Service Canada or Retraite Québec; do not re-enter an already adjusted claim amount as the age-65 base.", "example": "$1,000 per month at age 65 is a $12,000 annual age-65 estimate." },
-      "preferences": { "essential": "Facts may be estimated; preferences must be chosen and confirmed by you.", "why": "Keeping spending fixed and exploring a maximum spending level answer different questions and carry different trade-offs.", "help": "Choose the comparison that reflects your intent. Unsupported legacy amounts and lifetime gifts remain disclosed wishes, not hidden engine constraints.", "example": "You can view a spending ceiling without applying it to your existing budget." }
+      "family": {
+        "essential": "Start with who the plan covers and the timeline you want to examine.",
+        "why": "Ages set saving years, retirement years and when income can begin. Province affects the tax estimate.",
+        "help": "Use current ages and the province used for tax. The planning horizon is a range to test, not a prediction of lifespan.",
+        "example": "Alex is 40, stops full-time work at 55 and tests the plan through age 95."
+      },
+      "saving": {
+        "essential": "Count money newly added after tax, daily costs and existing loan payments.",
+        "why": "New deposits grow the portfolio before retirement; salary or market growth is not the same as savings.",
+        "help": "Review 12 months of deposits, subtract money taken back out, and exclude transfers between your own accounts.",
+        "example": "$2,000 a month of net new deposits equals $24,000 a year."
+      },
+      "assets": {
+        "essential": "First identify the account type, then use today’s balance—not contribution room.",
+        "why": "TFSA, RRSP and non-registered are tax wrappers; funds and stocks are investments held inside them.",
+        "help": "Use a recent bank or brokerage market value. Exclude RESP, your home and future government benefits.",
+        "example": "A $100,000 non-registered balance with $80,000 cost has a $20,000 unrealized gain, not a $20,000 tax bill."
+      },
+      "housing": {
+        "essential": "Describe where you expect to live before entering property values or loans.",
+        "why": "A home adds net worth but cannot pay bills unless sold. Loan payments reduce annual cash flow.",
+        "help": "Use the latest mortgage statement and enter each loan only once with the related property.",
+        "example": "A home kept for life remains net worth; its $2,000 monthly mortgage is a separate cash-flow cost."
+      },
+      "spending": {
+        "essential": "Use today’s prices. Loan payments already entered elsewhere stay outside this budget.",
+        "why": "This is the after-tax lifestyle the portfolio must fund; the engine separately estimates withdrawals and tax.",
+        "help": "Start with recent spending and adjust categories that genuinely change after work ends.",
+        "example": "$3,000 a month is $36,000 a year before separately modelled loans."
+      },
+      "income": {
+        "essential": "Identify whether income is a government benefit, lifetime employer pension, or account balance.",
+        "why": "Income starting later reduces withdrawals later, while investments must bridge the years before it begins.",
+        "help": "Use age-65 CPP/QPP estimates from Service Canada or Retraite Québec; do not re-enter an already adjusted claim amount as the age-65 base.",
+        "example": "$1,000 per month at age 65 is a $12,000 annual age-65 estimate."
+      },
+      "preferences": {
+        "essential": "Facts may be estimated; preferences must be chosen and confirmed by you.",
+        "why": "Keeping spending fixed and exploring a maximum spending level answer different questions and carry different trade-offs.",
+        "help": "Choose the comparison that reflects your intent. Unsupported legacy amounts and lifetime gifts remain disclosed wishes, not hidden engine constraints.",
+        "example": "You can view a spending ceiling without applying it to your existing budget."
+      }
     },
     "pages": {
-      "income_taxFacts": { "question": "Who receives each income and owns the taxable assets?" },
-      "family_people": { "question": "Is this plan for you alone or for you and a partner?" }, "family_ages": { "question": "How old are the people in this plan today?" }, "family_children": { "question": "Are there children whose current age belongs in this household plan?" }, "family_province": { "question": "Which province should this plan use for income tax?" }, "time_work": { "question": "When would you stop full-time work, and do you have an asset target?" }, "time_horizon": { "question": "How far into the future should this plan test?" },
-      "saving_method": { "question": "Is it easier to answer with a monthly or yearly saving amount?" }, "saving_amount": { "question": "How much new money do you actually add to savings and investments?" }, "work_after": { "question": "After full-time work ends, do you expect other work income?" }, "work_amount": { "question": "How much work income do you expect each year?" }, "work_period": { "question": "From what age until what age will that income continue?" },
-      "assets_identify": { "question": "Which accounts contain money you intend to use for retirement?" }, "account_tfsa_balance": { "question": "What is the current total balance in your TFSA accounts?" }, "account_rrsp_balance": { "question": "What is the current total balance in your RRSP accounts?" }, "account_nonReg_balance": { "question": "What are your non-registered investments worth now, and what is their cost base?" }, "allocation_tfsa": { "question": "How will you divide future new savings among your accounts?" }, "fhsa_details": { "question": "What is in the FHSA now, and how much will you add each year?" }, "fhsa_open": { "question": "How long ago was the FHSA opened?" }, "locked_balance": { "question": "How much is currently in the locked retirement account?" }, "locked_access": { "question": "When can the locked money first be used, and whose plan is it?" }, "locked_contributions": { "question": "How much do you and the employer add to this plan each year?" },
-      "home_situation": { "question": "Do you rent, own your home, or plan to buy one?" }, "home_value": { "question": "What is the home worth, and do you plan to sell it?" }, "home_mortgage": { "question": "Are you still making payments on this home?" }, "mortgage_balance": { "question": "How much remains on the mortgage?" }, "mortgage_payment": { "question": "How much is the mortgage payment and how long remains?" }, "purchase_time": { "question": "At what age do you expect to buy the home?" }, "purchase_price": { "question": "What price and down payment are you planning?" }, "purchase_loan": { "question": "What mortgage payment and term are you assuming?" }, "housing_other": { "question": "Do rental properties or other loans belong in this plan?" }, "rental_0_value": { "question": "What is the rental property worth and what did it cost?" }, "rental_0_income": { "question": "What net rent does it earn, and when might you sell?" }, "rental_0_mortgage": { "question": "Does this rental property have a mortgage?" }, "rental_0_loan": { "question": "What balance and annual payment remain on that mortgage?" }, "rental_0_term": { "question": "How many years remain on the rental mortgage?" }, "debt_0_type": { "question": "What kind of other loan is this?" }, "debt_0_balance": { "question": "How much remains on this loan?" }, "debt_0_payment": { "question": "What is its annual payment and how many years remain?" },
-      "spending_method": { "question": "Do you know your retirement budget, or should we build it from everyday categories?" }, "spending_total": { "question": "How much would one year of retirement life cost?" }, "spending_homeFood": { "question": "How much will housing and groceries cost?" }, "spending_travelHealth": { "question": "How much will travel and health care cost?" }, "spending_utilitiesTransport": { "question": "How much will utilities and transportation cost?" }, "spending_funOther": { "question": "How much will entertainment and other needs cost?" },
-      "cpp_self": { "question": "What CPP/QPP amount do you expect, and when will you claim it?" }, "oas_self": { "question": "What OAS amount do you expect, and when will you claim it?" }, "cpp_partner": { "question": "What CPP/QPP amount does your partner expect?" }, "oas_partner": { "question": "What OAS amount does your partner expect?" }, "pension_self": { "question": "Will an employer pay a pension over time, or give you an account balance?" }, "pension_self_details": { "question": "How much lifetime pension will be paid, and when does it begin?" }, "pension_self_indexing": { "question": "Will your pension rise with prices, and is there a bridge payment?" }, "pension_partner": { "question": "What kind of employer pension does your partner have?" }, "pension_partner_details": { "question": "How much lifetime pension will your partner receive, and when?" }, "pension_partner_indexing": { "question": "Will your partner’s pension rise with prices, and is there a bridge payment?" },
-      "intent_legacy": { "question": "After supporting your retirement, do you want to reserve something for other people or causes?" }, "intent_spending": { "question": "If the plan has room, do you want to explore spending more or keep your current budget?" }, "invest_mix": { "question": "Which broad investment mix best describes the plan?" }, "invest_fees": { "question": "What investment fee and inflation assumptions should we use?" }, "invest_tax": { "question": "How much taxable income do non-registered investments pay each year, and what tax rate should we estimate?" }, "invest_strategy": { "question": "In what order should retirement accounts fund spending?" }
+      "income_taxFacts": {
+        "question": "Who receives each income and owns the taxable assets?"
+      },
+      "family_people": {
+        "question": "Is this plan for you alone or for you and a partner?"
+      },
+      "family_ages": {
+        "question": "How old are the people in this plan today?"
+      },
+      "family_children": {
+        "question": "Are there children whose current age belongs in this household plan?"
+      },
+      "family_province": {
+        "question": "Which province should this plan use for income tax?"
+      },
+      "time_work": {
+        "question": "When would you stop full-time work, and do you have an asset target?"
+      },
+      "time_horizon": {
+        "question": "How far into the future should this plan test?"
+      },
+      "saving_method": {
+        "question": "Is it easier to answer with a monthly or yearly saving amount?"
+      },
+      "saving_amount": {
+        "question": "How much new money do you actually add to savings and investments?"
+      },
+      "work_after": {
+        "question": "After full-time work ends, do you expect other work income?"
+      },
+      "work_amount": {
+        "question": "How much work income do you expect each year?"
+      },
+      "work_period": {
+        "question": "From what age until what age will that income continue?"
+      },
+      "assets_identify": {
+        "question": "Which accounts contain money you intend to use for retirement?"
+      },
+      "account_tfsa_balance": {
+        "question": "What is the current total balance in your TFSA accounts?"
+      },
+      "account_rrsp_balance": {
+        "question": "What is the current total balance in your RRSP accounts?"
+      },
+      "account_nonReg_balance": {
+        "question": "What are your non-registered investments worth now, and what is their cost base?"
+      },
+      "allocation_tfsa": {
+        "question": "How will you divide future new savings among your accounts?"
+      },
+      "fhsa_details": {
+        "question": "What is in the FHSA now, and how much will you add each year?"
+      },
+      "fhsa_open": {
+        "question": "How long ago was the FHSA opened?"
+      },
+      "locked_balance": {
+        "question": "How much is currently in the locked retirement account?"
+      },
+      "locked_access": {
+        "question": "When can the locked money first be used, and whose plan is it?"
+      },
+      "locked_contributions": {
+        "question": "How much do you and the employer add to this plan each year?"
+      },
+      "home_situation": {
+        "question": "Do you rent, own your home, or plan to buy one?"
+      },
+      "home_value": {
+        "question": "What is the home worth, and do you plan to sell it?"
+      },
+      "home_mortgage": {
+        "question": "Are you still making payments on this home?"
+      },
+      "mortgage_balance": {
+        "question": "How much remains on the mortgage?"
+      },
+      "mortgage_payment": {
+        "question": "How much is the mortgage payment and how long remains?"
+      },
+      "purchase_time": {
+        "question": "At what age do you expect to buy the home?"
+      },
+      "purchase_price": {
+        "question": "What price and down payment are you planning?"
+      },
+      "purchase_loan": {
+        "question": "What mortgage payment and term are you assuming?"
+      },
+      "housing_other": {
+        "question": "Do rental properties or other loans belong in this plan?"
+      },
+      "rental_0_value": {
+        "question": "What is the rental property worth and what did it cost?"
+      },
+      "rental_0_income": {
+        "question": "What net rent does it earn, and when might you sell?"
+      },
+      "rental_0_mortgage": {
+        "question": "Does this rental property have a mortgage?"
+      },
+      "rental_0_loan": {
+        "question": "What balance and annual payment remain on that mortgage?"
+      },
+      "rental_0_term": {
+        "question": "How many years remain on the rental mortgage?"
+      },
+      "debt_0_type": {
+        "question": "What kind of other loan is this?"
+      },
+      "debt_0_balance": {
+        "question": "How much remains on this loan?"
+      },
+      "debt_0_payment": {
+        "question": "What is its annual payment and how many years remain?"
+      },
+      "spending_method": {
+        "question": "Do you know your retirement budget, or should we build it from everyday categories?"
+      },
+      "spending_total": {
+        "question": "How much would one year of retirement life cost?"
+      },
+      "spending_homeFood": {
+        "question": "How much will housing and groceries cost?"
+      },
+      "spending_travelHealth": {
+        "question": "How much will travel and health care cost?"
+      },
+      "spending_utilitiesTransport": {
+        "question": "How much will utilities and transportation cost?"
+      },
+      "spending_funOther": {
+        "question": "How much will entertainment and other needs cost?"
+      },
+      "cpp_self": {
+        "question": "What CPP/QPP amount do you expect, and when will you claim it?"
+      },
+      "oas_self": {
+        "question": "What OAS amount do you expect, and when will you claim it?"
+      },
+      "cpp_partner": {
+        "question": "What CPP/QPP amount does your partner expect?"
+      },
+      "oas_partner": {
+        "question": "What OAS amount does your partner expect?"
+      },
+      "pension_self": {
+        "question": "Will an employer pay a pension over time, or give you an account balance?"
+      },
+      "pension_self_details": {
+        "question": "How much lifetime pension will be paid, and when does it begin?"
+      },
+      "pension_self_indexing": {
+        "question": "Will your pension rise with prices, and is there a bridge payment?"
+      },
+      "pension_partner": {
+        "question": "What kind of employer pension does your partner have?"
+      },
+      "pension_partner_details": {
+        "question": "How much lifetime pension will your partner receive, and when?"
+      },
+      "pension_partner_indexing": {
+        "question": "Will your partner’s pension rise with prices, and is there a bridge payment?"
+      },
+      "intent_legacy": {
+        "question": "After supporting your retirement, do you want to reserve something for other people or causes?"
+      },
+      "intent_spending": {
+        "question": "If the plan has room, do you want to explore spending more or keep your current budget?"
+      },
+      "invest_mix": {
+        "question": "Which broad investment mix best describes the plan?"
+      },
+      "invest_fees": {
+        "question": "What investment fee and inflation assumptions should we use?"
+      },
+      "invest_tax": {
+        "question": "How much taxable income do non-registered investments pay each year, and what tax rate should we estimate?"
+      },
+      "invest_strategy": {
+        "question": "In what order should retirement accounts fund spending?"
+      }
     }
   },
   "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",
@@ -816,5 +1252,28 @@
     "spousalSource": "CRA form T2205",
     "limit": "Your own RRSP contribution and a recorded spousal-plan premium are priced against the contributor's room. The couple voluntary-savings RRSP split, RRSP/RRIF age-71 conversion and multi-account destination allocation are not implemented.",
     "source": "CRA T4040 RRSPs and other registered plans"
+  },
+  "be36": {
+    "title": "FHSA contribution room",
+    "explanation": "FHSA participation room belongs to the account holder, so it is recorded per person. Copy the opening year, the previous contributions and the unused room from the CRA participation-room statement or the T4FHSA slips. Leave a line blank if you cannot confirm it: a blank line stays unknown, no contribution is priced against it, and it is never treated as zero or as a full $8,000 of room.",
+    "person": "{{person}} FHSA room",
+    "noAccount": "This person has no FHSA account of their own, so there is no participation room to price. An FHSA is never shared, and a household total is not divided between two people.",
+    "ambiguousAccount": "This person has more than one FHSA account, so a planned contribution cannot be attributed to one of them.",
+    "multipleActive": "More than one FHSA is active this year. This estimate prices one active FHSA per plan, so the projection stops until only one account has a plan or a balance.",
+    "openedYear": "Year the first FHSA was opened",
+    "priorContributions": "Contributions and RRSP transfers before this plan year (CRA statement)",
+    "openingRoom": "Unused participation room carried into this plan year (CRA statement)",
+    "openingRoomNote": "Enter the room left over from earlier years, not the participation-room statement's figure for this year: that figure already includes this year's own room.",
+    "planned": "Planned FHSA contribution this year",
+    "scheduledRecorded": "A scheduled contribution of {{amount}} CAD is recorded for this plan year, so the plan shown is the larger of that schedule and the recorded amount.",
+    "ledger": "Opening room {{opening}} + this year's room {{addition}} − contributions {{applied}} = closing room {{closing}} CAD",
+    "lifetime": "Lifetime limit {{limit}} CAD: {{used}} used, {{remaining}} remaining. Investment growth never counts against it, and a transfer is never deducted twice.",
+    "retained": "Retained and not contributed: {{retained}} CAD.",
+    "retainedHelp": "Participation room is never exceeded and the money does not disappear: the remainder stays in the non-registered account instead.",
+    "unknownRoom": "FHSA participation room is not confirmed, so no contribution is priced: {{reason}}",
+    "maturity": "This FHSA has reached its 15-year participation clock. The statutory rollover into an RRSP/RRIF is not implemented yet, so no contribution is priced for that year.",
+    "limit": "The published $8,000 annual limit, $40,000 lifetime limit and $8,000 participation-room carryforward maximum come from the CRA FHSA pages. The year's room is this year's $8,000 plus at most that carryforward maximum, and the lifetime limit bounds that whole total, so room carried in from earlier years is never spent on top of the remaining lifetime room. Not implemented yet: the 15-year / age-71 clock, rollover into an RRSP/RRIF, qualifying and non-qualifying withdrawals, home-purchase eligibility and the death event. FHSA re-participation room, designated amounts and the excess-FHSA-amount tax are out of scope too, so this ledger reports only room the published limits allow.",
+    "source": "CRA: participating in your FHSAs",
+    "scope": "FHSA room is tracked per person and per year. Maturity, rollover, withdrawals and home-purchase eligibility remain outside this estimate."
   }
 }

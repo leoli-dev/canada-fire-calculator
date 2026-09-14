@@ -8,25 +8,72 @@
   "be11TerminalComparisonLimit": "两份计划的逐人终年税务尚未核实，税后遗产比较不可用。最终净资产不含遗产税，仅在比较受支持时显示。",
   "be11AuxiliaryEstimate": "下方开领时机、策略和蒙特卡洛工具仍使用旧单人近似，其排名仅供估算。",
   "be11": {
-    "title": "应税收入的领取人与归属", "reviewed": "我已核对这些税务事实", "unknownStill": "目前无法确认；结果保持为估算",
-    "personLedger": "逐人逐年税务表", "ledgerLimit": "年度税额沿用以2026年规则为基准的实际购买力假设。遗产税、其他求解器和复杂资金事件仍需逐人规则。", "person": "人员", "grossIncome": "总收入", "eligiblePension": "合格养老金",
+    "title": "应税收入的领取人与归属",
+    "reviewed": "我已核对这些税务事实",
+    "unknownStill": "目前无法确认；结果保持为估算",
+    "personLedger": "逐人逐年税务表",
+    "ledgerLimit": "年度税额沿用以2026年规则为基准的实际购买力假设。遗产税、其他求解器和复杂资金事件仍需逐人规则。",
+    "person": "人员",
+    "grossIncome": "总收入",
+    "eligiblePension": "合格养老金",
     "explanation": "引导与专业模式共用这些税务事实。请按人填写各自账户余额（注册账户始终单独归属一人），金额之和须等于家庭总额；家庭总额不会被自动均分。工作期税务和未支持的资产事件仍属估算。",
-    "unknown": "未确认", "shared": "共同应税归属", "splitOwners": "分别持有（已记录拆分）", "self": "本人", "partner": "伴侣", "yes": "是", "no": "否",
+    "unknown": "未确认",
+    "shared": "共同应税归属",
+    "splitOwners": "分别持有（已记录拆分）",
+    "self": "本人",
+    "partner": "伴侣",
+    "yes": "是",
+    "no": "否",
     "earned": "{{person}}：当前年度工作收入（加元）",
-    "ownership": "账户及房产税务归属", "selfTaxShare": "本人的应税份额（百分比）", "propertyOwner": "投资房产所有者",
-    "selfAmount": "本人金额（加元）", "partnerAmount": "伴侣金额（加元）",
+    "ownership": "账户及房产税务归属",
+    "selfTaxShare": "本人的应税份额（百分比）",
+    "propertyOwner": "投资房产所有者",
+    "selfAmount": "本人金额（加元）",
+    "partnerAmount": "伴侣金额（加元）",
     "splitSum": "本人金额 + 伴侣金额：{{sum}} / {{total}} 加元",
     "splitMismatch": "两项金额之和必须等于账户余额 {{total}} 加元；在金额一致之前，归属保持未确认。",
     "splitHelp": "注册账户各自属于一人：请分别填写两人的余额，两项之和须等于家庭总额。非注册账户与房产记录各自份额；任何金额都不会被自动分摊。",
     "lockedOwnerResetHelp": "在主表单中更改锁定账户的所有者，会把拆分重新记录为该所有者 100%。",
     "spouseSupport": "您是否与伴侣同住并提供扶养，以申领配偶抵免？",
-    "splitTransferor": "合格养老金显式分拆：由谁转出？", "noSplit": "不分拆养老金", "splitAmount": "年度转出金额（加元；不超过合格收入的50%）",
-    "registeredType": "注册账户类型", "rrifOpenedYear": "RRIF 开户年份", "rrifAgeElection": "RRIF 开户时选用的年龄", "noElection": "使用账户持有人年龄",
-    "rrifFactorCategory": "已核实的 RRIF 提款因子类别（请核对转入历史）", "rrifQualifying": "符合资格的 RRIF", "rrifAllOther": "其他 RRIF",
-    "rrifFactorHelp": "选择类别前请核对金融机构的开户、转入和修订记录。仅凭开户年份不能确认资格；保持“未确认”时，精确最低提款额及税务结果会继续受限。", "rrifFactorSource": "CRA 法定因子表",
+    "splitTransferor": "合格养老金显式分拆：由谁转出？",
+    "noSplit": "不分拆养老金",
+    "splitAmount": "年度转出金额（加元；不超过合格收入的50%）",
+    "registeredType": "注册账户类型",
+    "rrifOpenedYear": "RRIF 开户年份",
+    "rrifAgeElection": "RRIF 开户时选用的年龄",
+    "noElection": "使用账户持有人年龄",
+    "rrifFactorCategory": "已核实的 RRIF 提款因子类别（请核对转入历史）",
+    "rrifQualifying": "符合资格的 RRIF",
+    "rrifAllOther": "其他 RRIF",
+    "rrifFactorHelp": "选择类别前请核对金融机构的开户、转入和修订记录。仅凭开户年份不能确认资格；保持“未确认”时，精确最低提款额及税务结果会继续受限。",
+    "rrifFactorSource": "CRA 法定因子表",
     "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。"
   },
-  "be35": {"qcSplitTransferor": "魁省附表Q选择：由谁转出？","qcSplitAmount": "魁省年度退休收入转出额（加元）","splitHelp": "魁省养老金转移选择与联邦分拆独立。转出人必须至少65岁；只有实际选择附表Q时才填写转移。","coverageTitle": "魁省处方药保险覆盖","coverageHelp": "它只影响每人魁省税行中的魁省处方药保费（TP-1第447行），不涉及其他任何项目。适用对象是魁省居民：参加RAMQ公共药保、持有符合条件的私保，或已核实免缴资格的人。整年不变时只需选一个全年状态；只有年中真的更换保险时才需要逐月填写。只要某年含公共药保月份，在2026年附表K公布前该年魁省税仍是带标签的估算。","coveragePerson": "{{person}}的覆盖","mixed": "各月不同","unknown": "未确认","private": "私人基本药保","public": "RAMQ公共药保","waived": "已核实免缴保费","publicLimit": "公共保费取决于家庭收入和税年附表K；2026版尚未公布。七月至次年六月的RAMQ费率不能当作全年税额。","ramqSource": "RAMQ费率期间","limit": "魁省家庭抵免和FSS使用2026参数。公保保费待2026附表K核实；其他复杂税务事件仍属估算。","fss": "FSS缴费","ramq": "RAMQ保费","scheduleB": "附表B抵免","qcProvincialTax": "魁省所得税","federalEligiblePension": "联邦合格养老金","qcRetirementEligible": "魁省退休收入（122/123行）","annualStatus": "全年保险状态","changedDuringYear": "年内保险有变化","monthDetailHelp": "只有年内保险有变化时才需要填写。税年保费（附表K）分别核算1–6月和7–12月两个期间，因此变化的月份可能有影响——例如RAMQ上限于2026年7月1日上调。含公共药保月份时，2026年附表K公布前魁省税仍是带标签的估算。"},
+  "be35": {
+    "qcSplitTransferor": "魁省附表Q选择：由谁转出？",
+    "qcSplitAmount": "魁省年度退休收入转出额（加元）",
+    "splitHelp": "魁省养老金转移选择与联邦分拆独立。转出人必须至少65岁；只有实际选择附表Q时才填写转移。",
+    "coverageTitle": "魁省处方药保险覆盖",
+    "coverageHelp": "它只影响每人魁省税行中的魁省处方药保费（TP-1第447行），不涉及其他任何项目。适用对象是魁省居民：参加RAMQ公共药保、持有符合条件的私保，或已核实免缴资格的人。整年不变时只需选一个全年状态；只有年中真的更换保险时才需要逐月填写。只要某年含公共药保月份，在2026年附表K公布前该年魁省税仍是带标签的估算。",
+    "coveragePerson": "{{person}}的覆盖",
+    "mixed": "各月不同",
+    "unknown": "未确认",
+    "private": "私人基本药保",
+    "public": "RAMQ公共药保",
+    "waived": "已核实免缴保费",
+    "publicLimit": "公共保费取决于家庭收入和税年附表K；2026版尚未公布。七月至次年六月的RAMQ费率不能当作全年税额。",
+    "ramqSource": "RAMQ费率期间",
+    "limit": "魁省家庭抵免和FSS使用2026参数。公保保费待2026附表K核实；其他复杂税务事件仍属估算。",
+    "fss": "FSS缴费",
+    "ramq": "RAMQ保费",
+    "scheduleB": "附表B抵免",
+    "qcProvincialTax": "魁省所得税",
+    "federalEligiblePension": "联邦合格养老金",
+    "qcRetirementEligible": "魁省退休收入（122/123行）",
+    "annualStatus": "全年保险状态",
+    "changedDuringYear": "年内保险有变化",
+    "monthDetailHelp": "只有年内保险有变化时才需要填写。税年保费（附表K）分别核算1–6月和7–12月两个期间，因此变化的月份可能有影响——例如RAMQ上限于2026年7月1日上调。含公共药保月份时，2026年附表K公布前魁省税仍是带标签的估算。"
+  },
   "tagline": "加拿大式提前退休 —— 认真建模 TFSA、RRSP、CPP/QPP 和 OAS。",
   "profile": "基本信息",
   "ruleAssumptionsTitle": "税务与福利规则版本",
@@ -640,17 +687,77 @@
   "guidedBasedOnAssumptions": "基于你核对过的假设",
   "guidedResultSuccess": "投影可以覆盖到 {{age}} 岁；这是模型结果，不是保证。",
   "guidedResultShortfall": "第一次现金缺口出现在 {{age}} 岁：需要 {{need}}，当前路径提供 {{available}}，缺少 {{shortfall}}。",
-  "guided": { "meta": {
-    "confirmed": "已确认", "estimated": "估算", "unknown": "未知", "notApplicable": "不适用", "legacy": "旧数据", "example": "示例"
-  }, "steps": {
-    "household": { "short": "家庭", "title": "家庭与目标", "help": "先确定要测试的退休时间线。", "question": "你想规划怎样的退休？", "why": "年龄决定还要储蓄多久、投资要支持多久以及何时能开始领取福利。停止工作和领取福利是两项决定。", "how": "填写当前年龄，以及预计退休后的税务居住省份。", "example": "Sam 现在40岁，55岁停止全职工作，65岁领CPP，计划测试到95岁。" },
-    "income": { "short": "收入", "title": "收入与储蓄", "help": "把真实储蓄习惯换算成全年金额。", "question": "你实际会把多少钱加入投资？", "why": "新投入会在退休前增长；只知道工资，无法得知扣税和生活费后真正剩下多少。", "how": "比较过去12个月的账户账单并合计新存款，不含投资涨幅和账户转账。", "example": "每月存入2,000元，全年就是24,000元。" },
-    "accounts": { "short": "账户", "title": "账户与供款", "help": "先辨认投资放在哪种税务账户。", "question": "你的退休资金今天放在哪里？", "why": "TFSA、RRSP和非注册账户可以持有同样的基金，但提款和税务处理不同。", "how": "看银行或券商账单上的当前市值；不要把供款额度、房子、RESP或未来福利填进来。", "example": "当前价值100,000元、买入成本80,000元，账面增值20,000元；成本和市值不是一回事。" },
-    "housing": { "short": "房产", "title": "房产与负债", "help": "分清房产价值和能用来生活的现金。", "question": "住房会怎样影响退休现金流？", "why": "房产会增加净资产，但只有出售才会变成可投资现金；房贷或房租则影响每年支出。", "how": "选择租房、已有房或计划买房；与房产关联的房贷只填一次。", "example": "一套持有终身的80万元房产会增加净资产，但不会自动支付买菜费用。" },
-    "spending": { "short": "支出", "title": "退休生活费", "help": "用今天的购买力描述想要的生活。", "question": "退休生活一年大约花多少？", "why": "这个目标决定提款金额；引擎会另算为此需要的账户资金和税。", "how": "先合计每月基本开支，再加旅行、医疗和住房等年度费用；排除已经另填的贷款。", "example": "每月3,000元等于每年36,000元，另填的贷款不重复加入。" },
-    "benefits": { "short": "福利", "title": "福利与假设", "help": "把政府和雇主收入接到退休时间线上。", "question": "停止工作后会有哪些其他收入？", "why": "CPP/QPP和OAS以后能减少投资提款，但开始领取前的几年仍需投资账户过渡。", "how": "使用My Service Canada Account或Retraite Québec中的65岁基准年金额；如果只有65岁月金额则乘12。", "example": "65岁每月1,000元，对应65岁基准年金额12,000元。" },
-    "review": { "short": "核对", "title": "核对并阅读结果", "help": "先检查核心输入和警告，再读计划结论，然后查看完整图表和情景。" }
-  }},
+  "guided": {
+    "meta": {
+      "confirmed": "已确认",
+      "estimated": "估算",
+      "unknown": "未知",
+      "notApplicable": "不适用",
+      "legacy": "旧数据",
+      "example": "示例"
+    },
+    "steps": {
+      "household": {
+        "short": "家庭",
+        "title": "家庭与目标",
+        "help": "先确定要测试的退休时间线。",
+        "question": "你想规划怎样的退休？",
+        "why": "年龄决定还要储蓄多久、投资要支持多久以及何时能开始领取福利。停止工作和领取福利是两项决定。",
+        "how": "填写当前年龄，以及预计退休后的税务居住省份。",
+        "example": "Sam 现在40岁，55岁停止全职工作，65岁领CPP，计划测试到95岁。"
+      },
+      "income": {
+        "short": "收入",
+        "title": "收入与储蓄",
+        "help": "把真实储蓄习惯换算成全年金额。",
+        "question": "你实际会把多少钱加入投资？",
+        "why": "新投入会在退休前增长；只知道工资，无法得知扣税和生活费后真正剩下多少。",
+        "how": "比较过去12个月的账户账单并合计新存款，不含投资涨幅和账户转账。",
+        "example": "每月存入2,000元，全年就是24,000元。"
+      },
+      "accounts": {
+        "short": "账户",
+        "title": "账户与供款",
+        "help": "先辨认投资放在哪种税务账户。",
+        "question": "你的退休资金今天放在哪里？",
+        "why": "TFSA、RRSP和非注册账户可以持有同样的基金，但提款和税务处理不同。",
+        "how": "看银行或券商账单上的当前市值；不要把供款额度、房子、RESP或未来福利填进来。",
+        "example": "当前价值100,000元、买入成本80,000元，账面增值20,000元；成本和市值不是一回事。"
+      },
+      "housing": {
+        "short": "房产",
+        "title": "房产与负债",
+        "help": "分清房产价值和能用来生活的现金。",
+        "question": "住房会怎样影响退休现金流？",
+        "why": "房产会增加净资产，但只有出售才会变成可投资现金；房贷或房租则影响每年支出。",
+        "how": "选择租房、已有房或计划买房；与房产关联的房贷只填一次。",
+        "example": "一套持有终身的80万元房产会增加净资产，但不会自动支付买菜费用。"
+      },
+      "spending": {
+        "short": "支出",
+        "title": "退休生活费",
+        "help": "用今天的购买力描述想要的生活。",
+        "question": "退休生活一年大约花多少？",
+        "why": "这个目标决定提款金额；引擎会另算为此需要的账户资金和税。",
+        "how": "先合计每月基本开支，再加旅行、医疗和住房等年度费用；排除已经另填的贷款。",
+        "example": "每月3,000元等于每年36,000元，另填的贷款不重复加入。"
+      },
+      "benefits": {
+        "short": "福利",
+        "title": "福利与假设",
+        "help": "把政府和雇主收入接到退休时间线上。",
+        "question": "停止工作后会有哪些其他收入？",
+        "why": "CPP/QPP和OAS以后能减少投资提款，但开始领取前的几年仍需投资账户过渡。",
+        "how": "使用My Service Canada Account或Retraite Québec中的65岁基准年金额；如果只有65岁月金额则乘12。",
+        "example": "65岁每月1,000元，对应65岁基准年金额12,000元。"
+      },
+      "review": {
+        "short": "核对",
+        "title": "核对并阅读结果",
+        "help": "先检查核心输入和警告，再读计划结论，然后查看完整图表和情景。"
+      }
+    }
+  },
   "questionnaire": {
     "strategyIntro": "这决定模型每年凑足税后生活费时先动用哪个账户。必须领取的 RRIF 最低额会先计入；没有适合所有人的固定最优顺序，结果页可以比较。",
     "strategyDetails": {
@@ -659,16 +766,85 @@
       "tfsaFirst": "先计入 RRIF 最低提款，再依次用 TFSA→非注册→RRSP。TFSA 提款一般不增加当年应税收入；但会较早用掉免税资金，可能把 RRSP 税负推到以后。",
       "rrspFirst": "先计入 RRIF 最低提款，再优先用 RRSP/RRIF 支付生活费，之后才用非注册→TFSA。可提早降低注册账户余额，但较大的应税提款可能增加税额，并影响按收入计算的福利。"
     },
-    "strategySourceLabel": "税务规则参考：", "strategySourceRrsp": "RRSP 提款", "strategySourceTfsa": "TFSA 税务", "strategySourceCapital": "资本利得", "strategySourceRrif": "RRIF 最低提款", "strategySourceOas": "OAS 回收税",
+    "strategySourceLabel": "税务规则参考：",
+    "strategySourceRrsp": "RRSP 提款",
+    "strategySourceTfsa": "TFSA 税务",
+    "strategySourceCapital": "资本利得",
+    "strategySourceRrif": "RRIF 最低提款",
+    "strategySourceOas": "OAS 回收税",
     "targetQuestion": "你有希望在停工时达到的可投资资产目标吗？",
     "targetExplanation": "可选。这个金额只用于“目标达标？”比较，不决定维持退休生活所需的 FIRE 数字；后者由系统另行计算。",
     "targetExampleNote": "显示的 100 万只是示例。请按今天的购买力填写你自己的金额，输入后才算确认。",
-    "directory": "问卷目录", "categoryCount": "第 {{current}} 类，共 {{total}} 类", "closeDirectory": "关闭目录", "chooseOne": "请选择", "helpTitle": "为什么要问、去哪里找", "findLabel": "资料位置：", "exampleLabel": "虚构示例：",
-    "reviewAnswers": "核对答案", "backToQuestions": "返回问卷", "reviewTitle": "核对你的答案", "reviewIntro": "这里集中核对你的输入和投影假设；有不合适的项目可直接修改。核对完再生成结果。", "needsAttention": "请补充或核对这些项目", "generateResults": "生成我的结果", "modifyAnswers": "修改答案", "resultsTitle": "你的退休投影", "resultsIntro": "以下结果使用你填写或选择的数值与假设；估算不保证未来结果。", "nextCategory": "下一类别", "pendingSaved": "已标为待补。你可以继续，并在核对页回来处理。", "hasHome": "已计入住房", "notApplicable": "当前路径不适用这个问题。",
-    "monthlySavings": "平均每月新增储蓄", "savingFeedback": "每月 {{monthly}}，等于每年 {{annual}}。", "spendingFeedback": "按今天购买力，每月 {{monthly}}，等于每年 {{annual}}。", "housingOtherLimit": "投资房和其他负债会进入各自的后续页面。", "confirmRemoveValue": "这项内容含有已保存的非零金额。确定从计划中移除吗？", "intentRecommendationLabel": "根据你的选择，结果会这样比较：", "intentUnsupported": "固定遗产金额或生前赠与会保存为愿望，但当前引擎还不能把它作为现金流硬约束。",
-    "reviewAssumptionsTitle": "这次计算会用到的假设", "reviewAssumptionsIntro": "下面显示当前数值。标为“待核对”的只是示例或尚未选择，返回对应问题填写后才能生成结果。", "reviewAssumptionSet": "已设定", "reviewAssumptionEstimated": "含估算", "reviewAssumptionPending": "待核对", "reviewEditAssumption": "修改{{topic}}", "reviewNotChosen": "尚未选择", "reviewMixTitle": "投资配置与回报", "reviewMixValue": "{{mix}}；预计年均实际收益 {{real}}；模拟年波动率 {{volatility}}", "reviewFeesTitle": "费用与通胀", "reviewFeesValue": "投资总费用 {{fees}} / 年；长期通胀 {{inflation}} / 年", "reviewTaxTitle": "非注册投资与停工前税率", "reviewTaxValue": "每年应税分配 {{distributions}}；边际税率 {{rate}}", "reviewStrategyTitle": "退休提款顺序", "reviewPacedStrategy": "分阶段提取 RRSP", "reviewStrategyWithCap": "{{strategy}}；收入上限：{{cap}}", "reviewAssumptionsNote": "实际收益已扣通胀，投资费用另扣；波动率用于模拟市场每年的涨跌，不是另一项收益。这些都是规划估算，不是保证回报。",
-    "mixReturnExplanation": "以下百分比是长期预计的年均实际收益率，也就是已经扣除通胀影响的增长率；投资费用（MER）尚未扣除，会在下一页单独计算。这不是最近一年涨幅，也不是保证收益。", "mixExpectedReturn": "预计年均实际收益：{{value}}%", "mixNames": { "allStocks": "全股票", "aggressive": "进取 80/20", "balanced": "均衡 60/40", "conservative": "保守 40/60", "gic": "GIC 定存梯" },
-    "feeTotalLabel": "投资总费用（%/年）", "feePresetIntro": "按投资管理方式选一个参考值，也可直接填自己的合计费率。基金 MER 与持续收取的顾问/管理费都要计入，但不要重复计算。", "feePresetGroup": "投资费用参考预设", "feePreset": { "etf": "自助低成本 ETF · 0.2%", "managed": "代管 ETF 组合 · 0.65%", "mutual": "传统共同基金 · 2.1%" }, "feePresetSource": "产品费用示例（请以自己的账单为准）：", "inflationPresetIntro": "选择长期规划假设，或填写自己的数值。偏高通胀档只用于压力测试，不是官方预测。", "inflationPresetGroup": "年均通胀参考预设", "inflationPreset": { "fpCanada": "FP Canada 2026 · 2.1%", "bankTarget": "加拿大央行目标 · 2.0%", "stress": "偏高通胀情景 · 3.0%" }, "inflationPresetSource": "长期规划指引及政策目标：",
+    "directory": "问卷目录",
+    "categoryCount": "第 {{current}} 类，共 {{total}} 类",
+    "closeDirectory": "关闭目录",
+    "chooseOne": "请选择",
+    "helpTitle": "为什么要问、去哪里找",
+    "findLabel": "资料位置：",
+    "exampleLabel": "虚构示例：",
+    "reviewAnswers": "核对答案",
+    "backToQuestions": "返回问卷",
+    "reviewTitle": "核对你的答案",
+    "reviewIntro": "这里集中核对你的输入和投影假设；有不合适的项目可直接修改。核对完再生成结果。",
+    "needsAttention": "请补充或核对这些项目",
+    "generateResults": "生成我的结果",
+    "modifyAnswers": "修改答案",
+    "resultsTitle": "你的退休投影",
+    "resultsIntro": "以下结果使用你填写或选择的数值与假设；估算不保证未来结果。",
+    "nextCategory": "下一类别",
+    "pendingSaved": "已标为待补。你可以继续，并在核对页回来处理。",
+    "hasHome": "已计入住房",
+    "notApplicable": "当前路径不适用这个问题。",
+    "monthlySavings": "平均每月新增储蓄",
+    "savingFeedback": "每月 {{monthly}}，等于每年 {{annual}}。",
+    "spendingFeedback": "按今天购买力，每月 {{monthly}}，等于每年 {{annual}}。",
+    "housingOtherLimit": "投资房和其他负债会进入各自的后续页面。",
+    "confirmRemoveValue": "这项内容含有已保存的非零金额。确定从计划中移除吗？",
+    "intentRecommendationLabel": "根据你的选择，结果会这样比较：",
+    "intentUnsupported": "固定遗产金额或生前赠与会保存为愿望，但当前引擎还不能把它作为现金流硬约束。",
+    "reviewAssumptionsTitle": "这次计算会用到的假设",
+    "reviewAssumptionsIntro": "下面显示当前数值。标为“待核对”的只是示例或尚未选择，返回对应问题填写后才能生成结果。",
+    "reviewAssumptionSet": "已设定",
+    "reviewAssumptionEstimated": "含估算",
+    "reviewAssumptionPending": "待核对",
+    "reviewEditAssumption": "修改{{topic}}",
+    "reviewNotChosen": "尚未选择",
+    "reviewMixTitle": "投资配置与回报",
+    "reviewMixValue": "{{mix}}；预计年均实际收益 {{real}}；模拟年波动率 {{volatility}}",
+    "reviewFeesTitle": "费用与通胀",
+    "reviewFeesValue": "投资总费用 {{fees}} / 年；长期通胀 {{inflation}} / 年",
+    "reviewTaxTitle": "非注册投资与停工前税率",
+    "reviewTaxValue": "每年应税分配 {{distributions}}；边际税率 {{rate}}",
+    "reviewStrategyTitle": "退休提款顺序",
+    "reviewPacedStrategy": "分阶段提取 RRSP",
+    "reviewStrategyWithCap": "{{strategy}}；收入上限：{{cap}}",
+    "reviewAssumptionsNote": "实际收益已扣通胀，投资费用另扣；波动率用于模拟市场每年的涨跌，不是另一项收益。这些都是规划估算，不是保证回报。",
+    "mixReturnExplanation": "以下百分比是长期预计的年均实际收益率，也就是已经扣除通胀影响的增长率；投资费用（MER）尚未扣除，会在下一页单独计算。这不是最近一年涨幅，也不是保证收益。",
+    "mixExpectedReturn": "预计年均实际收益：{{value}}%",
+    "mixNames": {
+      "allStocks": "全股票",
+      "aggressive": "进取 80/20",
+      "balanced": "均衡 60/40",
+      "conservative": "保守 40/60",
+      "gic": "GIC 定存梯"
+    },
+    "feeTotalLabel": "投资总费用（%/年）",
+    "feePresetIntro": "按投资管理方式选一个参考值，也可直接填自己的合计费率。基金 MER 与持续收取的顾问/管理费都要计入，但不要重复计算。",
+    "feePresetGroup": "投资费用参考预设",
+    "feePreset": {
+      "etf": "自助低成本 ETF · 0.2%",
+      "managed": "代管 ETF 组合 · 0.65%",
+      "mutual": "传统共同基金 · 2.1%"
+    },
+    "feePresetSource": "产品费用示例（请以自己的账单为准）：",
+    "inflationPresetIntro": "选择长期规划假设，或填写自己的数值。偏高通胀档只用于压力测试，不是官方预测。",
+    "inflationPresetGroup": "年均通胀参考预设",
+    "inflationPreset": {
+      "fpCanada": "FP Canada 2026 · 2.1%",
+      "bankTarget": "加拿大央行目标 · 2.0%",
+      "stress": "偏高通胀情景 · 3.0%"
+    },
+    "inflationPresetSource": "长期规划指引及政策目标：",
     "taxIntro": "这一页只估算非注册账户每年发放的应税收入，以及停止全职工作前的简化税率；不是投资总收益，也不是退休后的税率。",
     "taxDistributionLabel": "每年应税分配占非注册投资的比例（%）",
     "taxDistributionMeaning": "包括利息、应税股息和基金 / ETF 分配；即使自动再投资也算。未卖出的市值上涨不算在这里。",
@@ -681,8 +857,26 @@
     "taxRateSource": "加拿大税务局税档",
     "taxWorkedExample": "算个例子：假设非注册投资有 {{balance}}，按你填的比例，每年约有 {{distribution}} 分配；按你填的边际税率，模型估算停工前税耗约 {{tax}}。",
     "taxModelNote": "模型简化：停工前也用此税率估算净租金及已领取的 CPP / OAS / 雇主养老金等。它未逐项处理股息税额抵免、资本利得与本金返还的不同税法；此处只是规划估算，不是实际税单。",
-    "categories": { "family": "家庭与时间", "saving": "日常储蓄", "assets": "已有资金", "housing": "住房与贷款", "spending": "退休生活", "income": "其他退休收入", "preferences": "偏好与假设" }, "status": { "answered": "已回答", "pending": "待填写" },
-    "accountNames": { "tfsa": "TFSA 免税账户", "rrsp": "RRSP / RRIF", "nonReg": "非注册账户", "fhsa": "FHSA 首套房储蓄账户", "locked": "锁定退休账户" },
+    "categories": {
+      "family": "家庭与时间",
+      "saving": "日常储蓄",
+      "assets": "已有资金",
+      "housing": "住房与贷款",
+      "spending": "退休生活",
+      "income": "其他退休收入",
+      "preferences": "偏好与假设"
+    },
+    "status": {
+      "answered": "已回答",
+      "pending": "待填写"
+    },
+    "accountNames": {
+      "tfsa": "TFSA 免税账户",
+      "rrsp": "RRSP / RRIF",
+      "nonReg": "非注册账户",
+      "fhsa": "FHSA 首套房储蓄账户",
+      "locked": "锁定退休账户"
+    },
     "accountRoles": {
       "tfsa": "税后资金在账户内免税增长，提款也不纳税，适合灵活支付退休生活费。",
       "rrsp": "供款通常可抵扣当年收入，账户内延税增长；从RRSP或RRIF提款时计入应税收入。",
@@ -695,30 +889,285 @@
     "allocationComplete": "三个比例合计为100%。",
     "allocationRemaining": "还需要分配 {{difference}} 个百分点。",
     "allocationOver": "当前超出 {{difference}} 个百分点，请调低比例。",
-    "choice": { "single": "只为我规划", "couple": "我和伴侣一起规划", "noChildren": "本计划不纳入孩子", "hasChildren": "纳入孩子", "monthly": "我知道每月金额", "annual": "我知道全年金额", "noWork": "停工后没有工作收入", "someWork": "预计仍有工作收入", "undecided": "还没决定", "no": "没有", "yes": "有", "noRental": "没有投资房", "hasRental": "纳入一套投资房", "noDebt": "没有其他贷款", "hasDebt": "纳入一笔其他贷款", "knowBudget": "我知道总预算", "estimateBudget": "按生活项目帮我估算", "unknown": "稍后回来补", "noPension": "没有单位养老金", "dbPension": "单位以后按期发钱", "dbDetail": "这是按期领取的DB养老金。", "dcPension": "我有一笔账户余额", "dcDetail": "DC/LIRA余额应放在锁定账户部分。", "indexedFull": "全部随通胀增长", "indexedPartial": "只有一部分随通胀增长", "indexedFixed": "金额保持固定", "leaveMore": "维持计划生活，比较可能剩下多少", "noLegacy": "不需要预留指定遗产", "fixedLegacy": "希望留下固定金额", "lifetimeGifts": "希望生前帮助别人", "unsupported": "会记录愿望并说明当前限制。", "maintainSpending": "维持当前退休预算", "exploreCeiling": "查看理论支出上限", "hasTarget": "我有自己的资产目标", "noTarget": "暂时没有目标" },
-    "intentSummary": { "legacy": "维持每年约 {{spending}} 的支出，比较剩余税后资产。", "spending": "不改变当前预算，另行查看理论支出上限。", "sustainability": "只检查当前计划能否持续，不假称你选择了遗产偏好。" },
+    "choice": {
+      "single": "只为我规划",
+      "couple": "我和伴侣一起规划",
+      "noChildren": "本计划不纳入孩子",
+      "hasChildren": "纳入孩子",
+      "monthly": "我知道每月金额",
+      "annual": "我知道全年金额",
+      "noWork": "停工后没有工作收入",
+      "someWork": "预计仍有工作收入",
+      "undecided": "还没决定",
+      "no": "没有",
+      "yes": "有",
+      "noRental": "没有投资房",
+      "hasRental": "纳入一套投资房",
+      "noDebt": "没有其他贷款",
+      "hasDebt": "纳入一笔其他贷款",
+      "knowBudget": "我知道总预算",
+      "estimateBudget": "按生活项目帮我估算",
+      "unknown": "稍后回来补",
+      "noPension": "没有单位养老金",
+      "dbPension": "单位以后按期发钱",
+      "dbDetail": "这是按期领取的DB养老金。",
+      "dcPension": "我有一笔账户余额",
+      "dcDetail": "DC/LIRA余额应放在锁定账户部分。",
+      "indexedFull": "全部随通胀增长",
+      "indexedPartial": "只有一部分随通胀增长",
+      "indexedFixed": "金额保持固定",
+      "leaveMore": "维持计划生活，比较可能剩下多少",
+      "noLegacy": "不需要预留指定遗产",
+      "fixedLegacy": "希望留下固定金额",
+      "lifetimeGifts": "希望生前帮助别人",
+      "unsupported": "会记录愿望并说明当前限制。",
+      "maintainSpending": "维持当前退休预算",
+      "exploreCeiling": "查看理论支出上限",
+      "hasTarget": "我有自己的资产目标",
+      "noTarget": "暂时没有目标"
+    },
+    "intentSummary": {
+      "legacy": "维持每年约 {{spending}} 的支出，比较剩余税后资产。",
+      "spending": "不改变当前预算，另行查看理论支出上限。",
+      "sustainability": "只检查当前计划能否持续，不假称你选择了遗产偏好。"
+    },
     "guidance": {
-      "family": { "essential": "先说明计划照顾谁，以及要测试的时间线。", "why": "年龄决定储蓄期、退休期和收入开始时间；省份影响税额估算。", "help": "填写当前年龄和用于估税的省份。规划终点是测试范围，不是寿命预测。", "example": "Alex现在40岁，55岁停工，把计划测试到95岁。" },
-      "saving": { "essential": "只算扣税、生活费和现有贷款后真正新增的钱。", "why": "新增投入会在退休前积累；工资和市场涨幅都不等于储蓄。", "help": "查看过去12个月投入记录，减去取出花掉的钱，排除自己的账户间转账。", "example": "每月净投入2,000元，等于每年24,000元。" },
-      "assets": { "essential": "先辨认账户类型，再填今天余额；不要填供款额度。", "why": "TFSA、RRSP和非注册是税务包装，基金和股票是里面的投资。", "help": "用近期银行或券商市值；不要计入RESP、住房和未来政府福利。", "example": "非注册现值100,000、成本80,000，20,000是未实现增值，不是税额。" },
-      "housing": { "essential": "先说明以后住哪里，再填写房价和贷款。", "why": "房屋增加净资产，但不卖就不能支付账单；贷款会减少每年现金流。", "help": "查看最新房贷账单，每笔贷款只在对应房产下录入一次。", "example": "终身保留的住房仍是净资产；每月2,000房贷是另外的现金支出。" },
-      "spending": { "essential": "按今天价格填写；已单列的贷款不要再算进生活费。", "why": "这是希望花掉的税后生活费；引擎会另算需要提款和纳税多少。", "help": "从近期支出开始，只调整退休后确实会变化的项目。", "example": "每月3,000等于每年36,000，不含另行建模的贷款。" },
-      "income": { "essential": "先分清政府福利、按期单位养老金和账户余额。", "why": "以后开始的收入会减少后期提款，开始前仍要靠投资过渡。", "help": "CPP/QPP使用Service Canada或Retraite Québec的65岁基准估算；不要把已经提前/延后调整的金额再次当基准。", "example": "65岁每月1,000元，基准年金额是12,000元。" },
-      "preferences": { "essential": "事实可以估算；偏好必须由你选择并确认。", "why": "维持支出比较遗产，与探索最高支出回答不同问题，也有不同取舍。", "help": "选择符合你意图的比较。未支持的固定遗产和生前赠与会明确披露，不会偷换成引擎约束。", "example": "你可以只查看支出上限，不把它应用到当前预算。" }
+      "family": {
+        "essential": "先说明计划照顾谁，以及要测试的时间线。",
+        "why": "年龄决定储蓄期、退休期和收入开始时间；省份影响税额估算。",
+        "help": "填写当前年龄和用于估税的省份。规划终点是测试范围，不是寿命预测。",
+        "example": "Alex现在40岁，55岁停工，把计划测试到95岁。"
+      },
+      "saving": {
+        "essential": "只算扣税、生活费和现有贷款后真正新增的钱。",
+        "why": "新增投入会在退休前积累；工资和市场涨幅都不等于储蓄。",
+        "help": "查看过去12个月投入记录，减去取出花掉的钱，排除自己的账户间转账。",
+        "example": "每月净投入2,000元，等于每年24,000元。"
+      },
+      "assets": {
+        "essential": "先辨认账户类型，再填今天余额；不要填供款额度。",
+        "why": "TFSA、RRSP和非注册是税务包装，基金和股票是里面的投资。",
+        "help": "用近期银行或券商市值；不要计入RESP、住房和未来政府福利。",
+        "example": "非注册现值100,000、成本80,000，20,000是未实现增值，不是税额。"
+      },
+      "housing": {
+        "essential": "先说明以后住哪里，再填写房价和贷款。",
+        "why": "房屋增加净资产，但不卖就不能支付账单；贷款会减少每年现金流。",
+        "help": "查看最新房贷账单，每笔贷款只在对应房产下录入一次。",
+        "example": "终身保留的住房仍是净资产；每月2,000房贷是另外的现金支出。"
+      },
+      "spending": {
+        "essential": "按今天价格填写；已单列的贷款不要再算进生活费。",
+        "why": "这是希望花掉的税后生活费；引擎会另算需要提款和纳税多少。",
+        "help": "从近期支出开始，只调整退休后确实会变化的项目。",
+        "example": "每月3,000等于每年36,000，不含另行建模的贷款。"
+      },
+      "income": {
+        "essential": "先分清政府福利、按期单位养老金和账户余额。",
+        "why": "以后开始的收入会减少后期提款，开始前仍要靠投资过渡。",
+        "help": "CPP/QPP使用Service Canada或Retraite Québec的65岁基准估算；不要把已经提前/延后调整的金额再次当基准。",
+        "example": "65岁每月1,000元，基准年金额是12,000元。"
+      },
+      "preferences": {
+        "essential": "事实可以估算；偏好必须由你选择并确认。",
+        "why": "维持支出比较遗产，与探索最高支出回答不同问题，也有不同取舍。",
+        "help": "选择符合你意图的比较。未支持的固定遗产和生前赠与会明确披露，不会偷换成引擎约束。",
+        "example": "你可以只查看支出上限，不把它应用到当前预算。"
+      }
     },
     "pages": {
-      "income_taxFacts": { "question": "每项收入由谁领取，应税资产归谁？" },
-      "family_people": { "question": "这份计划只看你自己，还是你和伴侣一起？" }, "family_ages": { "question": "这份计划里的每个人现在几岁？" }, "family_children": { "question": "是否有孩子的当前年龄需要纳入家庭计划？" }, "family_province": { "question": "这份计划按哪个省份估算所得税？" }, "time_work": { "question": "你想几岁停止全职工作，有个人资产目标吗？" }, "time_horizon": { "question": "希望把这份计划测试到多大年龄？" },
-      "saving_method": { "question": "用每月还是全年金额回答更容易？" }, "saving_amount": { "question": "你实际会新增多少储蓄和投资？" }, "work_after": { "question": "停止全职工作后，还会有其他工作收入吗？" }, "work_amount": { "question": "预计每年有多少工作收入？" }, "work_period": { "question": "这笔收入从几岁持续到几岁？" },
-      "assets_identify": { "question": "哪些账户里的钱准备留作退休使用？" }, "account_tfsa_balance": { "question": "你现在所有TFSA的总余额是多少？" }, "account_rrsp_balance": { "question": "你现在所有RRSP的总余额是多少？" }, "account_nonReg_balance": { "question": "非注册投资现在值多少，成本基础是多少？" }, "assets_allocation": { "question": "今后的储蓄准备怎样分到主要账户？" }, "fhsa_details": { "question": "FHSA现在有多少、以后每年投入多少？" }, "fhsa_open": { "question": "FHSA开户多久了？" }, "locked_access": { "question": "锁定资金最早何时可用、属于谁？" }, "locked_contributions": { "question": "你和单位每年分别投入多少？" },
-      "home_situation": { "question": "你租房、已有自住房，还是计划买房？" }, "home_value": { "question": "住房现在值多少，以后计划出售吗？" }, "home_mortgage": { "question": "这套住房还在还贷吗？" }, "mortgage_balance": { "question": "房贷还欠多少？" }, "mortgage_payment": { "question": "房贷还款是多少，还要还多久？" }, "purchase_time": { "question": "预计几岁买房？" }, "purchase_price": { "question": "计划房价和首付分别是多少？" }, "purchase_loan": { "question": "计划采用多少月供和多长贷款期？" }, "housing_other": { "question": "投资房或其他贷款需要纳入计划吗？" },
-      "spending_method": { "question": "你知道退休预算，还是按生活项目一起估算？" }, "spending_total": { "question": "一年的退休生活大约需要多少钱？" }, "spending_homeFood": { "question": "住房和饮食预计花多少？" }, "spending_travelHealth": { "question": "旅行和医疗预计花多少？" },
-      "benefits_self": { "question": "你预计领取多少CPP/QPP和OAS，分别何时开始？" }, "benefits_partner": { "question": "伴侣预计领取多少CPP/QPP和OAS？" }, "pension_self": { "question": "单位以后按期发养老金，还是给你一笔账户余额？" }, "pension_self_details": { "question": "终身养老金每年多少、何时开始？" }, "pension_self_indexing": { "question": "养老金会随物价上涨吗，65岁前有临时补贴吗？" },
-      "allocation_tfsa": { "question": "未来新增储蓄准备如何分配到各账户？" }, "locked_balance": { "question": "锁定退休账户现在有多少余额？" },
-      "rental_0_value": { "question": "投资房现在值多少，买入成本是多少？" }, "rental_0_income": { "question": "净租金是多少，预计何时出售？" }, "rental_0_mortgage": { "question": "这套投资房有相关贷款吗？" }, "rental_0_loan": { "question": "该贷款余额和每年还款额是多少？" }, "rental_0_term": { "question": "投资房贷款还要还多少年？" }, "debt_0_type": { "question": "这笔其他贷款属于哪一类？" }, "debt_0_balance": { "question": "这笔贷款还剩多少？" }, "debt_0_payment": { "question": "每年还款多少，还要还多少年？" },
-      "spending_utilitiesTransport": { "question": "水电和交通一年需要多少？" }, "spending_funOther": { "question": "娱乐和其他开支一年需要多少？" },
-      "cpp_self": { "question": "你预计CPP/QPP领多少，准备几岁开始？" }, "oas_self": { "question": "你预计OAS领多少，准备几岁开始？" }, "cpp_partner": { "question": "伴侣预计CPP/QPP领多少？" }, "oas_partner": { "question": "伴侣预计OAS领多少？" }, "pension_partner": { "question": "伴侣的单位养老金属于哪一种？" }, "pension_partner_details": { "question": "伴侣终身养老金每年多少，何时开始？" }, "pension_partner_indexing": { "question": "伴侣的养老金会随物价上涨吗，另有过渡金吗？" },
-      "intent_legacy": { "question": "保障退休生活后，你想为他人或公益预留什么吗？" }, "intent_spending": { "question": "如果计划还有余力，你想探索提高支出，还是维持预算？" }, "invest_mix": { "question": "哪种大类投资配置最接近你的计划？" }, "invest_fees": { "question": "采用多少投资费用和通胀假设？" }, "invest_tax": { "question": "非注册投资每年产生多少应税收入？按什么税率估算？" }, "invest_strategy": { "question": "退休支出应按什么顺序从账户提款？" }
+      "income_taxFacts": {
+        "question": "每项收入由谁领取，应税资产归谁？"
+      },
+      "family_people": {
+        "question": "这份计划只看你自己，还是你和伴侣一起？"
+      },
+      "family_ages": {
+        "question": "这份计划里的每个人现在几岁？"
+      },
+      "family_children": {
+        "question": "是否有孩子的当前年龄需要纳入家庭计划？"
+      },
+      "family_province": {
+        "question": "这份计划按哪个省份估算所得税？"
+      },
+      "time_work": {
+        "question": "你想几岁停止全职工作，有个人资产目标吗？"
+      },
+      "time_horizon": {
+        "question": "希望把这份计划测试到多大年龄？"
+      },
+      "saving_method": {
+        "question": "用每月还是全年金额回答更容易？"
+      },
+      "saving_amount": {
+        "question": "你实际会新增多少储蓄和投资？"
+      },
+      "work_after": {
+        "question": "停止全职工作后，还会有其他工作收入吗？"
+      },
+      "work_amount": {
+        "question": "预计每年有多少工作收入？"
+      },
+      "work_period": {
+        "question": "这笔收入从几岁持续到几岁？"
+      },
+      "assets_identify": {
+        "question": "哪些账户里的钱准备留作退休使用？"
+      },
+      "account_tfsa_balance": {
+        "question": "你现在所有TFSA的总余额是多少？"
+      },
+      "account_rrsp_balance": {
+        "question": "你现在所有RRSP的总余额是多少？"
+      },
+      "account_nonReg_balance": {
+        "question": "非注册投资现在值多少，成本基础是多少？"
+      },
+      "assets_allocation": {
+        "question": "今后的储蓄准备怎样分到主要账户？"
+      },
+      "fhsa_details": {
+        "question": "FHSA现在有多少、以后每年投入多少？"
+      },
+      "fhsa_open": {
+        "question": "FHSA开户多久了？"
+      },
+      "locked_access": {
+        "question": "锁定资金最早何时可用、属于谁？"
+      },
+      "locked_contributions": {
+        "question": "你和单位每年分别投入多少？"
+      },
+      "home_situation": {
+        "question": "你租房、已有自住房，还是计划买房？"
+      },
+      "home_value": {
+        "question": "住房现在值多少，以后计划出售吗？"
+      },
+      "home_mortgage": {
+        "question": "这套住房还在还贷吗？"
+      },
+      "mortgage_balance": {
+        "question": "房贷还欠多少？"
+      },
+      "mortgage_payment": {
+        "question": "房贷还款是多少，还要还多久？"
+      },
+      "purchase_time": {
+        "question": "预计几岁买房？"
+      },
+      "purchase_price": {
+        "question": "计划房价和首付分别是多少？"
+      },
+      "purchase_loan": {
+        "question": "计划采用多少月供和多长贷款期？"
+      },
+      "housing_other": {
+        "question": "投资房或其他贷款需要纳入计划吗？"
+      },
+      "spending_method": {
+        "question": "你知道退休预算，还是按生活项目一起估算？"
+      },
+      "spending_total": {
+        "question": "一年的退休生活大约需要多少钱？"
+      },
+      "spending_homeFood": {
+        "question": "住房和饮食预计花多少？"
+      },
+      "spending_travelHealth": {
+        "question": "旅行和医疗预计花多少？"
+      },
+      "benefits_self": {
+        "question": "你预计领取多少CPP/QPP和OAS，分别何时开始？"
+      },
+      "benefits_partner": {
+        "question": "伴侣预计领取多少CPP/QPP和OAS？"
+      },
+      "pension_self": {
+        "question": "单位以后按期发养老金，还是给你一笔账户余额？"
+      },
+      "pension_self_details": {
+        "question": "终身养老金每年多少、何时开始？"
+      },
+      "pension_self_indexing": {
+        "question": "养老金会随物价上涨吗，65岁前有临时补贴吗？"
+      },
+      "allocation_tfsa": {
+        "question": "未来新增储蓄准备如何分配到各账户？"
+      },
+      "locked_balance": {
+        "question": "锁定退休账户现在有多少余额？"
+      },
+      "rental_0_value": {
+        "question": "投资房现在值多少，买入成本是多少？"
+      },
+      "rental_0_income": {
+        "question": "净租金是多少，预计何时出售？"
+      },
+      "rental_0_mortgage": {
+        "question": "这套投资房有相关贷款吗？"
+      },
+      "rental_0_loan": {
+        "question": "该贷款余额和每年还款额是多少？"
+      },
+      "rental_0_term": {
+        "question": "投资房贷款还要还多少年？"
+      },
+      "debt_0_type": {
+        "question": "这笔其他贷款属于哪一类？"
+      },
+      "debt_0_balance": {
+        "question": "这笔贷款还剩多少？"
+      },
+      "debt_0_payment": {
+        "question": "每年还款多少，还要还多少年？"
+      },
+      "spending_utilitiesTransport": {
+        "question": "水电和交通一年需要多少？"
+      },
+      "spending_funOther": {
+        "question": "娱乐和其他开支一年需要多少？"
+      },
+      "cpp_self": {
+        "question": "你预计CPP/QPP领多少，准备几岁开始？"
+      },
+      "oas_self": {
+        "question": "你预计OAS领多少，准备几岁开始？"
+      },
+      "cpp_partner": {
+        "question": "伴侣预计CPP/QPP领多少？"
+      },
+      "oas_partner": {
+        "question": "伴侣预计OAS领多少？"
+      },
+      "pension_partner": {
+        "question": "伴侣的单位养老金属于哪一种？"
+      },
+      "pension_partner_details": {
+        "question": "伴侣终身养老金每年多少，何时开始？"
+      },
+      "pension_partner_indexing": {
+        "question": "伴侣的养老金会随物价上涨吗，另有过渡金吗？"
+      },
+      "intent_legacy": {
+        "question": "保障退休生活后，你想为他人或公益预留什么吗？"
+      },
+      "intent_spending": {
+        "question": "如果计划还有余力，你想探索提高支出，还是维持预算？"
+      },
+      "invest_mix": {
+        "question": "哪种大类投资配置最接近你的计划？"
+      },
+      "invest_fees": {
+        "question": "采用多少投资费用和通胀假设？"
+      },
+      "invest_tax": {
+        "question": "非注册投资每年产生多少应税收入？按什么税率估算？"
+      },
+      "invest_strategy": {
+        "question": "退休支出应按什么顺序从账户提款？"
+      }
     }
   },
   "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",
@@ -812,5 +1261,28 @@
     "spousalSource": "CRA T2205 表格",
     "limit": "本人 RRSP 供款和已记录的配偶计划供款都按供款人的额度计算。夫妻自愿储蓄的 RRSP 分拆、71 岁 RRSP／RRIF 转换以及多账户去向分配尚未实现。",
     "source": "CRA T4040 RRSP 及其他注册计划"
+  },
+  "be36": {
+    "title": "FHSA 供款空间",
+    "explanation": "FHSA 参与额度属于账户持有人，因此按人记录。请从 CRA 参与额度对账单或 T4FHSA 单据抄录开户年份、以往供款和未使用额度。无法确认的行请留空：留空即保持未知，不会据此计算任何供款，也绝不会当作 0 或整整 8,000 加元额度。",
+    "person": "{{person}} 的 FHSA 空间",
+    "noAccount": "此人没有属于自己的 FHSA 账户，因此没有可计算的参与额度。FHSA 不能共用，家庭总额也不会在两人之间分摊。",
+    "ambiguousAccount": "此人有多个 FHSA 账户，计划供款无法归属到其中某一个。",
+    "multipleActive": "本年度有多个 FHSA 处于活动状态。本估算每个计划只计算一个活动 FHSA，因此在仅有一个账户有供款计划或余额之前，投影会停止。",
+    "openedYear": "首个 FHSA 的开户年份",
+    "priorContributions": "本计划年度之前的供款与 RRSP 转入（CRA 对账单）",
+    "openingRoom": "结转到本计划年度的未使用参与额度（CRA 对账单）",
+    "openingRoomNote": "请填写往年剩余的额度，而不是参与额度对账单上本年度的数字：该数字已经包含本年度的新增额度。",
+    "planned": "本年计划 FHSA 供款",
+    "scheduledRecorded": "本计划年度记录了一笔 {{amount}} 加元的计划供款：显示的计划金额取该计划供款与已记录金额中的较大者。",
+    "ledger": "期初空间 {{opening}} + 本年新增 {{addition}} − 已供款 {{applied}} = 期末空间 {{closing}} 加元",
+    "lifetime": "终身上限 {{limit}} 加元：已使用 {{used}}，剩余 {{remaining}}。投资增值从不占用该上限，转入也不会被重复扣减。",
+    "retained": "保留而未供款：{{retained}} 加元。",
+    "retainedHelp": "参与额度绝不会被超用，钱也不会凭空消失：剩余部分留在非注册账户中。",
+    "unknownRoom": "FHSA 参与额度尚未确认，因此不计算任何供款：{{reason}}",
+    "maturity": "该 FHSA 已达到 15 年参与期。法定转入 RRSP/RRIF 尚未实现，因此该年度不计算任何供款。",
+    "limit": "公布的每年 8,000 加元上限、终身 40,000 加元上限以及 8,000 加元的参与额度结转上限均来自 CRA 的 FHSA 页面。年度额度为本年度的 8,000 加元加上至多该结转上限的金额，终身上限约束这一总额，因此往年结转的额度绝不会在剩余终身额度之上再被使用。尚未实现：15 年／71 岁到期时钟、转入 RRSP/RRIF、合格与非合格提款、首次购房资格以及身故事件。FHSA 重新参与额度、指定金额和超额 FHSA 税同样不在范围内，因此本台账只报告公布上限所允许的额度。",
+    "scope": "FHSA 空间按人、按年度跟踪。到期、转入、提款和首次购房资格仍不在本估算范围内。",
+    "source": "CRA：向 FHSA 供款"
   }
 }
