@@ -109,6 +109,13 @@ export interface GisCategoryOptions {
    */
   receivingAllowance?: boolean
   /**
+   * Whether the 60-64 spouse ever becomes an OAS pensioner. `false` means the
+   * Allowance can never be payable to them (an OAS start age past 65, or a
+   * failed residence test), so the household uses the row whose cut-off is
+   * 54,624 even though their age alone looks eligible.
+   */
+  spouseWillReceiveOas?: boolean
+  /**
    * The household's GIS test income. When given, a couple at or past the
    * Allowance cut-off is not receiving it, so the one-pensioner household falls
    * back to the "spouse receives neither OAS nor the Allowance" row.
@@ -188,6 +195,15 @@ export function gisHouseholdCategory(
     return agesPerPerson.length === 2
       ? { status: 'modeled', category: 'couple-partner-allowance', receivingAllowance: true }
       : { status: 'unsupported', reason: 'the Allowance is only payable to a 60 to 64 spouse/common-law partner, so its household row needs both ages' }
+  }
+  // The Allowance is only payable to the spouse of a GIS recipient, and GIS
+  // requires OAS. A 60-64 spouse who is not yet receiving OAS can still be a
+  // future Allowance recipient, but a spouse on an OAS start age past 65 (or
+  // who failed the residence test) never draws one, so the row whose cut-off
+  // is 54,624 applies instead. `options.receivingAllowance === false` above
+  // covers the eligible-looking spouse who simply does not claim it.
+  if (options.spouseWillReceiveOas === false) {
+    return { status: 'modeled', category: 'couple-partner-no-oas-no-allowance', receivingAllowance: false }
   }
   const oasIdx = onlyPensionerIndex(receivingOas, agesPerPerson)
   if (oasIdx === null) {

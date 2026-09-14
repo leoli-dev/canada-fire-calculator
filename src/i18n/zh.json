@@ -1305,5 +1305,21 @@
     "limit": "CRA 规定，供款空间由当年 TFSA 年度限额、以前年度未使用空间、以及以前年度的提款（不含直接转移）组成。本账本重算的正是这条规则。年度限额本身未被编码：它按 500 加元档位指数化，且没有已发布的来源规则包，因此对账单年度之后的年份不新增空间，并明确说明而不是猜测。",
     "source": "CRA：向 TFSA 供款",
     "scope": "尚未实现（BE-27 B），因此此处不会据此调配任何现金：退休期盈余回填与现金流盈余政策、RRIF 强制盈余再投资交互、盈余策略对照，以及内部合规转移处理。"
+  },
+  "benefitCategoryTitle": "GIS 与 Allowance：适用哪一行家庭情况",
+  "benefitCategoryNote": "2026 年 7–9 月按家庭情况分别公布最高额与收入上限（{{id}}，{{period}}）。投影按所示那一行计价；金额与上限都来自该行。",
+  "benefitCategoryYear": "年份",
+  "benefitCategoryRow": "家庭情况行",
+  "benefitCategoryCutoff": "收入上限",
+  "benefitCategoryGis": "GIS",
+  "benefitCategoryAllowance": "Allowance（60–64 岁配偶）",
+  "benefitCategoryTotal": "免税合计",
+  "benefitCategoryLimit": "补足收入与上限之间按公布的两个端点连成一条直线（{{id}}），因此中段数值与官方表格最多可能相差约每月 229 元；最高额与上限则完全一致。",
+  "benefitCategory": {
+    "single": "单身养老金领取者",
+    "couple-both-pensioners": "夫妻，双方都领 OAS",
+    "couple-partner-allowance": "夫妻，一方领养老金、配偶领 Allowance",
+    "couple-partner-no-oas-no-allowance": "夫妻，一方领养老金、配偶既无 OAS 也无 Allowance",
+    "unsupported": "没有适用的家庭情况行"
   }
 }

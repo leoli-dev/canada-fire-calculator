@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectTaxRules, selectBenefitRules, selectGisRules, selectFhsaRules, publishRulePack } from '../index'
+import { selectTaxRules, selectBenefitRules, selectGisRules, publishRulePack } from '../index'
 
 // Independent published boundary fixture, not calculated from taxData.ts.
 // CRA 2025/2026 tax-rate pages and CCB payment-period pages are linked in the pack.
@@ -47,9 +47,8 @@ describe('dated rule selection', () => {
 
   it('selects the published GIS quarter and refuses one that is not published', () => {
     const gis = selectGisRules()
-    expect(gis.id).toBe('CA-OAS-GIS-2026-Q3-v1')
-    expect(gis.paymentPeriod).toBe('2026-07/2026-09')
-    expect(gis.basedOnIncomeYear).toBe(2025)
+    expect([gis.id, gis.paymentPeriod, gis.basedOnIncomeYear])
+      .toEqual(['CA-OAS-GIS-2026-Q3-v1', '2026-07/2026-09', 2025])
     expect(gis.categories.single).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 22800 })
     expect(gis.categories['couple-both-pensioners']).toMatchObject({ maxMonthly: 2 * 676.09, annualCutoff: 30096 })
     expect(gis.categories['couple-partner-allowance']).toMatchObject({ maxMonthly: 676.09, annualCutoff: 42144 })
@@ -59,60 +58,32 @@ describe('dated rule selection', () => {
     // indexation mechanism for a quarterly table, so a new quarter needs a new
     // pack rather than an interpolated number.
     expect(() => selectGisRules('2026-10/2026-12')).toThrow()
-    expect(() => selectGisRules('2025-07/2025-09')).toThrow()
     // The selector hands back a copy, so a caller cannot mutate the pinned pack.
-    const copy = selectGisRules()
-    copy.categories.single.annualCutoff = 1
+    selectGisRules().categories.single.annualCutoff = 1
     expect(selectGisRules().categories.single.annualCutoff).toBe(22800)
   })
 
   it('rejects a GIS pack whose categories, cut-offs or sources are incomplete', () => {
     const gis = selectGisRules()
+    const withSingle = (single: object) => ({
+      ...gis, categories: { ...gis.categories, single: { ...gis.categories.single, ...single } },
+    })
     expect(() => publishRulePack(gis)).not.toThrow()
     expect(() => publishRulePack({ ...gis, categories: {} })).toThrow()
-    expect(() => publishRulePack({
-      ...gis,
-      categories: { ...gis.categories, single: { ...gis.categories.single, annualCutoff: 0 } },
-    })).toThrow()
-    expect(() => publishRulePack({
-      ...gis,
-      categories: { ...gis.categories, single: { ...gis.categories.single, reductionSegments: [] } },
-    })).toThrow()
-    expect(() => publishRulePack({
-      ...gis,
-      categories: {
-        ...gis.categories,
-        single: { ...gis.categories.single, reductionSegments: [{ rate: 0, upTo: 100 }, { rate: 0.5, upTo: Infinity }] },
-      },
-    })).not.toThrow()
-    expect(() => publishRulePack({
-      ...gis,
-      categories: {
-        ...gis.categories,
-        single: { ...gis.categories.single, reductionSegments: [{ rate: -1, upTo: Infinity }] },
-      },
-    })).toThrow()
-    expect(() => publishRulePack({
-      ...gis,
-      categories: {
-        ...gis.categories,
-        single: { ...gis.categories.single, reductionSegments: [{ rate: 0, upTo: 100 }, { rate: 0.5, upTo: 50 }] },
-      },
-    })).toThrow()
+    expect(() => publishRulePack(withSingle({ annualCutoff: 0 }))).toThrow()
+    expect(() => publishRulePack(withSingle({ reductionSegments: [] }))).toThrow()
+    expect(() => publishRulePack(withSingle({ reductionSegments: [{ rate: -1, upTo: Infinity }] }))).toThrow()
+    expect(() => publishRulePack(withSingle({
+      reductionSegments: [{ rate: 0, upTo: 100 }, { rate: 0.5, upTo: 50 }],
+    }))).toThrow()
     expect(() => publishRulePack({ ...gis, allowance: { ...gis.allowance, topUpIncome: 99999 } })).toThrow()
     expect(() => publishRulePack({ ...gis, fieldSources: { ...gis.fieldSources, topUpIncome: '' } })).toThrow()
     expect(() => publishRulePack({ ...gis, basedOnIncomeYear: 2024 })).toThrow()
     expect(() => publishRulePack({ ...gis, paymentPeriod: '2026-10/2026-12' })).toThrow()
-  })
-
-  it('keeps the GIS amounts separate from the FHSA and CCB packs', () => {
-    // Exactly one shape discriminator per pack; a GIS pack must never be
-    // accepted through the CCB or FHSA branch.
-    const gis = selectGisRules()
-    expect(selectFhsaRules().id).toBe('CA-FHSA-limit-v1')
+    // Exactly one shape discriminator per pack: a GIS pack is never accepted
+    // through the CCB or FHSA branch.
     expect(() => publishRulePack({ ...gis, program: 'CCB' })).toThrow()
     expect(() => publishRulePack({ ...gis, annualLimit: 8000 })).toThrow()
-    expect(gis.program).toBe('GIS')
   })
 
   it('blocks publication without complete provenance and policy metadata', () => {

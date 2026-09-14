@@ -9,6 +9,7 @@ import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
 import { WithdrawalOrderCard } from './components/WithdrawalOrderCard'
 import { ProjectionChart } from './components/ProjectionChart'
+import { BenefitCategoryPanel } from './components/BenefitCategoryPanel'
 import { IncomeChart } from './components/IncomeChart'
 import { TaxChart } from './components/TaxChart'
 import { YearTable } from './components/YearTable'
@@ -142,6 +143,8 @@ export default function App() {
             </p>
           )}
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
+          {/* BE-26 A: the GIS/Allowance household row is stated, not implied. */}
+          <BenefitCategoryPanel inputs={inputs} result={result} />
           {!taxBlocked && canonical && <PersonTaxTable plan={canonical} result={result} />}
           {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
           {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}

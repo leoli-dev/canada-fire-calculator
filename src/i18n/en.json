@@ -1296,5 +1296,21 @@
     "limit": "The CRA states that contribution room is the annual TFSA dollar limit plus unused room from previous years plus withdrawals made in previous years (excluding direct transfers). That is the rule this ledger recomputes. The annual dollar limit itself is not encoded: it is indexed in $500 increments and no sourced limit pack is published, so a year after the statement year adds no room here and says so instead of guessing.",
     "source": "CRA: contributing to a TFSA",
     "scope": "Not implemented yet (BE-27 B), so no cash is routed by them here: the retirement surplus refill and cash-flow surplus policy, the RRIF-forced-surplus reinvestment interaction, the surplus-strategy comparison, and internal compliant transfer handling."
+  },
+  "benefitCategoryTitle": "GIS and Allowance: which household row applies",
+  "benefitCategoryNote": "July-September 2026 publishes a different maximum and income cut-off for each household shape ({{id}}, {{period}}). The projection prices this plan from the row shown; the amount and the cut-off both come from that row.",
+  "benefitCategoryYear": "Year",
+  "benefitCategoryRow": "Household row",
+  "benefitCategoryCutoff": "Income cut-off",
+  "benefitCategoryGis": "GIS",
+  "benefitCategoryAllowance": "Allowance (60-64 spouse)",
+  "benefitCategoryTotal": "Tax-free total",
+  "benefitCategoryLimit": "The reduction between the top-up income and the cut-off is a straight line between the two published endpoints ({{id}}), so a mid-range figure can differ from the official table by up to about $229/month; the maximum and the cut-off are exact.",
+  "benefitCategory": {
+    "single": "Single pensioner",
+    "couple-both-pensioners": "Couple, both receive OAS",
+    "couple-partner-allowance": "Couple, one pensioner + Allowance spouse",
+    "couple-partner-no-oas-no-allowance": "Couple, one pensioner, spouse has neither OAS nor Allowance",
+    "unsupported": "No household row applies"
   }
 }

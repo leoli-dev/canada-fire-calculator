@@ -1305,5 +1305,21 @@
     "limit": "Selon l'ARC, les droits de cotisation sont le plafond annuel du CELI, plus les droits inutilisés des années précédentes, plus les retraits faits lors des années précédentes (à l'exclusion des transferts directs). C'est la règle que ce registre recalcule. Le plafond annuel lui-même n'est pas encodé : il est indexé par tranches de 500 $ et aucun jeu de règles sourcé n'est publié, donc une année postérieure à l'année du relevé n'ajoute aucun droit ici et le dit au lieu de deviner.",
     "source": "ARC : cotiser à un CELI",
     "scope": "Pas encore mis en œuvre (BE-27 B), donc aucun argent n'y est acheminé ici : la politique de remplissage des surplus à la retraite et des surplus de trésorerie, l'interaction de réinvestissement du surplus forcé d'un FERR, la comparaison des stratégies de surplus et le traitement des transferts internes conformes."
+  },
+  "benefitCategoryTitle": "SRG et Allocation : quelle ligne de ménage s'applique",
+  "benefitCategoryNote": "Juillet-septembre 2026 publie un maximum et un seuil de revenu différents selon la situation du ménage ({{id}}, {{period}}). La projection chiffre ce plan avec la ligne indiquée; le montant et le seuil viennent tous deux de cette ligne.",
+  "benefitCategoryYear": "Année",
+  "benefitCategoryRow": "Ligne de ménage",
+  "benefitCategoryCutoff": "Seuil de revenu",
+  "benefitCategoryGis": "SRG",
+  "benefitCategoryAllowance": "Allocation (conjoint de 60 à 64 ans)",
+  "benefitCategoryTotal": "Total non imposable",
+  "benefitCategoryLimit": "La réduction entre le revenu de complément et le seuil suit une droite entre les deux extrémités publiées ({{id}}), donc un montant en milieu de fourchette peut différer de la table officielle d'environ 229 $/mois au plus; le maximum et le seuil sont exacts.",
+  "benefitCategory": {
+    "single": "Personne seule",
+    "couple-both-pensioners": "Couple, les deux reçoivent la SV",
+    "couple-partner-allowance": "Couple, un pensionné + conjoint à l'Allocation",
+    "couple-partner-no-oas-no-allowance": "Couple, un pensionné, conjoint sans SV ni Allocation",
+    "unsupported": "Aucune ligne de ménage ne s'applique"
   }
 }

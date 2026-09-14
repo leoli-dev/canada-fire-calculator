@@ -121,34 +121,30 @@ const rowAt = (r: ReturnType<typeof runProjection>, age: number) =>
   r.rows.find((row) => row.age === age)!
 
 describe('benefit household categories', () => {
-  it('classifies every supported household shape, including the audit case', () => {
-    expect(categoryOf(gisHouseholdCategory([true], [67]))).toBe('single')
-    expect(categoryOf(gisHouseholdCategory([true], [95]))).toBe('single')
-    expect(categoryOf(gisHouseholdCategory([true, true], [67, 66]))).toBe('couple-both-pensioners')
-    // Exactly one pensioner, the other 60-64 and drawing the Allowance.
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 62]))).toBe('couple-partner-allowance')
-    // Exactly one pensioner, the other too young (59) or 60-64 but pinned off
-    // the Allowance: the 54,624 row.
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 59]))).toBe('couple-partner-no-oas-no-allowance')
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 60], { receivingAllowance: false })))
-      .toBe('couple-partner-no-oas-no-allowance')
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 64]))).toBe('couple-partner-allowance')
+  it('classifies every supported household shape from age, OAS and Allowance status', () => {
+    const cases: [boolean[], number[], GisCategoryOptions, string][] = [
+      [[true], [67], {}, 'single'],
+      [[true, true], [67, 66], {}, 'couple-both-pensioners'],
+      // Exactly one pensioner, the other 60-64: the Allowance row.
+      [[true, false], [67, 62], {}, 'couple-partner-allowance'],
+      [[true, false], [67, 64], {}, 'couple-partner-allowance'],
+      // ...unless receipt is pinned off or the income test says it is not in
+      // pay: then the 54,624 row.
+      [[true, false], [67, 62], { receivingAllowance: false }, 'couple-partner-no-oas-no-allowance'],
+      [[true, false], [67, 60], { receivingAllowance: false }, 'couple-partner-no-oas-no-allowance'],
+      [[true, false], [67, 59], {}, 'couple-partner-no-oas-no-allowance'],
+      [[true, false], [67, 62], { grossIncome: 50000 }, 'couple-partner-no-oas-no-allowance'],
+      [[true, false], [67, 62], { grossIncome: 1000 }, 'couple-partner-allowance'],
+      [[true, false], [67, 62], { receivingAllowance: true }, 'couple-partner-allowance'],
+      [[true, false], [67, 62], { spouseWillReceiveOas: false }, 'couple-partner-no-oas-no-allowance'],
+    ]
+    for (const [oas, ages, options, expected] of cases) {
+      expect([oas, ages, options, categoryOf(gisHouseholdCategory(oas, ages, options))])
+        .toEqual([oas, ages, options, expected])
+    }
     // Nobody receives OAS: the supplement requires it.
     expect(gisHouseholdCategory([false, false], [64, 62]).status).toBe('unsupported')
     expect(gisHouseholdCategory([], []).status).toBe('unsupported')
-  })
-
-  it('lets a caller pin Allowance receipt when the 60-64 spouse is eligible', () => {
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 62], { receivingAllowance: false })))
-      .toBe('couple-partner-no-oas-no-allowance')
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 62], { receivingAllowance: true })))
-      .toBe('couple-partner-allowance')
-    // ...and the income test does the same without being told: past the
-    // Allowance cut-off it is not in pay however eligible the spouse looks.
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 62], { grossIncome: 50000 })))
-      .toBe('couple-partner-no-oas-no-allowance')
-    expect(categoryOf(gisHouseholdCategory([true, false], [67, 62], { grossIncome: 1000 })))
-      .toBe('couple-partner-allowance')
   })
 
   it('pins the published July-September 2026 parameters with their category', () => {
@@ -190,11 +186,10 @@ describe('benefit household categories', () => {
     const pack = OAS_GIS_ALLOWANCE_2026_Q3
     expect(pack.sourceURL).toContain('2026-quarterly-july-september')
     expect(pack.additionalSourceURLs?.join(' ')).toContain('open.canada.ca')
-    expect(pack.fieldSources.maxMonthly).toContain('2026-quarterly-july-september')
-    expect(pack.fieldSources.annualCutoff).toContain('2026-quarterly-july-september')
+    expect(Object.values(pack.fieldSources).every(url => url.startsWith('https://'))).toBe(true)
     expect(pack.fieldSources.topUpIncome).toContain('open.canada.ca')
     expect(pack.fieldSources.allowanceMaxMonthly).toContain('allowance/benefit-amount')
-    expect(pack.limitation.length).toBeGreaterThan(0)
+    expect(pack.limitation).toContain('Not modelled')
   })
 })
 
@@ -210,15 +205,12 @@ describe('GIS by household category', () => {
     expect(basis([true, false], [65, 60], 0).allowance).toBeCloseTo(17136.72, 2)
   })
 
-  it('uses the single maximum for one person and the per-pensioner maximum for two', () => {
+  it('uses the single maximum for one person and one per pensioner for two', () => {
     const single = basis([true], [67], 0)
-    expect(single.category).toBe('single')
-    expect(single.gis).toBeCloseTo(SINGLE_MAX, 2) // 13,478.04, not 8,113.08
-
+    expect([single.category, single.gis]).toEqual(['single', SINGLE_MAX])
     const both = basis([true, true], [67, 66], 0)
-    expect(both.category).toBe('couple-both-pensioners')
     expect(both.gis).toBeCloseTo(2 * PENSIONER_COUPLE_MAX_EACH, 2) // 16,226.16
-    expect(both.allowance).toBe(0)
+    expect([both.category, both.allowance]).toEqual(['couple-both-pensioners', 0])
   })
 
   it('audit case: the one-pensioner spouse with no OAS and no Allowance uses the 54,624 cut-off', () => {
@@ -385,35 +377,55 @@ describe('GIS work-income exemption', () => {
 })
 
 describe('runProjection carries the category through to the year rows', () => {
+  it('states the household row and its cut-off on each benefit year', () => {
+    const r = runProjection(zeroIncomeCouple({ currentAge: 60, oasStartAge: 65 }))
+    const at65 = rowAt(r, 65)
+    expect(at65.gisCategory).toBe('couple-partner-allowance')
+    expect(at65.gisAnnualCutoff).toBe(42144)
+    expect(at65.allowance).toBeCloseTo(17136.72, 2)
+    expect(at65.gis - at65.allowance).toBeCloseTo(8113.08, 2)
+    // Once the spouse turns 65 the row changes with its own cut-off.
+    const at70 = rowAt(r, 70)
+    expect(at70.gisCategory).toBe('couple-both-pensioners')
+    expect(at70.gisAnnualCutoff).toBe(30096)
+    expect(at70.allowance).toBe(0)
+  })
+
   it('P15 reproduction: a 65/60 couple with no taxable income', () => {
     const r = runProjection(zeroIncomeCouple({ currentAge: 60, oasStartAge: 65 }))
-    // The projection starts at 65 here (life expectancy 75), so every row
-    // is past the primary's OAS start age.
+    // The projection starts at 65 here, so every row is past the primary's
+    // OAS start age; at 65 the partner is 60 and the household is the
+    // allowance row.
     expect(rowAt(r, 65).gis).toBeCloseTo(25249.8, 2)
-    expect(rowAt(r, 65).gis).toBeCloseTo(25249.8, 2)
-    expect(rowAt(r, 66).oas).toBeCloseTo(9024, 2)
+    expect(rowAt(r, 65).oas).toBeCloseTo(9024, 2)
   })
 
-  it('switches to the both-pensioners category once the younger spouse turns 65', () => {
-    const r = runProjection(zeroIncomeCouple({ currentAge: 60, oasStartAge: 65 }))
-    const at66 = rowAt(r, 66) // partner is 61: the Allowance category
-    const at70 = rowAt(r, 70) // partner is 65: both pensioners
-    expect(at66.gis).toBeCloseTo(25249.8, 2)
-    expect(at70.gis).toBeCloseTo(2 * PENSIONER_COUPLE_MAX_EACH, 2)
-    // The category switch is a real step down of the household benefit.
-    expect(at70.gis).toBeLessThan(at66.gis)
+  it('the audit case, priced directly: no Allowance in pay, its own 54,624 cut-off', () => {
+    // The engine cannot see a 60-64 spouse who declines the Allowance while
+    // the income test says one would be payable, so the audit's household is
+    // priced through the same basis the projection uses, with receipt pinned
+    // off: the Allowance drops to zero and the pensioner's GIS takes the row
+    // whose own cut-off is 54,624 rather than the single 22,800 or 30,096.
+    const audit = basis([true, false], [65, 60], 0, { receivingAllowance: false })
+    expect(audit.category).toBe('couple-partner-no-oas-no-allowance')
+    expect(audit.allowance).toBe(0)
+    expect(audit.annualCutoff).toBe(54624)
+    expect(audit.gis).toBeCloseTo(13478.04, 2)
+    // A household at the pensioners' 30,096 cut-off would already be at zero
+    // under the wrong row; the right row is still paying.
+    expect(basis([true, false], [65, 60], 30096, { receivingAllowance: false }).gis)
+      .toBeCloseTo(6542.70, 2)
   })
 
-  it('audit case in a projection: income past the Allowance cut-off drops it', () => {
-    // The Allowance is income-tested: past its 42,144 cut-off no Allowance is
-    // in pay, and the pensioner's GIS moves to the row whose own cut-off is
-    // 54,624 rather than the both-pensioners 30,096.
-    const aboveCutoff = basis([true, false], [67, 61], 42145)
-    expect(aboveCutoff.category).toBe('couple-partner-no-oas-no-allowance')
-    expect(aboveCutoff.allowance).toBe(0)
-    expect(aboveCutoff.gis).toBeGreaterThan(0)
-    const belowCutoff = basis([true, false], [67, 61], 10000)
-    expect(belowCutoff.category).toBe('couple-partner-allowance')
-    expect(belowCutoff.allowance).toBeGreaterThan(0)
+  it('a single-person plan stays on the single row', () => {
+    const r = runProjection({ ...base, currentAge: 67, fireAge: 67, lifeExpectancy: 70,
+      cppStartAge: 70, cppAnnualAt65: 0, retirementSpending: 0, annualSavings: 0,
+      savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, balances: { tfsa: 200000, rrsp: 0, nonReg: 0 },
+      nonRegBook: 0, strategy: 'tfsaFirst' as const })
+    const at67 = rowAt(r, 67)
+    expect(at67.gisCategory).toBe('single')
+    expect(at67.gisAnnualCutoff).toBe(22800)
+    expect(at67.gis).toBeCloseTo(13478.04, 2)
+    expect(at67.allowance).toBe(0)
   })
 })

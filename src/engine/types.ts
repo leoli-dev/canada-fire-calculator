@@ -359,6 +359,16 @@ export interface YearRow {
   oas: number
   /** GIS received — tax-free, requires OAS, income-tested (TFSA invisible) */
   gis: number
+  /**
+   * The household category this year's GIS/Allowance was priced from
+   * (BE-26 A), plus the annual income cut-off that category used, so a reader
+   * can see which table row applied instead of inferring it from the amount.
+   */
+  gisCategory: string
+  /** This year's income cut-off for that category, in annual dollars. */
+  gisAnnualCutoff: number
+  /** The part of `gis` that is the 60-64 spousal Allowance. */
+  allowance: number
   /** CCB received this year — tax-free; 0 during accumulation (assumed
    * already folded into annualSavings) and once all children turn 18 */
   ccb: number
