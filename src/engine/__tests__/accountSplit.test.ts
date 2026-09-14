@@ -63,10 +63,16 @@ describe('FE-35 A per-person account balances (registered)', () => {
     const selfOnly = rrspRow(base)
     expect(selfOnly).toHaveLength(1)
     expect(selfOnly[0]).toMatchObject({ id: 'legacy:account:rrsp', balance: 500000, ownerId: selfId(base) })
+    // A partner-only collapse keeps the base id too: the row's canonical id
+    // stays stable and the panel keeps rendering the row's registered-type
+    // control for the partner-owned account (regression: the collapse renamed
+    // unpinned accounts to the derived id and hid the control).
     const partnerOnly = recordAccountSplit(plan(), 'legacy:account:rrsp', 0, 500000)
-    const derivedOnly = rrspRow(partnerOnly)
-    expect(derivedOnly).toHaveLength(1)
-    expect(derivedOnly[0]).toMatchObject({ id: derivedAccountId('legacy:account:rrsp'), balance: 500000, ownerId: partnerId(partnerOnly) })
+    const singlePartnerRow = rrspRow(partnerOnly)
+    expect(singlePartnerRow).toHaveLength(1)
+    expect(singlePartnerRow[0]).toMatchObject({ id: 'legacy:account:rrsp', balance: 500000, ownerId: partnerId(partnerOnly) })
+    expect(partnerOnly.ownershipAmounts?.['legacy:account:rrsp']).toEqual(
+      { [selfId(partnerOnly)]: 0, [partnerId(partnerOnly)]: 500000 })
     // A zero household total keeps one account carrying the selected owner.
     const empty = migratePersistedPlan({ inputs: { ...couple(), balances: { tfsa: 0, rrsp: 0, nonReg: 0 } } }, 10, 2026)
     const zero = recordAccountSplit(empty, 'legacy:account:rrsp', 0, 0, { zeroOwnerId: partnerId(empty) })
@@ -247,6 +253,23 @@ describe('FE-35 A per-person account balances (registered)', () => {
     if (result.status === 'unsupported') expect(result.reason).toContain('multiple or missing registered accounts')
   })
 
+  it('the balance-only branch of the guard refuses a two-account plan with no withdrawals', () => {
+    // withdrawals.rrsp = 0: the base withdrawals-only guard cannot catch this
+    // call, so only the f.registeredBalance > 0 trigger rejects it. Removing
+    // that trigger makes this test fail (the call falls through to 'ok').
+    const inputs = couple()
+    const split = recordAccountSplit(plan(), 'legacy:account:rrsp', 300000, 200000)
+    const result = personProjectionTax({ plan: split, inputs, year: 2026, selfAge: 65,
+      withdrawals: { rrsp: 0, nonReg: 0 }, registeredBalance: 500000,
+      nonRegGainFraction: 0, nonRegDistributions: 0, rent: 0, otherWork: 0,
+      oasGross: [0, 0], purchaseRrspWithdrawal: 0, purchaseNonRegTaxable: 0, propertySaleTaxable: 0 })
+    expect(result.status).toBe('unsupported')
+    if (result.status === 'unsupported') {
+      expect(result.reason).toContain('multiple or missing registered accounts')
+      expect(result.reason).toContain('BE-14 B')
+    }
+  })
+
   it('validates the recorded per-person amounts and rejects broken entries', () => {
     const split = recordAccountSplit(plan(), 'legacy:account:rrsp', 300000, 200000)
     expect(() => assertCanonicalPlan(split)).not.toThrow()
@@ -288,6 +311,41 @@ describe('FE-35 A locked-account splits keep pinned contribution references live
         [derivedAccountId('legacy:account:locked'), 150000, partnerId(next)]].sort())
     expect(liraRow(next).reduce((sum, account) => sum + account.balance, 0)).toBe(400000)
     expect(() => assertCanonicalPlan(next)).not.toThrow()
+  })
+
+  it('a recorded locked split survives partner removal and re-add without being rewritten to the legacy owner', () => {
+    const split = recordAccountSplit(lockedPlan(), 'legacy:account:locked', 250000, 150000)
+    const removedPartnerId = partnerId(split)
+    const single = refreshCanonicalFromLegacy(split, { ...split.legacyProjection, partner: null })
+    expect(single.ownershipAmounts?.['legacy:account:locked']).toEqual(
+      { [selfId(single)]: 250000, [removedPartnerId]: 150000 })
+    expect(() => assertCanonicalPlan(single)).not.toThrow()
+    // Partner returns with the legacy lockedRetirement.owner field untouched:
+    // the recorded amounts must survive and ownership must stay suspended for
+    // confirmation, exactly like the RRSP row. Regression: returningPartner
+    // used to trigger the locked-owner reset and silently rewrite the entry
+    // to 100% of the legacy owner.
+    const returned = refreshCanonicalFromLegacy(single, { ...single.legacyProjection,
+      partner: { ...couple().partner! } })
+    expect(returned.ownershipAmounts?.['legacy:account:locked']).toEqual(
+      { [selfId(returned)]: 250000, [removedPartnerId]: 150000 })
+    expect(liraRow(returned)).toHaveLength(1)
+    expect(liraRow(returned)[0]).toMatchObject(
+      { id: 'legacy:account:locked', balance: 400000, ownerId: null })
+    expect(liraRow(returned)[0].taxableOwnerShares.status).toBe('unknown')
+    expect(returned.migration.ownershipNeedsConfirmation).toBe(true)
+    expect(() => assertCanonicalPlan(returned)).not.toThrow()
+  })
+
+  it('only an explicit legacy lockedRetirement.owner change re-records the split to 100%', () => {
+    const split = recordAccountSplit(lockedPlan(), 'legacy:account:locked', 250000, 150000)
+    const changed = refreshCanonicalFromLegacy(split, { ...split.legacyProjection,
+      lockedRetirement: { ...split.legacyProjection.lockedRetirement!, owner: 'partner' } })
+    expect(changed.ownershipAmounts?.['legacy:account:locked']).toEqual(
+      { [selfId(changed)]: 0, [partnerId(changed)]: 400000 })
+    expect(liraRow(changed)[0]).toMatchObject(
+      { id: 'legacy:account:locked', balance: 400000, ownerId: partnerId(changed) })
+    expect(() => assertCanonicalPlan(changed)).not.toThrow()
   })
 
   it('a one-off contribution pinning the base id also survives a partner-only collapse', () => {

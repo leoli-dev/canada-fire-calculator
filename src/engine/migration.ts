@@ -43,14 +43,11 @@ const requireSplitMatch = (selfAmount: number, partnerAmount: number, total: num
 }
 
 /** The id the sole surviving account keeps when a split collapses to one
- * owner. Any id pinned by contribution rows must stay live, so a
- * partner-only collapse reuses the base id when the plan's contributions
- * point at it instead of renaming the account out from under them. */
-const collapsedAccountId = (plan: InputsV2, baseId: string): string => {
-  const pinned = plan.contributions.some(contribution => contribution.accountId === baseId) ||
-    plan.recurringContributions.some(contribution => contribution.accountId === baseId)
-  return pinned ? baseId : derivedAccountId(baseId)
-}
+ * owner: always the base id. The row keeps one stable canonical id across
+ * collapse and re-split, contribution rows that pin the base id stay live,
+ * and the shared panel can keep rendering the row's registered-type control
+ * for a partner-owned account. */
+const collapsedAccountId = (baseId: string): string => baseId
 
 const recheckOwnership = (plan: InputsV2): void => {
   plan.migration = { ...plan.migration, ownershipNeedsConfirmation: plan.accounts.some(account =>
@@ -99,7 +96,7 @@ export function applyAccountSplit(plan: InputsV2, baseId: string, selfAmount: nu
   })
   const next: Account[] = plan.accounts.filter(account => account.id !== baseId && account.id !== derivedId)
   if (selfAmount > 0) next.push(owned(template, baseId, self.id, selfAmount))
-  if (partnerAmount > 0) next.push(owned(template, selfAmount === 0 ? collapsedAccountId(plan, baseId) : derivedId, partner.id, partnerAmount))
+  if (partnerAmount > 0) next.push(owned(template, selfAmount === 0 ? collapsedAccountId(baseId) : derivedId, partner.id, partnerAmount))
   if (selfAmount === 0 && partnerAmount === 0) {
     const ownerId = options.zeroOwnerId && plan.people.some(person => person.id === options.zeroOwnerId) ? options.zeroOwnerId : null
     next.push({ ...template, id: baseId, balance: 0, ownerId,
@@ -189,7 +186,7 @@ function reconcileOwnershipSplit(prior: InputsV2, next: InputsV2, baseId: string
       provenance: { ...account.provenance, ownerId: userOrigin, balance: userOrigin },
     })
     if (selfAmount > 0) next.accounts.push(owned(template, baseId, self.id, selfAmount))
-    if (partnerAmount > 0) next.accounts.push(owned(partnerTemplate, selfAmount === 0 ? collapsedAccountId(next, baseId) : derivedId, partner.id, partnerAmount))
+    if (partnerAmount > 0) next.accounts.push(owned(partnerTemplate, selfAmount === 0 ? collapsedAccountId(baseId) : derivedId, partner.id, partnerAmount))
     if (selfAmount === 0 && partnerAmount === 0) {
       const ownerId = priorBase?.ownerId && next.people.some(person => person.id === priorBase.ownerId) ? priorBase.ownerId : null
       next.accounts.push({ ...template, id: baseId, balance: 0, ownerId,
@@ -432,11 +429,16 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   // A recorded per-person split is a canonical fact that survives legacy form
   // edits: re-apply it while the household total still matches, otherwise keep
   // the conserved total with unconfirmed ownership and the amounts visible.
+  // Only an explicit change of the legacy lockedRetirement.owner field may
+  // re-record a locked split as 100% to that owner (a real user action, and
+  // documented in the panel); a partner being removed and re-added is a
+  // guarded household change, so the recorded amounts must survive it exactly
+  // like the RRSP/TFSA rows instead of being silently rewritten.
   next.ownershipAmounts = prior.ownershipAmounts ? { ...prior.ownershipAmounts } : undefined
   for (const baseId of SPLIT_BASE_IDS) {
     reconcileOwnershipSplit(prior, next, baseId, {
       expandedHousehold,
-      lockedOwnerReset: baseId === 'legacy:account:locked' && (lockedOwnerChanged || !!returningPartner),
+      lockedOwnerReset: baseId === 'legacy:account:locked' && lockedOwnerChanged,
     })
   }
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
