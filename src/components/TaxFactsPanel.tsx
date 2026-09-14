@@ -4,6 +4,7 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
+import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -159,6 +160,145 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
     {ledger.deductedThisYear > 0 && <p className="hint">{t('be12.deductedThisYear', { amount: money(ledger.deductedThisYear), year: plan.baseYear })}</p>}
     {ledger.deferredDeduction > 0 && <p className="hint">{t('be12.deferred', { amount: money(ledger.deferredDeduction), year: plan.baseYear + 1 })}</p>}
     <p className="hint">{t('be12.deductionPolicy')}</p>
+  </div>
+}
+
+/**
+ * BE-12 B: the recorded premium history of one spousal plan and a T2205 split
+ * preview. The history-completeness state is explicit, so "no premiums" is a
+ * user answer and an unrecorded history never silently becomes zero. Shared by
+ * both entry modes because both mount this panel.
+ */
+function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
+  const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  const label = (id: string | null | undefined) => {
+    const person = plan.people.find(item => item.id === id)
+    return person ? t(person.role === 'self' ? 'be11.self' : 'be11.partner') : t('be12.spousalUnassigned')
+  }
+  const annuitant = plan.people.find(person => person.id === account.ownerId)
+  const spouse = annuitant ? plan.people.find(person => person.id !== annuitant.id) : undefined
+  const rows = plan.contributions.filter(contribution => contribution.accountId === account.id)
+  const complete = plan.spousalHistory?.[account.id]?.status === 'complete'
+  const [paymentRaw, setPaymentRaw] = useState('')
+  const addRow = () => onEdit(draft => {
+    // The id is derived from the fresh draft, not from the render-time plan, so
+    // two adds in one task cannot produce the same id and corrupt the plan.
+    const used = new Set(draft.contributions.map(contribution => contribution.id))
+    let serial = 0
+    while (used.has(`be12:spousal:${account.id}:${serial}`)) serial += 1
+    draft.contributions.push({
+      id: `be12:spousal:${account.id}:${serial}`, accountId: account.id, contributorId: spouse?.id ?? null,
+      calendarYear: draft.baseYear - 1, amount: 0, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: draft.baseYear },
+    })
+    draft.spousalHistory = { ...(draft.spousalHistory ?? {}), [account.id]: { status: 'complete' } }
+  })
+  const setRow = (rowId: string, change: (contribution: InputsV2['contributions'][number]) => void) =>
+    onEdit(draft => { const row = draft.contributions.find(item => item.id === rowId); if (row) change(row) })
+  const removeRow = (rowId: string) => onEdit(draft => {
+    draft.contributions = draft.contributions.filter(item => item.id !== rowId)
+  })
+  const setHistory = (status: 'complete' | 'unknown') => onEdit(draft => {
+    draft.spousalHistory = { ...(draft.spousalHistory ?? {}), [account.id]: status === 'complete'
+      ? { status: 'complete' } : { status: 'unknown', reason: 'spousal premium history not supplied' } }
+  })
+  // The recorded premium history is itself the marker that this account is a
+  // spousal plan, so a type switch to RRIF keeps attributing (above the year's
+  // minimum) and a type switch to LIF or an ordinary RRSP is refused rather
+  // than silently taxed to the owner. The same routing drives the kernel.
+  const routing = resolveSpousalPlan(account, plan.people, plan.spousalHistory, plan.contributions, plan.baseYear, plan.baseYear)
+  const paymentText = paymentRaw.trim()
+  const payment = paymentText === '' ? Number.NaN : Number(paymentText)
+  const preview = complete && routing.status === 'ok' && Number.isFinite(payment) && payment > 0
+    ? attributeSpousalPayment({
+      payment, paymentYear: plan.baseYear,
+      contributorId: routing.parties.contributorId, annuitantId: routing.parties.annuitantId,
+      premiums: routing.parties.premiums, rrifMinimum: routing.parties.rrifMinimum,
+      annuitantIncomeBefore: 0,
+    })
+    : null
+  // A recorded plan that cannot be priced still says why, so a confirmed
+  // history never leaves the user with a field that can never answer.
+  const blocker = complete && routing.status === 'unsupported' ? routing.reason : null
+  return <div data-testid={`spousal-attribution-${account.id}`}>
+    <h5>{t('be12.spousalTitle')}</h5>
+    <p className="hint">{t('be12.spousalExplanation')}</p>
+    {account.kind === 'rrif' && <p className="hint" data-testid={`spousal-rrif-note-${account.id}`}>{t('be12.spousalRrifNote')}</p>}
+    <label>{t('be12.spousalHistory')}
+      <select data-testid={`spousal-history-${account.id}`} value={complete ? 'complete' : 'unknown'}
+        onChange={event => setHistory(event.target.value === 'complete' ? 'complete' : 'unknown')}>
+        <option value="unknown">{t('be12.spousalHistoryUnknown')}</option>
+        <option value="complete">{t('be12.spousalHistoryComplete')}</option>
+      </select>
+    </label>
+    {rows.map(row => <div key={row.id} data-testid={`spousal-row-${row.id}`}>
+      <label>{t('be12.spousalYear')}
+        <input type="number" min="1950" max="2200" step="1" data-testid={`spousal-year-${row.id}`}
+          key={`year:${row.id}:${row.calendarYear}`} defaultValue={row.calendarYear}
+          onBlur={event => {
+            const year = Number(event.currentTarget.value)
+            if (!Number.isInteger(year) || year < 1950 || year > 2200 || year === row.calendarYear) return
+            setRow(row.id, contribution => {
+              contribution.calendarYear = year
+              // The deferral is relative to the contribution year, so moving the
+              // year keeps "deducted the following year" true.
+              if (contribution.deductionYear !== null) contribution.deductionYear = year + 1
+            })
+          }} />
+      </label>
+      <label>{t('be12.spousalContributor')}
+        <select data-testid={`spousal-contributor-${row.id}`} value={row.contributorId ?? ''}
+          onChange={event => setRow(row.id, contribution => { contribution.contributorId = event.target.value || null })}>
+          <option value="">{t('be12.spousalUnassigned')}</option>
+          {plan.people.map(person => <option key={person.id} value={person.id}>
+            {t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
+        </select>
+      </label>
+      <label>{t('be12.spousalAmount')}
+        <input type="number" min="0" step="1" data-testid={`spousal-amount-${row.id}`}
+          key={`amount:${row.id}:${row.amount}`} defaultValue={row.amount}
+          onBlur={event => {
+            const amount = Number(event.currentTarget.value)
+            if (!Number.isFinite(amount) || amount < 0 || amount === row.amount) return
+            setRow(row.id, contribution => { contribution.amount = amount })
+          }} />
+      </label>
+      <label>{t('be12.spousalDeductLater')}
+        <input type="checkbox" data-testid={`spousal-deduct-later-${row.id}`}
+          checked={row.deductionYear !== null}
+          onChange={event => setRow(row.id, contribution => {
+            contribution.deductionYear = event.target.checked ? contribution.calendarYear + 1 : null
+          })} />
+      </label>
+      {row.deductionYear !== null && <p className="hint" data-testid={`spousal-deduction-year-${row.id}`}>
+        {t('be12.spousalDeductionYear', { deductionYear: row.deductionYear, contributionYear: row.calendarYear })}</p>}
+      <button type="button" data-testid={`spousal-remove-${row.id}`}
+        onClick={() => removeRow(row.id)}>{t('be12.spousalRemove')}</button>
+    </div>)}
+    <button type="button" data-testid={`spousal-add-${account.id}`} onClick={addRow}>{t('be12.spousalAdd')}</button>
+    <p className="hint" data-testid={`spousal-window-${account.id}`}>{t('be12.spousalWindow', {
+      year: plan.baseYear, years: [plan.baseYear - 2, plan.baseYear - 1, plan.baseYear].join(', ') })}</p>
+    <p className="hint" data-testid={`spousal-base-year-${account.id}`}>
+      {t('be12.spousalBaseYearNote', { baseYear: plan.baseYear })}</p>
+    {!complete && <p className="hint" role="status" data-testid={`spousal-unknown-${account.id}`}>{t('be12.spousalNoHistory')}</p>}
+    {complete && <label>{t('be12.spousalPaymentTest')}
+      <input type="number" min="0" step="1" data-testid={`spousal-payment-${account.id}`}
+        value={paymentRaw} onChange={event => setPaymentRaw(event.target.value)} />
+    </label>}
+    {blocker && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
+      {t('be12.spousalUnsupported', { reason: blocker })}</p>}
+    {preview && preview.status === 'ok' && <p data-testid={`spousal-split-${account.id}`}>{t('be12.spousalSplit', {
+      contributor: label(routing.status === 'ok' ? routing.parties.contributorId : spouse?.id),
+      attributed: money(preview.attributedToContributor),
+      annuitant: label(routing.status === 'ok' ? routing.parties.annuitantId : annuitant?.id),
+      taxed: money(preview.taxedToAnnuitant),
+    })}</p>}
+    {preview && preview.status !== 'ok' && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
+      {t('be12.spousalUnsupported', { reason: preview.reason })}</p>}
+    <p className="hint">{t('be12.spousalLimit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t2205.html"
+      target="_blank" rel="noopener noreferrer">{t('be12.spousalSource')}</a></p>
   </div>
 }
 
@@ -479,6 +619,10 @@ export function TaxFactsPanel() {
         </>}
       </div>
     })}
+    {current.accounts.filter(account =>
+      ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) &&
+      (account.kind === 'spousalRrsp' || current.spousalHistory?.[account.id] !== undefined)).map(account =>
+      <SpousalAttributionRow key={account.id} account={account} plan={current} onEdit={edit} />)}
     <p>{t(current.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
   </section>
 }

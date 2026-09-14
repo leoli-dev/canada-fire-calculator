@@ -189,18 +189,23 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     return opened.status === 'known' && year - opened.value >= 15
   })) return fail('unsupported', 'FHSA statutory rollover not yet wired')
   if (plan.recurringContributions.some(contribution => state.byAccount[contribution.accountId]?.kind === 'fhsa' && contribution.annualAmount > 0)) return fail('unsupported', 'FHSA contribution annual and lifetime rules not yet wired')
-  // BE-12 A: a scheduled contribution is priced by the person's own RRSP room
-  // ledger. Spousal or attributed contributions stay explicitly unsupported.
+  // BE-12 A/B: a scheduled contribution is priced by the person's own RRSP
+  // room ledger. BE-12 B adds the spousal plan: a premium to a `spousalRrsp`
+  // account consumes the recorded contributor's room whether or not that
+  // contributor is the plan holder, and the account kind is what makes a later
+  // withdrawal attributable. A contributor recorded against a plain RRSP
+  // account stays unsupported: that account is not recorded as a spousal plan.
   const scheduled = plan.contributions.filter(contribution => contribution.calendarYear === year && contribution.amount > 0)
   const scheduledByPerson: Record<string, { accountId: string; planned: number }> = {}
   for (const contribution of scheduled) {
     if (!finiteNonnegative(contribution.amount) || (contribution.deductionYear !== null && !Number.isInteger(contribution.deductionYear))) return fail('invalid', `scheduled contribution facts: ${contribution.id}`)
     const account = state.byAccount[contribution.accountId]
     if (!account) return fail('invalid', `scheduled contribution account missing: ${contribution.id}`)
-    if (account.kind === 'spousalRrsp') return fail('unsupported', `spousal RRSP attribution (T2205) is not wired: ${contribution.id}`)
-    if (account.kind !== 'rrsp') return fail('unsupported', `scheduled ${account.kind} contribution rule not yet wired: ${contribution.id}`)
+    if (!['rrsp', 'spousalRrsp'].includes(account.kind)) return fail('unsupported', `scheduled ${account.kind} contribution rule not yet wired: ${contribution.id}`)
     if (contribution.contributorId === null) return fail('unsupported', `scheduled RRSP contributor not recorded: ${contribution.id}`)
-    if (contribution.contributorId !== account.ownerId) return fail('unsupported', `RRSP contributor differs from the account owner; spousal attribution is not wired: ${contribution.id}`)
+    if (contribution.contributorId !== account.ownerId && account.kind !== 'spousalRrsp')
+      return fail('unsupported', `RRSP contributor differs from the account owner and the account is not recorded as a spousal plan: ${contribution.id}`)
+    if (account.kind === 'spousalRrsp' && account.ownerId === null) return fail('unsupported', `spousal RRSP holder not identified: ${contribution.id}`)
     const bucket = scheduledByPerson[contribution.contributorId] ??= { accountId: contribution.accountId, planned: 0 }
     if (bucket.accountId !== contribution.accountId) return fail('unsupported', `one person has scheduled RRSP contributions to more than one account: ${contribution.contributorId}`)
     bucket.planned += contribution.amount

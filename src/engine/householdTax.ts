@@ -1,6 +1,7 @@
 import type { InputsV2 } from './model'
 import { incomeTax } from './tax'
-import { calculatePersonIncome, type IncomeEvent, type PersonIncome } from './personIncome'
+import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext, type PersonIncome } from './personIncome'
+import type { SpousalAttributionLedger } from './spousalAttribution'
 import { calculateQuebecTax } from './quebecTax'
 
 export interface PersonTaxRow {
@@ -14,7 +15,9 @@ export interface PersonTaxRow {
   qc?: import('./quebecTax').QuebecTaxRow
   bySource: PersonIncome['bySource']
 }
-export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record<string, PersonTaxRow>; ruleYear: 2026; coverage: 'estimated' } |
+export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record<string, PersonTaxRow>; ruleYear: 2026; coverage: 'estimated';
+  /** The year's spousal attribution state, advanced for the next projected year. */
+  spousalAttribution?: SpousalAttributionLedger } |
   { status: 'unsupported' | 'invalid'; reason: string }
 
 /**
@@ -24,8 +27,8 @@ export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record
  * Current 2026 bracket/credit values are a real-dollar projection assumption
  * for future years until BE-38 supplies year-specific full return rules.
  */
-export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[]): HouseholdTaxResult {
-  const income = calculatePersonIncome(plan, year, events)
+export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): HouseholdTaxResult {
+  const income = calculatePersonIncome(plan, year, events, context)
   if (income.status !== 'ok') return income
   const people = structuredClone(income.byPerson)
   const election = plan.taxProfile?.pensionSplit
@@ -80,7 +83,8 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
         tax: row.federalTax + row.provincialIncomeTax + row.fss + row.ramq,
         bySource: person.bySource, qc: row }
     }
-    return { status: 'ok', total: qc.total, byPerson, ruleYear: 2026, coverage: 'estimated' }
+    return { status: 'ok', total: qc.total, byPerson, ruleYear: 2026, coverage: 'estimated',
+      spousalAttribution: income.spousalAttribution }
   }
   const byPerson: Record<string, PersonTaxRow> = {}
   for (const id of ids) {
@@ -96,5 +100,5 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
       tax, bySource: person.bySource }
   }
   return { status: 'ok', total: Object.values(byPerson).reduce((sum, row) => sum + row.tax, 0),
-    byPerson, ruleYear: 2026, coverage: 'estimated' }
+    byPerson, ruleYear: 2026, coverage: 'estimated', spousalAttribution: income.spousalAttribution }
 }

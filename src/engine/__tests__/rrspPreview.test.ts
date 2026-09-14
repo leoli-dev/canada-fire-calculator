@@ -71,4 +71,50 @@ describe('BE-12 A panel/kernel RRSP ledger parity', () => {
     // sourced cap/18% rule, which the kernel reports as unsupported.
     expect(preview.ledger.year).toBe(plan.baseYear)
   })
+
+  it('prices a spousal premium in the contributor ledger identically in the panel and the kernel', () => {
+    // BE-12 B: the panel prices the contributor's own ledger, so its
+    // `plannedRrspLines` set must be the same one `annualStep` prices — the
+    // exact parity the panel/kernel split broke before (B1).
+    const plan = migratePersistedPlan({ inputs: { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 20000, retirementSpending: 40000, balances: { tfsa: 0, rrsp: 100000, nonReg: 0 }, nonRegBook: 0,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } } }, 10, 2026)
+    plan.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    plan.budget = { kind: 'savingsBudget', annualNetSavings: 20000, retirementSpending: 40000,
+      debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }
+    const self = plan.people.find(person => person.role === 'self')!
+    const partner = plan.people.find(person => person.role === 'partner')!
+    for (const account of plan.accounts) {
+      account.contributionRoom = { status: 'known', value: 1_000_000 }
+      account.ownerId = self.id
+      account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    const spousal = plan.accounts.find(account => account.kind === 'rrsp')!
+    spousal.kind = 'spousalRrsp'
+    partner.rrspDeductionLimit = { status: 'known', value: 20000 }
+    partner.rrspUnusedUndeducted = { status: 'known', value: 12000 }
+    partner.rrspAvailableRoom = { status: 'unknown', reason: 'available room not typed separately' }
+    plan.contributions = [{ id: 'spousal-plan', accountId: spousal.id, contributorId: partner.id,
+      calendarYear: plan.baseYear, amount: 6000, deductionYear: null, provenance: { origin: 'user', sourceYear: plan.baseYear } }]
+    const preview = previewRrspRoomYear(plan, partner)
+    expect(preview.ledger.planned).toBe(6000)
+    expect(preview.ledger.applied).toBe(6000)
+    expect(preview.ledger.closingRoom).toEqual({ status: 'known', value: 2000 })
+    const opening = initializeState(plan)
+    expect(opening.status).toBe('ok')
+    if (opening.status !== 'ok') throw new Error('expected an initialized plan')
+    const split: AnnualProviders = {
+      evaluate: ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
+        income: 10000, earnedIncome: 0, benefits: 0, tax: 0, spending: 0, taxableIncome: 10000,
+        benefitIncomeForNextYear: { status: 'known' as const, value: 10000 },
+      }])) }),
+      returns: () => 0,
+    }
+    const step = annualStep(plan, opening.value, split)
+    expect(step.status).toBe('ok')
+    if (step.status !== 'ok') throw new Error('expected a settled year')
+    expect(preview.ledger).toEqual(step.value.row.rrspLedger[partner.id])
+    expect(step.value.row.byAccount[spousal.id].contribution).toBe(6000)
+  })
 })

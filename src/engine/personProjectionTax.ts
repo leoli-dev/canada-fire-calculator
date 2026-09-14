@@ -1,7 +1,8 @@
 import type { Inputs } from './types'
 import type { InputsV2 } from './model'
 import { calculateHouseholdTax, type HouseholdTaxResult } from './householdTax'
-import type { IncomeEvent } from './personIncome'
+import type { IncomeEvent, IncomeYearContext } from './personIncome'
+import type { SpousalAttributionLedger } from './spousalAttribution'
 import { cppAnnual, earlyClaimDilutionRelief, oasAfterClawback } from './benefits'
 import { pensionPaid } from './pensionPaid'
 import { minimumForRrif } from './rrif'
@@ -21,9 +22,18 @@ export interface ProjectionTaxFacts {
   purchaseRrspWithdrawal: number
   purchaseNonRegTaxable: number
   propertySaleTaxable: number
+  /**
+   * Spousal premiums' already-attributed state at the START of this year,
+   * carried across projected years so a premium is attributed at most once
+   * (ITA s.146(8.6)(a); review fix B2). Absent means the caller has no
+   * cross-year state, which is the base-year opening state.
+   */
+  spousalAttribution?: SpousalAttributionLedger
 }
 export type ProjectionTaxResult = { status: 'ok'; tax: HouseholdTaxResult & { status: 'ok' }; oasNet: number;
   oasByPerson: Record<string, { gross: number; net: number }>;
+  /** This year's post-payment attribution state, for the next projected year. */
+  spousalAttribution?: SpousalAttributionLedger;
   grossCpp: number; grossPension: number; taxableExOas: number; earnedWork: number } |
   { status: 'unsupported' | 'invalid'; reason: string }
 
@@ -98,10 +108,23 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
       return { status: 'unsupported', reason: 'rental allocation or mortgage deduction needs BE-14 B' }
     annualEvents.push({ id: `rent:${f.year}`, kind: 'rent', propertyId: rented[0].id, amount: f.rent })
   }
+  // Review fix B1: the spousal attribution's s.146.3(5.1) minimum must be the
+  // same figure as the year's mandatory RRIF withdrawal, which is computed from
+  // this year's opening registered balance (the caller's `registeredBalance`),
+  // never from the frozen canonical `account.balance`. The single-account path
+  // above is the only one that reaches an RRIF event, so the balance maps to
+  // that one account.
+  const yearContext: IncomeYearContext = {
+    registeredOpeningBalances: registered.length === 1 ? { [registered[0].id]: f.registeredBalance } : undefined,
+    // Review fix B2: the same year-opening ledger feeds both tax passes, so the
+    // OAS pass and the final pass agree, and the final pass's ledger is the one
+    // carried to the next year.
+    spousalAttributionLedger: f.spousalAttribution,
+  }
   // OAS recovery uses each person's net income after the same elected pension
   // split used by final tax, but before adding their own OAS event. CRA notes
   // that the election changes individual OAS repayment.
-  const before = calculateHouseholdTax(plan, f.year, annualEvents)
+  const before = calculateHouseholdTax(plan, f.year, annualEvents, yearContext)
   if (before.status !== 'ok') return before
   let oasNet = 0
   const oasByPerson: Record<string, { gross: number; net: number }> = {}
@@ -111,9 +134,10 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     oasByPerson[item.canonical.id] = { gross: f.oasGross[index] ?? 0, net: oas }
     if (oas) annualEvents.push({ id: `${item.canonical.id}:oas:${f.year}`, kind: 'oas', personId: item.canonical.id, amount: oas })
   }
-  const tax = calculateHouseholdTax(plan, f.year, annualEvents)
+  const tax = calculateHouseholdTax(plan, f.year, annualEvents, yearContext)
   if (tax.status !== 'ok') return tax
   return { status: 'ok', tax, oasNet, oasByPerson, grossCpp, grossPension,
+    spousalAttribution: tax.spousalAttribution,
     taxableExOas: Object.values(tax.byPerson).reduce((sum, row) => sum + row.taxableIncome, 0) - oasNet,
     earnedWork: f.otherWork }
 }
