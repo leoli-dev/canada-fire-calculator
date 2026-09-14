@@ -281,3 +281,79 @@ test('RRIF age-71 category is explicit and shared across Professional and Guided
   await page.reload()
   await expect(category).toHaveValue('qualifying')
 })
+
+test('each spouse records their own registered balance; the household total is conserved and results stay honest', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS, DEFAULT_PARTNER } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 65, fireAge: 65, lifeExpectancy: 70,
+      retirementSpending: 20000, province: 'ON', annualSavings: 0,
+      balances: { tfsa: 100000, rrsp: 500000, nonReg: 200000 }, nonRegBook: 100000,
+      cppAnnualAt65: 0, oasAnnualAt65: 0, cppStartAge: 70, oasStartAge: 70,
+      partner: { ...DEFAULT_PARTNER, currentAge: 63, cppAnnualAt65: 0, oasAnnualAt65: 0 } }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    canonical.accounts.forEach(account => { account.ownerId = canonical.people[0].id
+      account.taxableOwnerShares = { status: 'known', shares: { [canonical.people[0].id]: 1 } } })
+    canonical.migration.ownershipNeedsConfirmation = false
+    canonical.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: null }
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs, canonical, entryMode: 'professional', guidedView: 'questionnaire',
+      inputRevision: 0, resultRevision: null,
+    } }))
+  })
+  await page.reload()
+  const panel = page.getByTestId('person-tax-facts')
+  await expect(panel).toBeVisible()
+  // 100/0 ownership is a verified single-owner plan: precise person tax shows.
+  await expect(page.getByTestId('person-tax-table')).toBeVisible()
+  await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
+  await page.getByTestId('account-self-amount-legacy:account:rrsp').fill('300000')
+  await page.getByTestId('account-partner-amount-legacy:account:rrsp').fill('200000')
+  await page.getByTestId('account-partner-amount-legacy:account:rrsp').blur()
+  await expect(page.getByTestId('ownership-sum-legacy:account:rrsp')).toContainText('500,000')
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  const rrspAccounts = saved.canonical.accounts.filter((account: { kind: string }) => account.kind === 'rrsp')
+  expect(rrspAccounts.map((account: { balance: number }) => account.balance).sort((x: number, y: number) => x - y)).toEqual([200000, 300000])
+  expect(rrspAccounts.reduce((sum: number, account: { balance: number }) => sum + account.balance, 0)).toBe(500000)
+  expect(rrspAccounts.map((account: { ownerId: string }) => account.ownerId).sort())
+    .toEqual(['legacy:person:partner', 'legacy:person:self'])
+  // a genuine two-owner registered split is BE-14 B: results stay labelled estimates
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
+  // a mismatch is visible and refuses to write a partial split
+  await page.getByTestId('account-self-amount-legacy:account:rrsp').fill('100000')
+  await page.getByTestId('account-partner-amount-legacy:account:rrsp').blur()
+  await expect(page.getByTestId('ownership-mismatch-legacy:account:rrsp')).toBeVisible()
+  const afterMismatch = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(afterMismatch.canonical.accounts.filter((account: { kind: string }) => account.kind === 'rrsp')
+    .map((account: { balance: number }) => account.balance).sort((x: number, y: number) => x - y)).toEqual([200000, 300000])
+  await page.getByTestId('account-self-amount-legacy:account:rrsp').fill('300000')
+  await page.getByTestId('account-self-amount-legacy:account:rrsp').blur()
+  await expect(page.getByTestId('ownership-mismatch-legacy:account:rrsp')).toHaveCount(0)
+  // non-registered amounts become proportional shares
+  await page.getByTestId('account-self-amount-legacy:account:nonReg').fill('150000')
+  await page.getByTestId('account-partner-amount-legacy:account:nonReg').fill('50000')
+  await page.getByTestId('account-partner-amount-legacy:account:nonReg').blur()
+  const shares = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('fire-inputs')!).state
+    return state.canonical.accounts.find((account: { kind: string }) => account.kind === 'nonReg').taxableOwnerShares.shares
+  })
+  expect(shares['legacy:person:self']).toBeCloseTo(.75, 12)
+  expect(shares['legacy:person:partner']).toBeCloseTo(.25, 12)
+  // the 100/0 select path still works and the records survive a reload
+  await page.getByTestId('owner-legacy:account:tfsa').selectOption('legacy:person:partner')
+  await page.reload()
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:nonReg')).toHaveValue('150000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:nonReg')).toHaveValue('50000')
+  // guided mode shows the same recorded facts
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/income/income.taxFacts')
+  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200000')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
