@@ -280,6 +280,8 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
     <button type="button" data-testid={`spousal-add-${account.id}`} onClick={addRow}>{t('be12.spousalAdd')}</button>
     <p className="hint" data-testid={`spousal-window-${account.id}`}>{t('be12.spousalWindow', {
       year: plan.baseYear, years: [plan.baseYear - 2, plan.baseYear - 1, plan.baseYear].join(', ') })}</p>
+    <p className="hint" data-testid={`spousal-base-year-${account.id}`}>
+      {t('be12.spousalBaseYearNote', { baseYear: plan.baseYear })}</p>
     {!complete && <p className="hint" role="status" data-testid={`spousal-unknown-${account.id}`}>{t('be12.spousalNoHistory')}</p>}
     {complete && <label>{t('be12.spousalPaymentTest')}
       <input type="number" min="0" step="1" data-testid={`spousal-payment-${account.id}`}

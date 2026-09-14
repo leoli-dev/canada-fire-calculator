@@ -802,6 +802,7 @@
     "spousalAdd": "Ajouter une cotisation",
     "spousalRemove": "Retirer",
     "spousalWindow": "Un paiement en {{year}} peut être attribué par une cotisation versée en {{years}} : l'année du paiement ou l'une des deux années précédentes.",
+    "spousalBaseYearNote": "Chaque cotisation n'est attribuée qu'une seule fois au plus. Une cotisation versée avant {{baseYear}} est considérée comme non encore attribuée, car la projection commence en {{baseYear}} et aucun paiement antérieur de ce régime n'est inscrit.",
     "spousalNoHistory": "Aucun historique de cotisations n'est inscrit pour ce régime; un paiement ne peut donc pas être attribué. Tant qu'il n'est pas inscrit, le paiement n'est pas présumé appartenir au titulaire du régime.",
     "spousalPaymentTest": "Aperçu d'un paiement de ce régime ($ CA)",
     "spousalSplit": "Attribué à {{contributor}} : {{attributed}} $ CA. Imposé à {{annuitant}} : {{taxed}} $ CA.",

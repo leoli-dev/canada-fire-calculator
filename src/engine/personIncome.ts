@@ -1,7 +1,7 @@
 import type { InputsV2, TaxShares } from './model'
 import { ageReachedInYear, precisionGate } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
-import { attributeSpousalPayment, resolveSpousalPlan, type SpousalPremium } from './spousalAttribution'
+import { advanceAttributionLedger, applyAttributionLedger, attributeSpousalPayment, resolveSpousalPlan, type SpousalAttributionLedger, type SpousalPremium } from './spousalAttribution'
 
 export type IncomeKind = 'employment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
   'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'other'
@@ -30,7 +30,7 @@ export interface PersonIncome {
   bySource: Partial<Record<IncomeKind, number>>
   entries: { eventId: string; kind: IncomeKind; gross: number; taxable: number }[]
 }
-export type IncomeResult = { status: 'ok'; byPerson: Record<string, PersonIncome> } |
+export type IncomeResult = { status: 'ok'; byPerson: Record<string, PersonIncome>; spousalAttribution?: SpousalAttributionLedger } |
   { status: 'invalid' | 'unsupported'; reason: string }
 const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult => ({ status, reason })
 
@@ -42,18 +42,28 @@ const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult =
  * attribution must use the same one (review fix B1) rather than the frozen
  * canonical `account.balance`. Absent means the caller has no projected figure
  * and `minimumForRrif` keeps its base-year default.
+ *
+ * `spousalAttributionLedger` is the spousal premiums' already-attributed state
+ * at the START of `year`, carried across projected years. A premium attributed
+ * in an earlier year is deemed, afterwards, not to have been paid to the
+ * spousal plan (ITA s.146(8.6)(a)), so it must not be attributed again. The
+ * result carries the advanced ledger back out for the next year; the field is
+ * never mutated in place and is never written back into the canonical plan.
  */
 export interface IncomeYearContext {
   registeredOpeningBalances?: Record<string, number>
+  spousalAttributionLedger?: SpousalAttributionLedger
 }
 
 /**
  * Unknown ownership is a tax-capability limit, never a cue to divide by
  * household size. `spousalPremiums` carries the per-account premium state for
  * one year's events so a second payment cannot re-attribute a premium that an
- * earlier payment already attributed (ITA s.146(8.6)), and
- * `spousalAnnuitantIncome` carries the payments already made from the account
- * this year so the RRIF minimum is consumed once (s.146.3(5.1)(c)).
+ * earlier payment already attributed (ITA s.146(8.6)), seeded from the
+ * year-opening `spousalAttributionLedger` so an earlier projected YEAR cannot
+ * either (review fix B2), and `spousalAnnuitantIncome` carries the payments
+ * already made from the account this year so the RRIF minimum is consumed once
+ * (s.146.3(5.1)(c)).
  */
 function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousalPremiums: Map<string, SpousalPremium[]>, spousalAnnuitantIncome: Map<string, number>, context?: IncomeYearContext): { status: 'ok'; shares: Record<string, number> } | { status: 'invalid' | 'unsupported'; reason: string } {
   if (event.personId && (event.accountId || event.propertyId) || event.accountId && event.propertyId) return { status: 'invalid', reason: `income ownership ambiguous: ${event.id}` }
@@ -82,7 +92,12 @@ function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousa
         context?.registeredOpeningBalances?.[account.id])
       if (routing.status === 'unsupported') return { status: 'unsupported', reason: `${routing.reason}: ${event.id}` }
       if (routing.status === 'ok') {
-        const premiums = spousalPremiums.get(account.id) ?? routing.parties.premiums
+        // The first payment of the year starts from the year-opening ledger, so
+        // a premium an earlier projected year already attributed is treated as
+        // deemed not to have been paid (s.146(8.6)(a)). Later payments in the
+        // SAME year continue from this year's in-flight state.
+        const premiums = spousalPremiums.get(account.id) ??
+          applyAttributionLedger(routing.parties.premiums, context?.spousalAttributionLedger?.[account.id])
         const attribution = attributeSpousalPayment({
           paymentId: event.id, payment: event.amount, paymentYear: year,
           contributorId: routing.parties.contributorId, annuitantId: routing.parties.annuitantId,
@@ -157,7 +172,14 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
         person.provincialPensionEligible += taxable
     }
   }
-  return { status: 'ok', byPerson }
+  // Carry the year's post-payment state out so the next projected year cannot
+  // re-attribute a premium this year already attributed (ITA s.146(8.6)(a)).
+  // `advanceAttributionLedger` copies, so the caller's context and the
+  // canonical plan are left untouched and a re-run reproduces this ledger.
+  let spousalAttribution = context?.spousalAttributionLedger
+  for (const [accountId, premiumsAfter] of spousalPremiums)
+    spousalAttribution = advanceAttributionLedger(spousalAttribution ?? {}, accountId, premiumsAfter)
+  return spousalAttribution ? { status: 'ok', byPerson, spousalAttribution } : { status: 'ok', byPerson }
 }
 
 /** A known source amount stays with its recipient. Unknown source amounts gate exact tax. */

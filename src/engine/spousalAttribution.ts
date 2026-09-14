@@ -1,4 +1,4 @@
-import type { Account, Contribution, Known, Person, SpousalHistoryStatus } from './model'
+import type { Account, Contribution, InputsV2, Known, Person, SpousalHistoryStatus } from './model'
 import { minimumForRrif } from './rrif'
 import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
 
@@ -41,6 +41,15 @@ import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
  * RRIF minimum all return `unsupported` with a concrete reason instead of an
  * assumption. A known history with no premiums is a real zero and attributes
  * nothing.
+ *
+ * `attributeSpousalPayment` enforces no re-use WITHIN one call through
+ * `premiumsAfter`. Across projected years the callers must carry that state
+ * forward, so a `SpousalAttributionLedger` (per account, per premium id) is the
+ * year-over-year carrier: the projection seeds it once at the base year
+ * (`openingSpousalAttributionLedger`) and advances it with each year's
+ * post-payment state. Without that ledger a premium is re-attributed in every
+ * later year of its window, which breaks s.146(8.6)(a) and over-taxes the
+ * contributor (review fix B2).
  */
 
 /** A payment is attributed while its year is within this many years after the premium. */
@@ -112,6 +121,18 @@ export interface SpousalAttributionOk {
 export type SpousalAttributionResult = SpousalAttributionOk |
   { status: 'invalid' | 'unsupported'; reason: string }
 
+/**
+ * How much of each recorded spousal premium has already been included in the
+ * contributor's income: account id → premium id → attributed amount.
+ *
+ * The ledger is the year-over-year carrier of the s.146(8.6)(a) no-re-use rule.
+ * It is a plain value: `applyAttributionLedger` and `advanceAttributionLedger`
+ * both return new objects and never touch the ledger they are given, so the
+ * canonical plan and any caller's context are never mutated and running the
+ * same projection twice produces the same ledger.
+ */
+export type SpousalAttributionLedger = Record<string, Record<string, number>>
+
 const roundCents = (value: number) => Math.round(value * 100) / 100
 const finiteNonnegative = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
@@ -146,15 +167,79 @@ export function spousalPremiumLines(contributions: Contribution[], accountId: st
 }
 
 /**
+ * Overlay a carried-forward ledger onto one account's premium rows. A premium
+ * the ledger does not mention keeps the plan's own recorded `attributed`
+ * (always zero for a canonical row), so a missing entry is a real zero and not
+ * an unknown: the ledger is only ever written by this engine.
+ */
+export function applyAttributionLedger(premiums: SpousalPremium[], ledger: Record<string, number> | undefined): SpousalPremium[] {
+  if (!ledger) return premiums
+  return premiums.map(premium => {
+    const attributed = ledger[premium.id]
+    return attributed === undefined ? premium : { ...premium, attributed }
+  })
+}
+
+/** The ledger advanced by one account's post-payment premium state. */
+export function advanceAttributionLedger(
+  ledger: SpousalAttributionLedger,
+  accountId: string,
+  premiumsAfter: SpousalPremium[],
+): SpousalAttributionLedger {
+  const next: Record<string, number> = { ...(ledger[accountId] ?? {}) }
+  for (const premium of premiumsAfter) next[premium.id] = premium.attributed
+  return { ...ledger, [accountId]: next }
+}
+
+/**
+ * The attribution state of every recorded spousal premium at the start of the
+ * plan's base year — the ledger the projection carries forward.
+ *
+ * Every premium starts at zero. That is a stated decision, not a silent
+ * default:
+ *
+ * - `runProjection` computes the base year and later years only, and the
+ *   canonical plan has no payment-history field, so a payment out of a plan
+ *   before the base year is not a recorded fact. Reading an attribution out of
+ *   one would mean inventing data the plan does not hold.
+ * - The base year is the plan's own year zero, so its opening state is "no
+ *   projected payment has attributed anything yet". A premium whose whole
+ *   attribution window precedes the base year
+ *   (`calendarYear < baseYear - ATTRIBUTION_WINDOW_YEARS`) can never reach a
+ *   projected payment and stays at zero for that reason alone — the convention
+ *   cannot inflate any result for it.
+ * - The UI states the same convention beside the premium rows
+ *   (`be12.spousalBaseYearNote`), so it is visible rather than implicit.
+ *
+ * Only a `complete` history has premium rows to carry: an unrecorded history is
+ * refused by `resolveSpousalPlan`, never treated as an empty premium list.
+ */
+export function openingSpousalAttributionLedger(plan: InputsV2): SpousalAttributionLedger {
+  const ledger: SpousalAttributionLedger = {}
+  for (const account of plan.accounts) {
+    if (plan.spousalHistory?.[account.id]?.status !== 'complete') continue
+    const premiums = spousalPremiumLines(plan.contributions, account.id)
+    if (premiums.length === 0) continue
+    ledger[account.id] = Object.fromEntries(premiums.map(premium => [premium.id, 0]))
+  }
+  return ledger
+}
+
+/**
  * The required RRIF minimum as a `Known`, reusing `minimumForRrif` so there is
  * one minimum calculation in the engine. `null` means "not a RRIF", which is
- * not the same as an unknown minimum. `openingBalance` is the balance the year's
- * mandatory withdrawal is computed from; when the caller has a projected figure
- * it must be passed, or the minimum here would silently disagree with the
- * withdrawal enforced in the same year.
+ * not the same as an unknown minimum.
+ *
+ * `openingBalance` is the balance the year's mandatory withdrawal is computed
+ * from. When the caller has a projected figure it must be passed: the frozen
+ * canonical `account.balance` is the opening balance only in the base year, so
+ * for any later year an absent balance is an explicit `unknown` rather than a
+ * silent fall back to a figure that no longer applies (the round-2 defect).
  */
 export function knownRrifMinimum(account: Account, people: Person[], baseYear: number, year: number, openingBalance?: number): Known<number> | null {
   if (account.kind !== 'rrif') return null
+  if (openingBalance === undefined && year !== baseYear)
+    return { status: 'unknown', reason: `the ${year} opening RRIF balance was not supplied, so the year's required minimum cannot be taken from the frozen ${baseYear} balance` }
   const minimum = minimumForRrif(account, people, baseYear, year, openingBalance)
   if (minimum.status === 'ok') return { status: 'known', value: roundCents(minimum.amount) }
   return { status: 'unknown', reason: minimum.reason }
@@ -197,6 +282,8 @@ function spousalPlanName(kind: Account['kind']): string {
  * is enforced from, so the attribution minimum and the forced withdrawal are
  * one number (review fix B1); the tax panel passes nothing in the base year,
  * where `minimumForRrif`'s default (`account.balance`) is that same balance.
+ * For a later year an absent balance stays an explicit `unknown` supplied by
+ * `knownRrifMinimum` instead of silently reusing the frozen balance.
  */
 export function resolveSpousalPlan(
   account: Account,

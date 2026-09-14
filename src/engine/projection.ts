@@ -23,6 +23,7 @@ import {
 } from './benefits'
 import { minimumForRrif, rrifMinFactor } from './rrif'
 import type { InputsV2 } from './model'
+import { openingSpousalAttributionLedger, type SpousalAttributionLedger } from './spousalAttribution'
 import { personProjectionTax } from './personProjectionTax'
 import { pensionPaid } from './pensionPaid'
 export { pensionPaid } from './pensionPaid'
@@ -96,6 +97,8 @@ interface WithdrawalOutcome {
   taxPeople: TerminalTaxPerson[]
   byPersonTax?: YearRow['byPersonTax']
   taxUnsupportedReason?: string
+  /** The year's post-payment spousal attribution state, for the next year. */
+  spousalAttribution?: SpousalAttributionLedger
 }
 
 /**
@@ -135,6 +138,7 @@ function evaluate(
   propertySaleTaxable: number,
   canonical?: InputsV2,
   taxYear?: number,
+  spousalAttribution?: SpousalAttributionLedger,
 ): WithdrawalOutcome {
   const w: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
   let remaining = G
@@ -207,7 +211,7 @@ function evaluate(
       nonRegGainFraction: gainFraction,
       nonRegDistributions, rent, otherWork: extraIncome,
       oasGross: oasGrossPerPerson, purchaseRrspWithdrawal,
-      purchaseNonRegTaxable, propertySaleTaxable })
+      purchaseNonRegTaxable, propertySaleTaxable, spousalAttribution })
     if (person.status === 'ok') {
       tax = person.tax.total
       oasNet = person.oasNet
@@ -227,7 +231,8 @@ function evaluate(
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, ccb: personCcb,
-        netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson }
+        netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson,
+        spousalAttribution: person.spousalAttribution }
     }
     return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson,
       taxPeople, taxUnsupportedReason: person.reason }
@@ -259,10 +264,11 @@ function solveWithdrawals(
   propertySaleTaxable = 0,
   canonical?: InputsV2,
   taxYear?: number,
+  spousalAttribution?: SpousalAttributionLedger,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -309,6 +315,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   let taxUnsupportedReason: string | undefined
   let investmentSaleTaxUnsupported = false
   let nonRegLossTaxUnverified = false
+  // Review fix B2: the spousal premiums' already-attributed state lives for the
+  // whole projection (per account, per premium), is seeded once at the plan's
+  // base year, and is advanced by each settled year. It is never written back
+  // into the canonical plan, so `runProjection` stays pure and re-runnable.
+  let spousalAttribution: SpousalAttributionLedger = canonical ? openingSpousalAttributionLedger(canonical) : {}
   if (canonical && inputs.fireAge > inputs.currentAge && canonical.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
     taxUnsupportedReason = 'working RRIF minimum requires BE-14 B cash and tax settlement'
 
@@ -899,7 +910,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         extraIncome, nUnder6, n6to17, steps, inputs, purchaseTaxPaid, purchaseRrspWithdrawal,
         purchaseNonRegTaxable, saleGainsTaxable,
         canonical, canonical ? canonical.baseYear + yearIdx : undefined,
+        spousalAttribution,
       )
+      // The accepted solve's ledger is the year's post-payment state; the
+      // rejected binary-search candidates each started from the same
+      // year-opening ledger, so this move is deterministic and cannot
+      // double-count. An unsupported year returns no ledger and leaves it
+      // untouched rather than fabricating an attribution.
+      if (out.spousalAttribution) spousalAttribution = out.spousalAttribution
       if (out.taxUnsupportedReason) taxUnsupportedReason ??= out.taxUnsupportedReason
       byPersonTax = out.byPersonTax
       if (nonRegLossPreview && out.withdrawals.nonReg > 1) {

@@ -802,6 +802,7 @@
     "spousalAdd": "添加一笔供款",
     "spousalRemove": "删除",
     "spousalWindow": "{{year}} 年的付款可由 {{years}} 年内缴纳的供款产生归属：即付款当年或其前两年。",
+    "spousalBaseYearNote": "每笔供款最多只能归属一次。{{baseYear}} 年之前缴纳的供款视为尚未归属，因为推演从 {{baseYear}} 年开始，且此前没有任何该计划的付款记录。",
     "spousalNoHistory": "本计划尚未记录供款历史，因此无法确定归属。在您记录之前，不会假定该付款属于计划持有人。",
     "spousalPaymentTest": "预览本计划的一笔付款（加元）",
     "spousalSplit": "归属给 {{contributor}}：{{attributed}} 加元；由 {{annuitant}} 纳税：{{taxed}} 加元。",

@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
 import type { InputsV2, Known } from '../model'
 import { migratePersistedPlan } from '../migration'
+import { minimumForRrif } from '../rrif'
 import { RRSP_MONEY_TOLERANCE } from '../rrspRoom'
 import {
   ATTRIBUTION_WINDOW_YEARS,
   SPOUSAL_HISTORY_UNKNOWN_REASON,
+  advanceAttributionLedger,
+  applyAttributionLedger,
   attributeSpousalPayment,
   attributionWindowYears,
   isInAttributionWindow,
   knownRrifMinimum,
+  openingSpousalAttributionLedger,
   resolveSpousalPlan,
   spousalPremiumLines,
   type SpousalAttributionResult,
@@ -579,5 +583,170 @@ describe('BE-12 B personIncome wiring', () => {
     expect(result.status).toBe('unsupported')
     if (result.status !== 'unsupported') throw new Error('expected unsupported')
     expect(result.reason).toContain('RRIF minimum')
+  })
+})
+
+/**
+ * Review fix B2 at the module boundary: the s.146(8.6)(a) no-re-use rule has to
+ * survive the year boundary, so the per-premium `attributed` state travels in a
+ * value ledger. These tests pin the ledger's mechanics and the API tightening
+ * that stops a later year from silently reusing the frozen canonical balance as
+ * its RRIF minimum.
+ */
+describe('BE-12 B cross-year attribution ledger (review fix B2)', () => {
+  it('overlays a carried ledger as a value and leaves the plan rows and ledger untouched', () => {
+    const premiums = spousalPremiumLines([
+      { id: 'p1', accountId: 'rrif', contributorId: 'partner', calendarYear: 2025, amount: 10_000, deductionYear: null,
+        provenance: { origin: 'user', sourceYear: 2025 } },
+      { id: 'p2', accountId: 'rrif', contributorId: 'partner', calendarYear: 2026, amount: 4_000, deductionYear: null,
+        provenance: { origin: 'user', sourceYear: 2026 } },
+    ], 'rrif')
+    const ledger = { rrif: { p1: 6_000 } }
+    const overlaid = applyAttributionLedger(premiums, ledger.rrif)
+    expect(overlaid.map(row => [row.id, row.attributed])).toEqual([['p1', 6_000], ['p2', 0]])
+    // Neither the plan's rows nor the caller's ledger is a view into the result.
+    expect(ledger).toEqual({ rrif: { p1: 6_000 } })
+    expect(premiums.map(row => row.attributed)).toEqual([0, 0])
+    expect(overlaid[0]).not.toBe(premiums[0])
+    // A premium the ledger does not mention keeps the plan's own recorded value,
+    // which is a real zero for every canonical row; an absent ledger is the base
+    // year's opening state, not an unknown.
+    expect(applyAttributionLedger(premiums, undefined)).toBe(premiums)
+    expect(applyAttributionLedger(premiums, { other: 3_000 })).toEqual(premiums)
+  })
+
+  it('advances one account without mutating the ledger it was given', () => {
+    const before = { rrif: { p1: 1_000 }, other: { x: 2 } }
+    const after = advanceAttributionLedger(before, 'rrif', [premium('p1', 2025, 5_000, { attributed: 3_000 })])
+    expect(after).toEqual({ rrif: { p1: 3_000 }, other: { x: 2 } })
+    expect(before).toEqual({ rrif: { p1: 1_000 }, other: { x: 2 } })
+    expect(after).not.toBe(before)
+    expect(after.rrif).not.toBe(before.rrif)
+  })
+
+  it('seeds the base-year ledger at zero for a complete history only, and the window still excludes stale premiums', () => {
+    const plan = spousalPlan((draft, _selfId, partnerId, accountId) => {
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+      draft.contributions = [
+        { id: 'p2024', accountId, contributorId: partnerId, calendarYear: 2024, amount: 4_000, deductionYear: null,
+          provenance: { origin: 'user', sourceYear: 2024 } },
+        { id: 'p2025', accountId, contributorId: partnerId, calendarYear: 2025, amount: 6_000, deductionYear: null,
+          provenance: { origin: 'user', sourceYear: 2025 } },
+      ]
+    })
+    const account = plan.accounts.find(item => item.kind === 'spousalRrsp')!
+    const ledger = openingSpousalAttributionLedger(plan)
+    expect(ledger).toEqual({ [account.id]: { p2024: 0, p2025: 0 } })
+    // The year-zero convention cannot inflate anything: the 2024 premium's whole
+    // window precedes 2027, so only the 2025 premium is reachable.
+    const seeded = applyAttributionLedger(spousalPremiumLines(plan.contributions, account.id), ledger[account.id])
+    const stale = ok(attributeSpousalPayment(request({
+      contributorId: seeded[0].contributorId, premiums: seeded, paymentYear: 2027, payment: 99_000,
+    })))
+    expect(stale.inWindowUnattributed).toBe(6_000)
+    expect(stale.attributedToContributor).toBe(6_000)
+    // An unrecorded history has no ledger at all: unknown never becomes zero.
+    expect(openingSpousalAttributionLedger(spousalPlan())).toEqual({})
+  })
+
+  it('honours the year-opening ledger in calculatePersonIncome instead of restarting the premium', () => {
+    const plan = spousalPlan((draft, _selfId, partnerId, accountId) => {
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+      draft.contributions = [{ id: 'p2025', accountId, contributorId: partnerId, calendarYear: 2025, amount: 8_000,
+        deductionYear: null, provenance: { origin: 'user', sourceYear: 2025 } }]
+    })
+    const account = plan.accounts.find(item => item.kind === 'spousalRrsp')!
+    const self = plan.people.find(person => person.role === 'self')!
+    const partner = plan.people.find(person => person.role === 'partner')!
+
+    // 2026 attributes 5,000 of the 8,000 premium and reports the state out.
+    const first = calculatePersonIncome(plan, 2026,
+      [{ id: 'd1', kind: 'rrspWithdrawal', accountId: account.id, amount: 5_000 }], { spousalAttributionLedger: {} })
+    expect(first.status).toBe('ok')
+    if (first.status !== 'ok') return
+    expect(first.byPerson[partner.id].gross).toBe(5_000)
+    expect(first.spousalAttribution).toEqual({ [account.id]: { p2025: 5_000 } })
+
+    // 2027 is still in window but can reach only the remaining 3,000.
+    const second = calculatePersonIncome(plan, 2027,
+      [{ id: 'd2', kind: 'rrspWithdrawal', accountId: account.id, amount: 9_000 }],
+      { spousalAttributionLedger: first.spousalAttribution })
+    expect(second.status).toBe('ok')
+    if (second.status !== 'ok') return
+    expect(second.byPerson[partner.id].gross).toBe(3_000)
+    expect(second.byPerson[self.id].gross).toBeCloseTo(6_000, 6)
+    expect(second.spousalAttribution).toEqual({ [account.id]: { p2025: 8_000 } })
+
+    // Without the ledger the same call restarts the premium at its full 8,000:
+    // the context is exactly what carries s.146(8.6)(a) across the boundary.
+    const restarted = calculatePersonIncome(plan, 2027,
+      [{ id: 'd3', kind: 'rrspWithdrawal', accountId: account.id, amount: 9_000 }])
+    expect(restarted.status).toBe('ok')
+    if (restarted.status !== 'ok') return
+    expect(restarted.byPerson[partner.id].gross).toBe(8_000)
+  })
+})
+
+/**
+ * The reviewer's non-blocking note: `minimumForRrif`'s `openingBalance` default
+ * used to be reachable from the spousal path for a projected year, and that
+ * silent frozen-balance fallback is what caused the round-2 defect. The
+ * production spousal path now refuses a later year without a real balance; the
+ * exported `minimumForRrif` default stays as a base-year convenience for its
+ * legitimate direct callers and is pinned here so the behaviour is explicit.
+ */
+describe('BE-12 B RRIF minimum basis at the API boundary', () => {
+  const people = [{ id: 'self', ageInBaseYear: 80 }]
+  const rrif = { id: 'rrif', kind: 'rrif' as const, ownerId: 'self', balance: 100_000,
+    openedYear: { status: 'known' as const, value: 2020 } }
+
+  it('stays a real answer in the base year, where the canonical balance IS the opening balance', () => {
+    // age 80 during 2026 -> January 1 age 79 -> 0.0658 * 100,000 = 6,580.
+    expect(knownRrifMinimum(rrif as never, people as never, 2026, 2026)).toEqual(known(6_580))
+    expect(knownRrifMinimum(rrif as never, people as never, 2026, 2026, 100_000)).toEqual(known(6_580))
+  })
+
+  it('refuses a later year minimum when no opening balance is supplied', () => {
+    const later = knownRrifMinimum(rrif as never, people as never, 2026, 2027)
+    expect(later).toMatchObject({ status: 'unknown' })
+    if (later?.status !== 'unknown') throw new Error('expected an explicit unknown')
+    expect(later.reason).toContain('opening RRIF balance was not supplied')
+    // The year's own opening balance is the only lawful basis, and it changes
+    // the answer: 0.0682 * 50,000 = 3,410, not the frozen 6,820.
+    expect(knownRrifMinimum(rrif as never, people as never, 2026, 2027, 50_000)).toEqual(known(3_410))
+    expect(knownRrifMinimum(rrif as never, people as never, 2026, 2027, 50_000)).not.toEqual(known(6_820))
+  })
+
+  it('pins minimumForRrif\'s exported default so the remaining API-level fallback is documented, not accidental', () => {
+    // Legitimate direct callers omit the balance; the default is the account's
+    // own recorded balance and is only correct for the base year.
+    expect(minimumForRrif(rrif as never, people as never, 2026, 2026)).toMatchObject({ status: 'ok', amount: 6_580 })
+    expect(minimumForRrif(rrif as never, people as never, 2026, 2026, 50_000)).toMatchObject({ status: 'ok', amount: 3_290 })
+    // For a later year the default still returns the frozen figure. That is why
+    // the spousal path above must — and does — demand an explicit balance.
+    expect(minimumForRrif(rrif as never, people as never, 2026, 2027)).toMatchObject({ status: 'ok', amount: 6_820 })
+    expect(minimumForRrif(rrif as never, people as never, 2026, 2027, 50_000)).toMatchObject({ status: 'ok', amount: 3_410 })
+  })
+
+  it('refuses a later-year spousal RRIF payment through calculatePersonIncome when the balance is missing', () => {
+    const plan = spousalPlan((draft, selfId, partnerId, accountId) => {
+      const account = draft.accounts.find(item => item.id === accountId)!
+      account.kind = 'rrif'
+      account.openedYear = { status: 'known', value: 2020 }
+      account.rrifFactorCategory = { status: 'known', value: 'allOther' }
+      draft.people.find(person => person.id === selfId)!.ageInBaseYear = 72
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+      draft.contributions = [{ id: 'p2025', accountId, contributorId: partnerId, calendarYear: 2025, amount: 40_000,
+        deductionYear: null, provenance: { origin: 'user', sourceYear: 2025 } }]
+    })
+    const account = plan.accounts.find(item => item.kind === 'rrif')!
+    const draw = [{ id: 'draw', kind: 'rrifWithdrawal' as const, accountId: account.id, amount: 10_000 }]
+    const missing = calculatePersonIncome(plan, 2027, draw)
+    expect(missing.status).toBe('unsupported')
+    if (missing.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(missing.reason).toContain('opening RRIF balance was not supplied')
+    // Supplying the year's opening balance restores a real attribution.
+    const supplied = calculatePersonIncome(plan, 2027, draw, { registeredOpeningBalances: { [account.id]: 50_000 } })
+    expect(supplied.status).toBe('ok')
   })
 })

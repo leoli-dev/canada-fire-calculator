@@ -806,6 +806,7 @@
     "spousalAdd": "Add a premium",
     "spousalRemove": "Remove",
     "spousalWindow": "A payment in {{year}} can be attributed by a premium paid in {{years}}: the payment year or either of the two preceding years.",
+    "spousalBaseYearNote": "Each premium is attributed at most once. A premium paid before {{baseYear}} counts as not yet attributed, because the projection starts at {{baseYear}} and no earlier payment out of the plan is recorded.",
     "spousalNoHistory": "No premium history is recorded for this plan, so a payment cannot be attributed. Until you record it, the payment is not assumed to belong to the plan holder.",
     "spousalPaymentTest": "Preview a payment out of this plan (CAD)",
     "spousalSplit": "Attributed to {{contributor}}: {{attributed}} CAD. Taxed to {{annuitant}}: {{taxed}} CAD.",
