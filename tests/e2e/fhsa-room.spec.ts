@@ -362,6 +362,18 @@ test('a scheduled FHSA row is priced by participation room, never by the RRSP le
   expect(kernel.fhsaContribution).toBe(8000)
   expect(kernel.rrspContribution).toBe(0)
   expect(kernel.cashFhsa).toBe(8000)
+  // An explicit edit owns the plan year: the scheduled row is replaced, not
+  // added to or left behind for the ledger to price alongside the box.
+  const planned = page.getByTestId('fhsa-planned-self')
+  await planned.fill('3000')
+  await planned.blur()
+  await expect(planned).toHaveValue('3000')
+  await expect(page.getByTestId('fhsa-scheduled-self')).toHaveCount(0)
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 3,000')
+  const edited = await kernelStatus(page)
+  expect(edited.status).toBe('ok')
+  expect(edited.fhsaApplied).toBe(3000)
+  expect(edited.rrspPlanned).toBe(0)
   expect(await inViewport(page)).toBe(true)
 })
 
