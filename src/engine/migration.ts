@@ -27,9 +27,29 @@ const assertSplitAmounts = (selfAmount: number, partnerAmount: number): void => 
     throw new Error('split amounts must be finite and non-negative')
 }
 
+/** Two per-person amounts count as a recorded split of a household total when
+ * their sum matches within a tolerance scaled to the total. The scale matches
+ * the 1e-8 share-sum validation: amounts that pass here produce shares whose
+ * sum deviates by less than 1e-8, for sub-dollar totals included. */
+export const splitAmountsMatch = (selfAmount: number, partnerAmount: number, total: number): boolean => {
+  if (!Number.isFinite(selfAmount) || !Number.isFinite(partnerAmount) || !Number.isFinite(total)) return false
+  if (total === 0) return selfAmount === 0 && partnerAmount === 0
+  return Math.abs(selfAmount + partnerAmount - total) < 1e-8 * Math.abs(total)
+}
+
 const requireSplitMatch = (selfAmount: number, partnerAmount: number, total: number): void => {
-  if (Math.abs(selfAmount + partnerAmount - total) > 1e-8)
+  if (!splitAmountsMatch(selfAmount, partnerAmount, total))
     throw new Error(`split amounts ${selfAmount} + ${partnerAmount} do not match the household total ${total}`)
+}
+
+/** The id the sole surviving account keeps when a split collapses to one
+ * owner. Any id pinned by contribution rows must stay live, so a
+ * partner-only collapse reuses the base id when the plan's contributions
+ * point at it instead of renaming the account out from under them. */
+const collapsedAccountId = (plan: InputsV2, baseId: string): string => {
+  const pinned = plan.contributions.some(contribution => contribution.accountId === baseId) ||
+    plan.recurringContributions.some(contribution => contribution.accountId === baseId)
+  return pinned ? baseId : derivedAccountId(baseId)
 }
 
 const recheckOwnership = (plan: InputsV2): void => {
@@ -79,7 +99,7 @@ export function applyAccountSplit(plan: InputsV2, baseId: string, selfAmount: nu
   })
   const next: Account[] = plan.accounts.filter(account => account.id !== baseId && account.id !== derivedId)
   if (selfAmount > 0) next.push(owned(template, baseId, self.id, selfAmount))
-  if (partnerAmount > 0) next.push(owned(template, derivedId, partner.id, partnerAmount))
+  if (partnerAmount > 0) next.push(owned(template, selfAmount === 0 ? collapsedAccountId(plan, baseId) : derivedId, partner.id, partnerAmount))
   if (selfAmount === 0 && partnerAmount === 0) {
     const ownerId = options.zeroOwnerId && plan.people.some(person => person.id === options.zeroOwnerId) ? options.zeroOwnerId : null
     next.push({ ...template, id: baseId, balance: 0, ownerId,
@@ -157,7 +177,7 @@ function reconcileOwnershipSplit(prior: InputsV2, next: InputsV2, baseId: string
   const selfAmount = self ? recorded[self.id] : undefined
   const partnerAmount = partner ? recorded[partner.id] : undefined
   const matches = selfAmount !== undefined && partnerAmount !== undefined &&
-    Math.abs(selfAmount + partnerAmount - base.balance) <= 1e-8
+    splitAmountsMatch(selfAmount, partnerAmount, base.balance)
   if (matches && !options.expandedHousehold && !options.lockedOwnerReset) {
     if (!self || !partner) return
     next.accounts = next.accounts.filter(account => account.id !== baseId && account.id !== derivedId)
@@ -169,7 +189,7 @@ function reconcileOwnershipSplit(prior: InputsV2, next: InputsV2, baseId: string
       provenance: { ...account.provenance, ownerId: userOrigin, balance: userOrigin },
     })
     if (selfAmount > 0) next.accounts.push(owned(template, baseId, self.id, selfAmount))
-    if (partnerAmount > 0) next.accounts.push(owned(partnerTemplate, derivedId, partner.id, partnerAmount))
+    if (partnerAmount > 0) next.accounts.push(owned(partnerTemplate, selfAmount === 0 ? collapsedAccountId(next, baseId) : derivedId, partner.id, partnerAmount))
     if (selfAmount === 0 && partnerAmount === 0) {
       const ownerId = priorBase?.ownerId && next.people.some(person => person.id === priorBase.ownerId) ? priorBase.ownerId : null
       next.accounts.push({ ...template, id: baseId, balance: 0, ownerId,
