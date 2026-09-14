@@ -106,6 +106,22 @@ test('unknown, zero and a contradictory statement stay distinguishable', async (
   expect(await inViewport(page)).toBe(true)
 })
 
+test('a later deduction year is stored separately from the contribution year', async ({ page }) => {
+  await seed(page)
+  const baseYear = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.baseYear)
+  await enterStatement(page, { room: '15000', planned: '4000' })
+  await expect(page.getByTestId('rrsp-statement-self')).toContainText(`is deducted in ${baseYear}`)
+  await page.getByTestId('rrsp-deduct-later-self').check()
+  await expect(page.getByTestId('rrsp-statement-self')).toContainText(`is deducted in ${baseYear + 1}`)
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+  expect(saved.canonical.contributions[0].calendarYear).toBe(baseYear)
+  expect(saved.canonical.contributions[0].deductionYear).toBe(baseYear + 1)
+  await page.reload()
+  await expect(page.getByTestId('rrsp-deduct-later-self')).toBeChecked()
+  await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
+  expect(await inViewport(page)).toBe(true)
+})
+
 test('the RRSP room block explains itself in EN, FR and ZH', async ({ page }) => {
   await seed(page)
   const panel = page.getByTestId('rrsp-statement-self')

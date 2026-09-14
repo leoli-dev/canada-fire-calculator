@@ -768,6 +768,7 @@
     "availableRoom": "Droits de cotisation disponibles (état de l'ARC)",
     "unusedUndeducted": "Cotisations versées mais non encore déduites",
     "pa": "Facteur d'équivalence (FE)",
+    "adjustmentNote": "Le FE, la DCSP et le RFE sont enregistrés séparément pour comparaison avec l'état. Les droits disponibles de l'état les incluent déjà; cette ligne ne les retranche donc pas une seconde fois.",
     "pspa": "Disposition de cotisations pour services passés (DCSP)",
     "par": "Redressement du facteur d'équivalence (RFE)",
     "person": "Droits REER de {{person}}",

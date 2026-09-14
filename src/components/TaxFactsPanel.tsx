@@ -115,8 +115,9 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
   })
   const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
   const role = person.role
-  return <fieldset data-testid={`rrsp-statement-${role}`}>
-    <legend>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</legend>
+  return <div role="group" aria-label={t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}
+    data-testid={`rrsp-statement-${role}`}>
+    <h5>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</h5>
     <p className="hint">{t('be12.explanation')}</p>
     {RRSP_STATEMENT_FIELDS.map(([field, label]) => <label key={field}>{t(label)}
       <input type="number" min="0" step="1" data-testid={`${field === 'rrspDeductionLimit' ? 'rrsp-deduction-limit' :
@@ -128,6 +129,7 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
         placeholder={t('be12.unknown')}
         onBlur={event => commit(field, event.currentTarget.value)} />
     </label>)}
+    <p className="hint">{t('be12.adjustmentNote')}</p>
     {opening.mismatch && <p className="hint" role="status" data-testid={`rrsp-mismatch-${role}`}>{t('be12.mismatch')}</p>}
     {opening.overContribution > 0 && <p className="hint" role="status" data-testid={`rrsp-over-contribution-${role}`}>
       {t('be12.overContribution', { amount: money(opening.overContribution) })}</p>}
@@ -164,7 +166,7 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
     {ledger.deductedThisYear > 0 && <p className="hint">{t('be12.deductedThisYear', { amount: money(ledger.deductedThisYear), year: plan.baseYear })}</p>}
     {ledger.deferredDeduction > 0 && <p className="hint">{t('be12.deferred', { amount: money(ledger.deferredDeduction), year: plan.baseYear + 1 })}</p>}
     <p className="hint">{t('be12.deductionPolicy')}</p>
-  </fieldset>
+  </div>
 }
 
 export function TaxFactsPanel() {

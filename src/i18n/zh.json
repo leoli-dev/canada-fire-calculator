@@ -768,6 +768,7 @@
     "availableRoom": "可用供款空间（CRA 通知书）",
     "unusedUndeducted": "已供款但尚未扣除的金额",
     "pa": "养老金调整额（PA）",
+    "adjustmentNote": "PA、PSPA 和 PAR 单独记录以便与通知书核对。通知书的可用空间已包含它们，因此此处不会再次扣减。",
     "pspa": "过往服务养老金调整额（PSPA）",
     "par": "养老金调整额返还（PAR）",
     "person": "{{person}} 的 RRSP 额度",

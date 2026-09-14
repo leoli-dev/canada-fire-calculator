@@ -772,6 +772,7 @@
     "availableRoom": "Available contribution room (CRA statement)",
     "unusedUndeducted": "Contributions made but not yet deducted",
     "pa": "Pension adjustment (PA)",
+    "adjustmentNote": "PA, PSPA and PAR are recorded separately so you can compare them with the statement. The statement's available room already includes them, so this row does not subtract them a second time.",
     "pspa": "Past service pension adjustment (PSPA)",
     "par": "Pension adjustment reversal (PAR)",
     "person": "{{person}} RRSP room",
