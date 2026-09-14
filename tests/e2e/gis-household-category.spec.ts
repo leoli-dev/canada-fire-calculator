@@ -78,9 +78,11 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   await expect(page.getByTestId('benefit-category-name')).toHaveText('Couple, both receive OAS')
   await expect(page.getByTestId('benefit-category-cutoff')).toHaveText('CA$30,096')
   // The published both-pensioners maximum is 2 x 676.09 x 12 = 16,226.16 at
-  // zero countable income; this plan's modelled year has a small income, so
-  // the panel shows the reduced figure its own category and cut-off produce.
-  await expect(page.getByTestId('benefit-total-70')).toHaveText('CA$15,976')
+  // zero countable income. This plan's modelled year carries about 450 of
+  // countable income, where published Table 2 pays 2 x 667.09 x 12 = 16,010.16;
+  // the fitted row is 0.77/month below that, inside the pack's recorded $2.00
+  // bound, and the panel shows its own modelled figure.
+  await expect(page.getByTestId('benefit-total-70')).toHaveText('CA$16,001')
   // Reload keeps the same plan and the same priced row.
   await page.reload()
   await panel.locator('summary').click()

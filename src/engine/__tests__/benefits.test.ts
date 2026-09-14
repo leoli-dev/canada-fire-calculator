@@ -5,6 +5,7 @@ import { DEVIATION_TOLERANCE } from '../rules'
 import {
   OAS_GIS_ALLOWANCE_2026_Q3,
   allowanceAnnual,
+  basisAnnualAmount,
   benefitIncomeBasis,
   gisAnnual,
   gisHouseholdCategory,
@@ -400,6 +401,14 @@ describe('GIS by household category', () => {
     expect(allowanceAnnual([true, false], [67, 62], 42144)).toBe(0)
     expect(allowanceAnnual([true, false], [67, 62], 100000)).toBe(0)
     expect(allowanceAnnual([true, false], [67, 62], 0)).toBeGreaterThan(17000)
+  })
+
+  it('refuses to price an unsupported basis rather than reporting it as zero', () => {
+    // The projection always supplies both ages and every OAS flag, so this
+    // guard is a backstop: an unknown must never quietly become 0 cash.
+    expect(() => basisAnnualAmount({ status: 'unsupported', reason: 'the ages are unknown' }))
+      .toThrow(/unsupported/i)
+    expect(basisAnnualAmount({ status: 'none', reason: 'nobody draws OAS' })).toBe(0)
   })
 
   it('pays nothing when neither spouse receives OAS, and never calls that unknown', () => {
