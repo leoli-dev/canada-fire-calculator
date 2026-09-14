@@ -126,6 +126,47 @@ describe('requiredFireAssets', () => {
     expect(runProjection(p06).rows.at(-1)?.shortfall).toBeCloseTo(16_018.249433, 2)
     expect(requiredFireAssets(p06)).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
   })
+  it('withholds every quick answer when the plan itself realizes an unverified non-registered loss', () => {
+    // Cost equal to value at the base year, but the reinvested distribution
+    // against a flat market creates the loss while the plan runs.
+    const late: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 85,
+      annualSavings: 0, retirementSpending: 30_000, inflation: 0,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 300_000 }, nonRegBook: 300_000,
+      returns: { tfsa: .03, rrsp: .03, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: .03, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0, strategy: 'nonRegFirst' }
+    const canonical = refreshCanonicalFromLegacy(null, late)
+    const result = runProjection(late, undefined, canonical)
+    expect(result.capitalTaxLimit).toBe('nonRegisteredLoss')
+    expect(result.taxCapability?.reason).toContain('capital loss')
+    for (const solve of [
+      () => requiredFireAssets(late, canonical),
+      () => findEarliestFireAge(late, canonical),
+      () => maxSustainableSpending(late, canonical),
+    ])
+      expect(solve()).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
+  it('keeps a funded age when a loss-bearing non-registered account is never drawn', () => {
+    const idle: Inputs = { ...base, currentAge: 60, fireAge: 62, lifeExpectancy: 90,
+      annualSavings: 0, retirementSpending: 30_000, inflation: .02,
+      returns: { tfsa: .04, rrsp: .04, nonReg: 0 },
+      balances: { tfsa: 1_200_000, rrsp: 0, nonReg: 100_000 }, nonRegBook: 200_000,
+      savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, nonRegDistributionYield: 0, fees: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0, strategy: 'tfsaFirst' }
+    const canonical = refreshCanonicalFromLegacy(null, idle)
+    expect(runProjection(idle, undefined, canonical).rows.some(row => row.withdrawals.nonReg > 0)).toBe(false)
+    expect(findEarliestFireAge(idle, canonical).status).toBe('solved')
+  })
+  it('withholds a fabricated-basis mismatch, not just an unknown one', () => {
+    const sameYear: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 62,
+      annualSavings: 0, retirementSpending: 40_000, inflation: 0,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 500_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0, strategy: 'nonRegFirst' }
+    const canonical = refreshCanonicalFromLegacy(null, sameYear)
+    canonical.accounts.find(account => account.kind === 'nonReg')!.acb = { status: 'known', value: 111 }
+    expect(findEarliestFireAge(sameYear, canonical))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
   it('returns a number that succeeds and whose 90% fails', () => {
     const safe: Inputs = { ...base, balances: { tfsa: 400_000, rrsp: 0, nonReg: 0 },
       nonRegBook: 0, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, nonRegDistributionYield: 0 }

@@ -53,15 +53,33 @@ const cashResidual = (result: ProjectionResult): number | null => {
 }
 
 /**
- * A non-registered withdrawal's tax needs a verified cost basis. A known loss
- * (cost above value) needs superficial-loss confirmation and an owner-specific
- * carry ledger, and an unknown canonical basis is not a tax fact even while
- * the legacy scalar still holds a last-valid value.
+ * A positive funding or age claim is only as verified as the disposal tax it
+ * depends on. `nonRegisteredLoss` is reported by the projection only once a
+ * withdrawal settles an unrealized loss (superficial-loss and carry facts are
+ * not modeled), and `investmentPropertySale` once any modeled property
+ * disposition runs without a land/building split or CCA history.
  */
-const nonRegBasisUnverified = (inputs: Inputs, canonical?: InputsV2 | null): boolean =>
-  inputs.balances.nonReg > 0 && (inputs.nonRegBook > inputs.balances.nonReg + 1e-8 ||
-    (canonical?.accounts.some(account => account.kind === 'nonReg' && account.balance > 0 &&
-      account.acb.status !== 'known') ?? false))
+const capitalTaxReason = (result: ProjectionResult): 'investmentPropertySale' | 'nominalCapitalBasis' | null =>
+  result.capitalTaxLimit === 'investmentPropertySale' ? 'investmentPropertySale'
+    : result.capitalTaxLimit === 'nonRegisteredLoss' ? 'nominalCapitalBasis' : null
+
+/**
+ * The legacy `nonRegBook` scalar is a last-valid value, not a tax fact. It is
+ * usable only when no canonical plan exists, or when exactly one
+ * non-registered account carries a known basis matching both the visible
+ * balance and the scalar.
+ */
+const nonRegScalarUnverified = (inputs: Inputs, canonical?: InputsV2 | null): boolean => {
+  if (inputs.balances.nonReg <= 0 || !canonical) return false
+  const [account, ...rest] = canonical.accounts.filter(
+    item => item.kind === 'nonReg' && item.balance > 0)
+  return !account || rest.length > 0 || account.acb.status !== 'known' ||
+    account.balance !== inputs.balances.nonReg || account.acb.value !== inputs.nonRegBook
+}
+
+/** Cost above value is an unrealized loss; its eligibility and carry are unmodeled. */
+const nonRegLossUnverified = (inputs: Inputs): boolean =>
+  inputs.balances.nonReg > 0 && inputs.nonRegBook > inputs.balances.nonReg + 1e-8
 
 const hasNonFiniteNumber = (value: unknown): boolean => {
   if (typeof value === 'number') return !Number.isFinite(value)
@@ -168,9 +186,6 @@ function findEarliestFireAgeImpl(inputs: Inputs, canonical?: InputsV2 | null): S
   const assumptions = ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
-  // A retired age is only as verified as the withdrawal tax it relies on.
-  if (nonRegBasisUnverified(inputs, canonical))
-    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   const cap = inputs.lifeExpectancy - 1
   let iterations = 0
   let lastProjection: ProjectionResult | null = null
@@ -183,14 +198,18 @@ function findEarliestFireAgeImpl(inputs: Inputs, canonical?: InputsV2 | null): S
       unsupportedProjection ??= projection
       continue
     }
-    // The sale's tax facts are missing for the whole plan, not just one year.
-    if (projection.capitalTaxLimit)
-      return outcome('unsupported', null, assumptions, age, iterations,
-        cashResidual(projection), projection.capitalTaxLimit)
-    if (projection.success)
-      return hasUnverifiedLockedWithdrawals(inputs)
-        ? outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
-        : outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
+    if (projection.success) {
+      if (hasUnverifiedLockedWithdrawals(inputs))
+        return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+      // Only a positive age claim needs withholding: if no age can fund the
+      // plan, a failing verdict is not made more optimistic by missing tax.
+      if (nonRegScalarUnverified(inputs, canonical))
+        return outcome('unsupported', null, assumptions, age, iterations, cashResidual(projection), 'nominalCapitalBasis')
+      const capitalReason = capitalTaxReason(projection)
+      if (capitalReason)
+        return outcome('unsupported', null, assumptions, age, iterations, cashResidual(projection), capitalReason)
+      return outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
+    }
   }
   if (unsupportedProjection)
     return outcome('unsupported', null, assumptions, iterations ? cap : null, iterations,
@@ -242,15 +261,17 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
   // A same-year snapshot can reuse a verified basis, but the scalar legacy
   // adapter is only a last-valid value. Unknown canonical ACB is not a tax
   // fact, and an unrealized loss needs unmodeled eligibility/carry treatment.
-  const nonRegAccounts = canonical?.accounts.filter(account => account.kind === 'nonReg' && account.balance > 0) ?? []
-  if (inputs.balances.nonReg > 0 && (inputs.nonRegBook > inputs.balances.nonReg ||
-    nonRegAccounts.some(account => account.acb.status !== 'known') ||
-    nonRegAccounts.length > 1 ||
-    nonRegAccounts.length === 1 && (nonRegAccounts[0].balance !== inputs.balances.nonReg ||
-      nonRegAccounts[0].acb.status === 'known' && nonRegAccounts[0].acb.value !== inputs.nonRegBook)))
+  if (nonRegLossUnverified(inputs) || nonRegScalarUnverified(inputs, canonical))
     return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   if (checkedProjection(inputs).unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, null, 0, null, 'unfundedTransaction')
+  // With the snapshot's own basis verified, the plan can still realize a loss
+  // while it runs (reinvested distributions against a flat market), and a
+  // modeled property sale still lacks land/building and CCA facts. Either way
+  // the threshold itself is not verified.
+  const planCapitalReason = capitalTaxReason(checkedProjection(inputs))
+  if (planCapitalReason)
+    return outcome('unsupported', null, assumptions, null, 0, null, planCapitalReason)
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
   const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
@@ -391,6 +412,11 @@ export function rankCandidates<T>(
         return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
       if (result.terminalTaxStatus === 'unsupported')
         return { ...common, status: 'unsupported', reason: 'terminalTax' }
+      // A recommended strategy or start age is also a positive funding claim,
+      // so it needs the same verified disposal tax as the quick answers.
+      const capitalReason = capitalTaxReason(result)
+      if (capitalReason)
+        return { ...common, status: 'unsupported', reason: capitalReason }
       if (objective === 'maxSpending' && solver?.status !== 'solved')
         return { ...common, status: solver?.status ?? 'unsupported', reason: solver?.reason }
       const metric = objective === 'maxSpending' ? solver!.value : result.estateValue
@@ -419,9 +445,6 @@ function maxSustainableSpendingImpl(inputs: Inputs, canonical?: InputsV2 | null)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
   if (inputs.principalResidence?.mode === 'planned')
     return outcome('unsupported', null, assumptions, null, 0, null, 'plannedPurchase')
-  // The ceiling is only as verified as the withdrawal tax it relies on.
-  if (nonRegBasisUnverified(inputs, canonical))
-    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   let iterations = 0
   const evaluate = (spending: number) => {
     iterations++
@@ -430,12 +453,15 @@ function maxSustainableSpendingImpl(inputs: Inputs, canonical?: InputsV2 | null)
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
-  if (zero.capitalTaxLimit)
-    return outcome('unsupported', null, assumptions, 0, iterations,
-      cashResidual(zero), zero.capitalTaxLimit)
   if (!zero.success) return outcome('infeasible', null, assumptions, 0, iterations, cashResidual(zero), 'zeroSpendingFails')
   if (hasUnverifiedLockedWithdrawals(inputs))
     return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+  // A positive ceiling or a funded zero bound needs the same withheld limits.
+  if (nonRegScalarUnverified(inputs, canonical))
+    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'nominalCapitalBasis')
+  const zeroCapitalReason = capitalTaxReason(zero)
+  if (zeroCapitalReason)
+    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), zeroCapitalReason)
   let lo = 0
   let hi = 50000
   let lower = zero
@@ -463,6 +489,10 @@ function maxSustainableSpendingImpl(inputs: Inputs, canonical?: InputsV2 | null)
   // The annual withdrawal loop treats sub-cent shortfalls as zero. Preserve
   // the exact, already-verified zero candidate at that numerical floor.
   if (lo < 0.01) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  // The ceiling's own plan must not depend on an unverified disposal tax.
+  const winnerCapitalReason = capitalTaxReason(lower)
+  if (winnerCapitalReason)
+    return outcome('unsupported', null, assumptions, lo, iterations, cashResidual(lower), winnerCapitalReason)
   return outcome('solved', lo, assumptions, lo, iterations, lower.finalNetWorth)
 }
 

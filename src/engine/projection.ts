@@ -308,6 +308,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   const unfundedObligations: FundingGap[] = []
   let taxUnsupportedReason: string | undefined
   let investmentSaleTaxUnsupported = false
+  let nonRegLossTaxUnverified = false
   if (canonical && inputs.fireAge > inputs.currentAge && canonical.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
     taxUnsupportedReason = 'working RRIF minimum requires BE-14 B cash and tax settlement'
 
@@ -866,12 +867,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       } else {
         steps = STRATEGY_ORDER[inputs.strategy].map((account) => ({ account }))
       }
+      // The legacy withdrawal solver accepts a nonnegative gain fraction, so a
+      // holding whose cost exceeds its value is previewed as tax-free. The fact
+      // only becomes a tax limit once a withdrawal actually settles the loss:
+      // merely holding an unrealized loss is not a disposition. A sub-dollar
+      // balance or withdrawal is drain residue, not a real disposal.
+      const nonRegLossPreview = bal.nonReg > 1 && nonRegBookReal() > bal.nonReg + 1e-8
       const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBookReal()) / bal.nonReg) : 0
-      // The legacy withdrawal solver accepts a nonnegative gain fraction. A
-      // sale at a loss needs superficial-loss facts and an owner-specific
-      // carry ledger; zeroing its gain here is only a preview, not exact tax.
-      if (bal.nonReg > 0 && nonRegBookReal() > bal.nonReg + 1e-8)
-        taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
 
       // The purchase-year down payment has already been paid from opening
       // assets. The ordinary annual solver funds living costs, loan payments,
@@ -887,6 +889,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       )
       if (out.taxUnsupportedReason) taxUnsupportedReason ??= out.taxUnsupportedReason
       byPersonTax = out.byPersonTax
+      if (nonRegLossPreview && out.withdrawals.nonReg > 1) {
+        taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
+        nonRegLossTaxUnverified = true
+      }
       if (canonical && (saleGainsTaxable || purchaseTaxable || purchaseNonRegTaxable || rentMortgageInterest))
         taxUnsupportedReason ??= 'property sale, purchase or rental mortgage tax needs BE-14 B event settlement'
       withdrawals = out.withdrawals
@@ -951,11 +957,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         }
       }
 
-      // reduce ACB proportionally to the non-registered withdrawal
+      // Reduce ACB proportionally to the non-registered withdrawal. The gross
+      // withdrawal funds its own tax, so it can exceed the balance; a disposal
+      // never removes more than the whole pool, and a drained pool keeps no
+      // cost residue that would later read as an unrealized loss.
       if (withdrawals.nonReg > 0 && bal.nonReg > 0) {
-        nonRegBook -= (withdrawals.nonReg / bal.nonReg) * nonRegBook
+        const disposed = Math.min(1, withdrawals.nonReg / bal.nonReg)
+        nonRegBook = disposed >= 1 ? 0 : nonRegBook * (1 - disposed)
       }
       for (const t of ACCOUNT_TYPES) bal[t] -= withdrawals[t]
+      if (bal.nonReg < 0.005) bal.nonReg = 0
 
       // surplus cash (e.g. forced RRIF minimum above spending) reinvests taxed
       const surplus = netCash - spendTarget
@@ -1053,7 +1064,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   return {
     taxCapability: { status: canonical && !taxUnsupportedReason && inputs.fireAge <= inputs.currentAge ? 'person' : 'legacyEstimate',
       reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
-    capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale' : undefined,
+    capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale'
+      : nonRegLossTaxUnverified ? 'nonRegisteredLoss' : undefined,
     rows,
     unfundedObligations,
     success: depletedAge === null,

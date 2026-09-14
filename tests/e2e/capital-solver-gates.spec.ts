@@ -136,11 +136,20 @@ for (const mode of ['guided', 'professional'] as const) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
 
-  test(`${mode} retirement age withholds a known non-registered loss`, async ({ page }) => {
+  test(`${mode} retirement age withholds a funded plan that realizes a non-registered loss`, async ({ page }) => {
     await seed(page, 'nonReg', mode)
     await page.evaluate(() => {
       const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+      // A funded plan (so the withheld positive verdict is what is under test),
+      // funded by disposing of a holding whose cost exceeds its value.
+      saved.state.inputs.currentAge = 60
+      saved.state.inputs.fireAge = 60
+      saved.state.inputs.lifeExpectancy = 62
+      saved.state.inputs.retirementSpending = 40_000
+      saved.state.inputs.inflation = 0
       saved.state.inputs.nonRegBook = 700_000
+      saved.state.canonical.people[0].ageInBaseYear = 60
+      saved.state.canonical.people[0].retirementAge = 60
       saved.state.canonical.accounts.find((a: { kind: string }) => a.kind === 'nonReg').acb =
         { status: 'known', value: 700_000 }
       localStorage.setItem('fire-inputs', JSON.stringify(saved))

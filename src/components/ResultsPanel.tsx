@@ -193,7 +193,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             {earliest?.status === 'solved'
               ? t('whenAnswer', { age: earliest.value })
               : earliest?.status === 'infeasible' ? t('whenNever', { age: earliest.lastVerifiedBound ?? inputs.currentAge })
-                : earliest?.reason ? t(`solverReason_${earliest.reason}`, { defaultValue: t('solver_unsupported') })
+                : earliest?.reason ? t(`solverReason_${earliest.reason}`, { defaultValue: t(`solver_${earliest.status}`) })
                   : t(`solver_${earliest?.status ?? 'unsupported'}`)}
           </p>
           {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&
