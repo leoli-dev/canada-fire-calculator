@@ -4,6 +4,7 @@ import { migratePersistedPlan } from '../migration'
 import type { InputsV2 } from '../model'
 import { impliedRate } from '../debts'
 import { annualStep, fixedReturnProvider, initializeState, projectFromState, sumInvestableAssets, sumNetWorth, type AnnualProviders } from '../annualState'
+import { FHSA_HISTORY_MISSING } from '../fhsa'
 
 const input = (): Inputs => ({
   currentAge: 40, fireAge: 60, lifeExpectancy: 90, province: 'ON', annualSavings: 40,
@@ -772,5 +773,168 @@ describe('BE-12 A RRSP room ledger wiring', () => {
     expect(annualStep(canonical, ok(initializeState(canonical)), cashProviders(1000))).toMatchObject({
       status: 'unsupported', issues: [{ detail: expect.stringContaining('exceeds the year net savings') }],
     })
+  })
+})
+
+/**
+ * BE-36 A: the kernel prices the supported FHSA shape — an owned account with a
+ * confirmed statement, contributing within room — and keeps every other shape
+ * explicitly unsupported.
+ */
+describe('BE-36 A FHSA participation room in the annual kernel', () => {
+  /**
+   * The legacy form is what materialises an FHSA account and its recurring
+   * contribution, so `annualContribution` is part of the savings budget the
+   * kernel checks. The canonical statement facts are patched on afterwards,
+   * exactly as the panel writes them.
+   */
+  const fhsaPlan = (args: { cash: number; annualFhsa: number; cumulative?: number; openedYear?: number }) => {
+    const canonical = plan({
+      ...input(), inflation: 0, debts: [], annualSavings: args.cash,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      fhsa: { balance: 0, annualContribution: args.annualFhsa, openedYearsAgo: 0 },
+    } as Inputs)
+    const person = canonical.people[0]
+    const account = canonical.accounts.find(item => item.kind === 'fhsa')!
+    account.ownerId = person.id
+    account.taxableOwnerShares = { status: 'known', shares: { [person.id]: 1 } }
+    account.openedYear = { status: 'known', value: args.openedYear ?? 2026 }
+    account.contributionRoom = { status: 'known', value: 0 }
+    canonical.fhsaStatementHistory = {
+      [account.id]: {
+        cumulativePriorContributions: { status: 'known', value: args.cumulative ?? 0 },
+        provenance: { origin: 'user', sourceYear: 2026 },
+      },
+    }
+    return { canonical, person, account }
+  }
+
+  /** Evaluated cash equals the plan's savings budget when spending is income less cash. */
+  const budgetProviders = (cash: number): AnnualProviders => ({
+    evaluate: ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
+      income: cash * 2, earnedIncome: cash * 2, benefits: 0, tax: 0, spending: cash, taxableIncome: cash * 2,
+      benefitIncomeForNextYear: { status: 'known' as const, value: cash * 2 },
+    }])) }),
+    returns: () => 0,
+  })
+
+  it('executes a contribution inside the published annual limit and retains nothing', () => {
+    const { canonical, person, account } = fhsaPlan({ cash: 10000, annualFhsa: 6000 })
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000)))
+    const ledger = first.row.fhsaLedger[person.id]
+    expect(ledger.ordinaryPlanned).toBe(6000)
+    expect(ledger.applied).toBe(6000)
+    expect(ledger.retained).toBe(0)
+    // 8,000 of published room less the 6,000 contribution leaves 2,000.
+    expect(ledger.closingRoom).toEqual({ status: 'known', value: 2000 })
+    expect(ledger.remainingLifetimeRoom).toEqual({ status: 'known', value: 34000 })
+    expect(first.row.byAccount[account.id].contribution).toBe(6000)
+    expect(first.row.cashLedger.fhsaContributions).toBe(6000)
+    expect(first.row.cashLedger.retainedContributions).toBe(0)
+    // The account's own `contributionRoom` column is the statement's carry-in,
+    // not a running balance the ledger writes back.
+    expect(account.contributionRoom).toEqual({ status: 'known', value: 0 })
+  })
+
+  it('clips a 22,000 plan against the 8,000 annual limit and retains 14,000', () => {
+    const { canonical, person, account } = fhsaPlan({ cash: 22000, annualFhsa: 22000 })
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(22000)))
+    const ledger = first.row.fhsaLedger[person.id]
+    expect(ledger.ordinaryPlanned).toBe(22000)
+    expect(ledger.applied).toBe(8000)
+    expect(ledger.retained).toBe(14000)
+    expect(ledger.limitations.map(item => item.code)).toContain('annualCapped')
+    // The clipped remainder is retained in non-registered, never deleted.
+    expect(first.row.cashLedger.retainedContributions).toBe(14000)
+    expect(first.row.byAccount[account.id].contribution).toBe(8000)
+    const nonReg = canonical.accounts.find(item => item.kind === 'nonReg')!.id
+    expect(first.row.byAccount[nonReg].contribution).toBe(14000)
+  })
+
+  it('carries opening(y+1) = closing(y) through two projected years', () => {
+    const { canonical, person, account } = fhsaPlan({ cash: 3000, annualFhsa: 3000 })
+    const two = ok(projectFromState(canonical, ok(initializeState(canonical)), 2, budgetProviders(3000)))
+    const [first, second] = two.rows.map(row => row.fhsaLedger[person.id])
+    // Year 1 contributes 3,000 of the 8,000 available, leaving 5,000 unused.
+    expect(first.applied).toBe(3000)
+    expect(first.closingRoom).toEqual({ status: 'known', value: 5000 })
+    // Year 2 opens at exactly year 1's closing room and adds 8,000 more.
+    expect(second.openingRoom).toEqual({ status: 'known', value: 5000 })
+    expect(second.annualAddition).toEqual({ status: 'known', value: 8000 })
+    expect(second.applied).toBe(3000)
+    expect(second.closingRoom).toEqual({ status: 'known', value: 10000 })
+    expect(second.cumulativeContributions).toEqual({ status: 'known', value: 6000 })
+    expect(two.rows[1].byAccount[account.id].contribution).toBe(3000)
+  })
+
+  it('refuses an FHSA with unknown statement history instead of assuming room', () => {
+    const { canonical, person } = fhsaPlan({ cash: 10000, annualFhsa: 6000 })
+    delete canonical.fhsaStatementHistory
+    const result = annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain(FHSA_HISTORY_MISSING)
+    expect(result.issues[0].detail).toContain(person.id)
+  })
+
+  it('refuses an older account whose carry-in room is not recorded, instead of assuming a full year', () => {
+    const { canonical, account } = fhsaPlan({ cash: 10000, annualFhsa: 6000, openedYear: 2020 })
+    // A prior-year account needs the statement's unused-room figure; nothing
+    // else in the plan can produce it, so an unsupplied one is unknown.
+    account.contributionRoom = { status: 'unknown', reason: 'participation-room statement not supplied' }
+    const result = annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain('FHSA participation room not verified')
+    expect(result.issues[0].detail).toContain('participation-room statement not supplied')
+  })
+
+  it('prices a recorded carry-in room for an older account and carries it forward', () => {
+    const { canonical, account } = fhsaPlan({ cash: 10000, annualFhsa: 6000, openedYear: 2020 })
+    account.contributionRoom = { status: 'known', value: 4000 }
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000)))
+    // The statement's 4,000 of prior unused room plus the year's 8,000 is
+    // 12,000; the 6,000 plan executes and 6,000 carries into next year.
+    const ledger = first.row.fhsaLedger[canonical.people[0].id]
+    expect(ledger.openingRoom).toEqual({ status: 'known', value: 4000 })
+    expect(ledger.annualAddition).toEqual({ status: 'known', value: 8000 })
+    expect(ledger.applied).toBe(6000)
+    expect(ledger.closingRoom).toEqual({ status: 'known', value: 6000 })
+  })
+
+  it('refuses the 15-year maturity clock instead of rolling the balance into the RRSP', () => {
+    const { canonical } = fhsaPlan({ cash: 10000, annualFhsa: 6000, openedYear: 2011 })
+    const result = annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    // The kernel already refuses the rollover before the ledger; either way the
+    // maturity path is explicit and nothing is rolled over.
+    expect(result.issues[0].detail).toMatch(/15-year|maturity|rollover/)
+  })
+
+  it('prices a lifetime-exhausted account at zero room and retains the whole plan', () => {
+    // 38,000 of prior contributions leaves 2,000 of lifetime room, so the year
+    // adds 2,000 rather than the published 8,000 and keeps 4,000 back.
+    const { canonical, person } = fhsaPlan({ cash: 6000, annualFhsa: 6000, cumulative: 38000, openedYear: 2020 })
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(6000)))
+    const ledger = first.row.fhsaLedger[person.id]
+    expect(ledger.annualAddition).toEqual({ status: 'known', value: 2000 })
+    expect(ledger.applied).toBe(2000)
+    expect(ledger.retained).toBe(4000)
+    expect(ledger.remainingLifetimeRoom).toEqual({ status: 'known', value: 0 })
+    expect(first.row.cashLedger.retainedContributions).toBe(4000)
+  })
+
+  it('still refuses a scheduled FHSA row whose contributor is not recorded', () => {
+    const { canonical, person, account } = fhsaPlan({ cash: 10000, annualFhsa: 0 })
+    canonical.contributions.push({
+      id: 'other-contributor', accountId: account.id, contributorId: null, calendarYear: 2026, amount: 10, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: 2026 },
+    })
+    const result = annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain('scheduled FHSA contributor not recorded')
+    expect(person.id).toBe(canonical.people[0].id)
   })
 })

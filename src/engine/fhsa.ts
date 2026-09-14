@@ -319,14 +319,14 @@ export function plannedFhsaLines(args: { year: number; savingsShare: number }): 
 
 /**
  * The room carried into the base year from earlier years. A first-year FHSA
- * carries nothing, so its opening room is a real zero; an account opened
+ * carries nothing, so its opening room is a real zero. An account opened
  * earlier needs the statement's own unused-room figure, which nothing else in
- * the plan can supply, and stays unknown until the user records it.
+ * the plan can supply, and stays unknown until the user records it — a legacy
+ * "opened two years ago" fact is not enough, because it says nothing about how
+ * much of the earlier room was used.
  */
 export function fhsaOpeningRoom(plan: InputsV2, account: Account): Known<number> {
   if (account.openedYear.status === 'known' && account.openedYear.value >= plan.baseYear)
-    return { status: 'known', value: 0 }
-  if (account.openedYearsAgoAtBaseYear !== null && account.openedYearsAgoAtBaseYear <= 0)
     return { status: 'known', value: 0 }
   return account.contributionRoom
 }
