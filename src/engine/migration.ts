@@ -14,6 +14,188 @@ const normalizeListIds = <T extends { id?: string }>(items: T[], kind: string): 
   return result
 }
 
+/** Deterministic id of the second person's account when a household total is split. */
+export const derivedAccountId = (baseId: string): string => `${baseId}:partner`
+
+/** Base account ids whose household total can be recorded per person. */
+const SPLIT_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:locked'] as const
+const SPLIT_KINDS: readonly Account['kind'][] = ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira']
+const userOrigin: Provenance = { origin: 'user', sourceYear: null }
+
+const assertSplitAmounts = (selfAmount: number, partnerAmount: number): void => {
+  if (!Number.isFinite(selfAmount) || selfAmount < 0 || !Number.isFinite(partnerAmount) || partnerAmount < 0)
+    throw new Error('split amounts must be finite and non-negative')
+}
+
+const requireSplitMatch = (selfAmount: number, partnerAmount: number, total: number): void => {
+  if (Math.abs(selfAmount + partnerAmount - total) > 1e-8)
+    throw new Error(`split amounts ${selfAmount} + ${partnerAmount} do not match the household total ${total}`)
+}
+
+const recheckOwnership = (plan: InputsV2): void => {
+  plan.migration = { ...plan.migration, ownershipNeedsConfirmation: plan.accounts.some(account =>
+    account.kind !== 'nonReg' && !account.ownerId || account.taxableOwnerShares.status === 'unknown') ||
+    plan.properties.some(property => property.taxableOwnerShares.status === 'unknown') }
+}
+
+/**
+ * Record how much of one household account total belongs to each spouse.
+ * Registered/locked kinds become person-owned canonical accounts (two when
+ * both amounts are positive, exactly one otherwise); the non-registered
+ * account keeps one account with proportional `taxableOwnerShares`. The two
+ * amounts must add up to the account's current balance — nothing is ever
+ * split silently. Mutates `plan` in place for use inside a store transaction.
+ */
+export function applyAccountSplit(plan: InputsV2, baseId: string, selfAmount: number, partnerAmount: number,
+  options: { zeroOwnerId?: string | null } = {}): void {
+  assertSplitAmounts(selfAmount, partnerAmount)
+  const derivedId = derivedAccountId(baseId)
+  const base = plan.accounts.find(account => account.id === baseId)
+  const existingDerived = plan.accounts.find(account => account.id === derivedId)
+  const template = base ?? existingDerived
+  if (!template) throw new Error(`account not found: ${baseId}`)
+  // The household total is the sum of the row's accounts; in a previously
+  // recorded split the base account only holds one person's amount.
+  const total = (base?.balance ?? 0) + (existingDerived?.balance ?? 0)
+  requireSplitMatch(selfAmount, partnerAmount, total)
+  const self = plan.people.find(person => person.role === 'self')
+  const partner = plan.people.find(person => person.role === 'partner')
+  if (!self || !partner) throw new Error(`account split requires two people: ${baseId}`)
+  if (template.kind === 'nonReg') {
+    if (total === 0 && selfAmount === 0 && partnerAmount === 0) return
+    plan.accounts = plan.accounts.map(account => account.id === baseId ? {
+      ...account,
+      ownerId: selfAmount === total ? self.id : partnerAmount === total ? partner.id : null,
+      taxableOwnerShares: { status: 'known', shares: { [self.id]: selfAmount / total, [partner.id]: partnerAmount / total } },
+    } : account)
+    recheckOwnership(plan)
+    return
+  }
+  if (!SPLIT_KINDS.includes(template.kind)) throw new Error(`account kind cannot be split: ${template.kind}`)
+  const owned = (account: Account, id: string, ownerId: string, balance: number): Account => ({
+    ...account, id, ownerId, balance,
+    taxableOwnerShares: { status: 'known', shares: { [ownerId]: 1 } },
+    provenance: { ...account.provenance, ownerId: userOrigin, balance: userOrigin },
+  })
+  const next: Account[] = plan.accounts.filter(account => account.id !== baseId && account.id !== derivedId)
+  if (selfAmount > 0) next.push(owned(template, baseId, self.id, selfAmount))
+  if (partnerAmount > 0) next.push(owned(template, derivedId, partner.id, partnerAmount))
+  if (selfAmount === 0 && partnerAmount === 0) {
+    const ownerId = options.zeroOwnerId && plan.people.some(person => person.id === options.zeroOwnerId) ? options.zeroOwnerId : null
+    next.push({ ...template, id: baseId, balance: 0, ownerId,
+      taxableOwnerShares: ownerId ? { status: 'known', shares: { [ownerId]: 1 } } : unknown('zero-balance household account ownership not assigned'),
+      provenance: { ...template.provenance, balance: userOrigin } })
+  }
+  plan.accounts = next
+  plan.ownershipAmounts = { ...(plan.ownershipAmounts ?? {}), [baseId]: { [self.id]: selfAmount, [partner.id]: partnerAmount } }
+  recheckOwnership(plan)
+}
+
+/** Pure copy of {@link applyAccountSplit}; rejects a mismatch without writing. */
+export function recordAccountSplit(plan: InputsV2, baseId: string, selfAmount: number, partnerAmount: number,
+  options?: { zeroOwnerId?: string | null }): InputsV2 {
+  const next = structuredClone(plan)
+  applyAccountSplit(next, baseId, selfAmount, partnerAmount, options)
+  return next
+}
+
+/**
+ * Record each spouse's share of one investment property's value as
+ * proportional `taxableOwnerShares`. The two amounts must add up to the
+ * property's current value. Mutates `plan` in place.
+ */
+export function applyPropertySplit(plan: InputsV2, propertyId: string, selfAmount: number, partnerAmount: number): void {
+  assertSplitAmounts(selfAmount, partnerAmount)
+  const property = plan.properties.find(item => item.id === propertyId)
+  if (!property) throw new Error(`property not found: ${propertyId}`)
+  if (property.value === 0 && selfAmount === 0 && partnerAmount === 0) return
+  requireSplitMatch(selfAmount, partnerAmount, property.value)
+  const self = plan.people.find(person => person.role === 'self')
+  const partner = plan.people.find(person => person.role === 'partner')
+  if (!self || !partner) throw new Error(`property split requires two people: ${propertyId}`)
+  plan.properties = plan.properties.map(item => item.id === propertyId ? { ...item,
+    taxableOwnerShares: { status: 'known', shares: { [self.id]: selfAmount / property.value, [partner.id]: partnerAmount / property.value } } } : item)
+  recheckOwnership(plan)
+}
+
+/** Pure copy of {@link applyPropertySplit}; rejects a mismatch without writing. */
+export function recordPropertySplit(plan: InputsV2, propertyId: string, selfAmount: number, partnerAmount: number): InputsV2 {
+  const next = structuredClone(plan)
+  applyPropertySplit(next, propertyId, selfAmount, partnerAmount)
+  return next
+}
+
+/** Restore, suspend or collapse a recorded per-person split of one household
+ * account total after the legacy form edited the plan. The recorded amounts
+ * are the fact; when the new household total no longer equals their sum (or a
+ * person was removed and re-added, or the locked-account owner was reasserted
+ * in the legacy form), the single migrated account keeps the conserved total
+ * with unconfirmed ownership while the recorded amounts stay visible. */
+function reconcileOwnershipSplit(prior: InputsV2, next: InputsV2, baseId: string,
+  options: { expandedHousehold: boolean; lockedOwnerReset: boolean }): void {
+  const base = next.accounts.find(account => account.id === baseId)
+  const entry = next.ownershipAmounts?.[baseId]
+  if (!base) {
+    if (entry) {
+      const { [baseId]: _dropped, ...rest } = next.ownershipAmounts!
+      next.ownershipAmounts = Object.keys(rest).length ? rest : undefined
+    }
+    return
+  }
+  const derivedId = derivedAccountId(baseId)
+  const priorBase = prior.accounts.find(account => account.id === baseId)
+  const priorDerived = prior.accounts.find(account => account.id === derivedId)
+  const self = next.people.find(person => person.role === 'self')
+  const partner = next.people.find(person => person.role === 'partner')
+  // Recorded amounts come from the entry; a defensive fallback reads the two
+  // prior owned accounts' balances when an entry is missing.
+  const recorded = entry ?? (priorBase && priorDerived && priorBase.ownerId && priorDerived.ownerId && self && partner
+    ? { [self.id]: priorBase.ownerId === self.id ? priorBase.balance : priorDerived.balance,
+        [partner.id]: priorBase.ownerId === partner.id ? priorBase.balance : priorDerived.balance }
+    : undefined)
+  if (!recorded) return
+  const selfAmount = self ? recorded[self.id] : undefined
+  const partnerAmount = partner ? recorded[partner.id] : undefined
+  const matches = selfAmount !== undefined && partnerAmount !== undefined &&
+    Math.abs(selfAmount + partnerAmount - base.balance) <= 1e-8
+  if (matches && !options.expandedHousehold && !options.lockedOwnerReset) {
+    if (!self || !partner) return
+    next.accounts = next.accounts.filter(account => account.id !== baseId && account.id !== derivedId)
+    const template = priorBase ?? base
+    const partnerTemplate = priorDerived ?? template
+    const owned = (account: Account, id: string, ownerId: string, balance: number): Account => ({
+      ...account, id, ownerId, balance,
+      taxableOwnerShares: { status: 'known', shares: { [ownerId]: 1 } },
+      provenance: { ...account.provenance, ownerId: userOrigin, balance: userOrigin },
+    })
+    if (selfAmount > 0) next.accounts.push(owned(template, baseId, self.id, selfAmount))
+    if (partnerAmount > 0) next.accounts.push(owned(partnerTemplate, derivedId, partner.id, partnerAmount))
+    if (selfAmount === 0 && partnerAmount === 0) {
+      const ownerId = priorBase?.ownerId && next.people.some(person => person.id === priorBase.ownerId) ? priorBase.ownerId : null
+      next.accounts.push({ ...template, id: baseId, balance: 0, ownerId,
+        taxableOwnerShares: ownerId ? { status: 'known', shares: { [ownerId]: 1 } } : unknown('zero-balance household account ownership not assigned'),
+        provenance: { ...template.provenance, balance: userOrigin } })
+    }
+    next.ownershipAmounts ??= {}
+    next.ownershipAmounts[baseId] = recorded
+    return
+  }
+  // Mismatch, guarded re-add or an explicit locked-owner reset: keep the
+  // migrated single account (the conserved household total) and suspend
+  // ownership, but never drop or rewrite the recorded amounts.
+  next.accounts = next.accounts.filter(account => account.id !== derivedId)
+  if (options.lockedOwnerReset && base.ownerId && self && partner) {
+    next.ownershipAmounts ??= {}
+    next.ownershipAmounts[baseId] = { [self.id]: base.ownerId === self.id ? base.balance : 0,
+      [partner.id]: base.ownerId === partner.id ? base.balance : 0 }
+  } else {
+    base.ownerId = null
+    base.taxableOwnerShares = unknown('household total no longer matches the recorded per-person amounts')
+    next.ownershipAmounts ??= {}
+    next.ownershipAmounts[baseId] = recorded
+  }
+}
+
 /** Pure, deterministic migration of a previously supported persisted plan. */
 export function migratePersistedPlan(raw: unknown, persistVersion: number, baseYear: number): InputsV2 {
   if (persistVersion > 10 || persistVersion < 0) throw new Error('Unsupported persisted version')
@@ -227,6 +409,16 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
       taxableOwnerShares: expandedHousehold ? unknown('new combined household property needs owner allocation') : old.taxableOwnerShares.status === 'known' && Object.keys(old.taxableOwnerShares.shares).every(id => live.has(id))
       ? old.taxableOwnerShares : unknown('owner reference requires confirmation') }
   })
+  // A recorded per-person split is a canonical fact that survives legacy form
+  // edits: re-apply it while the household total still matches, otherwise keep
+  // the conserved total with unconfirmed ownership and the amounts visible.
+  next.ownershipAmounts = prior.ownershipAmounts ? { ...prior.ownershipAmounts } : undefined
+  for (const baseId of SPLIT_BASE_IDS) {
+    reconcileOwnershipSplit(prior, next, baseId, {
+      expandedHousehold,
+      lockedOwnerReset: baseId === 'legacy:account:locked' && (lockedOwnerChanged || !!returningPartner),
+    })
+  }
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))

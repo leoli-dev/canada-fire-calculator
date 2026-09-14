@@ -259,6 +259,16 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
   requireShape(['meltdownPaced', 'rrspFirst', 'nonRegFirst', 'tfsaFirst'].includes(plan.strategy as string), 'strategy')
   requireShape(['legacy', 'dieWithZero'].includes(plan.goal as string) && finite(plan.lifeExpectancy), 'goal/lifeExpectancy')
   known(plan.targetAssets, 'targetAssets')
+  if (plan.ownershipAmounts !== undefined) {
+    requireShape(object(plan.ownershipAmounts), 'ownershipAmounts')
+    for (const [baseId, amounts] of Object.entries(plan.ownershipAmounts)) {
+      requireShape(object(amounts), `ownershipAmounts.${baseId}`)
+      for (const [personId, amount] of Object.entries(amounts)) {
+        requireShape(people.has(personId), `ownershipAmounts.${baseId}.${personId}.owner`)
+        requireShape(finite(amount) && (amount as number) >= 0, `ownershipAmounts.${baseId}.${personId}`)
+      }
+    }
+  }
   assertLegacyInputs(plan.legacyProjection)
   requireShape(object(plan.migration) && integer(plan.migration.sourcePersistVersion) && typeof plan.migration.ownershipNeedsConfirmation === 'boolean' && typeof plan.migration.ageBasisNeedsConfirmation === 'boolean' && typeof plan.migration.savingsBasisNeedsConfirmation === 'boolean', 'migration')
 }

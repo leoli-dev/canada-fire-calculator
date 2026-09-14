@@ -142,6 +142,16 @@ export interface InputsV2 {
   targetAssets: Known<number>
   /** Old projection adapter is retained until BE-14 switches all consumers. */
   legacyProjection: Inputs
+  /**
+   * Per-person amounts of one household account total, keyed by the base
+   * account id (e.g. `legacy:account:rrsp`), mapping each person id to their
+   * recorded balance. This is the recorded fact behind a two-owner split of a
+   * registered/locked account. It survives later household-total edits so the
+   * panel can show a visible mismatch instead of silently rewriting or
+   * dropping the split; it is absent for non-registered accounts and
+   * properties, whose `taxableOwnerShares` are the durable fact.
+   */
+  ownershipAmounts?: Record<string, Record<EntityId, number>>
   migration: { sourcePersistVersion: number; ownershipNeedsConfirmation: boolean; ageBasisNeedsConfirmation: boolean; savingsBasisNeedsConfirmation: boolean }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
