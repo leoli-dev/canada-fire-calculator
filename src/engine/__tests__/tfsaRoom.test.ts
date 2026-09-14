@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
 import type { InputsV2, Known } from '../model'
 import { migratePersistedPlan } from '../migration'
-import { annualStep, initializeState, projectFromState, type AnnualProviders, type AnnualState } from '../annualState'
+import { annualStep, initializeState, projectFromState, type AnnualProviders } from '../annualState'
 import {
   TFSA_ADDITION_RULE_MISSING, TFSA_BLOCKING, TFSA_OUT_OF_SCOPE, TFSA_ROOM_UNKNOWN_NO_CONTRIBUTION,
   TFSA_STATEMENT_ROOM_BASIS, annualTfsaAdditionFor, plannedTfsaLines, previewTfsaRoomYear, restoredRoom,
