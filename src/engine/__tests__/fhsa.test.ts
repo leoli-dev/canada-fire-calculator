@@ -115,6 +115,23 @@ describe('BE-36 A audit P12 — cumulative contributions at the lifetime limit',
     expect(row.cumulativeContributions.status).toBe('unknown')
   })
 
+  it('never reports a negative room for sub-cent history noise, and refuses a real overshoot', () => {
+    // 40000.005 is over the limit by half a cent: within the engine's money
+    // tolerance, so it is a real zero rather than negative room.
+    const noise = fhsaRoomYear(request({
+      openedYear: known(2020), openingRoom: known(0), history: history(40000.005), lines: [line('c1', 100)],
+    }))
+    expect(noise.applied).toBe(0)
+    expect(noise.retained).toBe(100)
+    expect(noise.remainingLifetimeRoom).toEqual(known(0))
+    // Two cents over is a real overshoot and is refused, not floored.
+    const real = fhsaRoomYear(request({
+      openedYear: known(2020), openingRoom: known(0), history: history(40000.02), lines: [line('c1', 100)],
+    }))
+    expect(real.limitations.map(item => item.code)).toContain('lifetimeExceeded')
+    expect(real.remainingLifetimeRoom.status).toBe('unknown')
+  })
+
   it('caps at exactly the remaining lifetime limit and lets a growth-only balance stay legitimate', () => {
     // 39,000 already contributed leaves 1,000 of lifetime room. The year's
     // published annual room is 8,000, so the lifetime bound gives 1,000.

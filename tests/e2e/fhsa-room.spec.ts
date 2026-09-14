@@ -29,6 +29,56 @@ async function seed(page: Page, options: { guided?: boolean; couple?: boolean } 
   await page.reload()
 }
 
+/**
+ * The legacy form's FHSA amount is the plan a user already has, with the
+ * statement confirmed. B2 needs a plan that exists before the panel is touched.
+ */
+async function seedLegacyPlan(page: Page, annualContribution: number, openedYear = 2026) {
+  await page.goto('/')
+  await page.evaluate(async ({ annualContribution, openedYear }) => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 40_000, retirementSpending: 40_000,
+      savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0,
+      fhsa: { balance: 0, annualContribution, openedYearsAgo: 0 }, partner: null }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    const account = canonical.accounts.find((item: { kind: string }) => item.kind === 'fhsa')
+    account.openedYear = { status: 'known', value: openedYear }
+    account.contributionRoom = { status: 'known', value: 0 }
+    canonical.fhsaStatementHistory = { [account.id]: {
+      cumulativePriorContributions: { status: 'known', value: 0 }, provenance: { origin: 'user', sourceYear: 2026 } } }
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs, canonical, entryMode: 'professional', guidedView: 'questionnaire', inputRevision: 0, resultRevision: null,
+    } }))
+  }, { annualContribution, openedYear })
+  await page.reload()
+}
+
+/** The plan the panel shows, the rows it is recorded in, and the amount the
+ * kernel's own allocation and line builder price from the same plan. */
+const fhsaPlanState = (page: Page) => page.evaluate(async () => {
+  const { useStore } = await import('/src/store.ts')
+  const { resolveYearAllocation } = await import('/src/engine/funding.ts')
+  const { fhsaPlannedYearRequest } = await import('/src/engine/fhsa.ts')
+  const { plannedFhsaContribution } = await import('/src/engine/fhsaPlan.ts')
+  const plan = useStore.getState().canonical!
+  const account = plan.accounts.find((item: { kind: string }) => item.kind === 'fhsa')!
+  const rows = plan.recurringContributions.filter((item: { accountId: string }) => item.accountId === account.id)
+  const request = fhsaPlannedYearRequest({ plan, account, year: plan.baseYear })
+  return {
+    accountId: account.id,
+    rowIds: rows.map((item: { id: string }) => item.id),
+    mirror: useStore.getState().inputs.fhsa?.annualContribution,
+    panelPlan: plannedFhsaContribution(plan, account.id),
+    kernelAllocation: resolveYearAllocation(plan, plan.baseYear).fhsa,
+    kernelLines: request.request.lines.reduce((total: number, line: { amount: number }) => total + line.amount, 0),
+  }
+})
+
 const inViewport = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
 
@@ -183,5 +233,72 @@ test('the FHSA room block explains itself in EN, FR and ZH', async ({ page }) =>
   await page.getByRole('button', { name: '中文' }).click()
   await expect(page.getByTestId('person-tax-facts')).toContainText('FHSA 供款空间')
   await expect(panel).toContainText('账户持有人')
+  expect(await inViewport(page)).toBe(true)
+})
+
+/**
+ * B2: the panel and the kernel price one recorded plan. Before the fix the
+ * panel showed a blank plan while the kernel priced the legacy row, typing a
+ * value produced two rows and a doubled mirror, and an unrelated shared-field
+ * edit dropped the recorded row.
+ */
+test('the panel and the kernel price the same default legacy plan', async ({ page }) => {
+  await seedLegacyPlan(page, 8000)
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 8,000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('closing room 0')
+  await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('8,000 used')
+  const state = await fhsaPlanState(page)
+  expect(state.rowIds).toEqual([`be36:fhsa:${state.accountId}`])
+  expect(state.mirror).toBe(8000)
+  expect(state.panelPlan).toBe(8000)
+  expect(state.kernelAllocation).toBe(8000)
+  expect(state.kernelLines).toBe(8000)
+})
+
+test('recording a planned amount replaces the plan instead of adding to it', async ({ page }) => {
+  await seedLegacyPlan(page, 8000)
+  const planned = page.getByTestId('fhsa-planned-self')
+  await planned.fill('6000')
+  await planned.blur()
+  await expect(planned).toHaveValue('6000')
+  const state = await fhsaPlanState(page)
+  // One row, mirrored once, priced once: 8,000 + 6,000 must never appear.
+  expect(state.rowIds).toEqual([`be36:fhsa:${state.accountId}`])
+  expect(state.mirror).toBe(6000)
+  expect(state.panelPlan).toBe(6000)
+  expect(state.kernelAllocation).toBe(6000)
+  expect(state.kernelLines).toBe(6000)
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('closing room 2,000')
+  await expect(page.getByTestId('fhsa-retained-self')).toContainText('0')
+})
+
+test('a recorded plan survives an unrelated shared-field edit and a reload', async ({ page }) => {
+  await seedLegacyPlan(page, 8000)
+  const planned = page.getByTestId('fhsa-planned-self')
+  await planned.fill('6000')
+  await planned.blur()
+  await expect(planned).toHaveValue('6000')
+  // The reviewer's exact reproduction: edit only annualSavings through the
+  // app's own shared-field command.
+  await page.evaluate(async () => {
+    const { useStore } = await import('/src/store.ts')
+    useStore.getState().editSharedField('annualSavings', '41000')
+  })
+  await expect(planned).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
+  const edited = await fhsaPlanState(page)
+  expect(edited.rowIds).toEqual([`be36:fhsa:${edited.accountId}`])
+  expect(edited.mirror).toBe(6000)
+  expect(edited.kernelAllocation).toBe(6000)
+  expect(edited.kernelLines).toBe(6000)
+  // A reload must not drop the recorded row either.
+  await page.reload()
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
+  const reloaded = await fhsaPlanState(page)
+  expect(reloaded.rowIds).toEqual([`be36:fhsa:${reloaded.accountId}`])
+  expect(reloaded.kernelAllocation).toBe(6000)
   expect(await inViewport(page)).toBe(true)
 })

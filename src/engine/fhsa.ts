@@ -318,10 +318,13 @@ export function fhsaRoomYear(request: FhsaRoomRequest): FhsaRoomYear {
     ? unknownFrom(limitations)
     : ({ status: 'known' as const, value: roundCents(knownValue(cumulativePrior) + sum(lines.map(line => line.applied))) } as Known<number>)
   // Signed, not floored: the invariant is `cumulative <= lifetimeLimit`, and an
-  // overshoot must stay visible instead of reading as "no room left".
+  // overshoot must stay visible instead of reading as "no room left". A history
+  // past the limit is refused above, so only sub-tolerance noise can reach here,
+  // and that is snapped to a real zero rather than reported as negative room.
+  const signedRemainingLifetime = roundCents(lifetimeLimit.value - knownValue(cumulativeContributions))
   const remainingLifetimeRoom: Known<number> = blocked
     ? unknownFrom(limitations)
-    : { status: 'known' as const, value: roundCents(lifetimeLimit.value - knownValue(cumulativeContributions)) }
+    : { status: 'known' as const, value: Math.abs(signedRemainingLifetime) <= FHSA_MONEY_TOLERANCE ? 0 : signedRemainingLifetime }
   return {
     personId: request.personId,
     accountId: request.accountId,
