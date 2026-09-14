@@ -123,8 +123,11 @@ Work down the left column; every underlined term opens a plain-language explanat
   taxes the income split across both spouses (two personal amounts, two runs up the
   low brackets). Each partner has their own CPP/OAS timeline.
 - **Accounts** — current balances per wrapper. For the non-registered account also
-  enter the **ACB** (your broker calls it *book cost*): tax applies only to the gain
-  above it, so leaving it at 0 badly overstates tax. Asset-mix presets set realistic
+  enter the **ACB** (your broker calls it *book cost*, including reinvested
+  distributions and later purchases): tax applies only to the gain above it, so a
+  guessed percentage cannot support precise capital-gains tax. Leave it unknown
+  until you can verify it; a cost above today's value is a loss whose eligibility
+  must be confirmed before results rely on it. Asset-mix presets set realistic
   real returns and volatilities per account.
 - **FHSA** — a household-combined bucket (enter the couple's total, not per spouse):
   today's balance, annual contribution (carved out of annual savings before it's
@@ -135,10 +138,12 @@ Work down the left column; every underlined term opens a plain-language explanat
   own** (current value, appreciation, optional sale age) or **planned purchase**
   (purchase age, price and down payment in today's dollars, an auto-derived
   mortgage from payment + years, and a net $/year holding-cost change) — plus any
-  number of investment properties, each with an optional sale age and an optional
-  net annual rent (rent minus operating costs; it stops the year the property
-  sells). A principal-residence sale is tax-free and becomes investable capital
-  the same year; a planned purchase's down payment is funded FHSA → TFSA →
+  number of investment properties, each with an optional sale age, optional selling
+  expenses in today's dollars (charged once against proceeds — land/building split
+  and CCA recapture stay unmodeled, so a sale withholds precise tax conclusions), and
+  an optional net annual rent (rent minus operating costs; it stops the year the
+  property sells). A principal-residence sale is tax-free and becomes investable
+  capital the same year; a planned purchase's down payment is funded FHSA → TFSA →
   non-registered → RRSP, a fixed order that isn't configurable.
 - **Debts** — mortgage, car loan or other, each as (balance, annual payment, years
   remaining). Enter your annual savings as what you actually save *after* debt

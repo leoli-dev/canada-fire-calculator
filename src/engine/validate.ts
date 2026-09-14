@@ -193,6 +193,8 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     const at = (f: string) => `investmentProperties.${i}.${f}`
     if (ip.value < 0) err(at('value'), 'valNegative')
     if (ip.acb < 0) err(at('acb'), 'valNegative')
+    if (ip.saleExpenses !== undefined && (!Number.isFinite(ip.saleExpenses) || ip.saleExpenses < 0 || ip.saleExpenses > ip.value))
+      err(at('saleExpenses'), 'valSaleExpenses')
     if ((ip.annualRent ?? 0) < 0) err(at('annualRent'), 'valNegative')
     if (ip.acb > ip.value) warn(at('acb'), 'valAcbAboveValue')
     checkMortgage(ip.mortgage, at('mortgage'))

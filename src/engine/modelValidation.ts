@@ -212,6 +212,7 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
     requireShape(property.plannedMortgage === null || object(property.plannedMortgage) && finite(property.plannedMortgage.principal) && (property.plannedMortgage.annualPayment === null || finite(property.plannedMortgage.annualPayment)) && (property.plannedMortgage.yearsRemaining === null || finite(property.plannedMortgage.yearsRemaining)), `properties.${index}.plannedMortgage`)
     requireShape(property.mortgageDebtId === null || debts.has(property.mortgageDebtId), `properties.${index}.mortgageDebtId`)
     known(property.acb, `properties.${index}.acb`)
+    if (property.saleExpenses !== undefined) known(property.saleExpenses, `properties.${index}.saleExpenses`)
     known(property.annualRent, `properties.${index}.annualRent`)
     taxShares(property.taxableOwnerShares, people, `properties.${index}.taxableOwnerShares`)
     provenanceMap(property.provenance, `properties.${index}.provenance`)

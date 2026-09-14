@@ -23,14 +23,15 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
   const { inputs, result } = props
+  const canonical = useStore((s) => s.canonical)
 
   const earliest = useMemo(
-    () => (mode === 'when' ? findEarliestFireAge(inputs) : null),
-    [mode, inputs],
+    () => (mode === 'when' ? findEarliestFireAge(inputs, canonical) : null),
+    [mode, inputs, canonical],
   )
   const fireNumber = useMemo(
-    () => (mode === 'number' ? requiredFireAssets(inputs) : null),
-    [mode, inputs],
+    () => (mode === 'number' ? requiredFireAssets(inputs, canonical) : null),
+    [mode, inputs, canonical],
   )
   const projectedAtFire = useMemo(
     () =>
@@ -53,9 +54,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const dwzSpending = useMemo(
     () =>
       !props.legacyEstimate && mode === 'last' && (inputs.goal ?? 'legacy') === 'dieWithZero'
-        ? maxSustainableSpending(inputs)
+        ? maxSustainableSpending(inputs, canonical)
         : null,
-    [mode, inputs],
+    [mode, inputs, canonical],
   )
   const target = inputs.fireTargetAssets ?? 0
   const goal = useMemo(
@@ -67,7 +68,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const quickEstimateUnsupported = inputs.principalResidence?.mode === 'planned' ||
     result.unfundedObligations.length > 0 || earlySale || fireNumber !== null && fireNumber.status !== 'solved'
   const quickEstimateMessage = inputs.principalResidence?.mode === 'planned'
-    ? t('plannedPurchaseQuickUnsupported') : result.unfundedObligations.length > 0
+    ? t('plannedPurchaseQuickUnsupported') : goal?.reason === 'investmentPropertySale'
+      ? t('targetPropertySaleUnsupported') : fireNumber?.reason === 'nominalCapitalBasis'
+        ? t('solverReason_nominalCapitalBasis') : fireNumber?.reason === 'investmentPropertySale'
+          ? t('targetPropertySaleUnsupported') : result.unfundedObligations.length > 0
       ? t('fundingQuickUnsupported') : earlySale ? t('saleQuickUnsupported')
         : fireNumber?.reason === 'lockedWithdrawalLimits'
           ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
@@ -175,7 +179,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             </>
           )}
           {dwzSpending && dwzSpending.status !== 'solved' &&
-            <p className="hint">{t(`solver_${dwzSpending.status}`)}</p>}
+            <p className="hint">{dwzSpending.reason
+              ? t(`solverReason_${dwzSpending.reason}`, { defaultValue: t(`solver_${dwzSpending.status}`) })
+              : t(`solver_${dwzSpending.status}`)}</p>}
           {dwzSpending?.status === 'searchLimit' && dwzSpending.lastVerifiedBound !== null &&
             <p className="hint">{t('solverCheckedSpending', { amount: cad(dwzSpending.lastVerifiedBound), iterations: dwzSpending.iterations })}</p>}
         </>
@@ -187,7 +193,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             {earliest?.status === 'solved'
               ? t('whenAnswer', { age: earliest.value })
               : earliest?.status === 'infeasible' ? t('whenNever', { age: earliest.lastVerifiedBound ?? inputs.currentAge })
-                : earliest?.reason === 'lockedWithdrawalLimits' ? t('solverReason_lockedWithdrawalLimits')
+                : earliest?.reason ? t(`solverReason_${earliest.reason}`, { defaultValue: t(`solver_${earliest.status}`) })
                   : t(`solver_${earliest?.status ?? 'unsupported'}`)}
           </p>
           {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&

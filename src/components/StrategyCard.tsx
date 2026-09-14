@@ -56,8 +56,8 @@ export function StrategyCard(props: { inputs: Inputs }) {
                       : t(`solver_${assessed.status}`)}{' '}
                       {assessed.gap !== null && t('candidateGap', { amount: cad(assessed.gap) })}</>}
                 </td>
-                <td className="num">{cad(r.totalTax)}</td>
-                <td className="num">{cad(r.result.rrspTax)}</td>
+                <td className="num">{assessed.status === 'feasible' ? cad(r.totalTax) : '—'}</td>
+                <td className="num">{assessed.status === 'feasible' ? cad(r.result.rrspTax) : '—'}</td>
                 <td className="num">
                   {assessed.metric !== null ? cad(assessed.metric) : '—'}
                 </td>

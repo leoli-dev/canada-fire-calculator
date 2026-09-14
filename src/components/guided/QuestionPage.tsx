@@ -275,7 +275,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     }
     case 'account.nonReg.balance':
-      control = <><div className="question-pair"><FactNumber field="balances.nonReg" label={t('nonReg')} value={inputs.balances.nonReg} step={5000} onValue={(nonReg) => set({ balances: { ...inputs.balances, nonReg } })} /><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onValue={(nonRegBook) => set({ nonRegBook })} /></div><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(Math.max(0, inputs.balances.nonReg - inputs.nonRegBook)) })}</p></>
+      control = <><div className="question-pair"><FactNumber field="balances.nonReg" label={t('nonReg')} value={inputs.balances.nonReg} step={5000} onValue={(nonReg) => set({ balances: { ...inputs.balances, nonReg } })} /><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onValue={(nonRegBook) => set({ nonRegBook })} /></div><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(inputs.balances.nonReg - inputs.nonRegBook) })}</p><p className="hint">{t('nonRegBookHint')}</p></>
       break
     case 'allocation.tfsa': {
       const accounts = ['tfsa', 'rrsp', 'nonReg'] as const
@@ -382,7 +382,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'rental.0.income': {
       const property = inputs.investmentProperties![0]
-      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /></div>{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
+      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.saleExpenses" label={t('propSaleExpenses')} value={property.saleExpenses ?? 0} onValue={(saleExpenses) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, saleExpenses }; set({ investmentProperties: next }) }} /></div>{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'rental.0.mortgage': {

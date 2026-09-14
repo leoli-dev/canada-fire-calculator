@@ -220,9 +220,8 @@ describe('runProjection', () => {
   })
 
   it('tax drag raises the ACB: reinvested distributions are not taxed twice', () => {
-    // all-interest portfolio never sold until death: with the yield fully
-    // distributed and reinvested, book value tracks the balance and the
-    // estate has no unrealized gain left to tax
+    // Fully distributed returns reinvest inside the account. With zero CPI,
+    // book value tracks market value and the estate has no unrealized gain.
     const r = runProjection({
       ...base,
       strategy: 'tfsaFirst' as const,
@@ -231,6 +230,9 @@ describe('runProjection', () => {
       balances: { tfsa: 3000000, rrsp: 0, nonReg: 500000 },
       nonRegBook: 500000,
       nonRegDistributionYield: 0.03,
+      // With zero inflation, nominal ACB and the real balance share a unit.
+      // Inflation otherwise creates a genuine nominal gain at disposition.
+      inflation: 0,
       cppAnnualAt65: 0,
       oasAnnualAt65: 0,
     })

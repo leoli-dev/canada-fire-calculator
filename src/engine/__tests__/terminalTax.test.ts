@@ -19,6 +19,14 @@ const p07: Inputs = {
 }
 
 describe('terminal-year tax', () => {
+  it('withholds terminal tax after a sold investment property even when modeled gain is zero', () => {
+    const result = runProjection({ ...p07, currentAge: 60, fireAge: 60, lifeExpectancy: 60,
+      retirementSpending: 0, extraIncome: undefined, balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
+      investmentProperties: [{ value: 500_000, acb: 500_000, saleExpenses: 0,
+        appreciation: 0, annualRent: 0, sellAtAge: 60 }] })
+    expect(result.taxCapability?.status).toBe('legacyEstimate')
+    expect(result.terminalTaxStatus).toBe('unsupported')
+  })
   it('P07 adds the remaining RRSP to already taxed ordinary income', () => {
     const result = runProjection(p07)
     expect(result.rows[0].tax).toBeCloseTo(7_165.7755, 4)

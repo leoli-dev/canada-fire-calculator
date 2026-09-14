@@ -1,6 +1,6 @@
 import type { Inputs } from '../engine'
 
-export type SharedFieldId = 'currentAge' | 'fireAge' | 'lifeExpectancy' | 'annualSavings' | 'retirementSpending' | 'balances.tfsa' | 'balances.rrsp' | 'balances.nonReg' | 'principalResidence.annualMortgagePayment'
+export type SharedFieldId = 'currentAge' | 'fireAge' | 'lifeExpectancy' | 'annualSavings' | 'retirementSpending' | 'nonRegBook' | 'balances.tfsa' | 'balances.rrsp' | 'balances.nonReg' | 'principalResidence.annualMortgagePayment'
 export type FieldUnit = 'years' | 'annualCad' | 'cad'
 export interface FieldDefinition {
   id: SharedFieldId
@@ -29,6 +29,10 @@ export const fieldRegistry: Record<SharedFieldId, FieldDefinition> = {
   lifeExpectancy: scalar('lifeExpectancy', 'years', 0, 120, true),
   annualSavings: scalar('annualSavings', 'annualCad', 0, 1e12),
   retirementSpending: scalar('retirementSpending', 'annualCad', 0, 1e12),
+  nonRegBook: { id: 'nonRegBook', unit: 'cad', min: 0, max: 1e12,
+    guidedBinding: 'nonRegBook', professionalBinding: 'nonRegBook', estimatePolicy: 'none', capability: 'supported',
+    read: inputs => inputs.nonRegBook,
+    write: (inputs, value) => ({ ...inputs, nonRegBook: value }) },
   'balances.tfsa': balance('tfsa'),
   'balances.rrsp': balance('rrsp'),
   'balances.nonReg': balance('nonReg'),

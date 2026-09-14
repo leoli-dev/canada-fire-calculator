@@ -39,6 +39,48 @@ async function seedV10(page: import('@playwright/test').Page) {
   return original
 }
 
+test('v10 missing ACB remains unknown in current and Scenario A after hydration and refresh', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const original = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+    saved.version = 10
+    delete saved.state.canonical
+    delete saved.state.scenarioACanonical
+    saved.state.inputs.balances = { tfsa: 0, rrsp: 0, nonReg: 500_000 }
+    delete saved.state.inputs.nonRegBook
+    saved.state.scenarioA = structuredClone(saved.state.inputs)
+    localStorage.removeItem('fire-inputs:pre-v11-backup')
+    const original = JSON.stringify(saved)
+    localStorage.setItem('fire-inputs', original)
+    return original
+  })
+  await page.reload()
+  for (const mode of ['Professional', 'Guided'] as const) {
+    await page.getByRole('button', { name: mode, exact: true }).click()
+    const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
+    for (const plan of [state.canonical, state.scenarioACanonical]) {
+      expect(plan.accounts.find((a: { kind: string }) => a.kind === 'nonReg').acb.status).toBe('unknown')
+    }
+    expect(state.answerMeta.nonRegBook.status).toBe('unknown')
+    expect(state.scenarioAAnswerMeta.nonRegBook.status).toBe('unknown')
+    expect(state.draftByField.nonRegBook).toBe('')
+    expect(state.inputs.nonRegBook).toBe(0)
+    expect(state.scenarioA.nonRegBook).toBe(0)
+    if (mode === 'Professional') await expect(page.locator('label.field').filter({ hasText: 'Non-registered cost base (ACB)' }).locator('input')).toHaveValue('')
+    await page.reload()
+  }
+  const restored = await page.evaluate(async () => {
+    const { useStore } = await import('/src/store.ts')
+    useStore.getState().restoreScenarioA()
+    const state = useStore.getState()
+    return { canonical: state.canonical, draftByField: state.draftByField }
+  })
+  expect(restored.canonical.accounts.find((a: { kind: string }) => a.kind === 'nonReg').acb.status).toBe('unknown')
+  expect(restored.draftByField.nonRegBook).toBe('')
+  expect(await page.evaluate(() => localStorage.getItem('fire-inputs:pre-v11-backup'))).toBe(original)
+})
+
 test('single balance edited then combined with partner stays unassigned in both modes and after reload', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()

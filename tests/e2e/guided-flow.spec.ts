@@ -109,7 +109,7 @@ test('guided users may leave the personal target unset and add it from results',
   await expect(page.locator('[data-field="fireTargetAssets"] input')).toHaveValue('900,000')
 })
 
-test('an unverified FIRE asset search shows its boundary in guided and professional results', async ({ page }) => {
+test('a non-registered cost history withholds a false FIRE number in guided and professional results', async ({ page }) => {
   test.setTimeout(60_000)
   await completeGuidedQuestionnaire(page, 'no')
   await page.getByRole('button', { name: 'Generate my results' }).click()
@@ -120,13 +120,12 @@ test('an unverified FIRE asset search shows its boundary in guided and professio
   await page.getByRole('button', { name: 'Generate my results' }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
   const summary = page.locator('.summary')
-  await expect(summary).toContainText('search limit was reached')
-  await expect(summary).toContainText('Checked through')
+  await expect(summary).toContainText('cannot preserve the verified nominal cost history')
   await expect(summary).not.toContainText('Your FIRE number:')
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
-  await expect(page.locator('.summary')).toContainText('search limit was reached')
+  await expect(page.locator('.summary')).toContainText('cannot preserve the verified nominal cost history')
   await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
   await expect(page.locator('.results-column')).not.toContainText('NaN')
   await expect(page.locator('.results-column')).not.toContainText('Infinity')
@@ -218,8 +217,8 @@ test('non-registered value and cost base share one page', async ({ page }, testI
   await expect(page.locator('[data-field="nonRegBook"]')).toBeVisible()
   await page.locator('[data-field="balances.nonReg"] input').fill('100000')
   await page.locator('[data-field="nonRegBook"] input').fill('80000')
-  await expect(page.locator('.answer-feedback')).toContainText('账面增值为 CA$20,000')
-  await expect(page.locator('.answer-feedback')).toContainText('这不是税额')
+  await expect(page.locator('.answer-feedback')).toContainText('账面变动为 CA$20,000')
+  await expect(page.locator('.answer-feedback')).toContainText('都不是税额')
 })
 
 test('intent recommendation updates inline without a confirmation page', async ({ page }, testInfo) => {

@@ -221,6 +221,9 @@ export interface InvestmentProperty {
   value: number
   /** adjusted cost base; gain above it is 50% taxable at sale */
   acb: number
+  /** Estimated selling expenses in base-year purchasing-power CAD; charged
+   * once at sale, then converted to nominal CAD for the tax-basis ledger. */
+  saleExpenses?: number
   appreciation: number
   /** sale occurs at the opening of this age, including before FIRE; null = never sell */
   sellAtAge: number | null
@@ -394,6 +397,14 @@ export interface YearRow {
 export interface ProjectionResult {
   /** An explicit limit prevents an old pooled preview from becoming advice. */
   taxCapability?: { status: 'person' | 'legacyEstimate'; reason?: string }
+  /**
+   * A modeled disposition depends on tax facts this engine cannot verify, so a
+   * positive funding, retirement-age or spending claim derived from this run is
+   * not verified. `investmentPropertySale` needs a land/building split and CCA
+   * history; `nonRegisteredLoss` needs superficial-loss confirmation and an
+   * owner-specific carry ledger.
+   */
+  capitalTaxLimit?: 'investmentPropertySale' | 'nonRegisteredLoss'
   rows: YearRow[]
   unfundedObligations: import('./funding').FundingGap[]
   /** spending fully funded through life expectancy */

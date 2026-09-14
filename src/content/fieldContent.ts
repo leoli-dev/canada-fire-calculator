@@ -4,7 +4,7 @@ import { pageById } from '../guided/questionCatalog'
 import { guidanceForPage, type PageGuidance } from '../guided/pageGuidance'
 import type { QuestionAnswers } from '../guided/schema'
 
-export const FIELD_CONTENT_VERSION = 1
+export const FIELD_CONTENT_VERSION = 2
 
 type Applicability = 'always' | 'selectedAccount' | 'plannedHome'
 type CapabilityMeaning = 'projectionInput' | 'plannedMortgage'
@@ -38,6 +38,7 @@ export const FIELD_CONTENT: readonly FieldContent[] = [
   bind('balances.tfsa', 'account.tfsa.balance', 'selectedAccount'),
   bind('balances.rrsp', 'account.rrsp.balance', 'selectedAccount'),
   bind('balances.nonReg', 'account.nonReg.balance', 'selectedAccount'),
+  bind('nonRegBook', 'account.nonReg.balance', 'selectedAccount'),
   bind('principalResidence.annualMortgagePayment', 'purchase.loan', 'plannedHome', 'plannedMortgage'),
 ]
 

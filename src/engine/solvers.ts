@@ -1,9 +1,9 @@
 import { pensionPaid, runProjection } from './projection'
 import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSale } from './debts'
 import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
-import { incomeTax } from './tax'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
+import type { InputsV2 } from './model'
 import {
   ACCOUNT_TYPES,
   STRATEGIES,
@@ -51,6 +51,35 @@ const cashResidual = (result: ProjectionResult): number | null => {
     ...result.unfundedObligations.map((item) => item.amount))
   return Number.isFinite(gap) && gap > 0 ? -gap : null
 }
+
+/**
+ * A positive funding or age claim is only as verified as the disposal tax it
+ * depends on. `nonRegisteredLoss` is reported by the projection only once a
+ * withdrawal settles an unrealized loss (superficial-loss and carry facts are
+ * not modeled), and `investmentPropertySale` once any modeled property
+ * disposition runs without a land/building split or CCA history.
+ */
+const capitalTaxReason = (result: ProjectionResult): 'investmentPropertySale' | 'nominalCapitalBasis' | null =>
+  result.capitalTaxLimit === 'investmentPropertySale' ? 'investmentPropertySale'
+    : result.capitalTaxLimit === 'nonRegisteredLoss' ? 'nominalCapitalBasis' : null
+
+/**
+ * The legacy `nonRegBook` scalar is a last-valid value, not a tax fact. It is
+ * usable only when no canonical plan exists, or when exactly one
+ * non-registered account carries a known basis matching both the visible
+ * balance and the scalar.
+ */
+const nonRegScalarUnverified = (inputs: Inputs, canonical?: InputsV2 | null): boolean => {
+  if (inputs.balances.nonReg <= 0 || !canonical) return false
+  const [account, ...rest] = canonical.accounts.filter(
+    item => item.kind === 'nonReg' && item.balance > 0)
+  return !account || rest.length > 0 || account.acb.status !== 'known' ||
+    account.balance !== inputs.balances.nonReg || account.acb.value !== inputs.nonRegBook
+}
+
+/** Cost above value is an unrealized loss; its eligibility and carry are unmodeled. */
+const nonRegLossUnverified = (inputs: Inputs): boolean =>
+  inputs.balances.nonReg > 0 && inputs.nonRegBook > inputs.balances.nonReg + 1e-8
 
 const hasNonFiniteNumber = (value: unknown): boolean => {
   if (typeof value === 'number') return !Number.isFinite(value)
@@ -128,7 +157,7 @@ const numericInputIssue = (inputs: Inputs): string | null => {
     }
   }
   const properties = array(inputs.investmentProperties, 'investmentProperties', (item, path) => {
-    const issue = check(item, path, ['value', 'acb', 'appreciation'], ['sellAtAge', 'annualRent'])
+    const issue = check(item, path, ['value', 'acb', 'appreciation'], ['sellAtAge', 'annualRent', 'saleExpenses'])
     if (issue) return issue
     const property = item as NonNullable<Inputs['investmentProperties']>[number]
     return property.mortgage != null ? mortgage(property.mortgage, `${path}.mortgage`) : null
@@ -153,7 +182,7 @@ const invalidReason = (inputs: Inputs): string | null => {
 }
 
 /** Mode "when can I retire": calendar-year linear scan, with fixed benefit estimates. */
-function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
+function findEarliestFireAgeImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -169,10 +198,18 @@ function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
       unsupportedProjection ??= projection
       continue
     }
-    if (projection.success)
-      return hasUnverifiedLockedWithdrawals(inputs)
-        ? outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
-        : outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
+    if (projection.success) {
+      if (hasUnverifiedLockedWithdrawals(inputs))
+        return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+      // Only a positive age claim needs withholding: if no age can fund the
+      // plan, a failing verdict is not made more optimistic by missing tax.
+      if (nonRegScalarUnverified(inputs, canonical))
+        return outcome('unsupported', null, assumptions, age, iterations, cashResidual(projection), 'nominalCapitalBasis')
+      const capitalReason = capitalTaxReason(projection)
+      if (capitalReason)
+        return outcome('unsupported', null, assumptions, age, iterations, cashResidual(projection), capitalReason)
+      return outcome('solved', age, assumptions, age, iterations, projection.finalNetWorth)
+    }
   }
   if (unsupportedProjection)
     return outcome('unsupported', null, assumptions, iterations ? cap : null, iterations,
@@ -181,8 +218,8 @@ function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
     lastProjection ? cashResidual(lastProjection) : null, 'noFeasibleAge')
 }
 
-export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
-  try { return findEarliestFireAgeImpl(inputs) }
+export function findEarliestFireAge(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return findEarliestFireAgeImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan'], null, 0, null, 'projectionError') }
 }
 
@@ -192,7 +229,7 @@ export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
  * optional locked DC/LIRA side account) for the plan to
  * succeed with no further savings.
  */
-function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
+function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -205,8 +242,36 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   if ((inputs.principalResidence?.sellAtAge ?? Infinity) < inputs.fireAge ||
       (inputs.investmentProperties ?? []).some((p) => (p.sellAtAge ?? Infinity) < inputs.fireAge))
     return outcome('unsupported', null, assumptions, null, 0, null, 'preFireSale')
+  if ((inputs.investmentProperties ?? []).some(property => property.sellAtAge != null))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'investmentPropertySale')
+  if ((inputs.lockedRetirement?.balance ?? 0) > 0 &&
+      inputs.balances.tfsa + inputs.balances.rrsp + inputs.balances.nonReg === 0 &&
+      inputs.fireAge < inputs.lockedRetirement!.accessibleAge)
+    return outcome('unsupported', null, assumptions, 0, 0, null, 'lockedOnlyBridge')
+  if (hasUnverifiedLockedWithdrawals(inputs))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'lockedWithdrawalLimits')
+  // Re-basing currentAge to FIRE discards the real path of nominal ACB.
+  // Candidate T is a hypothetical FIRE-year portfolio, so neither a present
+  // holding nor future buys/reinvestments can be assigned a verified basis.
+  // The same limitation applies to an investment property carried forward.
+  if (inputs.fireAge > inputs.currentAge && (
+    inputs.balances.nonReg > 0 || inputs.annualSavings > 0 && inputs.savingsSplit.nonReg > 0 ||
+    (inputs.investmentProperties?.length ?? 0) > 0))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
+  // A same-year snapshot can reuse a verified basis, but the scalar legacy
+  // adapter is only a last-valid value. Unknown canonical ACB is not a tax
+  // fact, and an unrealized loss needs unmodeled eligibility/carry treatment.
+  if (nonRegLossUnverified(inputs) || nonRegScalarUnverified(inputs, canonical))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   if (checkedProjection(inputs).unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, null, 0, null, 'unfundedTransaction')
+  // With the snapshot's own basis verified, the plan can still realize a loss
+  // while it runs (reinvested distributions against a flat market), and a
+  // modeled property sale still lacks land/building and CCA facts. Either way
+  // the threshold itself is not verified.
+  const planCapitalReason = capitalTaxReason(checkedProjection(inputs))
+  if (planCapitalReason)
+    return outcome('unsupported', null, assumptions, null, 0, null, planCapitalReason)
   const b = inputs.balances
   const lockedBalance = inputs.lockedRetirement?.balance ?? 0
   const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
@@ -270,12 +335,13 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
-  if (lockedBalance > 0 && b.tfsa + b.rrsp + b.nonReg === 0 &&
-      inputs.fireAge < inputs.lockedRetirement!.accessibleAge)
-    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'lockedOnlyBridge')
-  if (hasUnverifiedLockedWithdrawals(inputs))
-    return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
-  if (zero.success) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  if (zero.success) {
+    // The threshold the user is told to reach must not itself be a plan whose
+    // disposal tax is unverified.
+    const zeroReason = capitalTaxReason(zero)
+    if (zeroReason) return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), zeroReason)
+    return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  }
   let upper = evaluate(hi)
   if (upper.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, hi, iterations, cashResidual(upper), 'unfundedTransaction')
@@ -295,11 +361,16 @@ function requiredFireAssetsImpl(inputs: Inputs): SolverResult<number> {
     if (result.success) { hi = mid; upper = result }
     else lo = mid
   }
+  // `upper` is the snapshot the reported threshold is taken from; its own
+  // disposal tax must be verified, not just the user's opening plan.
+  const answerReason = capitalTaxReason(upper)
+  if (answerReason)
+    return outcome('unsupported', null, assumptions, hi, iterations, cashResidual(upper), answerReason)
   return outcome('solved', hi, assumptions, hi, iterations, upper.finalNetWorth)
 }
 
-export function requiredFireAssets(inputs: Inputs): SolverResult<number> {
-  try { return requiredFireAssetsImpl(inputs) }
+export function requiredFireAssets(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return requiredFireAssetsImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['fireYearSnapshot', 'proportionalCurrentAccountAllocation', 'fixedBenefits', 'noFurtherSavings'], null, 0, null, 'projectionError') }
 }
 
@@ -352,6 +423,11 @@ export function rankCandidates<T>(
         return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
       if (result.terminalTaxStatus === 'unsupported')
         return { ...common, status: 'unsupported', reason: 'terminalTax' }
+      // A recommended strategy or start age is also a positive funding claim,
+      // so it needs the same verified disposal tax as the quick answers.
+      const capitalReason = capitalTaxReason(result)
+      if (capitalReason)
+        return { ...common, status: 'unsupported', reason: capitalReason }
       if (objective === 'maxSpending' && solver?.status !== 'solved')
         return { ...common, status: solver?.status ?? 'unsupported', reason: solver?.reason }
       const metric = objective === 'maxSpending' ? solver!.value : result.estateValue
@@ -374,7 +450,7 @@ export function rankCandidates<T>(
  * to life expectancy. Real dollars — constant spending already keeps pace
  * with inflation because returns are inflation-adjusted.
  */
-function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
+function maxSustainableSpendingImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
@@ -391,6 +467,12 @@ function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   if (!zero.success) return outcome('infeasible', null, assumptions, 0, iterations, cashResidual(zero), 'zeroSpendingFails')
   if (hasUnverifiedLockedWithdrawals(inputs))
     return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
+  // A positive ceiling or a funded zero bound needs the same withheld limits.
+  if (nonRegScalarUnverified(inputs, canonical))
+    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'nominalCapitalBasis')
+  const zeroCapitalReason = capitalTaxReason(zero)
+  if (zeroCapitalReason)
+    return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), zeroCapitalReason)
   let lo = 0
   let hi = 50000
   let lower = zero
@@ -418,11 +500,15 @@ function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   // The annual withdrawal loop treats sub-cent shortfalls as zero. Preserve
   // the exact, already-verified zero candidate at that numerical floor.
   if (lo < 0.01) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  // The ceiling's own plan must not depend on an unverified disposal tax.
+  const winnerCapitalReason = capitalTaxReason(lower)
+  if (winnerCapitalReason)
+    return outcome('unsupported', null, assumptions, lo, iterations, cashResidual(lower), winnerCapitalReason)
   return outcome('solved', lo, assumptions, lo, iterations, lower.finalNetWorth)
 }
 
-export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
-  try { return maxSustainableSpendingImpl(inputs) }
+export function maxSustainableSpending(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return maxSustainableSpendingImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation'], null, 0, null, 'projectionError') }
 }
 
@@ -445,6 +531,7 @@ export function compareStrategies(
 
 export interface TargetReport {
   status: 'supported' | 'unsupported'
+  reason?: 'investmentPropertySale'
   /** investable assets entering the FIRE year */
   assetsAtFire: number
   /** age at which the target is first reached if savings continue; null = never */
@@ -454,9 +541,9 @@ export interface TargetReport {
 /**
  * Goal check: does accumulation alone reach the target? Savings are assumed
  * to continue past the planned FIRE age until the target is hit (delayed
- * FIRE). Planned property sales count toward investable assets (mirroring
- * the projection: principal residence tax-free, investment-property gain
- * taxed); unsold real estate does not. `assetsAtFire` is the total entering
+ * FIRE). Planned principal-residence sales count toward investable assets;
+ * investment-property sales need a verified tax event and are unsupported.
+ * Unsold real estate does not count. `assetsAtFire` is the total entering
  * the FIRE year (plus any sale landing that year), before any further
  * savings or growth. Whether the money then lasts for life is a separate
  * question (the other modes).
@@ -464,6 +551,11 @@ export interface TargetReport {
 export function targetReport(inputs: Inputs, target: number): TargetReport {
   if (inputs.principalResidence?.mode === 'planned')
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
+  // This shortcut has no CCA/land-building history or a nominal owner tax
+  // settlement for investment-property dispositions. Withhold *all* target
+  // numbers rather than reusing its stale real-value ACB/fee approximation.
+  if ((inputs.investmentProperties ?? []).some(property => property.sellAtAge != null))
+    return { status: 'unsupported', reason: 'investmentPropertySale', assetsAtFire: Number.NaN, reachedAge: null }
   if (runProjection(inputs).unfundedObligations.length > 0)
     return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
   // This shortcut has no source/use ledger for a negative-equity discharge.
@@ -481,16 +573,12 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     : null
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
-    acb: Math.min(p.acb, p.value),
     appreciation: p.appreciation,
-    sellAtAge: p.sellAtAge,
-    sold: false,
     rent: p.annualRent ?? 0,
     mortgage: p.mortgage
       ? buildDebtStream([{ kind: 'mortgage', ...p.mortgage }], horizon, inflation)
       : null,
   }))
-  const persons = inputs.partner ? 2 : 1
   const marginal = inputs.accumulationMarginalRate ?? 0.35
 
   let lockedBal = inputs.lockedRetirement?.balance ?? 0
@@ -507,22 +595,6 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
       bal.nonReg += sale.proceeds
       prValue = 0
       prSold = true
-    }
-    for (const p of ips) {
-      if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
-        const sale = yearStartSale(p.value, p.mortgage, yearIdx)
-        if (sale.cashNeeded > 0)
-          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
-        const taxableGain = Math.max(0, p.value - p.acb) * 0.5
-        const gainTax = age < inputs.fireAge
-          ? taxableGain * marginal
-          : incomeTax(taxableGain / persons, inputs.province) * persons
-        if (gainTax > sale.proceeds)
-          return { status: 'unsupported', assetsAtFire: Number.NaN, reachedAge: null }
-        bal.nonReg += sale.proceeds - gainTax
-        p.value = 0
-        p.sold = true
-      }
     }
     // assets entering FIRE plus any sale landing that year — snapshot before
     // this iteration adds a further year of savings and growth (recording at
@@ -569,9 +641,7 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
         benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
     }
     bal.nonReg += benefits * (1 - marginal)
-    const releasedPayments =
-      releasedMortgagePayment(prMortgage, prSold, yearIdx) +
-      ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
+    const releasedPayments = releasedMortgagePayment(prMortgage, prSold, yearIdx)
     for (const t of ACCOUNT_TYPES) {
       bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)

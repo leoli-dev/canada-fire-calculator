@@ -145,26 +145,26 @@ describe('debts in the projection', () => {
   })
 
   it('a mortgage outstanding at FIRE raises the FIRE number', () => {
-    const withDebt = requiredFireAssets({ ...base, debts: [mortgage] })
-    const without = requiredFireAssets(base)
+    const liquidOnly = { ...base, balances: { tfsa: 200_000, rrsp: 200_000, nonReg: 0 },
+      nonRegBook: 0, savingsSplit: { tfsa: .5, rrsp: .5, nonReg: 0 } }
+    const withDebt = requiredFireAssets({ ...liquidOnly, debts: [mortgage] })
+    const without = requiredFireAssets(liquidOnly)
+    expect(withDebt.status).toBe('solved')
+    expect(without.status).toBe('solved')
     expect(withDebt.value!).toBeGreaterThan(without.value!)
   })
 
-  it('FIRE-number solver appreciates real estate to the FIRE year like it rolls debts', () => {
-    // a property sold at FIRE is worth 10 years of appreciation more than today,
-    // so the required portfolio must be smaller than if it never grew
+  it('FIRE-number solver still appreciates a principal residence to the FIRE year', () => {
+    const liquidOnly = { ...base, balances: { tfsa: 200_000, rrsp: 200_000, nonReg: 0 },
+      nonRegBook: 0, savingsSplit: { tfsa: .5, rrsp: .5, nonReg: 0 } }
     const appreciating = requiredFireAssets({
-      ...base,
-      investmentProperties: [
-        { value: 500000, acb: 300000, appreciation: 0.03, sellAtAge: base.fireAge },
-      ],
+      ...liquidOnly, principalResidence: { value: 500_000, appreciation: .03, sellAtAge: base.fireAge },
     })
     const flat = requiredFireAssets({
-      ...base,
-      investmentProperties: [
-        { value: 500000, acb: 300000, appreciation: 0, sellAtAge: base.fireAge },
-      ],
+      ...liquidOnly, principalResidence: { value: 500_000, appreciation: 0, sellAtAge: base.fireAge },
     })
+    expect(appreciating.status).toBe('solved')
+    expect(flat.status).toBe('solved')
     expect(appreciating.value!).toBeLessThan(flat.value!)
   })
 
@@ -212,8 +212,8 @@ describe('property-linked mortgages', () => {
     expectCad(sale.balances.nonReg, 465_000, .01)
     expectCad(projection.rows[1].balances.nonReg, 465_000, .01)
     const report = targetReport(input, 1_000_000)
-    expect(report.status).toBe('supported')
-    expectCad(report.assetsAtFire, 465_000, .01)
+    expect(report).toMatchObject({ status: 'unsupported', reason: 'investmentPropertySale', reachedAge: null })
+    expect(Number.isNaN(report.assetsAtFire)).toBe(true)
   })
 
   it('keeps unpaid sale-gain tax as a funding gap instead of negative cash', () => {
@@ -412,9 +412,7 @@ describe('property-linked mortgages', () => {
     expect(projection.rows.map((row) => row.rent)).toEqual([0, 0, 0])
     expect(projection.rows[0].balances.nonReg).toBeCloseTo(116_000, 2) // $100k sale + 20% × ($40k savings + $40k freed payment)
     const report = targetReport(input, 1_000_000)
-    expect(report.status).toBe('supported')
-    expect(report.assetsAtFire).toBeCloseTo(projection.rows[1].balances.tfsa +
-      projection.rows[1].balances.rrsp + projection.rows[1].balances.nonReg, 2)
+    expect(report).toMatchObject({ status: 'unsupported', reason: 'investmentPropertySale', reachedAge: null })
   })
 
   it('a funded negative-equity sale is explicit unsupported in the legacy target shortcut', () => {
@@ -506,7 +504,7 @@ describe('property-linked mortgages', () => {
     expect(unmortgaged.finalNetWorth - mortgaged.finalNetWorth).toBeGreaterThan(50000)
   })
 
-  it('requiredFireAssets and targetReport roll a property mortgage forward consistently', () => {
+  it('quick FIRE and target answers with an investment-property sale stay unavailable with or without its mortgage', () => {
     const withMortgage = requiredFireAssets({
       ...base,
       investmentProperties: [
@@ -519,7 +517,8 @@ describe('property-linked mortgages', () => {
         { value: 600000, acb: 400000, appreciation: 0, sellAtAge: base.fireAge },
       ],
     })
-    expect(withMortgage.value!).toBeGreaterThan(withoutMortgage.value!)
+    expect(withMortgage).toMatchObject({ status: 'unsupported', value: null, reason: 'investmentPropertySale' })
+    expect(withoutMortgage).toMatchObject({ status: 'unsupported', value: null, reason: 'investmentPropertySale' })
 
     const report = targetReport(
       {
@@ -539,6 +538,7 @@ describe('property-linked mortgages', () => {
       },
       99_999_999,
     )
-    expect(report.assetsAtFire).toBeLessThan(reportWithout.assetsAtFire)
+    expect(report).toMatchObject({ status: 'unsupported', reason: 'investmentPropertySale', reachedAge: null })
+    expect(reportWithout).toMatchObject({ status: 'unsupported', reason: 'investmentPropertySale', reachedAge: null })
   })
 })

@@ -11,6 +11,7 @@ it('has native failure, bound and assumption messages in all three languages', (
     'solverReason_plannedPurchase', 'solverReason_unfundedTransaction',
     'solverReason_zeroSpendingFails', 'solverReason_noFailingUpperBound',
     'solverReason_projectionError', 'solverReason_invalidField',
+    'solverReason_nominalCapitalBasis', 'solverReason_investmentPropertySale',
   ] as const
   for (const key of keys) {
     expect(en[key]).toBeTruthy()

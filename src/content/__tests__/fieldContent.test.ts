@@ -12,9 +12,9 @@ import { FIELD_CONTENT_VERSION, FIELD_CONTENT, contentForField, contentForPage, 
 
 describe('FE-13 A shared field content contract', () => {
   it('covers each real FE-14 shared field exactly once with a real guided and professional binding', () => {
-    expect(FIELD_CONTENT_VERSION).toBe(1)
+    expect(FIELD_CONTENT_VERSION).toBe(2)
     expect(FIELD_CONTENT.map(content => content.fieldId).sort()).toEqual(Object.keys(fieldRegistry).sort())
-    expect(new Set(FIELD_CONTENT.map(content => content.guidedPageId)).size).toBe(FIELD_CONTENT.length)
+    expect(new Set(FIELD_CONTENT.map(content => content.fieldId)).size).toBe(FIELD_CONTENT.length)
     for (const content of FIELD_CONTENT) {
       const page = pageById(content.guidedPageId)
       expect(page?.fieldBindings, content.fieldId).toContain(content.fieldId)
@@ -22,7 +22,7 @@ describe('FE-13 A shared field content contract', () => {
       expect(fieldRegistry[content.fieldId].professionalBinding).toBe(content.fieldId)
       expect(fieldRegistry[content.fieldId].capability).toBe('supported')
       expect(contentForField(content.fieldId)).toBe(content)
-      expect(contentForPage(content.guidedPageId)).toBe(content)
+      expect(contentForPage(content.guidedPageId)?.guidedPageId).toBe(content.guidedPageId)
       expect(content.unknownKey).toBe('fieldContent.unknownBlocksResults')
       expect(content.unitKey).toBe(`fieldContent.unit${fieldRegistry[content.fieldId].unit === 'years' ? 'Years' : fieldRegistry[content.fieldId].unit === 'cad' ? 'Cad' : 'AnnualCad'}`)
       expect(parseField(content.fieldId, '')).toEqual({ status: 'draft', reason: 'empty' })

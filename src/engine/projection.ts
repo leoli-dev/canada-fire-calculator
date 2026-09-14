@@ -28,6 +28,7 @@ import { pensionPaid } from './pensionPaid'
 export { pensionPaid } from './pensionPaid'
 import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale } from './debts'
 import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
+import { disposeHolding, nominalFactor, toNominal, toReal } from './capitalGains'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
 export type ReturnSampler = (age: number, account: AccountType) => number
@@ -295,6 +296,8 @@ export function pensionStartAge(inputs: Inputs): number {
 
 export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?: InputsV2): ProjectionResult {
   const bal: Record<AccountType, number> = { ...inputs.balances }
+  // ACB stays in nominal dollars; liquid balances and public charts remain in
+  // base-year purchasing power until the annual-state consumer migration.
   let nonRegBook = inputs.nonRegBook
   const pensionAge = pensionStartAge(inputs)
   const partner = inputs.partner ?? null
@@ -304,6 +307,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   let finalYearPeople: TerminalTaxPerson[] = []
   const unfundedObligations: FundingGap[] = []
   let taxUnsupportedReason: string | undefined
+  let investmentSaleTaxUnsupported = false
+  let nonRegLossTaxUnverified = false
   if (canonical && inputs.fireAge > inputs.currentAge && canonical.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
     taxUnsupportedReason = 'working RRIF minimum requires BE-14 B cash and tax settlement'
 
@@ -373,6 +378,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   const ips = (inputs.investmentProperties ?? []).map((p) => ({
     value: p.value,
     acb: p.acb,
+    saleExpenses: p.saleExpenses ?? 0,
     appreciation: p.appreciation,
     sellAtAge: p.sellAtAge,
     sold: false,
@@ -412,6 +418,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let housingFunding: YearRow['housingFunding'] = null
     const yearGaps: FundingGap[] = []
     const yearIdx = age - inputs.currentAge
+    const factor = nominalFactor(inflation, yearIdx)
+    const nonRegBookReal = () => toReal(nonRegBook, factor)
+    // A purchase or housing-funding disposal can realize an unverified loss in
+    // either phase; the funding planner reports it so no year's tax is called
+    // exact when the loss treatment is unknown.
+    const noteFundingLoss = (allocation: { nonRegLossRealized?: boolean } | null | undefined) => {
+      if (!allocation?.nonRegLossRealized) return
+      taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
+      nonRegLossTaxUnverified = true
+    }
     if (plannedPurchase && yearIdx > buyYearIdx! && unpaidPlannedMortgage > 0) {
       const sellingAtOpen = plannedPurchase.sellAtAge !== null && age >= plannedPurchase.sellAtAge && prValue > 0
       unpaidPlannedMortgage *= sellingAtOpen ? 1 : (1 + plannedMortgageRate) / (1 + inflation)
@@ -443,7 +459,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     if (plannedPurchase && yearIdx === buyYearIdx) {
       if (phase === 'accumulation') {
         const plan = planPurchaseFunding(plannedPurchase, age, {
-          balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook,
+          balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           annualSavings: inputs.annualSavings,
           firstYearCost: (prMortgage?.payment[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange,
@@ -451,7 +467,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
-          nonRegBook = plan.allocation.nonRegBook
+          noteFundingLoss(plan.allocation)
+          nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax = plan.allocation.withdrawalTax
           purchaseNonRegTaxable = plan.allocation.nonRegTaxable
           purchaseRrspWithdrawal = plan.allocation.rrspWithdrawal
@@ -472,7 +489,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       } else {
         const purchaseYearRent = ips.reduce((sum, p) => sum + (p.value > 0 ? p.rent : 0), 0)
         const plan = planPurchaseFunding(plannedPurchase, age, {
-          balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook,
+          balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent),
           annualSavings: 0, firstYearCost: 0,
@@ -480,7 +497,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
-          nonRegBook = plan.allocation.nonRegBook
+          noteFundingLoss(plan.allocation)
+          nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           purchaseTaxable = plan.allocation.taxableWithdrawal
           purchaseTaxPaid = plan.allocation.withdrawalTax
           purchaseNonRegTaxable = plan.allocation.nonRegTaxable
@@ -520,17 +538,18 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     const settleSale = (sale: ReturnType<typeof yearStartSale>, field: string) => {
       if (sale.proceeds > 0) {
         bal.nonReg += sale.proceeds
-        nonRegBook += sale.proceeds
+        nonRegBook += toNominal(sale.proceeds, factor)
       }
       if (sale.cashNeeded > 0) {
         const plan = planAnnualHousingFunding(age, sale.cashNeeded, {
-          balances: bal, nonRegBook, annualSavings: 0,
+          balances: bal, nonRegBook: nonRegBookReal(), annualSavings: 0,
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0),
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
-          nonRegBook = plan.allocation.nonRegBook
+          noteFundingLoss(plan.allocation)
+          nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           if (phase === 'accumulation') dpAccumTax += plan.allocation.withdrawalTax
           else {
             purchaseTaxable += plan.allocation.taxableWithdrawal
@@ -555,8 +574,18 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
       const p = ips[propertyIdx]
       if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
-        const sale = yearStartSale(p.value, p.mortgage, yearIdx)
-        const gain = Math.max(0, p.value - p.acb) * CAPITAL_GAINS_INCLUSION
+        investmentSaleTaxUnsupported = true
+        taxUnsupportedReason ??= 'investment-property sale requires verified building/land and CCA tax facts'
+        if (p.saleExpenses > p.value)
+          taxUnsupportedReason ??= 'projected selling expenses exceed property value'
+        const effectiveExpenses = Math.min(p.saleExpenses, p.value)
+        const sale = yearStartSale(p.value - effectiveExpenses, p.mortgage, yearIdx)
+        const disposal = disposeHolding({ marketValue: toNominal(p.value, factor), acb: p.acb },
+          toNominal(p.value, factor), toNominal(effectiveExpenses, factor))
+        if (disposal.status !== 'ok') taxUnsupportedReason ??= disposal.reason
+        // The legacy cash preview can still run, but a loss without verified
+        // CCA/land-building and superficial-loss facts is not a tax deduction.
+        const gain = disposal.status === 'ok' ? toReal(disposal.value.gain * CAPITAL_GAINS_INCLUSION, factor) : 0
         extraTaxable += gain
         saleGainsTaxable += gain
         settleSale(sale, `investmentProperties.${propertyIdx}.sellAtAge`)
@@ -587,12 +616,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // shortage remains a visible liability rather than negative cash.
     for (const obligation of saleTaxObligations) {
       const plan = planAnnualHousingFunding(age, obligation.amount, {
-        balances: bal, nonRegBook, annualSavings: freeSavingsForSaleTax,
+        balances: bal, nonRegBook: nonRegBookReal(), annualSavings: freeSavingsForSaleTax,
         marginalRate: inputs.accumulationMarginalRate ?? 0.35,
       })
       if (plan.allocation) {
         Object.assign(bal, plan.allocation.balances)
-        nonRegBook = plan.allocation.nonRegBook
+        noteFundingLoss(plan.allocation)
+        nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
         savingsAfterSaleTax -= plan.allocation.firstYearCostFromSavings
         freeSavingsForSaleTax -= plan.allocation.firstYearCostFromSavings
         dpAccumTax += plan.allocation.withdrawalTax
@@ -694,12 +724,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         // Reuse the purchase cash ledger for every later installment. Annual
         // savings arrive before the payment; only then are liquid assets sold.
         const plan = planAnnualHousingFunding(age, housingCost, {
-          balances: bal, nonRegBook, marginalRate: inputs.accumulationMarginalRate ?? 0.35,
+          balances: bal, nonRegBook: nonRegBookReal(), marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           annualSavings: savingsAfterSaleTax,
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
-          nonRegBook = plan.allocation.nonRegBook
+          noteFundingLoss(plan.allocation)
+          nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax += plan.allocation.withdrawalTax
           purchaseNonRegTaxable += plan.allocation.nonRegTaxable
           purchaseRrspWithdrawal += plan.allocation.rrspWithdrawal
@@ -743,20 +774,20 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       for (const t of ACCOUNT_TYPES) {
         const c = allocation.voluntary[t]
         bal[t] += c
-        if (t === 'nonReg') nonRegBook += c
+        if (t === 'nonReg') nonRegBook += toNominal(c, factor)
       }
       const marginal = inputs.accumulationMarginalRate ?? 0.35
       // working years: distributions taxed at the assumed marginal rate,
       // with the tax paid out of the account
       const dragTax = dist * marginal
       bal.nonReg -= dragTax
-      nonRegBook += dist - dragTax
+      nonRegBook += toNominal(dist - dragTax, factor)
       // net rent, taxed at the same marginal rate (after any mortgage
       // interest deduction), is saved on top of annualSavings (whose hint
       // tells the user to exclude rent)
       const rentTax = (rent - rentMortgageInterest) * marginal
       bal.nonReg += rent - rentTax
-      nonRegBook += rent - rentTax
+      nonRegBook += toNominal(rent - rentTax, factor)
       // benefits already being collected pre-FIRE are saved after tax at the
       // working marginal rate (no clawback/GIS modelling here — employment
       // income is unknown, so this leans simple; high earners drawing OAS
@@ -765,7 +796,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       const benefitBase = cpp + oasGross + pension
       const benefitTax = benefitBase * marginal
       bal.nonReg += benefitBase - benefitTax
-      nonRegBook += benefitBase - benefitTax
+      nonRegBook += toNominal(benefitBase - benefitTax, factor)
       oas = oasGross
       tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax
       const marginalPurchaseTax = inputs.accumulationMarginalRate ?? 0.35
@@ -849,7 +880,13 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       } else {
         steps = STRATEGY_ORDER[inputs.strategy].map((account) => ({ account }))
       }
-      const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBook) / bal.nonReg) : 0
+      // The legacy withdrawal solver accepts a nonnegative gain fraction, so a
+      // holding whose cost exceeds its value is previewed as tax-free. The fact
+      // only becomes a tax limit once a withdrawal actually settles the loss:
+      // merely holding an unrealized loss is not a disposition. A sub-dollar
+      // balance or withdrawal is drain residue, not a real disposal.
+      const nonRegLossPreview = bal.nonReg > 1 && nonRegBookReal() > bal.nonReg + 1e-8
+      const gainFraction = bal.nonReg > 0 ? Math.max(0, (bal.nonReg - nonRegBookReal()) / bal.nonReg) : 0
 
       // The purchase-year down payment has already been paid from opening
       // assets. The ordinary annual solver funds living costs, loan payments,
@@ -865,6 +902,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       )
       if (out.taxUnsupportedReason) taxUnsupportedReason ??= out.taxUnsupportedReason
       byPersonTax = out.byPersonTax
+      if (nonRegLossPreview && out.withdrawals.nonReg > 1) {
+        taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
+        nonRegLossTaxUnverified = true
+      }
       if (canonical && (saleGainsTaxable || purchaseTaxable || purchaseNonRegTaxable || rentMortgageInterest))
         taxUnsupportedReason ??= 'property sale, purchase or rental mortgage tax needs BE-14 B event settlement'
       withdrawals = out.withdrawals
@@ -929,20 +970,27 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         }
       }
 
-      // reduce ACB proportionally to the non-registered withdrawal
+      // Reduce ACB proportionally to the non-registered withdrawal. The gross
+      // withdrawal funds its own tax, so it can exceed the balance; a disposal
+      // never removes more than the whole pool, and a drained pool keeps no
+      // cost residue that would later read as an unrealized loss.
       if (withdrawals.nonReg > 0 && bal.nonReg > 0) {
-        nonRegBook -= (withdrawals.nonReg / bal.nonReg) * nonRegBook
+        const disposed = Math.min(1, withdrawals.nonReg / bal.nonReg)
+        nonRegBook = disposed >= 1 ? 0 : nonRegBook * (1 - disposed)
       }
       for (const t of ACCOUNT_TYPES) bal[t] -= withdrawals[t]
+      if (bal.nonReg < 0.005) bal.nonReg = 0
 
       // surplus cash (e.g. forced RRIF minimum above spending) reinvests taxed
       const surplus = netCash - spendTarget
       if (surplus > 0) {
         bal.nonReg += surplus
-        nonRegBook += surplus
+        nonRegBook += toNominal(surplus, factor)
       }
-      // reinvested distributions raise the ACB (already taxed this year)
-      nonRegBook += dist
+      // The distribution is taxable but not spendable in evaluate(): it is
+      // automatically reinvested inside the account. Add its full amount to
+      // ACB once; the cash tax is funded separately by the withdrawal solve.
+      nonRegBook += toNominal(dist, factor)
     }
 
     for (const t of ACCOUNT_TYPES) {
@@ -1000,8 +1048,18 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   const finalNetWorth = bal.tfsa + bal.rrsp + bal.nonReg + fhsaBal + lockedBal + prValue + ipTotal - finalDebt
   // deemed disposition at death: RRSP/RRIF fully taxable, gains half taxable;
   // TFSA and the principal residence pass tax-free
-  const nonRegGain = bal.nonReg > 0 ? bal.nonReg - nonRegBook : 0
-  const ipGain = ips.reduce((s, p) => s + (p.value > 0 ? p.value - p.acb : 0), 0)
+  const finalFactor = nominalFactor(inflation, inputs.lifeExpectancy - inputs.currentAge)
+  const terminalNonReg = bal.nonReg > 0
+    ? disposeHolding({ marketValue: toNominal(bal.nonReg, finalFactor), acb: nonRegBook }, toNominal(bal.nonReg, finalFactor)) : null
+  const terminalProperties = ips.filter(p => p.value > 0).map(p =>
+    disposeHolding({ marketValue: toNominal(p.value, finalFactor), acb: p.acb }, toNominal(p.value, finalFactor)))
+  const terminalBasisUnknown = canonical?.accounts.some(account => account.kind === 'nonReg' && account.balance > 0 && account.acb.status !== 'known') ?? false
+  const terminalCapitalUnsupported = terminalNonReg?.status !== 'ok' && terminalNonReg !== null ||
+    terminalBasisUnknown || terminalProperties.some(item => item.status !== 'ok') ||
+    ips.some(p => p.value > 0) || investmentSaleTaxUnsupported
+  const nonRegGain = terminalNonReg?.status === 'ok' ? toReal(terminalNonReg.value.gain, finalFactor)
+    : bal.nonReg > 0 ? bal.nonReg - toReal(nonRegBook, finalFactor) : 0
+  const ipGain = ips.reduce((sum, p) => sum + (p.value > 0 ? p.value - toReal(p.acb, finalFactor) : 0), 0)
   const terminal = finalYearPeople.length > 0 ? terminalTax({
     province: inputs.province,
     people: finalYearPeople,
@@ -1019,6 +1077,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   return {
     taxCapability: { status: canonical && !taxUnsupportedReason && inputs.fireAge <= inputs.currentAge ? 'person' : 'legacyEstimate',
       reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
+    capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale'
+      : nonRegLossTaxUnverified ? 'nonRegisteredLoss' : undefined,
     rows,
     unfundedObligations,
     success: depletedAge === null,
@@ -1026,7 +1086,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     finalNetWorth,
     // The terminal allocator still calls legacy incomeTax(), whose Quebec
     // Schedule F/K approximations cannot establish owner-specific closing tax.
-    terminalTaxStatus: terminal && rows.at(-1)?.phase !== 'accumulation' && inputs.province !== 'QC' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
+    terminalTaxStatus: terminal && !terminalCapitalUnsupported && rows.at(-1)?.phase !== 'accumulation' && inputs.province !== 'QC' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
     estateTax: terminal?.incrementalTax ?? Number.NaN,
     terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
     terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,
