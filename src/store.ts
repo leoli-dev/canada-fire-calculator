@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Partner, Pension } from './engine'
-import { blendedReturn, blendedVolatility, provenanceForTypedAmount, refreshPensionProvenance } from './engine'
+import { blendedReturn, blendedVolatility, provenanceForTypedAmount, refreshPensionProvenanceReport } from './engine'
 import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
-import { applyRewrittenBenefitAnswers, changeAccountPresence, changeIntent, editField, reconcileDirectFields, rewrittenBenefitAnswers } from './forms/planCommands'
+import { applyBenefitAnswerMeta, changeAccountPresence, changeIntent, editField, reconcileDirectFields, writtenBenefitFields, type RewrittenBenefitField } from './forms/planCommands'
+import type { PensionBenefitRewrite } from './engine'
 import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
@@ -292,15 +293,25 @@ function reconcileLegacyInputs(state: Store, inputs: Inputs) {
   }
 }
 
+/** What one `store.set` did to the recorded benefit amounts. */
+interface PensionProvenanceEdit {
+  inputs: Inputs
+  /** The amount boxes this patch wrote: the user owns those numbers. */
+  written: RewrittenBenefitField[]
+  /** The amounts the dependency pass re-derived because a premise moved. */
+  rewritten: PensionBenefitRewrite[]
+}
+
 /**
  * BE-39 A. Invalidate the CPP/QPP and OAS figures whose premise the edit just
  * moved. It has to run here: `store.set` only shallow-merges a patch, so before
  * this a stale `cppWork` survived a `fireAge` change untouched. A patch that
  * carries an explicit provenance record wins (the estimator's Apply); a patch
  * that changes an amount with no provenance is a manual fact; anything else
- * keeps the recorded source. Only an estimator amount is ever rewritten.
+ * keeps the recorded source. Only an estimator amount is ever rewritten, and
+ * only the pass itself says so.
  */
-function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<Inputs>): Inputs {
+function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<Inputs>): PensionProvenanceEdit {
   const partnerPatched = patch.partner
   const selfPatch = { ...patch }
   delete selfPatch.partner
@@ -336,13 +347,19 @@ function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<In
   }
   // The dependency pass runs after the source is decided, so a manual edit is
   // never re-priced and an estimator edit is made coherent with the new age.
-  return refreshPensionProvenance(withSelf)
+  // It reports what it rewrote; `written` is what this patch wrote directly.
+  const refreshed = refreshPensionProvenanceReport(withSelf)
+  return {
+    inputs: refreshed.inputs,
+    written: writtenBenefitFields(state, patch),
+    rewritten: refreshed.rewritten,
+  }
 }
 
 /**
- * BE-39 A: the rewritten-amount bookkeeping lives in `planCommands`, so
- * `store.set` and the field registry's `editField` apply exactly the same rule
- * to `answerMeta`.
+ * BE-39 A: the rewritten-amount bookkeeping lives in `planCommands`
+ * (`applyBenefitAnswerMeta`), so `store.set` and the field registry's
+ * `editField` apply exactly the same rule to `answerMeta`.
  */
 
 export const useStore = create<Store>()(
@@ -379,12 +396,15 @@ export const useStore = create<Store>()(
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
           const merged = { ...s.inputs, ...patch }
           // BE-39 A: record what changed the benefit amount, then invalidate
-          // anything whose retirement-age premise the edit moved.
-          const inputs = applyPensionProvenance(s.inputs, merged, patch)
-          const reconciled = reconcileLegacyInputs(s, inputs)
+          // anything whose retirement-age premise the edit moved. The metadata
+          // reacts to the pass's own rewrite report plus the amounts this patch
+          // wrote directly — never to a before/after value diff.
+          const provenance = applyPensionProvenance(s.inputs, merged, patch)
+          const reconciled = reconcileLegacyInputs(s, provenance.inputs)
           const shared = reconcileDirectFields(s, patch, reconciled.inputs)
-          const rewritten = rewrittenBenefitAnswers(s.inputs, reconciled.inputs)
-          const answerMeta = applyRewrittenBenefitAnswers(shared.answerMeta, rewritten)
+          const answerMeta = applyBenefitAnswerMeta(
+            shared.answerMeta, provenance.rewritten, provenance.written,
+          )
           return {
             ...reconciled,
             draftByField: shared.draftByField,

@@ -71,6 +71,14 @@ export interface PensionAmountDerivation {
   provenance: PensionAmountProvenance
   /** The recorded premise no longer matched the plan when this was derived. */
   stale: boolean
+  /**
+   * BE-39 A / B3: this pass replaced the stored amount with its own derivation
+   * because the retirement age the amount was recorded under moved. The signal
+   * is explicit and premise-based on purpose — a caller must never infer an
+   * engine rewrite from "the number changed", because a direct edit changes the
+   * number too and must keep its user provenance.
+   */
+  rewritten: boolean
 }
 
 /** A number read off a saved plan without inventing a source for it. */
@@ -108,6 +116,7 @@ export function deriveCppAmount(
       value: current,
       provenance: { ...recorded, premisesNeedReview: needsReview || undefined },
       stale: needsReview,
+      rewritten: false,
     }
   }
   // A work-history estimate is defined at 65 and today's dollars, so the
@@ -130,6 +139,9 @@ export function deriveCppAmount(
       premisesNeedReview: undefined,
     },
     stale,
+    // The amount this pass just derived replaces the stored one under a moved
+    // retirement age: that is an engine rewrite, whatever the arithmetic did.
+    rewritten: stale,
   }
 }
 
@@ -153,6 +165,9 @@ export function deriveOasAmount(
       value: current,
       provenance: { ...recorded, premisesNeedReview: stale || undefined },
       stale,
+      // OAS residence cannot be re-priced from a retirement age, so this pass
+      // never replaces an OAS amount: it flags the premise instead.
+      rewritten: false,
     }
   }
   const needsReview = statementPremiseNeedsReview(recorded, retirementAge)
@@ -160,6 +175,7 @@ export function deriveOasAmount(
     value: current,
     provenance: { ...recorded, premisesNeedReview: needsReview || undefined },
     stale: needsReview,
+    rewritten: false,
   }
 }
 
@@ -214,7 +230,9 @@ export function pensionAmountWarning(
 /**
  * Apply the dependency rules to one person's CPP/QPP and OAS figures.
  * `retirementAge` is that person's current retirement age, so a FIRE-age change
- * is the trigger. Only estimator CPP amounts change value.
+ * is the trigger. Only estimator CPP amounts change value. `cppRewritten` /
+ * `oasRewritten` report which amounts *this pass* replaced, so a caller labels
+ * the metadata from the pass's own signal rather than from a value diff.
  */
 export function syncPensionAmounts(person: {
   cppAnnualAt65: number
@@ -226,22 +244,51 @@ export function syncPensionAmounts(person: {
   oasAnnualAt65: number
   cppAmountSource?: PensionAmountProvenance
   oasAmountSource?: PensionAmountProvenance
+  cppRewritten: boolean
+  oasRewritten: boolean
 } {
   // A plan that never recorded a source stays that way: this function must not
   // manufacture an `unknown` record just because it ran. A record is written
   // only where one already existed (or where the amount was re-priced).
   const cpp = person.cppAmountSource === undefined
-    ? { value: person.cppAnnualAt65, provenance: undefined }
+    ? { value: person.cppAnnualAt65, provenance: undefined, rewritten: false }
     : deriveCppAmount(person.cppAnnualAt65, person.cppAmountSource, retirementAge)
   const oas = person.oasAmountSource === undefined
-    ? { value: person.oasAnnualAt65, provenance: undefined }
+    ? { value: person.oasAnnualAt65, provenance: undefined, rewritten: false }
     : deriveOasAmount(person.oasAnnualAt65, person.oasAmountSource, retirementAge)
   return {
     cppAnnualAt65: cpp.value,
     oasAnnualAt65: oas.value,
     cppAmountSource: cpp.provenance,
     oasAmountSource: oas.provenance,
+    cppRewritten: cpp.rewritten,
+    oasRewritten: oas.rewritten,
   }
+}
+
+/** The four recorded benefit amounts whose provenance the UI surfaces. */
+export type PensionBenefitField =
+  | 'cppAnnualAt65'
+  | 'oasAnnualAt65'
+  | 'partner.cppAnnualAt65'
+  | 'partner.oasAnnualAt65'
+
+/** One amount the dependency pass replaced with its own derivation. */
+export interface PensionBenefitRewrite {
+  field: PensionBenefitField
+  /** The number the pass put there, for the review pages to show. */
+  assumptionValue: number
+}
+
+/** The plan after the dependency pass, plus what that pass rewrote. */
+export interface PensionProvenanceRefresh {
+  inputs: Inputs
+  /**
+   * The amounts this pass re-derived because their retirement-age premise
+   * moved. Empty when the edit did not move a premise, which is why a direct
+   * amount edit — whose value also changes — never lands here.
+   */
+  rewritten: PensionBenefitRewrite[]
 }
 
 /**
@@ -250,8 +297,13 @@ export function syncPensionAmounts(person: {
  * `cppWork`-style snapshot cannot survive a `fireAge` change. It only *writes*
  * an `estimator`-sourced amount; manual and statement values pass through with
  * their flag recomputed.
+ *
+ * It also reports which amounts it wrote: the store and the field registry turn
+ * that report into `answerMeta`, so an engine-replaced amount can never be
+ * confused with one the user typed (the heuristic that diffed the values did
+ * exactly that).
  */
-export function refreshPensionProvenance(inputs: Inputs): Inputs {
+export function refreshPensionProvenanceReport(inputs: Inputs): PensionProvenanceRefresh {
   const self = syncPensionAmounts(inputs, inputs.fireAge)
   // The engine keeps only one FIRE age for the household, so a partner's
   // retirement age is the age they have reached when the primary retires —
@@ -262,22 +314,35 @@ export function refreshPensionProvenance(inputs: Inputs): Inputs {
   const partner = inputs.partner
     ? syncPensionAmounts(inputs.partner, partnerRetirementAge)
     : null
+  const rewritten: PensionBenefitRewrite[] = []
+  if (self.cppRewritten) rewritten.push({ field: 'cppAnnualAt65', assumptionValue: self.cppAnnualAt65 })
+  if (self.oasRewritten) rewritten.push({ field: 'oasAnnualAt65', assumptionValue: self.oasAnnualAt65 })
+  if (partner?.cppRewritten) rewritten.push({ field: 'partner.cppAnnualAt65', assumptionValue: partner.cppAnnualAt65 })
+  if (partner?.oasRewritten) rewritten.push({ field: 'partner.oasAnnualAt65', assumptionValue: partner.oasAnnualAt65 })
   return {
-    ...inputs,
-    cppAnnualAt65: self.cppAnnualAt65,
-    oasAnnualAt65: self.oasAnnualAt65,
-    cppAmountSource: self.cppAmountSource ?? inputs.cppAmountSource,
-    oasAmountSource: self.oasAmountSource ?? inputs.oasAmountSource,
-    partner: inputs.partner && partner
-      ? {
-          ...inputs.partner,
-          cppAnnualAt65: partner.cppAnnualAt65,
-          oasAnnualAt65: partner.oasAnnualAt65,
-          cppAmountSource: partner.cppAmountSource ?? inputs.partner.cppAmountSource,
-          oasAmountSource: partner.oasAmountSource ?? inputs.partner.oasAmountSource,
-        }
-      : inputs.partner,
+    inputs: {
+      ...inputs,
+      cppAnnualAt65: self.cppAnnualAt65,
+      oasAnnualAt65: self.oasAnnualAt65,
+      cppAmountSource: self.cppAmountSource ?? inputs.cppAmountSource,
+      oasAmountSource: self.oasAmountSource ?? inputs.oasAmountSource,
+      partner: inputs.partner && partner
+        ? {
+            ...inputs.partner,
+            cppAnnualAt65: partner.cppAnnualAt65,
+            oasAnnualAt65: partner.oasAnnualAt65,
+            cppAmountSource: partner.cppAmountSource ?? inputs.partner.cppAmountSource,
+            oasAmountSource: partner.oasAmountSource ?? inputs.partner.oasAmountSource,
+          }
+        : inputs.partner,
+    },
+    rewritten,
   }
+}
+
+/** The plan after the dependency pass; see `refreshPensionProvenanceReport`. */
+export function refreshPensionProvenance(inputs: Inputs): Inputs {
+  return refreshPensionProvenanceReport(inputs).inputs
 }
 
 /** The provenance that an `Apply` from the CPP estimator records. */

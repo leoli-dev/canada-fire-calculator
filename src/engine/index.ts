@@ -41,6 +41,7 @@ export {
   pensionAmountWarning,
   syncPensionAmounts,
   refreshPensionProvenance,
+  refreshPensionProvenanceReport,
   deriveCppAmount,
   deriveOasAmount,
   cppEstimatorProvenance,
@@ -56,6 +57,9 @@ export {
   type PensionAmountReading,
   type PensionAmountDerivation,
   type PensionAmountWarning,
+  type PensionBenefitField,
+  type PensionBenefitRewrite,
+  type PensionProvenanceRefresh,
 } from './pensionProvenance'
 export { rrifMinFactor } from './rrif'
 export { validateInputs, type ValidationIssue, type Severity } from './validate'

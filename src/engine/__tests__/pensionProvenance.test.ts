@@ -20,6 +20,7 @@ import {
   provenanceForTypedAmount,
   reconfirmStatementAmount,
   refreshPensionProvenance,
+  refreshPensionProvenanceReport,
   statementProvenance,
 } from '../index'
 import { refreshCanonicalFromLegacy } from '../migration'
@@ -265,6 +266,46 @@ describe('BE-39 A: a typed figure is never silently reverted', () => {
     expect(provenanceForTypedAmount(undefined)?.source).toBe('manual')
     const unknown: PensionAmountProvenance = { source: 'unknown', sourceYear: null, basis: 'annual', ageBasis: null, dollarBasis: 'today' }
     expect(provenanceForTypedAmount(unknown)?.source).toBe('manual')
+  })
+})
+
+describe('BE-39 A / B3: the pass reports its own rewrites, never a value diff', () => {
+  it('flags a rewrite when the retirement-age premise moved, even if the amount is unchanged', () => {
+    // `startWorkAge` 25 credits at most 39 years, so the estimator returns the
+    // same number at 64 and at 70 while the premise genuinely moved. A value
+    // diff cannot see this rewrite; the pass's own premise-based signal must.
+    const at64 = deriveCppAmount(0, cppEstimate(64, 25, 1), 64)
+    const at70 = deriveCppAmount(at64.value, at64.provenance, 70)
+    expect(estimateCppAt65(25, 64, 1)).toBe(estimateCppAt65(25, 70, 1))
+    expect(at70.value).toBe(at64.value)
+    expect(at70.stale).toBe(true)
+    expect(at70.rewritten).toBe(true)
+  })
+
+  it('does not report a rewrite when the premise did not move', () => {
+    const applied = deriveCppAmount(0, cppEstimate(45, 25, 1), 45)
+    expect(applied.rewritten).toBe(false)
+    const settled = deriveCppAmount(applied.value, applied.provenance, 45)
+    expect(settled.rewritten).toBe(false)
+  })
+
+  it('never reports a rewrite for a manual, statement or unrecorded amount', () => {
+    expect(deriveCppAmount(12_345, manualProvenance(2026), 55).rewritten).toBe(false)
+    const statement = statementProvenance(2026, { basis: 'annual', ageBasis: 65, dollarBasis: 'today' }, 45)
+    expect(deriveCppAmount(14_000, statement, 55).rewritten).toBe(false)
+    const unknown: PensionAmountProvenance = { source: 'unknown', sourceYear: null, basis: 'annual', ageBasis: null, dollarBasis: 'today' }
+    expect(deriveCppAmount(12_000, unknown, 55).rewritten).toBe(false)
+    // OAS residence cannot be re-priced from an age: it is flagged, not rewritten
+    expect(deriveOasAmount(9_024, oasEstimate(45, 40), 55).rewritten).toBe(false)
+  })
+
+  it('reports exactly the amounts the plan-level pass re-derived', () => {
+    const inputs: Inputs = { ...base(), fireAge: 55, cppAnnualAt65: 9_278, cppAmountSource: cppEstimate(45, 25, 1) }
+    expect(refreshPensionProvenanceReport(inputs).rewritten)
+      .toEqual([{ field: 'cppAnnualAt65', assumptionValue: Math.round(estimateCppAt65(25, 55, 1)) }])
+    // an edit that moves no premise reports nothing: the settled plan is stable
+    const settled = refreshPensionProvenance(inputs)
+    expect(refreshPensionProvenanceReport(settled).rewritten).toEqual([])
   })
 })
 

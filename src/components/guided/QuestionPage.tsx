@@ -449,7 +449,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
           retirementAge={inputs.fireAge}
           onProvenance={(cppAmountSource) => set({ cppAmountSource })}
           onReconfirm={() => set(reconfirmStatementAmount(inputs.cppAnnualAt65, inputs.cppAmountSource, inputs.fireAge))} />
-        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ cppAnnualAt65, cppAmountSource, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
+        {/* BE-39 A / B3: the Apply is an explicit user action on this amount,
+            and `store.set` now records it as `confirmed`/`user` itself — the
+            same rule professional mode gets. No guided-only repair is needed. */}
+        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ cppAnnualAt65, cppAmountSource, cppWork }) }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} />
         <BenefitClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ cppStartAge })} />
@@ -466,7 +469,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
             const next = reconfirmStatementAmount(inputs.oasAnnualAt65, inputs.oasAmountSource, inputs.fireAge)
             set({ oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource })
           }} />
-        <OasEstimator retireAge={inputs.fireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ oasAnnualAt65, oasAmountSource }); markAnswers(['oasAnnualAt65'], 'confirmed') }} />
+        <OasEstimator retireAge={inputs.fireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ oasAnnualAt65, oasAmountSource }) }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} />
         <BenefitClaimAgeGuide field="oasStartAge" value={inputs.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ oasStartAge })} />
@@ -483,7 +486,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
             const next = reconfirmStatementAmount(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource, partnerRetireAge)
             set({ partner: { ...inputs.partner!, cppAnnualAt65: next.cppAnnualAt65, cppAmountSource: next.cppAmountSource } })
           }} />
-        <CppEstimator retireAge={partnerRetireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppAmountSource, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'confirmed') }} />
+        <CppEstimator retireAge={partnerRetireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppAmountSource, cppWork } }) }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
         <BenefitClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
@@ -500,7 +503,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
             const next = reconfirmStatementAmount(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource, partnerRetireAge)
             set({ partner: { ...inputs.partner!, oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource } })
           }} />
-        <OasEstimator retireAge={partnerRetireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ partner: { ...inputs.partner!, oasAnnualAt65, oasAmountSource } }); markAnswers(['partner.oasAnnualAt65'], 'confirmed') }} />
+        <OasEstimator retireAge={partnerRetireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ partner: { ...inputs.partner!, oasAnnualAt65, oasAmountSource } }) }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
         <BenefitClaimAgeGuide field="partner.oasStartAge" value={inputs.partner!.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
