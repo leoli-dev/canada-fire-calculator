@@ -83,7 +83,7 @@ function crossYearInputs(): Inputs {
 }
 
 /** One 10,000 premium paid in 2025 by the partner to a spousal plan owned by self. */
-function crossYearPlan(inputs: Inputs): { plan: InputsV2; selfId: string; partnerId: string; accountId: string } {
+function crossYearPlan(inputs: Inputs, premiumYear = 2025, premiumAmount = 10_000): { plan: InputsV2; selfId: string; partnerId: string; accountId: string } {
   const plan = migratePersistedPlan({ inputs }, 10, BASE_YEAR)
   plan.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false,
     ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
@@ -98,8 +98,8 @@ function crossYearPlan(inputs: Inputs): { plan: InputsV2; selfId: string; partne
   account.openedYear = { status: 'known', value: 2020 }
   plan.spousalHistory = { [account.id]: { status: 'complete' } }
   plan.taxProfile = { spouseSupported: { status: 'known', value: false }, pensionSplit: null }
-  plan.contributions = [{ id: 'p2025', accountId: account.id, contributorId: partner.id, calendarYear: 2025,
-    amount: 10_000, deductionYear: null, provenance: { origin: 'user', sourceYear: 2025 } }]
+  plan.contributions = [{ id: `p${premiumYear}`, accountId: account.id, contributorId: partner.id, calendarYear: premiumYear,
+    amount: premiumAmount, deductionYear: null, provenance: { origin: 'user', sourceYear: premiumYear } }]
   return { plan, selfId: self.id, partnerId: partner.id, accountId: account.id }
 }
 
@@ -271,5 +271,19 @@ describe('BE-12 B an attributed premium is never reused in a later projected yea
     // the trivial "nothing was attributed" case.
     expect(cents(registeredShare(first.rows[0], partnerId))).toBe(10_000)
     expect(cents(registeredShare(second.rows[0], partnerId))).toBe(10_000)
+  })
+
+  it('seeds a premium recorded for a year after the base year, attributing it once in its own year', () => {
+    const inputs = crossYearInputs()
+    const { plan, partnerId } = crossYearPlan(inputs, BASE_YEAR + 1, 10_000)
+    const result = runProjection(inputs, undefined, plan)
+    // The window is {contribution year, +1, +2}, so a 2027 premium cannot
+    // attribute a 2026 payment — the ledger seeds it but the window test keeps
+    // it out — and it attributes once in 2027, then never again.
+    expect(cents(registeredShare(result.rows[0], partnerId))).toBe(0)
+    expect(cents(registeredShare(result.rows[1], partnerId))).toBe(10_000)
+    expect(cents(registeredShare(result.rows[2], partnerId))).toBe(0)
+    const cumulative = result.rows.reduce((sum, row) => sum + registeredShare(row, partnerId), 0)
+    expect(cents(cumulative)).toBe(10_000)
   })
 })
