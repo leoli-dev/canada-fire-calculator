@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cppAnnual, oasAnnual, scanBenefitTiming, type Inputs, type RankedCandidate } from '../engine'
+import { inputsCppAnnual, inputsOasAnnual, scanBenefitTiming, type Inputs, type RankedCandidate } from '../engine'
 import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
@@ -33,7 +33,12 @@ export function TimingCard({ inputs }: { inputs: Inputs }) {
         <th>{dwz ? t('maxSpendingCol') : t('estateValue')}</th><th>{t('colDelta')}</th><th></th></tr></thead>
       <tbody>{rows.map((row) => {
         const age = which === 'cpp' ? row.value.cppStartAge : row.value.oasStartAge
-        const annual = which === 'cpp' ? cppAnnual(inputs.cppAnnualAt65, age, inputs.province === 'QC' ? 72 : 70) : oasAnnual(inputs.oasAnnualAt65, age)
+        // BE-39 A: the same shared annual-benefit function the projection and
+        // the scan that produced this row use — never a second copy of the
+        // formula, which previously omitted the early-claim dilution relief.
+        const annual = which === 'cpp'
+          ? inputsCppAnnual(inputs, age, inputs.province, inputs.fireAge)
+          : inputsOasAnnual(inputs, age)
         const isCurrent = age === currentAge
         const delta = row.metric !== null && current?.metric !== null && current?.metric !== undefined ? row.metric - current.metric : null
         return <tr key={age} className={isCurrent ? 'current-row' : ''}>

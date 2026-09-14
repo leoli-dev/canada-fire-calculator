@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Partner, Pension } from './engine'
-import { blendedReturn, blendedVolatility } from './engine'
+import { blendedReturn, blendedVolatility, manualProvenance, refreshPensionProvenance } from './engine'
 import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
@@ -292,6 +292,61 @@ function reconcileLegacyInputs(state: Store, inputs: Inputs) {
   }
 }
 
+/**
+ * BE-39 A. Invalidate the parts of a CPP/QPP or OAS figure whose premise the
+ * edit just moved.
+ *
+ * The rule has to be applied here, at the one place every edit funnels through
+ * — `store.set` only shallow-merges a patch, so before this a stale `cppWork`
+ * (and any other derived benefit input) survived a `fireAge` change untouched.
+ *
+ * A patch that carries an explicit provenance record wins: that is the
+ * estimator's `Apply`. A patch that changes an *amount* without provenance is a
+ * user typing the number, which is a manual fact. Anything else keeps the
+ * recorded source. Only an `estimator`-sourced amount is ever rewritten.
+ */
+function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<Inputs>): Inputs {
+  const partnerPatched = patch.partner
+  const selfPatch = { ...patch }
+  delete selfPatch.partner
+  const withSelf: Inputs = { ...inputs }
+  if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined && inputs.cppAnnualAt65 !== state.cppAnnualAt65)
+    withSelf.cppAmountSource = manualProvenance(new Date().getFullYear())
+  if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined && inputs.oasAnnualAt65 !== state.oasAnnualAt65)
+    withSelf.oasAmountSource = manualProvenance(new Date().getFullYear())
+  // A partner patch is a whole-record replacement, so it can carry its own
+  // provenance; when it only moves the amount, record that as manual too.
+  if (partnerPatched && inputs.partner) {
+    const before = state.partner
+    const partner = { ...inputs.partner }
+    if (partnerPatched.cppAmountSource === undefined && before && partner.cppAnnualAt65 !== before.cppAnnualAt65)
+      partner.cppAmountSource = manualProvenance(new Date().getFullYear())
+    if (partnerPatched.oasAmountSource === undefined && before && partner.oasAnnualAt65 !== before.oasAnnualAt65)
+      partner.oasAmountSource = manualProvenance(new Date().getFullYear())
+    withSelf.partner = partner
+  }
+  // The dependency pass runs after the source is decided, so a manual edit is
+  // never re-priced and an estimator edit is made coherent with the new age.
+  return refreshPensionProvenance(withSelf)
+}
+
+/**
+ * The answers whose stored *value* was rewritten by the dependency pass, so
+ * their metadata stops claiming a user confirmed a number the engine has since
+ * replaced. A statement amount never lands here: its value is not touched.
+ */
+function rewrittenBenefitAnswers(
+  before: Inputs,
+  after: Inputs,
+): { field: 'cppAnnualAt65' | 'partner.cppAnnualAt65'; assumptionValue?: number }[] {
+  const fields: { field: 'cppAnnualAt65' | 'partner.cppAnnualAt65'; assumptionValue?: number }[] = []
+  if (after.cppAnnualAt65 !== before.cppAnnualAt65)
+    fields.push({ field: 'cppAnnualAt65', assumptionValue: after.cppAnnualAt65 })
+  if (after.partner && before.partner && after.partner.cppAnnualAt65 !== before.partner.cppAnnualAt65)
+    fields.push({ field: 'partner.cppAnnualAt65', assumptionValue: after.partner.cppAnnualAt65 })
+  return fields
+}
+
 export const useStore = create<Store>()(
   persist(
     (set) => ({
@@ -324,16 +379,26 @@ export const useStore = create<Store>()(
               (!!oldLocked && !!newLocked && oldLocked.owner !== newLocked.owner))
           const householdChanged = patch.partner !== undefined && Boolean(s.inputs.partner) !== Boolean(patch.partner)
           const ownerAnswer = s.answerMeta['lockedRetirement.owner']
-          const inputs = { ...s.inputs, ...patch }
+          const merged = { ...s.inputs, ...patch }
+          // BE-39 A: record what changed the benefit amount, then invalidate
+          // anything whose retirement-age premise the edit moved.
+          const inputs = applyPensionProvenance(s.inputs, merged, patch)
           const reconciled = reconcileLegacyInputs(s, inputs)
           const shared = reconcileDirectFields(s, patch, reconciled.inputs)
+          const rewritten = rewrittenBenefitAnswers(s.inputs, reconciled.inputs)
+          const answerMeta = rewritten.length === 0 ? shared.answerMeta : (() => {
+            const next = { ...shared.answerMeta }
+            for (const { field, assumptionValue } of rewritten)
+              next[field] = { status: 'estimated', origin: 'default', updatedAt: new Date().toISOString(), assumptionValue }
+            return next
+          })()
           return {
             ...reconciled,
             draftByField: shared.draftByField,
             questionAnswers: shared.questionAnswers ?? s.questionAnswers,
             answerMeta: (ownerChanged || householdChanged) && ownerAnswer
-              ? { ...shared.answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
-              : shared.answerMeta,
+              ? { ...answerMeta, 'lockedRetirement.owner': { ...ownerAnswer, status: 'unknown' as const, updatedAt: new Date().toISOString() } }
+              : answerMeta,
           }
         })
       },

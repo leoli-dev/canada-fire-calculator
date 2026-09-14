@@ -42,6 +42,59 @@ export interface CppWork {
 }
 
 /**
+ * BE-39 A. The source of one recorded CPP/QPP or OAS figure and the premises
+ * the amount is expressed in. The app previously could not tell an
+ * estimator-derived amount from a hand-entered statement value, so a
+ * retirement-age change either left an estimate silently stale or silently
+ * overwrote a recorded fact.
+ */
+export type PensionAmountSource = 'manual' | 'statement' | 'estimator' | 'unknown'
+
+/**
+ * `'unknown'` means no source was ever recorded — an older saved plan, or a
+ * value carried over from the pre-v11 schema. It is never rewritten as
+ * `'estimator'`, because nothing established that a formula produced it.
+ *
+ * The amount fields are the *unit contract*: what the recorded number means.
+ * The engine stores annual, age-65-basis, today's-dollars figures. A
+ * statement value entered as `1000`, `monthly`, at age `65` is recorded as
+ * `basis: 'monthly'`, `ageBasis: 65`, and converted to 12,000 exactly once —
+ * the recorded premise is kept so the conversion can be checked and redone.
+ */
+export interface PensionAmountProvenance {
+  source: PensionAmountSource
+  /** The year the statement/estimate information is from; null = not given. */
+  sourceYear: number | null
+  /** Whether the recorded figure was stated monthly or annually. */
+  basis: 'monthly' | 'annual'
+  /**
+   * The age the recorded amount is stated at. `null` means "the age-65
+   * basis". When a statement states an amount at the person's actual claim
+   * age (say 60), the claiming factor is already inside the number and must
+   * not be applied a second time.
+   */
+  ageBasis: number | null
+  /** `today` = today's purchasing power; `nominal` = dollars of `sourceYear`. */
+  dollarBasis: 'today' | 'nominal'
+  /** What an estimator-derived amount assumed, so it can be recomputed. */
+  premises?: {
+    /** The plan's retirement age at apply time — the stale-able premise. */
+    retirementAge: number
+    /** CPP/QPP: age full-time work began, and career-average YMPE ratio. */
+    startWorkAge?: number
+    avgEarningsRatio?: number
+    /** OAS: years of Canadian residence by 65 (from age 18). */
+    residenceYearsBy65?: number
+  }
+  /**
+   * Set on a `statement` value whose retirement-age premise no longer matches
+   * the plan. The amount is *not* changed; the flag asks the user to
+   * re-confirm the premise against the statement.
+   */
+  premisesNeedReview?: boolean
+}
+
+/**
  * Expected income after FIRE beyond the portfolio (Barista FIRE: part-time
  * work, a small business, selling things). Taxable as ordinary income;
  * treated as employment income for the GIS exemption.
@@ -86,6 +139,9 @@ export interface Partner {
   oasStartAge: number
   oasAnnualAt65: number
   cppWork?: CppWork | null
+  /** BE-39 A: where the partner's CPP/QPP and OAS figures came from. */
+  cppAmountSource?: PensionAmountProvenance
+  oasAmountSource?: PensionAmountProvenance
   pension?: Pension | null
 }
 
@@ -269,12 +325,16 @@ export interface Inputs {
   cppStartAge: number
   /** user's estimated CPP/QPP annual benefit if taken at 65, today's dollars */
   cppAnnualAt65: number
+  /** BE-39 A: where `cppAnnualAt65` came from (manual / statement / estimator). */
+  cppAmountSource?: PensionAmountProvenance
   /** work history from the estimator; refines the early-claim dilution */
   cppWork?: CppWork | null
   /** OAS start age, 65–70 */
   oasStartAge: number
   /** OAS annual benefit at 65, today's dollars */
   oasAnnualAt65: number
+  /** BE-39 A: where `oasAnnualAt65` came from (manual / statement / estimator). */
+  oasAmountSource?: PensionAmountProvenance
   /** how retirement spending is funded */
   strategy: Strategy
   /** meltdownPaced only: how far to fill the RRSP before capping (default bracket1) */

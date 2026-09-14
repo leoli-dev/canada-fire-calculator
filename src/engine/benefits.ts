@@ -14,6 +14,41 @@ export function cppAnnual(annualAt65: number, startAge: number, maxAge = 70): nu
 }
 
 /**
+ * The start-age adjustment itself, as a multiplier over the age-65 amount.
+ * `cppAnnual` is this factor times the amount, so a caller can state an amount
+ * on a different basis without ever applying the same adjustment twice.
+ */
+export function cppAgeFactor(startAge: number, maxAge = 70): number {
+  const months = (Math.min(maxAge, Math.max(60, startAge)) - 65) * 12
+  return months < 0 ? 1 + months * 0.006 : 1 + months * 0.007
+}
+
+/** OAS: no early start; +0.6%/month deferred past 65 (cap 70). */
+export function oasAgeFactor(startAge: number): number {
+  const months = (Math.min(70, Math.max(65, startAge)) - 65) * 12
+  return 1 + months * 0.006
+}
+
+/**
+ * BE-39 A: an amount recorded on a basis other than 65 carries whatever factor
+ * belongs to its own basis. The projection must multiply it by the ratio
+ * between the claim age and the basis age — not by the full claim factor. An
+ * amount already stated at its claim age (basis === claim) gets a ratio of 1,
+ * which is what stops a statement's early-claim amount from being reduced a
+ * second time.
+ *
+ * A `null` basis is the engine's ordinary "amount at 65" contract, so it takes
+ * the full claim-age factor.
+ */
+export function cppAnnualAtBasis(amount: number, basisAge: number | null, startAge: number, maxAge = 70): number {
+  return amount * (cppAgeFactor(startAge, maxAge) / cppAgeFactor(basisAge ?? 65, maxAge))
+}
+
+export function oasAnnualAtBasis(amount: number, basisAge: number | null, startAge: number): number {
+  return amount * (oasAgeFactor(startAge) / oasAgeFactor(basisAge ?? 65))
+}
+
+/**
  * Claiming before 65 shortens the contributory period (18 → claim age), and
  * the 17% general dropout with it: at 60 the divisor is ~35 years, not 39,
  * so a FIRE retiree's zero-income years dilute less. Returns the multiplier
@@ -38,8 +73,7 @@ export function earlyClaimDilutionRelief(
 
 /** OAS: no early start; +0.6%/month deferred past 65 (cap 70). */
 export function oasAnnual(annualAt65: number, startAge: number): number {
-  const months = (Math.min(70, Math.max(65, startAge)) - 65) * 12
-  return annualAt65 * (1 + months * 0.006)
+  return annualAt65 * oasAgeFactor(startAge)
 }
 
 // 2026 figures — update annually. CPP max rises each year with the

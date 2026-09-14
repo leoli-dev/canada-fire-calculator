@@ -1,4 +1,4 @@
-import type { AccountType, CppWork, Goal, Inputs, MeltdownCap, Pension, Province, Strategy } from './types'
+import type { AccountType, CppWork, Goal, Inputs, MeltdownCap, Pension, PensionAmountProvenance, Province, Strategy } from './types'
 
 export type EntityId = string
 export type Known<T> = { status: 'known'; value: T } | { status: 'unknown'; reason: string }
@@ -37,6 +37,9 @@ export interface Person {
   pensionAnnual: number
   pension: Pension | null
   cppWork: CppWork | null
+  /** BE-39 A: where this person's CPP/QPP and OAS figures came from. */
+  cppAmountSource?: PensionAmountProvenance
+  oasAmountSource?: PensionAmountProvenance
   provenance: Record<string, Provenance>
 }
 export const ageReachedInYear = (person: Person, baseYear: number, year: number) => person.ageInBaseYear + year - baseYear
