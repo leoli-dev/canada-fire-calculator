@@ -658,3 +658,4 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .qc-month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin: 10px 0; }
 .qc-month-grid label { min-width: 0; }
 .qc-month-grid select { width: 100%; min-width: 0; }
+.qc-change-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
