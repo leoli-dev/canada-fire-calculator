@@ -509,6 +509,93 @@ async function seedCoupleFhsa(page: Page, options: { balance: number; guided?: b
   await page.reload()
 }
 
+/**
+ * Round 4 blocking defect: a migrated legacy plan records its FHSA opening
+ * answer only in the legacy `openedYearsAgo` field, because migration leaves the
+ * canonical opening year unknown (`14` is a years-ago count, not a calendar
+ * year — `migration.ts` deliberately refuses to invent one). Any tax-panel edit
+ * must leave that recorded answer untouched.
+ */
+async function seedLegacyOpenedYearsAgo(page: Page, openedYearsAgo: number, options: { guided?: boolean } = {}) {
+  await page.goto('/')
+  await page.evaluate(async ({ openedYearsAgo, guided }) => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 40_000, retirementSpending: 40_000,
+      savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0,
+      fhsa: { balance: 100000, annualContribution: 4000, openedYearsAgo }, partner: null }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs, canonical, entryMode: guided ? 'guided' : 'professional', guidedView: guided ? 'results' : 'questionnaire',
+      inputRevision: 0, resultRevision: guided ? 0 : null,
+    } }))
+  }, { openedYearsAgo, guided: options.guided ?? false })
+  await page.reload()
+}
+
+/**
+ * The recorded legacy answer and the validation it drives, read from the live
+ * store. `validationKeys` is what `validateInputs` says about
+ * `fhsa.openedYearsAgo` after the edit, so an erased error is visible here.
+ */
+const legacyFhsaAnswer = (page: Page) => page.evaluate(async () => {
+  const { useStore } = await import('/src/store.ts')
+  const { validateInputs } = await import('/src/engine/validate.ts')
+  const inputs = useStore.getState().inputs
+  const plan = useStore.getState().canonical
+  return {
+    openedYearsAgo: inputs.fhsa?.openedYearsAgo,
+    validationKeys: validateInputs(inputs)
+      .filter((issue: { field: string }) => issue.field === 'fhsa.openedYearsAgo')
+      .map((issue: { key: string }) => issue.key),
+    canonicalOpenedYear: plan?.accounts.find((account: { kind: string }) => account.kind === 'fhsa')?.openedYear ?? null,
+  }
+})
+
+/** Edit one unrelated field in the shared tax panel and blur, the reviewer's
+ * exact reproduction, and return the plan's answer afterwards. */
+async function editUnrelatedEarned(page: Page) {
+  const earned = page.getByTestId('earned-self')
+  await earned.fill('90000')
+  await earned.blur()
+  await expect(earned).toHaveValue('90000')
+  return legacyFhsaAnswer(page)
+}
+
+for (const guided of [false, true] as const) {
+  const mode = guided ? 'guided' : 'professional'
+  test(`${mode}: an unrelated panel edit preserves the recorded legacy FHSA opening age`, async ({ page }) => {
+    await seedLegacyOpenedYearsAgo(page, 14, { guided })
+    if (guided) await page.goto('/#/guided/income/income.taxFacts')
+    await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
+    // Precondition: migration carries the answer in the legacy field and leaves
+    // the canonical calendar year explicitly unknown.
+    const before = await legacyFhsaAnswer(page)
+    expect(before.openedYearsAgo).toBe(14)
+    expect(before.canonicalOpenedYear).toMatchObject({ status: 'unknown' })
+    // The reviewer's probe: 14 must survive an unrelated edit and blur.
+    const after = await editUnrelatedEarned(page)
+    expect(after.openedYearsAgo).toBe(14)
+    expect(after.canonicalOpenedYear).toMatchObject({ status: 'unknown' })
+  })
+
+  test(`${mode}: an unrelated panel edit does not erase valFhsaExpired`, async ({ page }) => {
+    await seedLegacyOpenedYearsAgo(page, 15, { guided })
+    if (guided) await page.goto('/#/guided/income/income.taxFacts')
+    await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
+    const before = await legacyFhsaAnswer(page)
+    expect(before.openedYearsAgo).toBe(15)
+    expect(before.validationKeys).toContain('valFhsaExpired')
+    const after = await editUnrelatedEarned(page)
+    expect(after.openedYearsAgo).toBe(15)
+    expect(after.validationKeys).toContain('valFhsaExpired')
+  })
+}
+
 /** The FHSA accounts and ownership facts the panel recorded in the stored plan. */
 const ownershipState = (page: Page) => page.evaluate(async () => {
   const { useStore } = await import('/src/store.ts')

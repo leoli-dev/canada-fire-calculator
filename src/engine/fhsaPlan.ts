@@ -1,4 +1,5 @@
 import type { Contribution, InputsV2 } from './model'
+import type { Fhsa } from './types'
 
 /**
  * BE-36 A: the one planned FHSA contribution per account.
@@ -64,4 +65,48 @@ export function plannedFhsaYearTotal(
   const scheduled = fhsaScheduledContributions(plan, accountId, year)
     .reduce((total, contribution) => total + nonnegative(contribution.amount), 0)
   return roundCents(Math.max(plannedFhsaContribution(plan, accountId), scheduled))
+}
+
+/**
+ * The one FHSA account the legacy form mirrors: migration emits this id for
+ * `input.fhsa`, and the shared tax panel writes the household's recorded
+ * accounts back onto it, so the legacy form's next rebuild produces the same
+ * account instead of dropping it.
+ */
+export const legacyFhsaAccountId = 'legacy:account:fhsa'
+
+const finiteOrNull = (value: number | null | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+
+/**
+ * The legacy form's single FHSA bucket, mirrored from the canonical accounts.
+ *
+ * The legacy interface has no unknown state, so this is the one place an
+ * unrecorded FHSA fact could be flattened into a concrete zero. It never does:
+ * `openedYearsAgo` is derived from the canonical calendar opening year only
+ * when that year is known; otherwise the recorded legacy years-ago answer is
+ * carried through untouched (the canonical account's own
+ * `openedYearsAgoAtBaseYear` is the second recorded source). A years-ago count
+ * is not a calendar year, and `0` would assert "opened this year" — a fact the
+ * plan does not hold. Only a plan that records neither source falls back to
+ * zero, which is what the legacy form itself starts from.
+ */
+export function legacyFhsaMirror(
+  plan: Pick<InputsV2, 'accounts' | 'baseYear' | 'contributions' | 'recurringContributions'>,
+  recordedOpenedYearsAgo: number | null | undefined,
+): Fhsa | null {
+  const accounts = plan.accounts.filter(account => account.kind === 'fhsa')
+  if (accounts.length === 0) return null
+  const mirrored = accounts.find(account => account.id === legacyFhsaAccountId) ?? accounts[0]
+  const recorded = finiteOrNull(recordedOpenedYearsAgo) ?? finiteOrNull(mirrored.openedYearsAgoAtBaseYear)
+  return {
+    // The balance is the household total across every FHSA account, so a
+    // recorded per-person split reconciles back onto both accounts instead of
+    // folding the partner's balance into the base one.
+    balance: roundCents(accounts.reduce((total, account) => total + account.balance, 0)),
+    annualContribution: plannedFhsaYearTotal(plan, mirrored.id, plan.baseYear),
+    openedYearsAgo: mirrored.openedYear.status === 'known'
+      ? Math.max(0, plan.baseYear - mirrored.openedYear.value)
+      : recorded ?? 0,
+  }
 }

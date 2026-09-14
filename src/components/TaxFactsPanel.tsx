@@ -5,7 +5,7 @@ import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonic
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
-import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from '../engine/fhsaPlan'
+import { fhsaPlanRowId, fhsaScheduledContributions, legacyFhsaMirror, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
@@ -470,17 +470,11 @@ export function TaxFactsPanel() {
     // edit, so a recorded FHSA has to exist there too; otherwise the next form
     // edit or mode switch would silently drop the account and its room row.
     // The legacy field is a mirror of the one recorded plan, never a second
-    // copy of it: it is written from the same accessor the panel box and the
-    // kernel read. The balance is the household total across every FHSA account,
-    // so a recorded per-person split reconciles back onto both accounts instead
-    // of folding the partner's balance into the base one.
-    const fhsaAccounts = draft.accounts.filter(account => account.kind === 'fhsa')
-    const fhsa = fhsaAccounts.find(account => account.id === 'legacy:account:fhsa') ?? fhsaAccounts[0]
-    const inputs = fhsa ? { ...state.inputs, fhsa: {
-      balance: roundCents(fhsaAccounts.reduce((total, account) => total + account.balance, 0)),
-      annualContribution: plannedFhsaYearTotal(draft, fhsa.id, draft.baseYear),
-      openedYearsAgo: fhsa.openedYear.status === 'known' ? Math.max(0, draft.baseYear - fhsa.openedYear.value) : 0,
-    } } : state.inputs
+    // copy of it, and `legacyFhsaMirror` is the whole write: it carries the
+    // household total across every FHSA account and preserves a recorded
+    // years-ago opening answer when the canonical opening year is unknown.
+    const mirroredFhsa = legacyFhsaMirror(draft, state.inputs.fhsa?.openedYearsAgo)
+    const inputs = mirroredFhsa ? { ...state.inputs, fhsa: mirroredFhsa } : state.inputs
     commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta,
       draftByField: state.draftByField })
   }

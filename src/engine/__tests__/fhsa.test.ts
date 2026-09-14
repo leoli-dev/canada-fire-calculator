@@ -15,12 +15,15 @@ import {
   type FhsaRoomRequest,
   type FhsaRoomYear,
 } from '../fhsa'
-import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaContribution, plannedFhsaYearTotal } from '../fhsaPlan'
+import { fhsaPlanRowId, fhsaScheduledContributions, legacyFhsaAccountId, legacyFhsaMirror, plannedFhsaContribution, plannedFhsaYearTotal } from '../fhsaPlan'
 import { plannedRrspLines } from '../rrspRoom'
 import { selectFhsaRules } from '../rules'
 import { assertCanonicalPlan } from '../modelValidation'
 import type { Account, InputsV2, Known, Provenance } from '../model'
-import { migratePersistedPlan } from '../migration'
+import type { Inputs } from '../types'
+import { migratePersistedPlan, refreshCanonicalFromLegacy } from '../migration'
+import { runProjection } from '../projection'
+import { validateInputs } from '../validate'
 import { DEFAULT_INPUTS } from '../../store'
 
 /**
@@ -571,5 +574,90 @@ describe('BE-36 A the two room ledgers never price each other\'s rows', () => {
     plan.recurringContributions.reverse()
     expect(plannedFhsaContribution(plan, fhsa.id)).toBe(8000)
     expect(plannedFhsaYearTotal(plan, fhsa.id, plan.baseYear)).toBe(8000)
+  })
+})
+
+/**
+ * Round 4 blocking defect: the panel's legacy mirror encoded an unknown FHSA
+ * opening year as `openedYearsAgo: 0`, which destroyed a migrated plan's
+ * recorded years-ago answer, erased `valFhsaExpired` and moved the legacy
+ * projection's FHSA→RRSP rollover. `legacyFhsaMirror` is the whole panel write
+ * path, so these tests exercise the same function the component calls.
+ */
+describe('BE-36 A the panel legacy mirror never turns an unknown opening year into zero', () => {
+  /** The reviewer's round-4 probe, through the real migration path. */
+  const legacyFhsaInputs = (openedYearsAgo: number): Inputs => ({
+    ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+    annualSavings: 40_000, retirementSpending: 40_000,
+    savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+    balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+    cppAnnualAt65: 0, oasAnnualAt65: 0,
+    fhsa: { balance: 100000, annualContribution: 4000, openedYearsAgo },
+  })
+  const mirroredRecordedAnswer = (openedYearsAgo: number) => {
+    const plan = refreshCanonicalFromLegacy(null, legacyFhsaInputs(openedYearsAgo))
+    return { plan, mirrored: legacyFhsaMirror(plan, plan.legacyProjection.fhsa?.openedYearsAgo) }
+  }
+
+  it('carries the recorded years-ago answer through while the opening year is unknown', () => {
+    for (const openedYearsAgo of [14, 15]) {
+      const { plan, mirrored } = mirroredRecordedAnswer(openedYearsAgo)
+      const account = plan.accounts.find(item => item.kind === 'fhsa')!
+      // Precondition and id contract: migration holds the years-ago count in
+      // the legacy field and deliberately leaves the calendar year unknown.
+      expect(account.id).toBe(legacyFhsaAccountId)
+      expect(account.openedYear).toEqual({ status: 'unknown', reason: 'legacy years-ago opening needs calendar-year confirmation' })
+      expect(mirrored).toEqual({ balance: 100000, annualContribution: 4000, openedYearsAgo })
+    }
+  })
+
+  it('keeps valFhsaExpired on the inputs the panel writes back', () => {
+    const { plan, mirrored } = mirroredRecordedAnswer(15)
+    const writtenBack = { ...plan.legacyProjection, fhsa: mirrored! }
+    expect(validateInputs({ ...writtenBack, fhsa: { ...mirrored!, openedYearsAgo: 0 } })
+      .filter(issue => issue.field === 'fhsa.openedYearsAgo')).toEqual([])
+    expect(validateInputs(writtenBack).filter(issue => issue.field === 'fhsa.openedYearsAgo').map(issue => issue.key))
+      .toEqual(['valFhsaExpired'])
+  })
+
+  it('keeps the legacy projection rollover age the mirror feeds', () => {
+    const inputs = { ...legacyFhsaInputs(14), fhsa: { balance: 100000, annualContribution: 0, openedYearsAgo: 14 } }
+    const rolloverAge = (fhsa: Inputs['fhsa']) => runProjection({ ...inputs, fhsa }).rows
+      .find((row, index) => index > 0 && row.fhsaBalance === 0)!.age
+    const plan = refreshCanonicalFromLegacy(null, inputs)
+    const mirrored = legacyFhsaMirror(plan, plan.legacyProjection.fhsa?.openedYearsAgo)!
+    // The reviewer measured 41 with the recorded 14 and 55 after the reset to 0.
+    expect(rolloverAge(inputs.fhsa)).toBe(41)
+    expect(rolloverAge(mirrored)).toBe(41)
+    expect(rolloverAge({ ...mirrored, openedYearsAgo: 0 })).toBe(55)
+  })
+
+  it('derives the answer from a known calendar year and clamps a future one', () => {
+    const plan = refreshCanonicalFromLegacy(null, legacyFhsaInputs(14))
+    const account = plan.accounts.find(item => item.kind === 'fhsa')!
+    account.openedYear = known(plan.baseYear - 5)
+    expect(legacyFhsaMirror(plan, 14)?.openedYearsAgo).toBe(5)
+    account.openedYear = known(plan.baseYear + 3)
+    expect(legacyFhsaMirror(plan, 14)?.openedYearsAgo).toBe(0)
+  })
+
+  it('falls back to the account-recorded years-ago, and only then to zero', () => {
+    const plan = refreshCanonicalFromLegacy(null, legacyFhsaInputs(14))
+    const account = plan.accounts.find(item => item.kind === 'fhsa')!
+    // An imported canonical plan carries no legacy field; the account's own
+    // recorded years-ago answer still stands.
+    expect(legacyFhsaMirror(plan, undefined)?.openedYearsAgo).toBe(14)
+    expect(legacyFhsaMirror(plan, null)?.openedYearsAgo).toBe(14)
+    // Only a plan that records neither source falls back to the legacy form's
+    // own starting value.
+    account.openedYearsAgoAtBaseYear = null
+    expect(legacyFhsaMirror(plan, undefined)?.openedYearsAgo).toBe(0)
+  })
+
+  it('mirrors the household total across a recorded per-person split', () => {
+    const plan = refreshCanonicalFromLegacy(null, legacyFhsaInputs(14))
+    const base = plan.accounts.find(item => item.kind === 'fhsa')!
+    plan.accounts.push({ ...base, id: `${base.id}:partner`, balance: 6000 })
+    expect(legacyFhsaMirror(plan, 14)).toEqual({ balance: 106000, annualContribution: 4000, openedYearsAgo: 14 })
   })
 })
