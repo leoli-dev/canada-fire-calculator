@@ -1053,6 +1053,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   return {
     taxCapability: { status: canonical && !taxUnsupportedReason && inputs.fireAge <= inputs.currentAge ? 'person' : 'legacyEstimate',
       reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
+    capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale' : undefined,
     rows,
     unfundedObligations,
     success: depletedAge === null,

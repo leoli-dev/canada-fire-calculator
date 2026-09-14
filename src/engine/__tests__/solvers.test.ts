@@ -32,11 +32,58 @@ const base: Inputs = {
 }
 
 describe('findEarliestFireAge', () => {
+  const zeroReturnPropertySale: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+    annualSavings: 0, retirementSpending: 40_000, inflation: .02,
+    balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+    returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+    nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+    investmentProperties: [{ value: 500_000, acb: 500_000, saleExpenses: 0, appreciation: 0,
+      annualRent: 0, sellAtAge: 60 }] }
+
   it('finds an age no later than a known-successful fireAge', () => {
     const earliest = findEarliestFireAge(base)
     expect(earliest.status).toBe('solved')
     expect(earliest.value!).toBeLessThanOrEqual(45)
     expect(runProjection({ ...base, fireAge: earliest.value! }).success).toBe(true)
+  })
+
+  it('withholds an age whose funding depends on an untaxed investment-property sale', () => {
+    // The zero-gain sale still lowers tax capability (land/building split and
+    // CCA recapture are unknown), so any age derived from it is unverified.
+    expect(runProjection({ ...zeroReturnPropertySale, fireAge: 60 }).capitalTaxLimit).toBe('investmentPropertySale')
+    expect(findEarliestFireAge(zeroReturnPropertySale))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'investmentPropertySale' })
+  })
+
+  it('withholds an age whose withdrawals rely on unverified non-registered loss treatment', () => {
+    const lossPlan: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 62,
+      annualSavings: 0, retirementSpending: 40_000, inflation: 0,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 700_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0, strategy: 'nonRegFirst' }
+    // The legacy solver clamps the realized loss to a zero gain, so the age
+    // it finds depends on a tax treatment nobody has verified.
+    expect(runProjection(lossPlan).success).toBe(true)
+    expect(findEarliestFireAge(lossPlan))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+    expect(maxSustainableSpending(lossPlan))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
+
+  it('withholds an age when the canonical cost basis is unknown behind a stale legacy scalar', () => {
+    const sameYear: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 62,
+      annualSavings: 0, retirementSpending: 40_000, inflation: 0,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 500_000,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0, strategy: 'nonRegFirst' }
+    const canonical = refreshCanonicalFromLegacy(null, sameYear)
+    canonical.accounts.find(account => account.kind === 'nonReg')!.acb = {
+      status: 'unknown', reason: 'broker record unavailable',
+    }
+    expect(findEarliestFireAge(sameYear, canonical))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+    // Without canonical the legacy scalar is still the last-valid value.
+    expect(findEarliestFireAge(sameYear).status).toBe('solved')
   })
 
   it('returns null when retirement is impossible', () => {
@@ -186,6 +233,18 @@ describe('maxSustainableSpending (die with zero)', () => {
     const paced = maxSustainableSpending({ ...base, strategy: 'meltdownPaced' })
     const tfsaFirst = maxSustainableSpending({ ...base, strategy: 'tfsaFirst' })
     expect(paced.value!).toBeGreaterThanOrEqual(tfsaFirst.value!)
+  })
+
+  it('withholds a spending ceiling that depends on an investment-property sale', () => {
+    const input: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 0, retirementSpending: 40_000, inflation: .02,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
+      investmentProperties: [{ value: 500_000, acb: 500_000, saleExpenses: 0, appreciation: 0,
+        annualRent: 0, sellAtAge: 60 }] }
+    expect(maxSustainableSpending(input))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'investmentPropertySale' })
   })
 })
 

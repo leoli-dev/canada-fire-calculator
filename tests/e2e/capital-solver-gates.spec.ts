@@ -114,4 +114,40 @@ for (const mode of ['guided', 'professional'] as const) {
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
+
+  test(`${mode} retirement age and spending ceiling withhold an untaxed property sale`, async ({ page }) => {
+    await seed(page, 'property', mode)
+    await page.getByRole('tab', { name: 'When can I retire?' }).click()
+    await expect(page.locator('.summary .verdict')).toContainText('investment-property sale')
+    await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
+    for (const [language, phrase] of [['FR', 'immeuble de placement'], ['中文', '投资房出售']] as const) {
+      await page.getByRole('button', { name: language, exact: true }).click()
+      await expect(page.locator('.summary .verdict')).toContainText(phrase)
+    }
+    await page.getByRole('button', { name: 'EN', exact: true }).click()
+    await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+      saved.state.inputs.goal = 'dieWithZero'
+      localStorage.setItem('fire-inputs', JSON.stringify(saved))
+    })
+    await page.reload()
+    await expect(page.locator('.summary')).toContainText('investment-property sale')
+    await expect(page.locator('.summary')).not.toContainText('Max sustainable after-tax spending')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  })
+
+  test(`${mode} retirement age withholds a known non-registered loss`, async ({ page }) => {
+    await seed(page, 'nonReg', mode)
+    await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
+      saved.state.inputs.nonRegBook = 700_000
+      saved.state.canonical.accounts.find((a: { kind: string }) => a.kind === 'nonReg').acb =
+        { status: 'known', value: 700_000 }
+      localStorage.setItem('fire-inputs', JSON.stringify(saved))
+    })
+    await page.reload()
+    await page.getByRole('tab', { name: 'When can I retire?' }).click()
+    await expect(page.locator('.summary .verdict')).toContainText('verified nominal cost history')
+    await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
+  })
 }

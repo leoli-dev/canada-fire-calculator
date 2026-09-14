@@ -52,6 +52,17 @@ const cashResidual = (result: ProjectionResult): number | null => {
   return Number.isFinite(gap) && gap > 0 ? -gap : null
 }
 
+/**
+ * A non-registered withdrawal's tax needs a verified cost basis. A known loss
+ * (cost above value) needs superficial-loss confirmation and an owner-specific
+ * carry ledger, and an unknown canonical basis is not a tax fact even while
+ * the legacy scalar still holds a last-valid value.
+ */
+const nonRegBasisUnverified = (inputs: Inputs, canonical?: InputsV2 | null): boolean =>
+  inputs.balances.nonReg > 0 && (inputs.nonRegBook > inputs.balances.nonReg + 1e-8 ||
+    (canonical?.accounts.some(account => account.kind === 'nonReg' && account.balance > 0 &&
+      account.acb.status !== 'known') ?? false))
+
 const hasNonFiniteNumber = (value: unknown): boolean => {
   if (typeof value === 'number') return !Number.isFinite(value)
   if (Array.isArray(value)) return value.some(hasNonFiniteNumber)
@@ -153,10 +164,13 @@ const invalidReason = (inputs: Inputs): string | null => {
 }
 
 /** Mode "when can I retire": calendar-year linear scan, with fixed benefit estimates. */
-function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
+function findEarliestFireAgeImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
+  // A retired age is only as verified as the withdrawal tax it relies on.
+  if (nonRegBasisUnverified(inputs, canonical))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   const cap = inputs.lifeExpectancy - 1
   let iterations = 0
   let lastProjection: ProjectionResult | null = null
@@ -169,6 +183,10 @@ function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
       unsupportedProjection ??= projection
       continue
     }
+    // The sale's tax facts are missing for the whole plan, not just one year.
+    if (projection.capitalTaxLimit)
+      return outcome('unsupported', null, assumptions, age, iterations,
+        cashResidual(projection), projection.capitalTaxLimit)
     if (projection.success)
       return hasUnverifiedLockedWithdrawals(inputs)
         ? outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
@@ -181,8 +199,8 @@ function findEarliestFireAgeImpl(inputs: Inputs): SolverResult<number> {
     lastProjection ? cashResidual(lastProjection) : null, 'noFeasibleAge')
 }
 
-export function findEarliestFireAge(inputs: Inputs): SolverResult<number> {
-  try { return findEarliestFireAgeImpl(inputs) }
+export function findEarliestFireAge(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return findEarliestFireAgeImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['fixedBenefitEstimates', 'currentSavingsPlan', 'calendarYearScan'], null, 0, null, 'projectionError') }
 }
 
@@ -395,12 +413,15 @@ export function rankCandidates<T>(
  * to life expectancy. Real dollars — constant spending already keeps pace
  * with inflation because returns are inflation-adjusted.
  */
-function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
+function maxSustainableSpendingImpl(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
   const assumptions = ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation']
   const invalid = invalidReason(inputs)
   if (invalid) return outcome('invalid', null, assumptions, null, 0, null, invalid)
   if (inputs.principalResidence?.mode === 'planned')
     return outcome('unsupported', null, assumptions, null, 0, null, 'plannedPurchase')
+  // The ceiling is only as verified as the withdrawal tax it relies on.
+  if (nonRegBasisUnverified(inputs, canonical))
+    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
   let iterations = 0
   const evaluate = (spending: number) => {
     iterations++
@@ -409,6 +430,9 @@ function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
+  if (zero.capitalTaxLimit)
+    return outcome('unsupported', null, assumptions, 0, iterations,
+      cashResidual(zero), zero.capitalTaxLimit)
   if (!zero.success) return outcome('infeasible', null, assumptions, 0, iterations, cashResidual(zero), 'zeroSpendingFails')
   if (hasUnverifiedLockedWithdrawals(inputs))
     return outcome('unsupported', null, assumptions, null, iterations, null, 'lockedWithdrawalLimits')
@@ -442,8 +466,8 @@ function maxSustainableSpendingImpl(inputs: Inputs): SolverResult<number> {
   return outcome('solved', lo, assumptions, lo, iterations, lower.finalNetWorth)
 }
 
-export function maxSustainableSpending(inputs: Inputs): SolverResult<number> {
-  try { return maxSustainableSpendingImpl(inputs) }
+export function maxSustainableSpending(inputs: Inputs, canonical?: InputsV2 | null): SolverResult<number> {
+  try { return maxSustainableSpendingImpl(inputs, canonical) }
   catch { return outcome('invalid', null, ['constantRealSpending', 'fixedBenefits', 'currentAccountAllocation'], null, 0, null, 'projectionError') }
 }
 

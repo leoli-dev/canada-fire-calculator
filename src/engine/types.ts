@@ -397,6 +397,13 @@ export interface YearRow {
 export interface ProjectionResult {
   /** An explicit limit prevents an old pooled preview from becoming advice. */
   taxCapability?: { status: 'person' | 'legacyEstimate'; reason?: string }
+  /**
+   * A modeled investment-property disposition needs a land/building split and
+   * CCA history this engine does not have, so no funding, retirement-age or
+   * spending answer derived from this run is verified. Consumers must withhold
+   * the number instead of reporting it precisely.
+   */
+  capitalTaxLimit?: 'investmentPropertySale'
   rows: YearRow[]
   unfundedObligations: import('./funding').FundingGap[]
   /** spending fully funded through life expectancy */
