@@ -420,6 +420,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     const yearIdx = age - inputs.currentAge
     const factor = nominalFactor(inflation, yearIdx)
     const nonRegBookReal = () => toReal(nonRegBook, factor)
+    // A purchase or housing-funding disposal can realize an unverified loss in
+    // either phase; the funding planner reports it so no year's tax is called
+    // exact when the loss treatment is unknown.
+    const noteFundingLoss = (allocation: { nonRegLossRealized?: boolean } | null | undefined) => {
+      if (!allocation?.nonRegLossRealized) return
+      taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
+      nonRegLossTaxUnverified = true
+    }
     if (plannedPurchase && yearIdx > buyYearIdx! && unpaidPlannedMortgage > 0) {
       const sellingAtOpen = plannedPurchase.sellAtAge !== null && age >= plannedPurchase.sellAtAge && prValue > 0
       unpaidPlannedMortgage *= sellingAtOpen ? 1 : (1 + plannedMortgageRate) / (1 + inflation)
@@ -459,6 +467,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
+          noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax = plan.allocation.withdrawalTax
           purchaseNonRegTaxable = plan.allocation.nonRegTaxable
@@ -488,6 +497,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
+          noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           purchaseTaxable = plan.allocation.taxableWithdrawal
           purchaseTaxPaid = plan.allocation.withdrawalTax
@@ -538,6 +548,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
+          noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           if (phase === 'accumulation') dpAccumTax += plan.allocation.withdrawalTax
           else {
@@ -610,6 +621,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       })
       if (plan.allocation) {
         Object.assign(bal, plan.allocation.balances)
+        noteFundingLoss(plan.allocation)
         nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
         savingsAfterSaleTax -= plan.allocation.firstYearCostFromSavings
         freeSavingsForSaleTax -= plan.allocation.firstYearCostFromSavings
@@ -717,6 +729,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
+          noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax += plan.allocation.withdrawalTax
           purchaseNonRegTaxable += plan.allocation.nonRegTaxable

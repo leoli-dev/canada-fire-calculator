@@ -31,6 +31,8 @@ export interface PurchaseAllocation {
   firstYearCostFromOpening: number
   downPaymentFromFhsa: number
   downPaymentFromAccounts: number
+  /** A non-registered disposal realized a loss whose tax treatment is unmodeled. */
+  nonRegLossRealized: boolean
 }
 
 /** Validate the consideration identity before any home or loan is booked. */
@@ -65,6 +67,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   let taxableWithdrawal = 0
   let nonRegTaxable = 0
   let rrspWithdrawal = 0
+  let nonRegLossRealized = false
   const grossWithdrawals: Record<AccountType, number> = { tfsa: 0, nonReg: 0, rrsp: 0 }
   const tax = funds.taxOnWithdrawal ?? ((taxable: number) => taxable * funds.marginalRate)
   const takeTaxable = (capacity: number, taxablePerGross: number, need: number, isRrsp: boolean) => {
@@ -92,9 +95,16 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     const gainFraction = balances.nonReg > 0 ? Math.max(0, (balances.nonReg - book) / balances.nonReg) : 0
     const nonRegTaxablePerGross = gainFraction * CAPITAL_GAINS_INCLUSION
     const nonReg = takeTaxable(balances.nonReg, nonRegTaxablePerGross, remaining, false)
+    // An unrealized loss disposed of here is previewed as tax-free by the
+    // nonnegative gain fraction; report it so no consumer treats it as exact.
+    if (nonReg > 1 && balances.nonReg > 1 && book > balances.nonReg + 1e-8)
+      nonRegLossRealized = true
     const nonRegGain = nonReg * nonRegTaxablePerGross
     const nonRegTax = tax(taxableWithdrawal + nonRegGain, rrspWithdrawal) - tax(taxableWithdrawal, rrspWithdrawal)
-    if (balances.nonReg > 0) book -= (nonReg / balances.nonReg) * book
+    if (balances.nonReg > 0) {
+      const disposed = Math.min(1, nonReg / balances.nonReg)
+      book = disposed >= 1 ? 0 : book * (1 - disposed)
+    }
     balances.nonReg -= nonReg
     grossWithdrawals.nonReg += nonReg
     remaining -= nonReg - nonRegTax
@@ -130,7 +140,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
       balances, grossWithdrawals, nonRegBook: book, taxableWithdrawal, nonRegTaxable, rrspWithdrawal,
       withdrawalTax: tax(taxableWithdrawal, rrspWithdrawal),
       firstYearCostFromSavings, firstYearCostFromOpening: firstYearCostFromOpening - unpaidCost,
-      downPaymentFromFhsa, downPaymentFromAccounts,
+      downPaymentFromFhsa, downPaymentFromAccounts, nonRegLossRealized,
     },
   }
 }

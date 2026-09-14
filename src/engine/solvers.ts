@@ -335,7 +335,13 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
   const zero = evaluate(0)
   if (zero.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), 'unfundedTransaction')
-  if (zero.success) return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  if (zero.success) {
+    // The threshold the user is told to reach must not itself be a plan whose
+    // disposal tax is unverified.
+    const zeroReason = capitalTaxReason(zero)
+    if (zeroReason) return outcome('unsupported', null, assumptions, 0, iterations, cashResidual(zero), zeroReason)
+    return outcome('solved', 0, assumptions, 0, iterations, zero.finalNetWorth)
+  }
   let upper = evaluate(hi)
   if (upper.unfundedObligations.length > 0)
     return outcome('unsupported', null, assumptions, hi, iterations, cashResidual(upper), 'unfundedTransaction')
@@ -355,6 +361,11 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
     if (result.success) { hi = mid; upper = result }
     else lo = mid
   }
+  // `upper` is the snapshot the reported threshold is taken from; its own
+  // disposal tax must be verified, not just the user's opening plan.
+  const answerReason = capitalTaxReason(upper)
+  if (answerReason)
+    return outcome('unsupported', null, assumptions, hi, iterations, cashResidual(upper), answerReason)
   return outcome('solved', hi, assumptions, hi, iterations, upper.finalNetWorth)
 }
 

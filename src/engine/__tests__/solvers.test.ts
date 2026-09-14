@@ -167,6 +167,35 @@ describe('requiredFireAssets', () => {
     expect(findEarliestFireAge(sameYear, canonical))
       .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
   })
+  it('withholds an age when a purchase-funded non-registered disposal realizes the loss', () => {
+    // The loss is realized while accumulating (home down payment), not by a
+    // retirement withdrawal, so the funding planner has to report it.
+    const plan: Inputs = { ...base, currentAge: 40, fireAge: 50, lifeExpectancy: 85,
+      balances: { tfsa: 0, rrsp: 0, nonReg: 100_000 }, nonRegBook: 200_000,
+      returns: { tfsa: .03, rrsp: .03, nonReg: .03 }, inflation: 0,
+      annualSavings: 40_000, savingsSplit: { tfsa: .3, rrsp: .5, nonReg: .2 },
+      retirementSpending: 30_000, strategy: 'tfsaFirst',
+      principalResidence: { mode: 'planned', buyAtAge: 42, price: 100_000, downPayment: 100_000,
+        appreciation: 0, netHoldingCostChange: 0, sellAtAge: null } }
+    const canonical = refreshCanonicalFromLegacy(null, plan)
+    expect(runProjection({ ...plan, fireAge: 54 }, undefined, canonical).capitalTaxLimit).toBe('nonRegisteredLoss')
+    expect(findEarliestFireAge(plan, canonical))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
+  it('withholds a threshold whose own snapshot disposes a loss-making holding', () => {
+    // The user's plan never draws non-registered (big TFSA, tfsaFirst), but the
+    // scaled snapshot the threshold is taken from does.
+    const plan: Inputs = { ...base, currentAge: 60, fireAge: 60, lifeExpectancy: 90,
+      balances: { tfsa: 2_000_000, rrsp: 0, nonReg: 100_000 }, nonRegBook: 100_000,
+      returns: { tfsa: .03, rrsp: .03, nonReg: 0 }, inflation: 0,
+      annualSavings: 0, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      retirementSpending: 30_000, strategy: 'tfsaFirst',
+      nonRegDistributionYield: .03, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0 }
+    const canonical = refreshCanonicalFromLegacy(null, plan)
+    expect(runProjection(plan, undefined, canonical).capitalTaxLimit).toBeUndefined()
+    expect(requiredFireAssets(plan, canonical))
+      .toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+  })
   it('returns a number that succeeds and whose 90% fails', () => {
     const safe: Inputs = { ...base, balances: { tfsa: 400_000, rrsp: 0, nonReg: 0 },
       nonRegBook: 0, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 }, nonRegDistributionYield: 0 }
