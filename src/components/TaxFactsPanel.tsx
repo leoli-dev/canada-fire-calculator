@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, QcDrugCoverage } from '../engine/model'
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
+import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -60,6 +61,9 @@ export function TaxFactsPanel() {
   const people = current.people
   const self = people.find(person => person.role === 'self')
   const partner = people.find(person => person.role === 'partner')
+  // Local-only reveal of the month detail; never part of the recorded plan.
+  // A mixed recorded pattern always re-reveals itself so it cannot hide.
+  const [revealMonths, setRevealMonths] = useState<Record<string, boolean>>({})
   const monthNames = Array.from({ length: 12 }, (_, index) => new Intl.DateTimeFormat(i18n.language, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, index, 1))))
   const edit = (change: (draft: InputsV2) => void) => {
     const state = useStore.getState()
@@ -264,30 +268,50 @@ export function TaxFactsPanel() {
       <p>{t('be35.coverageHelp')}</p>
       {people.map(person => {
         const label = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
-        const months = current.taxProfile?.qcDrugCoverage?.[person.id] ?? Array<QcDrugCoverage>(12).fill('unknown')
-        const setCoverage = (index: number | null, value: QcDrugCoverage) => edit(draft => {
-          draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
-          draft.taxProfile.qcDrugCoverage ??= {}
-          const next = [...(draft.taxProfile.qcDrugCoverage[person.id] ?? Array<QcDrugCoverage>(12).fill('unknown'))]
-          if (index === null) next.fill(value)
-          else next[index] = value
-          draft.taxProfile.qcDrugCoverage[person.id] = next
-        })
+        const months = current.taxProfile?.qcDrugCoverage?.[person.id] ?? qcCoverageUniform('unknown')
+        const annual = qcCoverageAnnualStatus(months)
+        const mixed = annual === 'mixed'
+        const revealed = mixed || !!revealMonths[person.id]
         return <fieldset key={person.id}>
           <legend>{t('be35.coveragePerson', { person: label })}</legend>
-          <label>{t('be35.allMonths')}
-            <select data-testid={`qc-coverage-all-${person.role}`} value={months.every(month => month === months[0]) ? months[0] : 'mixed'}
-              onChange={event => setCoverage(null, event.target.value as QcDrugCoverage)}>
+          <label>{t('be35.annualStatus')}
+            <select data-testid={`qc-coverage-all-${person.role}`} value={annual}
+              onChange={event => {
+                const value = event.target.value
+                if (value === 'mixed') return
+                // An explicit annual pick is the one action that flattens a
+                // mixed pattern; it also closes the month detail.
+                setRevealMonths(previous => { const { [person.id]: _dropped, ...rest } = previous; return rest })
+                edit(draft => {
+                  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+                  draft.taxProfile.qcDrugCoverage = applyQcAnnualCoverage(draft.taxProfile.qcDrugCoverage, person.id, value as QcDrugCoverage)
+                })
+              }}>
               <option value="mixed" disabled>{t('be35.mixed')}</option>
               {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
             </select>
           </label>
-          <div className="qc-month-grid">{months.map((status, index) => <label key={index}>{monthNames[index]}
-            <select data-testid={`qc-coverage-${person.role}-${index + 1}`} value={status}
-              onChange={event => setCoverage(index, event.target.value as QcDrugCoverage)}>
-              {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
-            </select>
-          </label>)}</div>
+          <label className="qc-change-toggle">
+            <input type="checkbox" data-testid={`qc-coverage-changed-${person.role}`}
+              checked={revealed}
+              onChange={event => setRevealMonths(previous => ({ ...previous, [person.id]: event.target.checked }))} />
+            {t('be35.changedDuringYear')}
+          </label>
+          {revealed && <>
+            <div className="qc-month-grid">{months.map((status, index) => <label key={index}>{monthNames[index]}
+              <select data-testid={`qc-coverage-${person.role}-${index + 1}`} value={status}
+                onChange={event => edit(draft => {
+                  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+                  draft.taxProfile.qcDrugCoverage ??= {}
+                  const next = [...(draft.taxProfile.qcDrugCoverage[person.id] ?? qcCoverageUniform('unknown'))]
+                  next[index] = event.target.value as QcDrugCoverage
+                  draft.taxProfile.qcDrugCoverage[person.id] = next
+                })}>
+                {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
+              </select>
+            </label>)}</div>
+            <p className="hint">{t('be35.monthDetailHelp')}</p>
+          </>}
         </fieldset>
       })}
       <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>

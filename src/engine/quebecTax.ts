@@ -1,4 +1,4 @@
-import type { InputsV2, QcDrugCoverage } from './model'
+import type { EntityId, InputsV2, QcDrugCoverage } from './model'
 import type { PersonIncome } from './personIncome'
 import { federalIncomeTax, ordinaryQuebecIncomeTax } from './tax'
 import { PROV_AGE_PENSION, PROVINCIAL, QC_FSS } from './taxData'
@@ -53,6 +53,35 @@ export function ramqScheduleK2025(familyNetIncome: number, hasSpouse: boolean,
   const calendarCap = Math.max(0, 755 - (6 - publicMonthsJanJun) * 62 - (6 - publicMonthsJulDec) * 63.83)
   return { status: 'ok', premium: Math.max(0, Math.min(incomeProrated, calendarCap)),
     familyExcess, publicMonthsJanJun, publicMonthsJulDec }
+}
+
+/** FE-36 A: the annual-first editor expresses one whole-year status as the
+ * same 12-month record the engine already consumes. These helpers change no
+ * formula; they only shape the entry path into the unchanged monthly data. */
+export const QC_DRUG_MONTHS_PER_YEAR = 12
+
+/** One annual status recorded for every calendar month. */
+export function qcCoverageUniform(status: QcDrugCoverage): QcDrugCoverage[] {
+  return Array<QcDrugCoverage>(QC_DRUG_MONTHS_PER_YEAR).fill(status)
+}
+
+/** The single annual status a 12-month record expresses: `mixed` when months
+ * differ, `unknown` when nothing is recorded. Deriving this is a read and
+ * never flattens a mixed record; flattening requires an explicit annual edit
+ * through `applyQcAnnualCoverage`. */
+export function qcCoverageAnnualStatus(months: QcDrugCoverage[] | undefined): QcDrugCoverage | 'mixed' {
+  if (!Array.isArray(months) || months.length !== QC_DRUG_MONTHS_PER_YEAR) return 'unknown'
+  return months.every(month => month === months[0]) ? months[0] : 'mixed'
+}
+
+/** Explicit annual edit: record one status for all twelve months of one
+ * person. Only this deliberate action replaces an existing mixed pattern. */
+export function applyQcAnnualCoverage(
+  coverage: Record<EntityId, QcDrugCoverage[]> | undefined,
+  personId: EntityId,
+  status: QcDrugCoverage,
+): Record<EntityId, QcDrugCoverage[]> {
+  return { ...(coverage ?? {}), [personId]: qcCoverageUniform(status) }
 }
 
 /** An all-private or verified-waived year has no Schedule K premium. A public
