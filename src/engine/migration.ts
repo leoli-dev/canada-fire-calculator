@@ -490,12 +490,12 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     account.openedYear = old.openedYear
     account.contributionRoom = old.contributionRoom
   }
-  // BE-27 A: a person's TFSA statement year and withdrawal history are canonical
-  // statement facts entered by the shared tax panel, exactly like the CRA RRSP
-  // and FHSA statement lines above; the legacy form has no field for them, so an
-  // ordinary form edit or a mode switch must carry them over rather than reset
-  // them to unknown. An entry for a person who is no longer in the household is
-  // dropped, so a stale id can never price room for someone else.
+  // BE-27 A: a person's TFSA withdrawal history is a canonical statement fact
+  // entered by the shared tax panel, exactly like the CRA RRSP and FHSA
+  // statement lines above; the legacy form has no field for it, so an ordinary
+  // form edit or a mode switch must carry it over rather than reset it to an
+  // absent history. An entry for a person who is no longer in the household is
+  // dropped, so a stale id can never restore room for someone else.
   next.tfsaStatement = prior.tfsaStatement
     ? Object.fromEntries(Object.entries(structuredClone(prior.tfsaStatement)).filter(([personId]) => live.has(personId)))
     : undefined
