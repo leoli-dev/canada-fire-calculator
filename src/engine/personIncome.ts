@@ -1,7 +1,7 @@
 import type { InputsV2, TaxShares } from './model'
 import { ageReachedInYear, precisionGate } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
-import { attributeSpousalPayment, spousalPremiumLines, type SpousalPremium } from './spousalAttribution'
+import { attributeSpousalPayment, resolveSpousalPlan, type SpousalPremium } from './spousalAttribution'
 
 export type IncomeKind = 'employment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
   'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'other'
@@ -38,9 +38,11 @@ const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult =
  * Unknown ownership is a tax-capability limit, never a cue to divide by
  * household size. `spousalPremiums` carries the per-account premium state for
  * one year's events so a second payment cannot re-attribute a premium that an
- * earlier payment already attributed (ITA s.146(8.6)).
+ * earlier payment already attributed (ITA s.146(8.6)), and
+ * `spousalAnnuitantIncome` carries the payments already made from the account
+ * this year so the RRIF minimum is consumed once (s.146.3(5.1)(c)).
  */
-function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousalPremiums: Map<string, SpousalPremium[]>): { status: 'ok'; shares: Record<string, number> } | { status: 'invalid' | 'unsupported'; reason: string } {
+function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousalPremiums: Map<string, SpousalPremium[]>, spousalAnnuitantIncome: Map<string, number>): { status: 'ok'; shares: Record<string, number> } | { status: 'invalid' | 'unsupported'; reason: string } {
   if (event.personId && (event.accountId || event.propertyId) || event.accountId && event.propertyId) return { status: 'invalid', reason: `income ownership ambiguous: ${event.id}` }
   if (event.personId && ['rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal'].includes(event.kind))
     return { status: 'invalid', reason: `asset income must cite asset ownership: ${event.id}` }
@@ -55,32 +57,30 @@ function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousa
     if (['rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal'].includes(event.kind)) {
       const required = event.kind === 'rrspWithdrawal' ? ['rrsp', 'spousalRrsp'] : event.kind === 'rrifWithdrawal' ? ['rrif'] : ['lif']
       if (!required.includes(account.kind)) return { status: 'invalid', reason: `account type mismatch: ${event.id}` }
-      if (account.kind === 'spousalRrsp') {
-        // BE-12 B (ITA s.146(8.3)): the contributor is the annuitant's spouse,
-        // and only premiums recorded for this plan can attribute. Unknown
-        // history is refused rather than assumed to be the annuitant's money.
-        if (!account.ownerId || !plan.people.some(person => person.id === account.ownerId))
-          return { status: 'unsupported', reason: `spousal RRSP holder not identified: ${event.id}` }
-        const spouse = plan.people.find(person => person.id !== account.ownerId)
-        if (!spouse) return { status: 'unsupported', reason: `spousal RRSP attribution needs the annuitant's spouse in the plan: ${event.id}` }
-        const history = plan.spousalHistory?.[account.id]
-        if (history?.status !== 'complete')
-          return { status: 'unsupported', reason: `spousal RRSP contribution history is not recorded, so the payment is not assumed to be the annuitant's: ${event.id}` }
-        const premiums = spousalPremiums.get(account.id) ?? spousalPremiumLines(plan.contributions, account.id)
+      // BE-12 B (ITA s.146(8.3), s.146.3(5.1)): a recorded spousal premium
+      // history marks the account as a spousal plan even after its registered
+      // type changed, so a spousal RRIF is attributed above the year's required
+      // minimum and an unwired spousal path is refused rather than silently
+      // taxed to the annuitant. The routing is shared with the tax panel so the
+      // preview and the kernel cannot drift apart.
+      const routing = resolveSpousalPlan(account, plan.people, plan.spousalHistory, plan.contributions, plan.baseYear, year)
+      if (routing.status === 'unsupported') return { status: 'unsupported', reason: `${routing.reason}: ${event.id}` }
+      if (routing.status === 'ok') {
+        const premiums = spousalPremiums.get(account.id) ?? routing.parties.premiums
         const attribution = attributeSpousalPayment({
           paymentId: event.id, payment: event.amount, paymentYear: year,
-          contributorId: spouse.id, annuitantId: account.ownerId, premiums,
-          // A spousal RRSP has no required minimum; a spousal RRIF is not
-          // identified by the account model yet, so it stays on the owner path.
-          rrifMinimum: null, annuitantIncomeBefore: 0,
+          contributorId: routing.parties.contributorId, annuitantId: routing.parties.annuitantId,
+          premiums, rrifMinimum: routing.parties.rrifMinimum,
+          annuitantIncomeBefore: spousalAnnuitantIncome.get(account.id) ?? 0,
         })
         if (attribution.status !== 'ok') return { status: attribution.status, reason: `${attribution.reason}: ${event.id}` }
         spousalPremiums.set(account.id, attribution.premiumsAfter)
-        if (event.amount === 0) return { status: 'ok', shares: { [account.ownerId]: 1 } }
+        spousalAnnuitantIncome.set(account.id, (spousalAnnuitantIncome.get(account.id) ?? 0) + event.amount)
+        if (event.amount === 0) return { status: 'ok', shares: { [routing.parties.annuitantId]: 1 } }
         const contributorShare = attribution.attributedToContributor / event.amount
-        if (contributorShare <= 0) return { status: 'ok', shares: { [account.ownerId]: 1 } }
-        if (contributorShare >= 1) return { status: 'ok', shares: { [spouse.id]: 1 } }
-        return { status: 'ok', shares: { [spouse.id]: contributorShare, [account.ownerId]: 1 - contributorShare } }
+        if (contributorShare <= 0) return { status: 'ok', shares: { [routing.parties.annuitantId]: 1 } }
+        if (contributorShare >= 1) return { status: 'ok', shares: { [routing.parties.contributorId]: 1 } }
+        return { status: 'ok', shares: { [routing.parties.contributorId]: contributorShare, [routing.parties.annuitantId]: 1 - contributorShare } }
       }
       if (account.ownerId && !plan.people.some(person => person.id === account.ownerId)) return { status: 'invalid', reason: `account owner missing: ${event.id}` }
       return account.ownerId ? { status: 'ok', shares: { [account.ownerId]: 1 } } : { status: 'unsupported', reason: `account owner unknown: ${event.id}` }
@@ -110,10 +110,11 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
   const ids = new Set<string>()
   // Premium attribution is consumed once per (account, year) event sequence.
   const spousalPremiums = new Map<string, SpousalPremium[]>()
+  const spousalAnnuitantIncome = new Map<string, number>()
   for (const event of events) {
     if (!event || !event.id || ids.has(event.id) || !INCOME_KINDS.includes(event.kind) || !Number.isFinite(event.amount) || event.amount < 0) return fail('invalid', 'income event invalid or duplicate')
     ids.add(event.id)
-    const ownership = sharesForEvent(plan, event, year, spousalPremiums)
+    const ownership = sharesForEvent(plan, event, year, spousalPremiums, spousalAnnuitantIncome)
     if (ownership.status !== 'ok') return fail(ownership.status, ownership.reason)
     for (const [id, share] of Object.entries(ownership.shares)) {
       const person = byPerson[id]

@@ -804,7 +804,8 @@
     "spousalPaymentTest": "Aperçu d'un paiement de ce régime ($ CA)",
     "spousalSplit": "Attribué à {{contributor}} : {{attributed}} $ CA. Imposé à {{annuitant}} : {{taxed}} $ CA.",
     "spousalUnsupported": "L'attribution n'est pas prise en charge pour ce régime : {{reason}}",
-    "spousalLimit": "Seuls la fenêtre d'attribution, l'ordre premier entré, premier sorti et le minimum obligatoire de FERR sont mis en œuvre ici. Le modèle de comptes ne permet pas encore d'identifier un FERR de conjoint, son attribution au retrait n'est donc pas branchée; le fractionnement REER de l'épargne volontaire du couple et l'affectation entre plusieurs comptes restent non pris en charge.",
+    "spousalLimit": "La fenêtre d'attribution, l'ordre premier entré, premier sorti et le minimum obligatoire de FERR sont mis en œuvre ici. Un historique de cotisations inscrit marque le compte comme régime de conjoint : un FERR de conjoint est donc fractionné au minimum obligatoire de l'année, tandis qu'un FRV de conjoint est refusé; le fractionnement REER de l'épargne volontaire du couple, la conversion REER/FERR à 71 ans et l'affectation entre plusieurs comptes restent non pris en charge.",
+    "spousalRrifNote": "Le type enregistré est FERR : le minimum obligatoire de l'année est donc imposé au titulaire du régime, et seul l'excédent peut être attribué au cotisant.",
     "spousalSource": "Formulaire T2205 de l'ARC",
     "limit": "Votre propre cotisation REER et une cotisation inscrite à un régime de conjoint sont chiffrées selon le droit du cotisant. Le fractionnement REER de l'épargne volontaire du couple, la conversion REER/FERR à 71 ans et l'affectation entre plusieurs comptes ne sont pas mis en œuvre.",
     "source": "ARC T4040 REER et autres régimes enregistrés"

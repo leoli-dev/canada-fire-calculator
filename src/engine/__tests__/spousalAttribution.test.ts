@@ -140,6 +140,26 @@ describe('BE-12 B first in, first out and no re-use', () => {
     expect(result.taxedToAnnuitant).toBe(4_000)
   })
 
+  it('carries a partially attributed premium into the next payment instead of restarting it', () => {
+    // The per-premium state handed to the next payment is what actually enforces
+    // s.146(8.6). Premium A already has 1,000 attributed before today; a 2,500
+    // payment therefore fills A's last 1,000 and takes 1,500 from B. A second
+    // 5,000 payment can only reach the 500 still left in B, so the two payments
+    // together attribute 3,000 = 4,000 of premiums less the 1,000 already used.
+    const premiums = [premium('A', 2026, 2_000, { attributed: 1_000 }), premium('B', 2026, 2_000, { attributed: 0 })]
+    const first = ok(attributeSpousalPayment(request({ premiums, payment: 2_500 })))
+    expect(first.attributedToContributor).toBe(2_500)
+    expect(first.lines.map(line => [line.id, line.attributedBefore, line.attributedNow, line.attributedAfter]))
+      .toEqual([['A', 1_000, 1_000, 2_000], ['B', 0, 1_500, 1_500]])
+    expect(first.premiumsAfter.map(premium => [premium.id, premium.attributed])).toEqual([['A', 2_000], ['B', 1_500]])
+    const second = ok(attributeSpousalPayment(request({ premiums: first.premiumsAfter, payment: 5_000 })))
+    expect(second.inWindowUnattributed).toBe(500)
+    expect(second.attributedToContributor).toBe(500)
+    expect(second.taxedToAnnuitant).toBe(4_500)
+    expect(second.premiumsAfter.map(premium => [premium.id, premium.attributed])).toEqual([['A', 2_000], ['B', 2_000]])
+    expect(first.attributedToContributor + second.attributedToContributor).toBe(3_000)
+  })
+
   it('is order-independent and deterministic', () => {
     const premiums = [premium('c', 2026, 1_000), premium('a', 2024, 2_000), premium('b', 2025, 3_000)]
     const forward = ok(attributeSpousalPayment(request({ premiums, payment: 4_000 })))
@@ -150,13 +170,30 @@ describe('BE-12 B first in, first out and no re-use', () => {
   })
 
   it('conserves the payment with no negative part', () => {
-    const cases = [0, 1, 999.99, 5_000, 12_345.67]
+    // Sub-cent payments round at the cent boundary; the clamp keeps both parts
+    // non-negative and the sum within the module's cent tolerance.
+    const cases = [0, 1, 999.99, 5_000, 12_345.67, 100.005, 0.004, 0.005]
     for (const payment of cases) {
       const result = ok(attributeSpousalPayment(request({ premiums: [premium('p', 2026, 6_000)], payment, paymentYear: 2026 })))
-      expect(result.attributedToContributor).toBeGreaterThanOrEqual(0)
-      expect(result.taxedToAnnuitant).toBeGreaterThanOrEqual(0)
-      expect(Math.abs(result.attributedToContributor + result.taxedToAnnuitant - payment)).toBeLessThanOrEqual(RRSP_MONEY_TOLERANCE)
+      expect(result.attributedToContributor, String(payment)).toBeGreaterThanOrEqual(0)
+      expect(result.taxedToAnnuitant, String(payment)).toBeGreaterThanOrEqual(0)
+      expect(Math.abs(result.attributedToContributor + result.taxedToAnnuitant - payment), String(payment)).toBeLessThanOrEqual(RRSP_MONEY_TOLERANCE)
     }
+    // The reviewer's reachable case: a 100.005 payment with a large premium used
+    // to round the attributed part past the payment and render "Taxed to You:
+    // -0.01 CAD".
+    const subCent = ok(attributeSpousalPayment(request({
+      premiums: [premium('big', 2026, 1_000_000)], payment: 100.005, paymentYear: 2026,
+    })))
+    expect(subCent.taxedToAnnuitant).toBe(0)
+    expect(subCent.attributedToContributor).toBeGreaterThanOrEqual(0)
+    // A sub-cent payment with the whole minimum still applied cannot go negative
+    // either.
+    const atMinimum = ok(attributeSpousalPayment(request({
+      premiums: [premium('big', 2026, 1_000_000)], payment: 100.005, paymentYear: 2026, rrifMinimum: known(100.005),
+    })))
+    expect(atMinimum.attributedToContributor).toBeGreaterThanOrEqual(0)
+    expect(atMinimum.taxedToAnnuitant).toBeGreaterThanOrEqual(0)
   })
 })
 
@@ -377,5 +414,109 @@ describe('BE-12 B personIncome wiring', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.byPerson[self.id].gross).toBe(5_000)
+  })
+
+  /** The reviewer's B1 shape: a recorded history, then the kind becomes `rrif`. */
+  function spousalRrif(mutate: (draft: InputsV2, selfId: string, partnerId: string, accountId: string) => void = () => {}): InputsV2 {
+    return spousalPlan((draft, selfId, partnerId, accountId) => {
+      const rrif = draft.accounts.find(item => item.id === accountId)!
+      rrif.kind = 'rrif'
+      rrif.openedYear = { status: 'known', value: 2020 }
+      // Age reached during the year 72 -> January 1 age 71, whose post-1986
+      // factor needs the category. `allOther` is 0.0528, so a 100,000 balance
+      // has a 5,280 minimum.
+      rrif.rrifFactorCategory = { status: 'known', value: 'allOther' }
+      const self = draft.people.find(person => person.id === selfId)!
+      self.ageInBaseYear = 72
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+      draft.contributions = [{ id: 'p2025', accountId, contributorId: partnerId, calendarYear: 2025, amount: 40_000, deductionYear: null,
+        provenance: { origin: 'user', sourceYear: 2025 } }]
+      mutate(draft, selfId, partnerId, accountId)
+    })
+  }
+
+  it('attributes a recorded spousal RRIF only above the year required minimum', () => {
+    // Review fix B1: before this, the whole 10,000 was silently taxed to the
+    // annuitant. The recorded history is the marker, and the s.146.3(5.1)
+    // minimum is taxed to the holder while only the 4,720 excess is attributed.
+    const plan = spousalRrif()
+    const account = plan.accounts.find(item => item.kind === 'rrif')!
+    const self = plan.people.find(person => person.role === 'self')!
+    const partner = plan.people.find(person => person.role === 'partner')!
+    const result = calculatePersonIncome(plan, 2026, [{ id: 'draw', kind: 'rrifWithdrawal', accountId: account.id, amount: 10_000 }])
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.byPerson[partner.id].gross).toBeCloseTo(4_720, 6)
+    expect(result.byPerson[self.id].gross).toBeCloseTo(5_280, 6)
+    expect(result.byPerson[partner.id].gross + result.byPerson[self.id].gross).toBeCloseTo(10_000, 6)
+  })
+
+  it('consumes the spousal RRIF minimum once across two payments in the same year', () => {
+    const plan = spousalRrif()
+    const account = plan.accounts.find(item => item.kind === 'rrif')!
+    const self = plan.people.find(person => person.role === 'self')!
+    const partner = plan.people.find(person => person.role === 'partner')!
+    const result = calculatePersonIncome(plan, 2026, [
+      { id: 'draw1', kind: 'rrifWithdrawal', accountId: account.id, amount: 6_000 },
+      { id: 'draw2', kind: 'rrifWithdrawal', accountId: account.id, amount: 6_000 },
+    ])
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    // 5,280 of the first payment covers the minimum; the second has none left,
+    // so 720 + 6,000 = 6,720 is attributed and 5,280 stays with the annuitant.
+    expect(result.byPerson[partner.id].gross).toBeCloseTo(6_720, 6)
+    expect(result.byPerson[self.id].gross).toBeCloseTo(5_280, 6)
+  })
+
+  it('refuses a spousal LIF and an ordinary RRSP that carries a recorded history', () => {
+    const lif = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+      draft.accounts.find(item => item.id === accountId)!.kind = 'lif'
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+    })
+    const lifAccount = lif.accounts.find(item => item.kind === 'lif')!
+    const lifResult = calculatePersonIncome(lif, 2026, [{ id: 'draw', kind: 'lifWithdrawal', accountId: lifAccount.id, amount: 5_000 }])
+    expect(lifResult.status).toBe('unsupported')
+    if (lifResult.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(lifResult.reason).toContain('spousal LIF')
+    const rrsp = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+      draft.accounts.find(item => item.id === accountId)!.kind = 'rrsp'
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+    })
+    const rrspAccount = rrsp.accounts.find(item => item.kind === 'rrsp')!
+    const rrspResult = calculatePersonIncome(rrsp, 2026, [{ id: 'draw', kind: 'rrspWithdrawal', accountId: rrspAccount.id, amount: 5_000 }])
+    expect(rrspResult.status).toBe('unsupported')
+    if (rrspResult.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(rrspResult.reason).toContain('ordinary RRSP')
+  })
+
+  it('keeps a plain RRIF and a plain LIF with no recorded history on the owner path', () => {
+    for (const kind of ['rrif', 'lif'] as const) {
+      const plain = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+        const item = draft.accounts.find(account => account.id === accountId)!
+        item.kind = kind
+        item.openedYear = { status: 'known', value: 2020 }
+      })
+      const account = plain.accounts.find(item => item.kind === kind)!
+      const self = plain.people.find(person => person.role === 'self')!
+      const partner = plain.people.find(person => person.role === 'partner')!
+      const result = calculatePersonIncome(plain, 2026, [{
+        id: `draw-${kind}`, kind: kind === 'rrif' ? 'rrifWithdrawal' : 'lifWithdrawal', accountId: account.id, amount: 5_000,
+      }])
+      expect(result.status, kind).toBe('ok')
+      if (result.status !== 'ok') continue
+      expect(result.byPerson[self.id].gross, kind).toBe(5_000)
+      expect(result.byPerson[partner.id].gross, kind).toBe(0)
+    }
+  })
+
+  it('refuses an unconfirmed RRIF minimum instead of attributing against a guess', () => {
+    const plan = spousalRrif((draft, _selfId, _partnerId, accountId) => {
+      draft.accounts.find(item => item.id === accountId)!.openedYear = { status: 'unknown', reason: 'not supplied' }
+    })
+    const account = plan.accounts.find(item => item.kind === 'rrif')!
+    const result = calculatePersonIncome(plan, 2026, [{ id: 'draw', kind: 'rrifWithdrawal', accountId: account.id, amount: 10_000 }])
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.reason).toContain('RRIF minimum')
   })
 })

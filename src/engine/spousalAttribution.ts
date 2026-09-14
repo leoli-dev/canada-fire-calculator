@@ -1,4 +1,4 @@
-import type { Account, Contribution, Known, Person } from './model'
+import type { Account, Contribution, Known, Person, SpousalHistoryStatus } from './model'
 import { minimumForRrif } from './rrif'
 import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
 
@@ -157,6 +157,80 @@ export function knownRrifMinimum(account: Account, people: Person[], baseYear: n
   return { status: 'unknown', reason: minimum.reason }
 }
 
+/** The parties and the year's minimum for one account that is a spousal plan. */
+export interface SpousalPlanParties {
+  contributorId: string
+  annuitantId: string
+  premiums: SpousalPremium[]
+  /** The year's required RRIF minimum, or `null` for a spousal RRSP. */
+  rrifMinimum: Known<number> | null
+}
+
+export type SpousalPlanRouting =
+  | { status: 'notSpousal' }
+  | { status: 'unsupported'; reason: string }
+  | { status: 'ok'; parties: SpousalPlanParties }
+
+/** Registered plan name for a concrete refusal reason. */
+function spousalPlanName(kind: Account['kind']): string {
+  return kind === 'rrif' ? 'spousal RRIF' : kind === 'lif' ? 'spousal LIF' : 'spousal RRSP'
+}
+
+/**
+ * The one place that decides whether an account is a spousal plan, who the two
+ * parties are and which RRIF minimum applies, so the tax panel and the income
+ * kernel cannot drift apart.
+ *
+ * A recorded `spousalHistory` entry is itself the marker that the account is a
+ * spousal plan, even after its registered type changes. The recorded fact is
+ * therefore never persisted, invisible and ignored: a `rrif` account with a
+ * recorded history is attributed through the s.146.3(5.1) minimum path, and a
+ * `lif` or a plain-`rrsp` contradiction is refused loudly. An account with
+ * neither the `spousalRrsp` kind nor a history entry stays on the ordinary
+ * owner path, exactly as before this rule existed.
+ */
+export function resolveSpousalPlan(
+  account: Account,
+  people: Person[],
+  spousalHistory: Record<string, SpousalHistoryStatus> | undefined,
+  contributions: Contribution[],
+  baseYear: number,
+  year: number,
+  openingBalance?: number,
+): SpousalPlanRouting {
+  if (!['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind)) return { status: 'notSpousal' }
+  const history = spousalHistory?.[account.id]
+  if (account.kind !== 'spousalRrsp' && history === undefined) return { status: 'notSpousal' }
+  const name = spousalPlanName(account.kind)
+  // LIF/LIRA minimum and maximum withdrawals are BE-36 territory and stay out
+  // of scope; a recorded spousal history must not turn them into a plain owner
+  // answer.
+  if (account.kind === 'lif')
+    return { status: 'unsupported', reason: `a ${name} cannot be attributed yet: LIF minimum and maximum withdrawals need BE-36 rules` }
+  // A plain RRSP kind together with a recorded spousal premium history is a
+  // contradiction in the plan's own facts, not a fact to guess from.
+  if (account.kind === 'rrsp')
+    return { status: 'unsupported', reason: `a spousal premium history is recorded for this ordinary RRSP, so a withdrawal cannot be attributed: reclassify the account as a spousal RRSP or clear the history` }
+  if (!account.ownerId || !people.some(person => person.id === account.ownerId))
+    return { status: 'unsupported', reason: `${name} holder not identified` }
+  const spouse = people.find(person => person.id !== account.ownerId)
+  if (!spouse) return { status: 'unsupported', reason: `${name} attribution needs the annuitant's spouse in the plan` }
+  if (history?.status !== 'complete')
+    return { status: 'unsupported', reason: `${name} contribution history is not recorded, so the payment is not assumed to be the annuitant's` }
+  return {
+    status: 'ok',
+    parties: {
+      contributorId: spouse.id,
+      annuitantId: account.ownerId,
+      premiums: spousalPremiumLines(contributions, account.id),
+      // Only a spousal RRIF has a required minimum; a spousal RRSP has none,
+      // so the minimum is an explicit `null` rather than a zero. An
+      // unconfirmed minimum stays `unknown` and makes the payment unsupported.
+      rrifMinimum: account.kind === 'rrif' ? knownRrifMinimum(account, people, baseYear, year, openingBalance) : null,
+    },
+  }
+}
+
 /** Sort premiums deterministically so the result cannot depend on input order. */
 function sortPremiums(premiums: SpousalPremium[]): SpousalPremium[] {
   return [...premiums].sort((left, right) =>
@@ -209,13 +283,14 @@ export function attributeSpousalPayment(request: SpousalAttributionRequest): Spo
   // s.146.3(5.1)(c) compares the year's cumulative income inclusion with the
   // year's required minimum, so the minimum is consumed once across payments.
   const minimumApplied = roundCents(Math.min(payment, Math.max(0, minimum - annuitantIncomeBefore)))
-  const attributableCeiling = roundCents(payment - minimumApplied)
-
+  // Clamp both parts to [0, payment] before rounding to cents so a sub-cent
+  // payment cannot round one part past the payment and make the other negative.
+  const attributableCeiling = roundCents(Math.max(0, payment - minimumApplied))
   const sorted = sortPremiums(premiums)
   const inWindow = sorted.filter(premium => premium.contributorId === contributorId && isInAttributionWindow(premium.calendarYear, paymentYear))
   const inWindowUnattributed = roundCents(inWindow.reduce((total, premium) => total + Math.max(0, roundCents(premium.amount - premium.attributed)), 0))
-  const attributedToContributor = roundCents(Math.min(attributableCeiling, inWindowUnattributed))
-  const taxedToAnnuitant = roundCents(payment - attributedToContributor)
+  const attributedToContributor = roundCents(Math.max(0, Math.min(attributableCeiling, inWindowUnattributed, payment)))
+  const taxedToAnnuitant = roundCents(Math.max(0, payment - attributedToContributor))
 
   // s.146(8.5) first in, first out. The totals above do not depend on this
   // order; the per-premium split does, so it is applied deterministically.

@@ -804,7 +804,8 @@
     "spousalPaymentTest": "预览本计划的一笔付款（加元）",
     "spousalSplit": "归属给 {{contributor}}：{{attributed}} 加元；由 {{annuitant}} 纳税：{{taxed}} 加元。",
     "spousalUnsupported": "本计划不支持归属计算：{{reason}}",
-    "spousalLimit": "此处仅实现归属窗口、先进先出顺序和 RRIF 法定最低提款额。账户模型目前无法识别配偶 RRIF，因此其提款归属尚未接入；夫妻自愿储蓄的 RRSP 分拆和多账户去向分配仍不支持。",
+    "spousalLimit": "此处已实现归属窗口、先进先出顺序和 RRIF 法定最低提款额。已记录的供款历史即标记该账户为配偶计划：配偶 RRIF 按当年法定最低提款额拆分，配偶 LIF 则明确拒绝；夫妻自愿储蓄的 RRSP 分拆、71 岁 RRSP／RRIF 转换以及多账户去向分配仍不支持。",
+    "spousalRrifNote": "注册类型为 RRIF：当年法定最低提款额由计划持有人纳税，只有超出最低额的部分才能归属给供款人。",
     "spousalSource": "CRA T2205 表格",
     "limit": "本人 RRSP 供款和已记录的配偶计划供款都按供款人的额度计算。夫妻自愿储蓄的 RRSP 分拆、71 岁 RRSP／RRIF 转换以及多账户去向分配尚未实现。",
     "source": "CRA T4040 RRSP 及其他注册计划"

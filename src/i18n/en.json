@@ -808,7 +808,8 @@
     "spousalPaymentTest": "Preview a payment out of this plan (CAD)",
     "spousalSplit": "Attributed to {{contributor}}: {{attributed}} CAD. Taxed to {{annuitant}}: {{taxed}} CAD.",
     "spousalUnsupported": "Attribution is not supported for this plan: {{reason}}",
-    "spousalLimit": "Only the attribution window, first-in-first-out order and the required RRIF minimum are implemented here. A spousal RRIF cannot be identified by the account model yet, so its withdrawal attribution is not wired; the couple voluntary-savings RRSP split and multi-account destination allocation remain unsupported.",
+    "spousalLimit": "The attribution window, first-in-first-out order and the required RRIF minimum are implemented here. A recorded premium history marks the account as a spousal plan, so a spousal RRIF is split at the year's required minimum while a spousal LIF is refused; the couple voluntary-savings RRSP split, RRSP/RRIF age-71 conversion and multi-account destination allocation remain unsupported.",
+    "spousalRrifNote": "The registered type is RRIF, so the year's required minimum is taxed to the plan holder and only the excess over it can be attributed to the contributor.",
     "spousalSource": "CRA form T2205",
     "limit": "Your own RRSP contribution and a recorded spousal-plan premium are priced against the contributor's room. The couple voluntary-savings RRSP split, RRSP/RRIF age-71 conversion and multi-account destination allocation are not implemented.",
     "source": "CRA T4040 RRSPs and other registered plans"

@@ -4,7 +4,7 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
-import { attributeSpousalPayment, spousalPremiumLines } from '../engine/spousalAttribution'
+import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -182,16 +182,14 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
   const rows = plan.contributions.filter(contribution => contribution.accountId === account.id)
   const complete = plan.spousalHistory?.[account.id]?.status === 'complete'
   const [paymentRaw, setPaymentRaw] = useState('')
-  // A stable, collision-free row id keeps reload and mode switches deterministic.
-  const nextRowId = () => {
-    const used = new Set(plan.contributions.map(contribution => contribution.id))
+  const addRow = () => onEdit(draft => {
+    // The id is derived from the fresh draft, not from the render-time plan, so
+    // two adds in one task cannot produce the same id and corrupt the plan.
+    const used = new Set(draft.contributions.map(contribution => contribution.id))
     let serial = 0
     while (used.has(`be12:spousal:${account.id}:${serial}`)) serial += 1
-    return `be12:spousal:${account.id}:${serial}`
-  }
-  const addRow = () => onEdit(draft => {
     draft.contributions.push({
-      id: nextRowId(), accountId: account.id, contributorId: spouse?.id ?? null,
+      id: `be12:spousal:${account.id}:${serial}`, accountId: account.id, contributorId: spouse?.id ?? null,
       calendarYear: draft.baseYear - 1, amount: 0, deductionYear: null,
       provenance: { origin: 'user', sourceYear: draft.baseYear },
     })
@@ -206,20 +204,28 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
     draft.spousalHistory = { ...(draft.spousalHistory ?? {}), [account.id]: status === 'complete'
       ? { status: 'complete' } : { status: 'unknown', reason: 'spousal premium history not supplied' } }
   })
+  // The recorded premium history is itself the marker that this account is a
+  // spousal plan, so a type switch to RRIF keeps attributing (above the year's
+  // minimum) and a type switch to LIF or an ordinary RRSP is refused rather
+  // than silently taxed to the owner. The same routing drives the kernel.
+  const routing = resolveSpousalPlan(account, plan.people, plan.spousalHistory, plan.contributions, plan.baseYear, plan.baseYear)
   const paymentText = paymentRaw.trim()
   const payment = paymentText === '' ? Number.NaN : Number(paymentText)
-  const preview = complete && annuitant && spouse && Number.isFinite(payment) && payment > 0
+  const preview = complete && routing.status === 'ok' && Number.isFinite(payment) && payment > 0
     ? attributeSpousalPayment({
-      payment, paymentYear: plan.baseYear, contributorId: spouse.id, annuitantId: annuitant.id,
-      premiums: spousalPremiumLines(plan.contributions, account.id),
-      // A spousal RRSP has no required minimum; the spousal-RRIF path is not
-      // identified by the account model yet, so it is not previewed here.
-      rrifMinimum: null, annuitantIncomeBefore: 0,
+      payment, paymentYear: plan.baseYear,
+      contributorId: routing.parties.contributorId, annuitantId: routing.parties.annuitantId,
+      premiums: routing.parties.premiums, rrifMinimum: routing.parties.rrifMinimum,
+      annuitantIncomeBefore: 0,
     })
     : null
+  // A recorded plan that cannot be priced still says why, so a confirmed
+  // history never leaves the user with a field that can never answer.
+  const blocker = complete && routing.status === 'unsupported' ? routing.reason : null
   return <div data-testid={`spousal-attribution-${account.id}`}>
     <h5>{t('be12.spousalTitle')}</h5>
     <p className="hint">{t('be12.spousalExplanation')}</p>
+    {account.kind === 'rrif' && <p className="hint" data-testid={`spousal-rrif-note-${account.id}`}>{t('be12.spousalRrifNote')}</p>}
     <label>{t('be12.spousalHistory')}
       <select data-testid={`spousal-history-${account.id}`} value={complete ? 'complete' : 'unknown'}
         onChange={event => setHistory(event.target.value === 'complete' ? 'complete' : 'unknown')}>
@@ -265,9 +271,13 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
       <input type="number" min="0" step="1" data-testid={`spousal-payment-${account.id}`}
         value={paymentRaw} onChange={event => setPaymentRaw(event.target.value)} />
     </label>}
+    {blocker && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
+      {t('be12.spousalUnsupported', { reason: blocker })}</p>}
     {preview && preview.status === 'ok' && <p data-testid={`spousal-split-${account.id}`}>{t('be12.spousalSplit', {
-      contributor: label(spouse?.id), attributed: money(preview.attributedToContributor),
-      annuitant: label(annuitant?.id), taxed: money(preview.taxedToAnnuitant),
+      contributor: label(routing.status === 'ok' ? routing.parties.contributorId : spouse?.id),
+      attributed: money(preview.attributedToContributor),
+      annuitant: label(routing.status === 'ok' ? routing.parties.annuitantId : annuitant?.id),
+      taxed: money(preview.taxedToAnnuitant),
     })}</p>}
     {preview && preview.status !== 'ok' && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
       {t('be12.spousalUnsupported', { reason: preview.reason })}</p>}
@@ -593,7 +603,9 @@ export function TaxFactsPanel() {
         </>}
       </div>
     })}
-    {current.accounts.filter(account => account.kind === 'spousalRrsp').map(account =>
+    {current.accounts.filter(account =>
+      ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) &&
+      (account.kind === 'spousalRrsp' || current.spousalHistory?.[account.id] !== undefined)).map(account =>
       <SpousalAttributionRow key={account.id} account={account} plan={current} onEdit={edit} />)}
     <p>{t(current.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
   </section>
