@@ -1,5 +1,5 @@
 import type { Account, InputsV2, Known, Provenance } from './model'
-import { plannedFhsaContribution } from './fhsaPlan'
+import { fhsaScheduledContributions, plannedFhsaContribution } from './fhsaPlan'
 import { selectFhsaRules } from './rules'
 import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
 
@@ -56,9 +56,6 @@ export const FHSA_CARRY_FORWARD_CAPPED = (limit: number) =>
 
 export const FHSA_MATURITY_UNSUPPORTED =
   'the FHSA 15-year / age-71 maturity clock, RRSP/RRIF rollover, qualifying and non-qualifying withdrawals, home-purchase eligibility, and the death event are not implemented (BE-36 B)'
-
-export const FHSA_OUT_OF_SCOPE =
-  'FHSA maturity, rollover, qualifying and non-qualifying withdrawals, home-purchase eligibility and the death event remain unsupported (BE-36 B)'
 
 /**
  * One person-year is priced against one account's participation room. More than
@@ -205,13 +202,20 @@ const minKnown = (limit: number, remaining: Known<number>): Known<number> =>
     ? { status: 'known', value: roundCents(Math.min(limit, Math.max(0, remaining.value))) }
     : remaining
 
-const BLOCKING: ReadonlySet<FhsaRoomLimitationCode> = new Set([
+/**
+ * FHSA limitations that make the room itself unknowable. The annual and
+ * lifetime caps are not blocking: they clip the contribution and retain the
+ * remainder, which is the point of the ledger. Exported so the kernel refuses
+ * on exactly the same set the ledger marks blocking, instead of keeping a
+ * second copy that could silently diverge.
+ */
+export const FHSA_BLOCKING: ReadonlySet<FhsaRoomLimitationCode> = new Set([
   'openingYearUnknown', 'historyUnknown', 'openingRoomUnknown', 'accountNotOpen',
   'notYetOpen', 'transferUnverified', 'ownershipUnknown', 'ambiguousAccount', 'lifetimeExceeded',
 ])
 
 const unknownFrom = (limitations: FhsaRoomLimitation[]): Known<number> =>
-  ({ status: 'unknown', reason: limitations.filter(item => BLOCKING.has(item.code)).map(item => item.detail).join('; ') })
+  ({ status: 'unknown', reason: limitations.filter(item => FHSA_BLOCKING.has(item.code)).map(item => item.detail).join('; ') })
 
 /**
  * Price one person-year of FHSA participation room. Clipping happens line by
@@ -254,7 +258,7 @@ export function fhsaRoomYear(request: FhsaRoomRequest): FhsaRoomYear {
   // refused with its own blocking reason.
   if (cumulativePrior.status === 'known' && cumulativePrior.value > lifetimeLimit.value + FHSA_MONEY_TOLERANCE)
     limitations.push({ code: 'lifetimeExceeded', detail: FHSA_LIFETIME_EXCEEDED })
-  const blocked = limitations.some(item => BLOCKING.has(item.code))
+  const blocked = limitations.some(item => FHSA_BLOCKING.has(item.code))
   const remainingLifetimeBefore = subtractKnown(lifetimeLimit, cumulativePrior)
   const annualAddition: Known<number> = blocked || notYetOpen || implausibleOpening
     ? { status: 'known', value: 0 }
@@ -368,6 +372,22 @@ export function fhsaStatementHistory(plan: Pick<InputsV2, 'fhsaStatementHistory'
 }
 
 /**
+ * The FHSA accounts one year would have to price: a held balance, a recorded
+ * plan, or a scheduled row. BE-36 A prices at most one active FHSA per plan, so
+ * the panel and the kernel measure "active" with this one function and the
+ * refusal is visible where the user records the accounts.
+ */
+export function activeFhsaAccounts(
+  plan: Pick<InputsV2, 'accounts' | 'contributions' | 'recurringContributions'>,
+  year: number,
+  balanceOf: (accountId: string) => number,
+): Account[] {
+  return plan.accounts.filter(account => account.kind === 'fhsa' &&
+    (balanceOf(account.id) > 0 || plannedFhsaContribution(plan, account.id) > 0 ||
+      fhsaScheduledContributions(plan, account.id, year).length > 0))
+}
+
+/**
  * Every FHSA line the plan makes for one account in one year. Ordinary
  * contributions come from the resolved savings split; RRSP transfers are not
  * priced (see `FHSA_TRANSFER_HISTORY_UNVERIFIED`), so they are never invented
@@ -421,8 +441,7 @@ function fhsaAccountYearRequest(args: {
  */
 export function fhsaPlannedYearRequest(args: { plan: InputsV2; account: Account; year: number }): FhsaPlannedRequest {
   const { plan, account, year } = args
-  const scheduled = plan.contributions.filter(contribution =>
-    contribution.accountId === account.id && contribution.calendarYear === year && contribution.amount > 0)
+  const scheduled = fhsaScheduledContributions(plan, account.id, year)
   const recordedPlan = plannedFhsaContribution(plan, account.id)
   const scheduledPlanned = roundCents(sum(scheduled.map(contribution => contribution.amount)))
   // The recorded plan is the account's total annual plan; a scheduled row for

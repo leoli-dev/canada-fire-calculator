@@ -8,8 +8,9 @@ import {
   type RrspRoomLimitation, type RrspRoomYear,
 } from './rrspRoom'
 import {
-  FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, fhsaOpeningRoom, fhsaPlannedYearRequest, fhsaRoomYear,
-  fhsaStatementHistory, type FhsaRoomLimitationCode, type FhsaRoomYear,
+  FHSA_BLOCKING, FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_OPENING_YEAR_MISSING,
+  activeFhsaAccounts, fhsaOpeningRoom, fhsaPlannedYearRequest, fhsaRoomYear,
+  fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
 import { plannedFhsaContribution } from './fhsaPlan'
 
@@ -81,16 +82,6 @@ const sameContribution = (left: AnnualState['contributionHistory'][number], righ
   left.calendarYear === right.calendarYear && left.amount === right.amount && left.deductionYear === right.deductionYear
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 const roundCents = (value: number) => Math.round(value * 100) / 100
-/**
- * FHSA limitations that make the room itself unknowable. The annual and
- * lifetime caps are not blocking: they clip the contribution and retain the
- * remainder, which is the point of the ledger. Maturity is refused separately
- * because BE-36 B owns the rollover, not because the room is unknown.
- */
-const FHSA_BLOCKING: ReadonlySet<FhsaRoomLimitationCode> = new Set([
-  'openingYearUnknown', 'historyUnknown', 'openingRoomUnknown', 'accountNotOpen',
-  'notYetOpen', 'transferUnverified', 'ownershipUnknown', 'ambiguousAccount', 'lifetimeExceeded',
-])
 
 export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
@@ -211,16 +202,18 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
   if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
   if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
-  const activeFhsa = plan.accounts.filter(account => account.kind === 'fhsa' &&
-    (state.byAccount[account.id].balance > 0 || plannedFhsaContribution(plan, account.id) > 0))
+  // A held balance, a recorded plan, or a scheduled row all make an FHSA active
+  // for the year, measured by the one function the panel also uses.
+  const activeFhsa = activeFhsaAccounts(plan, year, accountId => state.byAccount[accountId].balance)
   // More than one active FHSA has no single participation-room ledger, and the
   // money must not simply vanish from the account rows into a conservation
   // failure. Refuse it explicitly instead.
   if (activeFhsa.length > 1) return fail('unsupported', `${FHSA_MULTIPLE_ACTIVE_ACCOUNTS}: ${activeFhsa.map(account => account.id).join(', ')}`)
-  if (activeFhsa.some(account => {
+  for (const account of activeFhsa) {
     const opened = state.byAccount[account.id].openedYear
-    return opened.status === 'unknown' || year < opened.value
-  })) return fail('unsupported', 'FHSA opening year unknown or in the future')
+    if (opened.status === 'unknown') return fail('unsupported', `${FHSA_OPENING_YEAR_MISSING}: ${account.id}`)
+    if (year < opened.value) return fail('unsupported', `FHSA opening year is in the future: the FHSA is not open until ${opened.value}: ${account.id}`)
+  }
   if (activeFhsa.some(account => {
     const opened = state.byAccount[account.id].openedYear
     return opened.status === 'known' && year - opened.value >= 15
@@ -247,12 +240,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (!account) return fail('invalid', `scheduled contribution account missing: ${contribution.id}`)
     if (account.kind === 'fhsa') {
       // BE-36 A: only the holder can participate, no one else can contribute to
-      // their FHSA, and the row is priced by the holder's own room ledger.
+      // their FHSA, and the row is priced by the holder's own participation-room
+      // ledger below. It must never enter `scheduledByPerson`: that map is the
+      // RRSP ledger's line source *and* its destination, so parking an FHSA row
+      // there would spend RRSP room and pay the same contribution twice.
       if (contribution.contributorId === null) return fail('unsupported', `scheduled FHSA contributor not recorded: ${contribution.id}`)
       if (contribution.contributorId !== account.ownerId) return fail('unsupported', `only the FHSA holder can contribute to their own account: ${contribution.id}`)
-      const bucket = scheduledByPerson[contribution.contributorId] ??= { accountId: contribution.accountId, planned: 0 }
-      if (bucket.accountId !== contribution.accountId) return fail('unsupported', `one person has scheduled FHSA contributions to more than one account: ${contribution.contributorId}`)
-      bucket.planned += contribution.amount
       continue
     }
     if (!['rrsp', 'spousalRrsp'].includes(account.kind)) return fail('unsupported', `scheduled ${account.kind} contribution rule not yet wired: ${contribution.id}`)
@@ -350,9 +343,15 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     // be forgotten and counted again next year.
     const prior = fhsaLedgerByPerson[owner.id]
     const statement = fhsaStatementHistory(plan, activeFhsaId!)
-    const history = prior
+    // Once a year has been priced, the prior row's cumulative total is
+    // authoritative, so a projected contribution can never be forgotten and
+    // counted again next year. A prior row whose room was never established (a
+    // held account with nothing priced) carries no cumulative, so the plan's own
+    // statement is used instead of inheriting a permanent unknown.
+    const priorCumulative = prior?.cumulativeContributions
+    const history = priorCumulative?.status === 'known'
       ? {
-        cumulativePriorContributions: prior.cumulativeContributions,
+        cumulativePriorContributions: priorCumulative,
         provenance: statement?.provenance ?? account.provenance.balance ?? { origin: 'estimated' as const, sourceYear: plan.baseYear },
       }
       : statement
@@ -365,9 +364,11 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       accountId: activeFhsaId!,
       year,
       // A legacy plan that only recorded "years ago" keeps its unknown calendar
-      // year, and an unknown opening year is refused rather than assumed.
+      // year, and an unknown opening year is refused rather than assumed. A
+      // prior row, known or not, owns the carry: falling back to the opening
+      // room would turn an unestablished prior room into a real zero.
       openedYear: state.byAccount[activeFhsaId!].openedYear,
-      openingRoom: prior?.closingRoom.status === 'known' ? prior.closingRoom : fhsaOpeningRoom(plan, account),
+      openingRoom: prior ? prior.closingRoom : fhsaOpeningRoom(plan, account),
       history,
       lines: planned.request.lines,
     })
@@ -375,7 +376,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     fhsaLedgerByPerson[owner.id] = ledger
     fhsaLedger[owner.id] = ledger
     const blocking = ledger.limitations.filter(limitation => FHSA_BLOCKING.has(limitation.code))
-    if (blocking.length) return fail('unsupported', `FHSA participation room not verified for ${owner.id}: ${blocking.map(item => item.detail).join('; ')}`)
+    // An unconfirmed statement with nothing planned prices nothing, so it does
+    // not have to stop the whole year: the panel says the same thing. A year
+    // that would actually move money into the unknown room is still refused.
+    if (ledger.planned > 0 && blocking.length) return fail('unsupported', `FHSA participation room not verified for ${owner.id}: ${blocking.map(item => item.detail).join('; ')}`)
     if (ledger.retained > FHSA_MONEY_TOLERANCE &&
         !ledger.limitations.some(limitation => limitation.code === 'annualCapped' || limitation.code === 'lifetimeCapped' || limitation.code === 'carryForwardCapped'))
       return fail('invalid', `FHSA clipped without a reason: ${activeFhsaId}`)
@@ -407,7 +411,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const voluntary = plan.people.length === 1 ? allocation.voluntary.rrsp : 0
     // The same line set `previewRrspRoomYear` prices for the panel: recorded
     // rows plus the resolved savings-split RRSP share.
-    const lines = plannedRrspLines({ contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
+    const lines = plannedRrspLines({ accounts: plan.accounts, contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
     const statementYear = year === plan.baseYear
     let openingRoom = facts.rrspRoom
     let mismatch: RrspRoomLimitation | null = null

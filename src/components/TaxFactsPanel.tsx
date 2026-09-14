@@ -4,7 +4,7 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
-import { fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
+import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
 import { fhsaPlanRowId, plannedFhsaContribution } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
@@ -722,6 +722,11 @@ export function TaxFactsPanel() {
     })}
     {people.some(person => ownFhsaAccount(current, person.id).ambiguous) && <p className="hint" role="status" data-testid="fhsa-ambiguous">
       {t('be36.ambiguousAccount')}</p>}
+    {/* BE-36 A prices one active FHSA per plan, so the couple rows above are
+        offered while the projection refuses the year. Say so where the user
+        records the accounts instead of only inside the kernel. */}
+    {activeFhsaAccounts(current, current.baseYear, id => current.accounts.find(item => item.id === id)?.balance ?? 0).length > 1 &&
+      <p className="hint" role="status" data-testid="fhsa-multiple-active">{t('be36.multipleActive')}</p>}
     <p className="hint">{t('be36.scope')}</p>
     {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
       const rowIds = [account.id, derivedAccountId(account.id)]

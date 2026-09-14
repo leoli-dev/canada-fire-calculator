@@ -15,7 +15,8 @@ import {
   type FhsaRoomRequest,
   type FhsaRoomYear,
 } from '../fhsa'
-import { fhsaPlanRowId, plannedFhsaContribution } from '../fhsaPlan'
+import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaContribution, plannedFhsaYearTotal } from '../fhsaPlan'
+import { plannedRrspLines } from '../rrspRoom'
 import { selectFhsaRules } from '../rules'
 import { assertCanonicalPlan } from '../modelValidation'
 import type { Account, InputsV2, Known, Provenance } from '../model'
@@ -520,5 +521,55 @@ function planWith(options: { omitHistory?: boolean }): InputsV2 {
 describe('BE-36 A tolerance', () => {
   it('keeps the cents tolerance at the engine-wide figure', () => {
     expect(FHSA_MONEY_TOLERANCE).toBe(0.01)
+  })
+})
+
+/**
+ * Blocking B-1's invariant, at the line-builders themselves: a scheduled row is
+ * priced by the ledger of its own account kind and by no other.
+ */
+describe('BE-36 A the two room ledgers never price each other\'s rows', () => {
+  it('keeps an FHSA row out of the RRSP line set and an RRSP row out of the FHSA request', () => {
+    const plan = planWith({ omitHistory: true })
+    const person = plan.people[0]
+    const fhsa = plan.accounts.find(item => item.kind === 'fhsa')!
+    const rrsp = plan.accounts.find(item => item.kind === 'rrsp')!
+    plan.recurringContributions.push({
+      id: fhsaPlanRowId(fhsa.id), accountId: fhsa.id, contributorId: person.id,
+      annualAmount: 6000, funding: 'fromSavings', provenance,
+    })
+    plan.contributions.push(
+      { id: 'sched-fhsa', accountId: fhsa.id, contributorId: person.id, calendarYear: plan.baseYear, amount: 2000, deductionYear: null, provenance },
+      { id: 'sched-rrsp', accountId: rrsp.id, contributorId: person.id, calendarYear: plan.baseYear, amount: 500, deductionYear: null, provenance },
+    )
+    // The RRSP ledger's own line builder sees only the RRSP-kind row.
+    const rrspLines = plannedRrspLines({
+      accounts: plan.accounts, contributions: plan.contributions, personId: person.id, year: plan.baseYear, savingsShare: 0,
+    })
+    expect(rrspLines.map(item => item.id)).toEqual(['sched-rrsp'])
+    // The FHSA request prices the FHSA row plus the part of the recorded plan
+    // the scheduled row does not already cover.
+    const request = fhsaPlannedYearRequest({ plan, account: fhsa, year: plan.baseYear })
+    expect(request.request.lines.map(item => item.id)).toEqual(['sched-fhsa', `annual:${plan.baseYear}:fhsa`])
+    expect(request.savingsShare).toBe(4000)
+    // The year's whole plan is the recorded 6,000, never 6,000 + 2,000.
+    expect(plannedFhsaYearTotal(plan, fhsa.id, plan.baseYear)).toBe(6000)
+    expect(fhsaScheduledContributions(plan, fhsa.id, plan.baseYear).map(item => item.id)).toEqual(['sched-fhsa'])
+  })
+
+  it('takes the largest stale row, never their sum, when no recorded plan row exists', () => {
+    const plan = planWith({ omitHistory: true })
+    const person = plan.people[0]
+    const fhsa = plan.accounts.find(item => item.kind === 'fhsa')!
+    plan.recurringContributions.push(
+      { id: 'legacy:contribution:fhsa', accountId: fhsa.id, contributorId: person.id, annualAmount: 8000, funding: 'fromSavings', provenance },
+      { id: 'stale:fhsa', accountId: fhsa.id, contributorId: person.id, annualAmount: 6000, funding: 'fromSavings', provenance },
+    )
+    // 14,000 was the N-2 doubling; the fallback is one row, deterministically.
+    expect(plannedFhsaContribution(plan, fhsa.id)).toBe(8000)
+    expect(plannedFhsaYearTotal(plan, fhsa.id, plan.baseYear)).toBe(8000)
+    plan.recurringContributions.reverse()
+    expect(plannedFhsaContribution(plan, fhsa.id)).toBe(8000)
+    expect(plannedFhsaYearTotal(plan, fhsa.id, plan.baseYear)).toBe(8000)
   })
 })

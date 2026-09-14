@@ -1,4 +1,4 @@
-import type { Contribution, InputsV2, Known, Person } from './model'
+import type { Account, AccountKind, Contribution, InputsV2, Known, Person } from './model'
 import { resolveYearAllocation } from './funding'
 
 /**
@@ -289,10 +289,29 @@ export function sortRrspLines(lines: RrspContributionLine[]): RrspContributionLi
     left.id.localeCompare(right.id))
 }
 
-/** Contribution rows recorded for one person for one calendar year. */
-export function contributionLinesFor(contributions: Contribution[], personId: string, year: number): RrspContributionLine[] {
+/**
+ * The account kinds a scheduled contribution row may ever reach the RRSP room
+ * ledger through. An FHSA (or any other kind's) row is priced by its own
+ * ledger, so it must never consume RRSP room.
+ */
+export const RRSP_CONTRIBUTION_KINDS: ReadonlySet<AccountKind> = new Set<AccountKind>(['rrsp', 'spousalRrsp'])
+
+/**
+ * Contribution rows recorded for one person for one calendar year, restricted
+ * to accounts whose kind the RRSP ledger may price. The destination account
+ * kind is part of the filter: a scheduled FHSA row that reached this list would
+ * be booked as an RRSP contribution and would spend RRSP room.
+ */
+export function contributionLinesFor(
+  contributions: Contribution[], personId: string, year: number,
+  accountKinds: ReadonlyMap<string, AccountKind>,
+): RrspContributionLine[] {
   return sortRrspLines(contributions
-    .filter(contribution => contribution.calendarYear === year && contribution.contributorId === personId && contribution.amount > 0)
+    .filter(contribution => {
+      const kind = accountKinds.get(contribution.accountId)
+      return kind !== undefined && RRSP_CONTRIBUTION_KINDS.has(kind) &&
+        contribution.calendarYear === year && contribution.contributorId === personId && contribution.amount > 0
+    })
     .map(contribution => ({
       id: contribution.id,
       calendarYear: contribution.calendarYear,
@@ -308,15 +327,18 @@ export function contributionLinesFor(contributions: Contribution[], personId: st
  * ledger, so the displayed "planned"/"retained" figures cannot drift from the
  * kernel's (DM01 parity). `savingsShare` is
  * `resolveYearAllocation(plan, year).voluntary.rrsp`, computed by the same
- * function for both callers.
+ * function for both callers. `accounts` carries the destination kinds, so a
+ * scheduled FHSA row can never appear here as an RRSP line.
  */
 export function plannedRrspLines(args: {
+  accounts: Pick<Account, 'id' | 'kind'>[]
   contributions: Contribution[]
   personId: string
   year: number
   savingsShare: number
 }): RrspContributionLine[] {
-  const lines = contributionLinesFor(args.contributions, args.personId, args.year)
+  const accountKinds = new Map(args.accounts.map(account => [account.id, account.kind]))
+  const lines = contributionLinesFor(args.contributions, args.personId, args.year, accountKinds)
   const share = roundCents(Math.max(0, args.savingsShare))
   // Same synthetic id the kernel records, so the two ledgers are identical
   // objects and the applied row is attributable in the contribution history.
@@ -356,7 +378,7 @@ export function previewRrspRoomYear(plan: InputsV2, person: Person): RrspRoomPre
     adjustments: { pensionAdjustment: person.rrspPensionAdjustment, pspa: person.rrspPspa, par: person.rrspPar },
     adjustmentBasis: 'includedInStatement',
     unusedUndeducted: person.rrspUnusedUndeducted, deductionLimit: person.rrspDeductionLimit,
-    lines: plannedRrspLines({ contributions: plan.contributions, personId: person.id, year, savingsShare }),
+    lines: plannedRrspLines({ accounts: plan.accounts, contributions: plan.contributions, personId: person.id, year, savingsShare }),
   })
   return { opening, ledger, savingsShare }
 }

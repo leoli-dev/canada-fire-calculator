@@ -1,7 +1,7 @@
 import type { AccountType, PlannedResidence } from './types'
 import type { AccountKind, InputsV2 } from './model'
 import { ageReachedInYear } from './model'
-import { plannedFhsaContribution } from './fhsaPlan'
+import { plannedFhsaYearTotal } from './fhsaPlan'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 
 export interface FundingGap {
@@ -222,19 +222,27 @@ export function resolveYearAllocation(plan: InputsV2, year: number): Contributio
   // such a plan earlier, and the panel shows statement facts only.
   if (plan.budget.kind !== 'savingsBudget') return allocateContributions({ age, budget: 0, fhsa: 0, employee: 0, employer: 0, split })
   const cash = plan.budget.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
-  const scheduledPlanned = plan.contributions
-    .filter(contribution => contribution.calendarYear === year && contribution.amount > 0)
-    .reduce((total, contribution) => total + contribution.amount, 0)
   const kindOf = (accountId: string) => plan.accounts.find(account => account.id === accountId)?.kind
+  // An FHSA scheduled row is a component of the account's whole plan, which is
+  // reserved through `plannedFhsaYearTotal` below. Subtracting it here as well
+  // would charge the same money twice and understate the voluntary split.
+  const scheduledPlanned = plan.contributions
+    .filter(contribution => contribution.calendarYear === year && contribution.amount > 0 && kindOf(contribution.accountId) !== 'fhsa')
+    .reduce((total, contribution) => total + contribution.amount, 0)
   const fromSavings = (kind: AccountKind) => plan.recurringContributions
     .filter(contribution => kindOf(contribution.accountId) === kind && contribution.funding === 'fromSavings')
     .reduce((total, contribution) => total + contribution.annualAmount, 0)
-  // BE-36 A: one recorded plan per FHSA account, read through the same accessor
-  // the panel and the kernel price with. A stale duplicate row for the same
-  // account is never allocated as a second plan.
+  // BE-36 A: one whole plan per FHSA account — the recorded row, or the
+  // scheduled rows when they are larger — read through the same accessor the
+  // panel and the kernel price with. A stale duplicate row for the same account
+  // is never allocated as a second plan, and the amount reserved here is
+  // exactly what the participation-room ledger decides whether to execute. A
+  // non-`fromSavings` FHSA row is refused by the kernel, so it is reserved for
+  // neither ledger.
   const fhsa = plan.accounts
     .filter(account => account.kind === 'fhsa')
-    .reduce((total, account) => total + plannedFhsaContribution(plan, account.id), 0)
+    .filter(account => !plan.recurringContributions.some(item => item.accountId === account.id && item.funding !== 'fromSavings'))
+    .reduce((total, account) => total + plannedFhsaYearTotal(plan, account.id, year), 0)
   const employer = plan.recurringContributions
     .filter(contribution => contribution.funding === 'employerAdditional')
     .reduce((total, contribution) => total + contribution.annualAmount, 0)

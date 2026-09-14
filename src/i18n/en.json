@@ -1259,6 +1259,7 @@
     "person": "{{person}} FHSA room",
     "noAccount": "This person has no FHSA account of their own, so there is no participation room to price. An FHSA is never shared, and a household total is not divided between two people.",
     "ambiguousAccount": "This person has more than one FHSA account, so a planned contribution cannot be attributed to one of them.",
+    "multipleActive": "More than one FHSA is active this year. This estimate prices one active FHSA per plan, so the projection stops until only one account has a plan or a balance.",
     "openedYear": "Year the first FHSA was opened",
     "priorContributions": "Contributions and RRSP transfers before this plan year (CRA statement)",
     "openingRoom": "Unused participation room carried into this plan year (CRA statement)",

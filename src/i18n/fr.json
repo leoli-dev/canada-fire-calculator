@@ -1268,6 +1268,7 @@
     "person": "Droits CELIAPP de {{person}}",
     "noAccount": "Cette personne n'a pas de CELIAPP à elle : il n'y a donc aucun droit de participation à calculer. Un CELIAPP n'est jamais partagé et un total ménage n'est pas réparti entre deux personnes.",
     "ambiguousAccount": "Cette personne a plus d'un CELIAPP : une cotisation prévue ne peut pas être attribuée à un seul compte.",
+    "multipleActive": "Plus d'un CELIAPP est actif cette année. Cette estimation ne calcule qu'un seul CELIAPP actif par plan : la projection s'arrête tant qu'un seul compte a un plan ou un solde.",
     "openedYear": "Année d'ouverture du premier CELIAPP",
     "priorContributions": "Cotisations et transferts REER antérieurs à cette année du plan (relevé de l'ARC)",
     "openingRoom": "Droits de participation inutilisés reportés sur cette année du plan (relevé de l'ARC)",

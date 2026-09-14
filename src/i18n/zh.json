@@ -1268,6 +1268,7 @@
     "person": "{{person}} 的 FHSA 空间",
     "noAccount": "此人没有属于自己的 FHSA 账户，因此没有可计算的参与额度。FHSA 不能共用，家庭总额也不会在两人之间分摊。",
     "ambiguousAccount": "此人有多个 FHSA 账户，计划供款无法归属到其中某一个。",
+    "multipleActive": "本年度有多个 FHSA 处于活动状态。本估算每个计划只计算一个活动 FHSA，因此在仅有一个账户有供款计划或余额之前，投影会停止。",
     "openedYear": "首个 FHSA 的开户年份",
     "priorContributions": "本计划年度之前的供款与 RRSP 转入（CRA 对账单）",
     "openingRoom": "结转到本计划年度的未使用参与额度（CRA 对账单）",
