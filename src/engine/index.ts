@@ -22,6 +22,8 @@ export {
   gisWorkExemption,
   ccbAnnual,
   CPP_MAX_AT_65,
+  CPP_OAS_UNSUPPORTED_PATHS,
+  type BenefitUnsupportedPath,
   OAS_FULL_AT_65,
   OAS_GIS_ALLOWANCE_2026_Q3,
   GIS_HOUSEHOLD_CATEGORIES,

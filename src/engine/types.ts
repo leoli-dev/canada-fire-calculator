@@ -43,23 +43,18 @@ export interface CppWork {
 
 /**
  * BE-39 A. The source of one recorded CPP/QPP or OAS figure and the premises
- * the amount is expressed in. The app previously could not tell an
- * estimator-derived amount from a hand-entered statement value, so a
- * retirement-age change either left an estimate silently stale or silently
- * overwrote a recorded fact.
+ * the amount is expressed in, so a retirement-age change can never silently
+ * leave an estimate stale or silently overwrite a recorded fact.
  */
 export type PensionAmountSource = 'manual' | 'statement' | 'estimator' | 'unknown'
 
 /**
- * `'unknown'` means no source was ever recorded — an older saved plan, or a
- * value carried over from the pre-v11 schema. It is never rewritten as
- * `'estimator'`, because nothing established that a formula produced it.
- *
- * The amount fields are the *unit contract*: what the recorded number means.
- * The engine stores annual, age-65-basis, today's-dollars figures. A
- * statement value entered as `1000`, `monthly`, at age `65` is recorded as
- * `basis: 'monthly'`, `ageBasis: 65`, and converted to 12,000 exactly once —
- * the recorded premise is kept so the conversion can be checked and redone.
+ * `'unknown'` means no source was ever recorded — an older saved plan. It is
+ * never rewritten as `'estimator'`, because nothing established that a formula
+ * produced it. The amount fields are the unit contract: the engine stores
+ * annual, age-65-basis, today's-dollars figures, so a monthly `1000` at age 65
+ * is recorded `basis: 'monthly'`, `ageBasis: 65` and converted to 12,000
+ * exactly once, with the recorded premise kept so it can be re-checked.
  */
 export interface PensionAmountProvenance {
   source: PensionAmountSource

@@ -12,16 +12,10 @@ type StatementUnit = { basis: 'monthly' | 'annual'; ageBasis: number | null; dol
 
 /**
  * BE-39 A. The provenance line under one CPP/QPP or OAS amount: where the
- * figure came from, what its unit means, and — the point of the slice — the
- * flag raised when a retirement-age change invalidated a premise.
- *
- * The rules this surface has to show, and never blur:
- *   - `manual` and "no source recorded" are never flagged;
- *   - a `statement` amount is never silently overwritten; it asks for a
- *     re-confirmation instead;
- *   - an `estimator` CPP amount is re-priced from the same estimator, and says
- *     so; an `estimator` OAS amount cannot be re-priced from a retirement age,
- *     so it asks for confirmation.
+ * figure came from, what its unit means, and the flag a retirement-age change
+ * raised. `manual` and "no source recorded" are never flagged; a `statement`
+ * asks to be re-confirmed instead of being overwritten; an OAS residence
+ * estimate cannot be re-priced from an age, so it asks too.
  */
 export function PensionSourceNote(props: {
   kind: 'cpp' | 'oas'
@@ -88,12 +82,13 @@ export function PensionSourceNote(props: {
           </label>
           <label className="field pension-source-field">
             <span>{t('pensionAgeBasis')}</span>
-            <NumberInput
-              data-pension-age-basis={props.kind}
-              value={unit.ageBasis ?? 65}
-              step={1}
-              onChange={(value) => setUnit({ ageBasis: value == null ? null : Math.round(value) })}
-            />
+            <span data-pension-age-basis={props.kind}>
+              <NumberInput
+                value={unit.ageBasis ?? 65}
+                step={1}
+                onChange={(value) => setUnit({ ageBasis: value == null ? null : Math.round(value) })}
+              />
+            </span>
           </label>
         </>}
       </div>

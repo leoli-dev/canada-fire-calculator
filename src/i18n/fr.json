@@ -1341,7 +1341,6 @@
   "pensionAgeBasis": "Indique a l'age",
   "pensionReconfirm": "Verifier et reconfirmer",
   "pensionStatementNeedsReview": "L'age de retraite saisi a change depuis l'enregistrement de ce montant. Le montant n'a pas ete modifie - verifiez que l'hypothese d'age de debut du releve tient toujours, puis reconfirmez.",
-  "pensionEstimatorRecalculated": "Cette estimation a ete recalculee parce que votre age de retraite a change (maintenant {{age}}). C'est une estimation approximative, pas un droit acquis.",
   "pensionEstimatorNeedsReview": "Cette estimation reposait sur les annees de residence que vous avez saisies. Un changement d'age de retraite peut modifier le nombre d'annees comptees - confirmez ce chiffre avant de vous y fier. Le montant n'a pas ete modifie.",
   "pensionSourceUnknownNote": "Cette valeur a ete enregistree avant que le calculateur ne note sa provenance. Elle est traitee comme non confirmee, et non comme une estimation.",
   "pensionSourceManualNote": "Enregistre tel que saisi par vous. Un changement d'age de retraite ne le modifie pas.",

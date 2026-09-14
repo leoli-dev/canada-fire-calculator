@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CPP_MAX_AT_65,
+  CPP_OAS_UNSUPPORTED_PATHS,
   OAS_FULL_AT_65,
   cppAnnual,
   cppEstimatorProvenance,
@@ -235,6 +236,21 @@ describe('BE-39 A: statutory reference points', () => {
     expect(OAS_FULL_AT_65).toBeGreaterThan(0)
     const inputs: Inputs = { ...base(), cppAnnualAt65: CPP_MAX_AT_65 }
     expect(inputsCppAnnual(inputs, 65, 'ON', inputs.fireAge)).toBeCloseTo(CPP_MAX_AT_65, 6)
+  })
+
+  it('declares every out-of-scope rule surface with a concrete reason', () => {
+    // Not half-implemented: named, with the reason, and never read to compute.
+    expect(CPP_OAS_UNSUPPORTED_PATHS.length).toBeGreaterThanOrEqual(4)
+    const ids = CPP_OAS_UNSUPPORTED_PATHS.map(path => path.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const path of CPP_OAS_UNSUPPORTED_PATHS) {
+      expect(path.id.trim().length).toBeGreaterThan(0)
+      expect(path.reason.trim().length).toBeGreaterThan(40)
+    }
+    expect(ids).toEqual(expect.arrayContaining([
+      'cpp-qpp-separate-dropout', 'oas-residence-eligibility',
+      'db-indexation-start', 'provincial-benefit-interactions',
+    ]))
   })
 
   it('does not price an amount whose source is unknown as zero or as an estimate', () => {

@@ -1,20 +1,14 @@
-// BE-39 A: CPP/QPP and OAS amount provenance, and the dependency invalidation
-// that a retirement-age change must trigger.
-//
-// Three sources are distinguished, and they fail differently:
-//
-//   manual    — typed by the user. Never changed, never flagged: it is a fact.
-//   statement — an amount read off a Service Canada / Retraite Québec
-//               statement. Never changed. When the retirement age moves, the
-//               premise it assumes ("benefits start at X") may no longer hold,
-//               so it gets `premisesNeedReview` rather than a new number.
-//   estimator — produced by this app from work/residence premises. When the
-//               retirement age moves it is recomputed from the same shared
-//               estimator, or explicitly flagged when the estimator has no
-//               retirement-age input to recompute with (OAS residence years).
-//
-// `unknown` is the absence of a recorded source (a plan saved before this
-// field existed). It is never treated as `estimator`.
+// BE-39 A: CPP/QPP and OAS amount provenance, and the retirement-age
+// dependency invalidation that a FIRE-age change must trigger. The four sources
+// fail differently:
+//   manual    — a typed fact. Never changed, never flagged.
+//   statement — a statement figure. Never changed; moves only its
+//               `premisesNeedReview` flag.
+//   estimator — this app's own work/residence estimate. Re-priced from the
+//               same shared estimator, or flagged when the estimator has no
+//               retirement-age input to re-price with (OAS residence).
+//   unknown   — no source ever recorded (an older saved plan). Never treated
+//               as an estimate.
 
 import type { Inputs, PensionAmountProvenance, Province } from './types'
 import type { Person } from './model'
@@ -25,25 +19,23 @@ import {
   oasAnnualAtBasis,
 } from './benefits'
 
-/** A recorded amount and its provenance, in the engine's own stored units. */
+/**
+ * A recorded amount read into the engine's units: annual, age-65-basis,
+ * today's dollars.
+ */
 export interface PensionAmountReading {
-  /** Annual, age-65-basis, today's-dollars — what `cppAnnualAt65` stores. */
   annual: number
   /** The age the recorded figure is stated at; null = the 65 basis. */
   ageBasis: number | null
-  /** True when the recorded figure was stated per month. */
   fromMonthly: boolean
   source: PensionAmountProvenance['source']
 }
 
 /**
- * Read one recorded amount into the engine's units.
- *
- * The stored contract is annual dollars: `cppAnnualAt65` / `oasAnnualAt65` are
- * annual fields, and a monthly entry is multiplied by 12 exactly once, when it
- * is written. `basis` is kept as *provenance* — what the user actually saw and
- * typed — so the reverse (for display) and the audit trail are both exact.
- * Nothing downstream ever multiplies by 12 again.
+ * Read one recorded amount into the engine's units. The stored contract is
+ * annual dollars: a monthly entry is multiplied by 12 exactly once, when it is
+ * written. `basis` is kept as provenance — what the user typed — so the display
+ * reverse and the audit trail are exact, and nothing multiplies again.
  */
 export function normalizePensionAmount(
   amount: number,
@@ -75,14 +67,9 @@ export function pensionAmountFromDisplay(
 
 /** What one recorded amount looks like once the current plan is applied. */
 export interface PensionAmountDerivation {
-  /** The value to store in `cppAnnualAt65` / `oasAnnualAt65`. */
   value: number
   provenance: PensionAmountProvenance
-  /**
-   * The recorded premise no longer matches the plan. The amount was either
-   * recomputed from the shared estimator (CPP) or deliberately left alone and
-   * flagged (statement, OAS residence).
-   */
+  /** The recorded premise no longer matched the plan when this was derived. */
   stale: boolean
 }
 
@@ -101,16 +88,11 @@ function estimatorPremises(
 }
 
 /**
- * CPP/QPP dependency invalidation.
- *
- * An estimator-derived amount is recomputed with the *same* shared estimator
- * (`estimateCppAt65`) and the premises the estimator recorded, with only the
- * retirement age advanced to the plan's current one. That is the dependency
- * the audit found broken: the old code captured `cppWork.retireAge` at apply
- * time and let it drive a relief factor forever after.
- *
- * A statement amount is returned untouched and only flagged. A manual amount
- * is returned untouched and unflagged.
+ * CPP/QPP dependency invalidation. An estimator amount is re-priced with the
+ * same shared estimator and the recorded premises, with only the retirement age
+ * advanced — the dependency the audit found broken, where `cppWork.retireAge`
+ * captured at apply time drove a relief factor forever after. A statement or
+ * manual amount is returned untouched; only the statement is flagged.
  */
 export function deriveCppAmount(
   current: number,
@@ -152,14 +134,11 @@ export function deriveCppAmount(
 }
 
 /**
- * OAS dependency invalidation.
- *
- * The OAS estimator is residence-based and takes no retirement age, so there
- * is nothing to recompute: the full 40-year scale is the same at every
- * retirement age. Rather than silently re-price a residence premise that a
- * different retirement age may contradict, the amount is kept and the premise
- * is flagged for re-confirmation. This is the "explicitly flagged" arm of the
- * BE-39 requirement.
+ * OAS dependency invalidation. The OAS estimator is residence-based and takes
+ * no retirement age, so there is nothing to re-price: rather than silently
+ * assert residence years a different retirement age may contradict, the amount
+ * is kept and the premise is flagged for re-confirmation — the "explicitly
+ * flagged" arm of the requirement.
  */
 export function deriveOasAmount(
   current: number,
@@ -185,10 +164,8 @@ export function deriveOasAmount(
 }
 
 /**
- * A statement amount keeps its number, but the retirement age its premises
- * assume may no longer match the plan. `premises.retirementAge === null` means
- * no age premise was recorded (an older statement entry), which is re-confirmed
- * once and then recorded — not left permanently undecidable.
+ * A statement amount keeps its number; only its assumed retirement age can
+ * drift. An entry with no recorded premise is re-confirmed once, then recorded.
  */
 function statementPremiseNeedsReview(
   recorded: PensionAmountProvenance,
@@ -208,12 +185,9 @@ export type PensionAmountWarning =
 
 /**
  * The visible consequence of the invalidation rules, in one place so the
- * professional panel, the guided page and the tests describe the same thing.
- * A `manual` value, and a value with no recorded source, are never flagged:
- * neither has a premise that a retirement-age change could invalidate.
- *
- * `retirementAge` is the plan's current retirement age for this person, so the
- * warning reflects a genuine drift rather than merely the presence of a flag.
+ * professional panel, the guided page and the tests agree. A `manual` value and
+ * one with no recorded source are never flagged: neither has a premise a
+ * retirement-age change could invalidate.
  */
 export function pensionAmountWarning(
   provenance: PensionAmountProvenance | undefined,
@@ -239,11 +213,8 @@ export function pensionAmountWarning(
 
 /**
  * Apply the dependency rules to one person's CPP/QPP and OAS figures.
- *
- * `retirementAge` is the plan's current retirement age for that person, so
- * changing the FIRE age — which is what moves it — is the trigger the audit
- * asked for. Returns new amounts only for estimator CPP values; everything
- * else is returned unchanged with its provenance updated.
+ * `retirementAge` is that person's current retirement age, so a FIRE-age change
+ * is the trigger. Only estimator CPP amounts change value.
  */
 export function syncPensionAmounts(person: {
   cppAnnualAt65: number
@@ -274,12 +245,11 @@ export function syncPensionAmounts(person: {
 }
 
 /**
- * Invalidate the estimator-derived component of a retirement-age change.
- *
- * This is a pure function over `Inputs`, and the store runs it on every edit
- * so a stale `cppWork`-style snapshot cannot survive a `fireAge` change. It
- * only *writes* amounts whose recorded source is `estimator`; a manual or
- * statement value is carried through with its flag recomputed.
+ * Invalidate the estimator-derived component of a retirement-age change. A pure
+ * function over `Inputs`, run by the store on every edit, so a stale
+ * `cppWork`-style snapshot cannot survive a `fireAge` change. It only *writes*
+ * an `estimator`-sourced amount; manual and statement values pass through with
+ * their flag recomputed.
  */
 export function refreshPensionProvenance(inputs: Inputs): Inputs {
   const self = syncPensionAmounts(inputs, inputs.fireAge)
@@ -347,8 +317,8 @@ export function manualProvenance(sourceYear: number): PensionAmountProvenance {
 
 /**
  * A statement value entered as monthly or annual at its own stated age. The
- * retirement age assumed at entry is recorded, so a later FIRE-age change can
- * raise `premisesNeedReview` instead of silently re-pricing the statement.
+ * retirement age assumed at entry is recorded so a later change can raise the
+ * review flag instead of silently re-pricing the statement.
  */
 export function statementProvenance(
   sourceYear: number,
@@ -360,8 +330,8 @@ export function statementProvenance(
 
 /**
  * Re-confirm a statement amount against the plan as it stands: the value is
- * kept, the recorded retirement-age premise is adopted, and the review flag
- * clears. This is the only thing that clears it — nothing clears it silently.
+ * kept, the recorded premise is adopted, and the review flag clears. This is
+ * the only thing that clears it — nothing clears it silently.
  */
 export function reconfirmStatementAmount(
   amount: number,
@@ -381,17 +351,14 @@ export function reconfirmStatementAmount(
 }
 
 /**
- * The annual CPP/QPP a person receives in a year at which they are already
- * claiming, on the shared formula. This is the one entry point the main
- * projection, the candidate timing scan and the timing card all call, so a
- * candidate row can never disagree with the projection it is ranking.
- *
- * Three independent pieces, each applied at most once:
- *   1. the start-age factor, relative to the amount's own recorded basis
- *      (`cppAnnualAtBasis`), so an amount already stated at its claim age is
- *      not reduced twice;
- *   2. the early-claim dilution relief, from the *current* retirement age.
- * OAS's 75+ top-up is OAS, not CPP, and stays with the caller that owns it.
+ * The annual CPP/QPP a person receives at a claim age, on the shared formula.
+ * This is the one entry point the projection, the candidate scan and the timing
+ * card all call, so a candidate row cannot disagree with the projection it
+ * ranks. Two independent pieces, each applied at most once: the start-age
+ * factor relative to the amount's own recorded basis (so an amount already
+ * stated at its claim age is not reduced twice), and the dilution relief from
+ * the *current* retirement age. OAS's 75+ top-up is OAS and stays with its
+ * caller.
  */
 export function personCppAnnual(
   person: Pick<Person, 'retirementAge' | 'cppWork'>,
@@ -410,13 +377,9 @@ export function personCppAnnual(
 }
 
 /**
- * The CPP/QPP amount shown for one `Inputs`-shaped person (self or partner) at
- * a given claim age. `amount` and `basisAge` come from the normalized
- * provenance reading, so the UI never re-derives the formula.
- *
- * `claimAge` is the age the benefit is *claimed at* (normally the person's
- * `cppStartAge`), not the calendar age of the projection row — the caller owns
- * the "has this person reached their start age yet" gate.
+ * The CPP/QPP amount for one `Inputs`-shaped person at a claim age. `claimAge`
+ * is the age claimed at (normally `cppStartAge`), not the projection row's
+ * calendar age: the caller owns the "reached the start age" gate.
  */
 export function inputsCppAnnual(
   input: Pick<Inputs, 'cppStartAge' | 'cppAnnualAt65' | 'cppWork' | 'cppAmountSource'>,

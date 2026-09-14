@@ -3,6 +3,7 @@ import type { InputsV2 } from '../engine/model'
 import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
 import type { PlanningIntent } from '../store'
+import { refreshPensionProvenance } from '../engine'
 import { fieldRegistry, parseField, type SharedFieldId } from './fieldRegistry'
 
 export interface PlanFieldSnapshot {
@@ -32,7 +33,10 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
   }
   const draftByField = { ...state.draftByField }
   delete draftByField[id]
-  const inputs = fieldRegistry[id].write(state.inputs, parsed.value)
+  // BE-39 A: a registered-field edit that moves the retirement age (the FIRE
+  // age is the one that does) must invalidate the estimate-derived amounts.
+  // Without this the registry path bypasses the rule `store.set` applies.
+  const inputs = refreshPensionProvenance(fieldRegistry[id].write(state.inputs, parsed.value))
   const canonical = refreshCanonicalFromLegacy(state.canonical, inputs)
   if (id === 'nonRegBook') {
     const account = canonical.accounts.find(item => item.kind === 'nonReg')

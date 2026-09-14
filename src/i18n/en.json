@@ -1332,7 +1332,6 @@
   "pensionAgeBasis": "Stated at age",
   "pensionReconfirm": "Review and re-confirm",
   "pensionStatementNeedsReview": "The retirement age you entered has changed since this statement amount was recorded. The amount has not been changed - check that the statement's start-age assumption still matches, then re-confirm.",
-  "pensionEstimatorRecalculated": "This estimate was re-calculated because your retirement age changed (now {{age}}). It is a rough estimate, not an entitlement.",
   "pensionEstimatorNeedsReview": "This estimate was based on years of residence you entered. Changing your retirement age may change how many years count - confirm the residence figure before relying on it. The amount has not been changed.",
   "pensionSourceUnknownNote": "This value was saved before the calculator recorded where it came from. It is treated as unconfirmed, not as an estimate.",
   "pensionSourceManualNote": "Recorded as entered by you. Changing your retirement age does not change it.",

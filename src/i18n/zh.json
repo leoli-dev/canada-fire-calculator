@@ -1341,7 +1341,6 @@
   "pensionAgeBasis": "标注的起始年龄",
   "pensionReconfirm": "查看并重新确认",
   "pensionStatementNeedsReview": "自记录该对账单金额以来，你填写的退休年龄已变化。金额未被改动——请核对该对账单的起领年龄假设是否仍然成立，然后重新确认。",
-  "pensionEstimatorRecalculated": "由于你的退休年龄变化（现为 {{age}}），该估算已重新计算。它是粗略估算，不是应得权益。",
   "pensionEstimatorNeedsReview": "该估算基于你填写的居住年数。退休年龄变化可能改变计入的年数——请在依赖该金额前确认居住年数。金额未被改动。",
   "pensionSourceUnknownNote": "该值保存于本计算器开始记录来源之前。它被视为未确认，而不是估算值。",
   "pensionSourceManualNote": "按你的输入记录。改变退休年龄不会改动它。",

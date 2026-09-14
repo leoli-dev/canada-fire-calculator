@@ -293,35 +293,40 @@ function reconcileLegacyInputs(state: Store, inputs: Inputs) {
 }
 
 /**
- * BE-39 A. Invalidate the parts of a CPP/QPP or OAS figure whose premise the
- * edit just moved.
- *
- * The rule has to be applied here, at the one place every edit funnels through
- * — `store.set` only shallow-merges a patch, so before this a stale `cppWork`
- * (and any other derived benefit input) survived a `fireAge` change untouched.
- *
- * A patch that carries an explicit provenance record wins: that is the
- * estimator's `Apply`. A patch that changes an *amount* without provenance is a
- * user typing the number, which is a manual fact. Anything else keeps the
- * recorded source. Only an `estimator`-sourced amount is ever rewritten.
+ * BE-39 A. Invalidate the CPP/QPP and OAS figures whose premise the edit just
+ * moved. It has to run here: `store.set` only shallow-merges a patch, so before
+ * this a stale `cppWork` survived a `fireAge` change untouched. A patch that
+ * carries an explicit provenance record wins (the estimator's Apply); a patch
+ * that changes an amount with no provenance is a manual fact; anything else
+ * keeps the recorded source. Only an estimator amount is ever rewritten.
  */
 function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<Inputs>): Inputs {
   const partnerPatched = patch.partner
   const selfPatch = { ...patch }
   delete selfPatch.partner
   const withSelf: Inputs = { ...inputs }
-  if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined && inputs.cppAnnualAt65 !== state.cppAnnualAt65)
+  // Only an amount that had no provenance, or one already recorded as manual,
+  // becomes manual when it is retyped. Typing over a `statement` value or an
+  // `estimator` value must not silently relabel where the figure came from —
+  // the source control is what changes a source.
+  const becomesManual = (recorded: Inputs['cppAmountSource']) =>
+    recorded === undefined || recorded.source === 'unknown' || recorded.source === 'manual'
+  if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined &&
+      inputs.cppAnnualAt65 !== state.cppAnnualAt65 && becomesManual(state.cppAmountSource))
     withSelf.cppAmountSource = manualProvenance(new Date().getFullYear())
-  if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined && inputs.oasAnnualAt65 !== state.oasAnnualAt65)
+  if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined &&
+      inputs.oasAnnualAt65 !== state.oasAnnualAt65 && becomesManual(state.oasAmountSource))
     withSelf.oasAmountSource = manualProvenance(new Date().getFullYear())
   // A partner patch is a whole-record replacement, so it can carry its own
   // provenance; when it only moves the amount, record that as manual too.
   if (partnerPatched && inputs.partner) {
     const before = state.partner
     const partner = { ...inputs.partner }
-    if (partnerPatched.cppAmountSource === undefined && before && partner.cppAnnualAt65 !== before.cppAnnualAt65)
+    if (partnerPatched.cppAmountSource === undefined && before && partner.cppAnnualAt65 !== before.cppAnnualAt65 &&
+        becomesManual(before.cppAmountSource))
       partner.cppAmountSource = manualProvenance(new Date().getFullYear())
-    if (partnerPatched.oasAmountSource === undefined && before && partner.oasAnnualAt65 !== before.oasAnnualAt65)
+    if (partnerPatched.oasAmountSource === undefined && before && partner.oasAnnualAt65 !== before.oasAnnualAt65 &&
+        becomesManual(before.oasAmountSource))
       partner.oasAmountSource = manualProvenance(new Date().getFullYear())
     withSelf.partner = partner
   }
