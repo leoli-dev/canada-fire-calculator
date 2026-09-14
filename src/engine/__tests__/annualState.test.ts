@@ -498,12 +498,16 @@ describe('BE-14 A nominal annual state kernel', () => {
   })
 })
 
-/** Cash, tax and spending chosen so evaluated cash equals the savings budget. */
+/** Cash, tax and spending chosen so evaluated household cash equals the
+ * savings budget; the total is split evenly so a couple still sums to cash. */
 const cashProviders = (cash: number, earnedIncome = 0): AnnualProviders => ({
-  evaluate: ({ state }) => ({ byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
-    income: cash, earnedIncome, benefits: 0, tax: 0, spending: 0, taxableIncome: cash,
-    benefitIncomeForNextYear: { status: 'known' as const, value: cash },
-  }])) }),
+  evaluate: ({ state }) => {
+    const ids = Object.keys(state.byPerson)
+    return { byPerson: Object.fromEntries(ids.map(id => [id, {
+      income: cash / ids.length, earnedIncome, benefits: 0, tax: 0, spending: 0, taxableIncome: cash / ids.length,
+      benefitIncomeForNextYear: { status: 'known' as const, value: cash / ids.length },
+    }])) }
+  },
   returns: () => 0,
 })
 
@@ -670,5 +674,40 @@ describe('BE-12 A RRSP room ledger wiring', () => {
       expect(projectFromState(canonical, forged, 0, cashProviders(20000)).status).toBe('invalid')
       expect(annualStep(canonical, forged, cashProviders(20000)).status).toBe('invalid')
     }
+  })
+
+  it('prices each partner against their own room and their own contributor', () => {
+    const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+    const self = canonical.people.find(person => person.role === 'self')!
+    const partner = canonical.people.find(person => person.role === 'partner')!
+    const base = canonical.accounts.find(account => account.kind === 'rrsp')!
+    for (const account of canonical.accounts) {
+      account.ownerId = self.id
+      account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    const partnerRrsp = { ...structuredClone(base), id: `${base.id}:partner`, ownerId: partner.id, balance: 0,
+      taxableOwnerShares: { status: 'known' as const, shares: { [partner.id]: 1 } } }
+    canonical.accounts.push(partnerRrsp)
+    self.rrspAvailableRoom = { status: 'known', value: 10000 }
+    partner.rrspAvailableRoom = { status: 'known', value: 4000 }
+    canonical.contributions = [
+      { id: 'self-plan', accountId: base.id, contributorId: self.id, calendarYear: canonical.baseYear, amount: 8000, deductionYear: null, provenance: { origin: 'user', sourceYear: canonical.baseYear } },
+      { id: 'partner-plan', accountId: partnerRrsp.id, contributorId: partner.id, calendarYear: canonical.baseYear, amount: 6000, deductionYear: null, provenance: { origin: 'user', sourceYear: canonical.baseYear } },
+    ]
+    const { state, row } = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000)))
+    expect(row.rrspLedger[self.id].applied).toBe(8000)
+    expect(row.rrspLedger[self.id].retained).toBe(0)
+    expect(row.rrspLedger[partner.id].applied).toBe(4000)
+    expect(row.rrspLedger[partner.id].retained).toBe(2000)
+    expect(state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 2000 })
+    expect(state.byPerson[partner.id].rrspRoom).toEqual({ status: 'known', value: 0 })
+    expect(row.byAccount[base.id].contribution).toBe(8000)
+    expect(row.byAccount[partnerRrsp.id].contribution).toBe(4000)
+    // 6,000 voluntary nonReg + the partner's clipped 2,000 retained in nonReg.
+    const nonReg = canonical.accounts.find(account => account.kind === 'nonReg')!
+    expect(row.byAccount[nonReg.id].contribution).toBe(8000)
+    expect(row.cashLedger.retainedContributions).toBe(2000)
   })
 })

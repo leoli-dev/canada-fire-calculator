@@ -760,5 +760,33 @@
     "appliesPlannedHome": "仅适用于计划购房",
     "capabilityProjectionInput": "参与当前投影；仍可能有其他能力限制。",
     "capabilityPlannedMortgage": "核对模型中的还款与融资；计划购房时不支持快捷 FIRE 资产数求解，也不代表贷款机构批准。"
+  },
+  "be12": {
+    "title": "RRSP 供款额度",
+    "explanation": "请照抄 CRA 的 RRSP 扣除上限通知书上的各行数字。无法确认的行请留空：留空会保持未知并限制精确建议，绝不会被当作 0，也不会被当作无限额度。",
+    "deductionLimit": "RRSP 扣除上限（CRA 通知书）",
+    "availableRoom": "可用供款空间（CRA 通知书）",
+    "unusedUndeducted": "已供款但尚未扣除的金额",
+    "pa": "养老金调整额（PA）",
+    "pspa": "过往服务养老金调整额（PSPA）",
+    "par": "养老金调整额返还（PAR）",
+    "person": "{{person}} 的 RRSP 额度",
+    "planned": "今年计划向本人 RRSP 供款的金额",
+    "deductLater": "该笔供款留到以后年度扣除",
+    "zero": "0",
+    "unknown": "未确认",
+    "ledger": "期初额度 {{opening}} + 新增 {{additions}} + 调整 {{adjustments}} − 已供款 {{applied}} = 期末额度 {{closing}} 加元",
+    "retained": "留存未供款：{{retained}} 加元。",
+    "retainedHelp": "额度不会被超出，资金也不会消失：超出部分留在非注册账户中。",
+    "unknownRoom": "供款额度尚未确认，因此不计算任何供款。填写 CRA 通知书各行即可得到确切数字。",
+    "mismatch": "可用供款空间不等于扣除上限减去未扣除供款。请核对 CRA 通知书各行；在两者一致之前不会计算供款。",
+    "overContribution": "通知书中的未扣除供款超出扣除上限 {{amount}} 加元。可用空间为零；请向 CRA 确认超额供款。",
+    "noOwnAccount": "请先在上方归属区为本人指定其自己的 RRSP 账户，再规划供款。",
+    "ambiguousAccount": "本人拥有多个 RRSP 账户，无法把计划供款归到其中某一个。",
+    "deductedThisYear": "{{amount}} 加元在 {{year}} 年扣除。",
+    "deferred": "{{amount}} 加元现在使用额度，留到 {{year}} 年扣除。",
+    "deductionPolicy": "新供款默认在供款当年扣除，除非您选择以后年度。该默认值是本方案的策略选择，不是 CRA 规则。",
+    "limit": "此处只计算本人（非配偶）RRSP 供款。配偶归属（T2205）、前 60 天规则和提款年度窗口尚未实现。",
+    "source": "CRA T4040 RRSP 及其他注册计划"
   }
 }
