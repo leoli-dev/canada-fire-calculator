@@ -240,7 +240,12 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
           onBlur={event => {
             const year = Number(event.currentTarget.value)
             if (!Number.isInteger(year) || year < 1950 || year > 2200 || year === row.calendarYear) return
-            setRow(row.id, contribution => { contribution.calendarYear = year })
+            setRow(row.id, contribution => {
+              contribution.calendarYear = year
+              // The deferral is relative to the contribution year, so moving the
+              // year keeps "deducted the following year" true.
+              if (contribution.deductionYear !== null) contribution.deductionYear = year + 1
+            })
           }} />
       </label>
       <label>{t('be12.spousalContributor')}
@@ -260,6 +265,15 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
             setRow(row.id, contribution => { contribution.amount = amount })
           }} />
       </label>
+      <label>{t('be12.spousalDeductLater')}
+        <input type="checkbox" data-testid={`spousal-deduct-later-${row.id}`}
+          checked={row.deductionYear !== null}
+          onChange={event => setRow(row.id, contribution => {
+            contribution.deductionYear = event.target.checked ? contribution.calendarYear + 1 : null
+          })} />
+      </label>
+      {row.deductionYear !== null && <p className="hint" data-testid={`spousal-deduction-year-${row.id}`}>
+        {t('be12.spousalDeductionYear', { deductionYear: row.deductionYear, contributionYear: row.calendarYear })}</p>}
       <button type="button" data-testid={`spousal-remove-${row.id}`}
         onClick={() => removeRow(row.id)}>{t('be12.spousalRemove')}</button>
     </div>)}

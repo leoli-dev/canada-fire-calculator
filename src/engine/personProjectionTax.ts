@@ -1,7 +1,7 @@
 import type { Inputs } from './types'
 import type { InputsV2 } from './model'
 import { calculateHouseholdTax, type HouseholdTaxResult } from './householdTax'
-import type { IncomeEvent } from './personIncome'
+import type { IncomeEvent, IncomeYearContext } from './personIncome'
 import { cppAnnual, earlyClaimDilutionRelief, oasAfterClawback } from './benefits'
 import { pensionPaid } from './pensionPaid'
 import { minimumForRrif } from './rrif'
@@ -98,10 +98,19 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
       return { status: 'unsupported', reason: 'rental allocation or mortgage deduction needs BE-14 B' }
     annualEvents.push({ id: `rent:${f.year}`, kind: 'rent', propertyId: rented[0].id, amount: f.rent })
   }
+  // Review fix B1: the spousal attribution's s.146.3(5.1) minimum must be the
+  // same figure as the year's mandatory RRIF withdrawal, which is computed from
+  // this year's opening registered balance (the caller's `registeredBalance`),
+  // never from the frozen canonical `account.balance`. The single-account path
+  // above is the only one that reaches an RRIF event, so the balance maps to
+  // that one account.
+  const yearContext: IncomeYearContext = {
+    registeredOpeningBalances: registered.length === 1 ? { [registered[0].id]: f.registeredBalance } : undefined,
+  }
   // OAS recovery uses each person's net income after the same elected pension
   // split used by final tax, but before adding their own OAS event. CRA notes
   // that the election changes individual OAS repayment.
-  const before = calculateHouseholdTax(plan, f.year, annualEvents)
+  const before = calculateHouseholdTax(plan, f.year, annualEvents, yearContext)
   if (before.status !== 'ok') return before
   let oasNet = 0
   const oasByPerson: Record<string, { gross: number; net: number }> = {}
@@ -111,7 +120,7 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     oasByPerson[item.canonical.id] = { gross: f.oasGross[index] ?? 0, net: oas }
     if (oas) annualEvents.push({ id: `${item.canonical.id}:oas:${f.year}`, kind: 'oas', personId: item.canonical.id, amount: oas })
   }
-  const tax = calculateHouseholdTax(plan, f.year, annualEvents)
+  const tax = calculateHouseholdTax(plan, f.year, annualEvents, yearContext)
   if (tax.status !== 'ok') return tax
   return { status: 'ok', tax, oasNet, oasByPerson, grossCpp, grossPension,
     taxableExOas: Object.values(tax.byPerson).reduce((sum, row) => sum + row.taxableIncome, 0) - oasNet,

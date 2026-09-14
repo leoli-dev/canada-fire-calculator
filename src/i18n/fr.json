@@ -796,6 +796,8 @@
     "spousalYear": "Année du versement de la cotisation",
     "spousalContributor": "Cotisant",
     "spousalAmount": "Montant de la cotisation ($ CA)",
+    "spousalDeductLater": "Déduire cette cotisation l'année suivante",
+    "spousalDeductionYear": "Année de déduction inscrite : {{deductionYear}}. La cotisation a été versée en {{contributionYear}}, donc l'attribution utilise toujours {{contributionYear}}.",
     "spousalUnassigned": "Non inscrit",
     "spousalAdd": "Ajouter une cotisation",
     "spousalRemove": "Retirer",

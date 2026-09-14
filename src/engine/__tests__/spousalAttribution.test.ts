@@ -10,6 +10,7 @@ import {
   attributionWindowYears,
   isInAttributionWindow,
   knownRrifMinimum,
+  resolveSpousalPlan,
   spousalPremiumLines,
   type SpousalAttributionResult,
   type SpousalPremium,
@@ -286,8 +287,13 @@ describe('BE-12 B unknown is never zero', () => {
     expect(empty.attributedToContributor).toBe(0)
     expect(empty.taxedToAnnuitant).toBe(10_000)
     const unknown = attributeSpousalPayment(request({ premiums: null }))
+    // The two states differ by status: "no premiums" is an answered `ok` zero,
+    // "history not recorded" is refused. (The old assertion compared the 0
+    // attribution to a reason string and could never fail.)
+    expect(empty.status).toBe('ok')
     expect(unknown.status).toBe('unsupported')
-    expect(empty.attributedToContributor).not.toBe((unknown as { reason: string }).reason)
+    if (unknown.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(unknown.reason).toBe(SPOUSAL_HISTORY_UNKNOWN_REASON)
   })
 
   it('refuses an unrecorded contributor, an unrecorded plan holder and an unrecorded premium payer', () => {
@@ -404,7 +410,7 @@ describe('BE-12 B personIncome wiring', () => {
     expect(result.byPerson[self.id].gross).toBe(5_000)
   })
 
-  it('leaves an ordinary RRSP and a single-person spousal plan on the owner path', () => {
+  it('leaves an ordinary RRSP with no recorded history on the owner path', () => {
     const ordinary = spousalPlan((draft, _selfId, _partnerId, accountId) => {
       draft.accounts.find(item => item.id === accountId)!.kind = 'rrsp'
     })
@@ -414,6 +420,61 @@ describe('BE-12 B personIncome wiring', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.byPerson[self.id].gross).toBe(5_000)
+  })
+
+  it('refuses a single-person spousal plan because there is no spouse to attribute to', () => {
+    // The recorded history still marks the account as a spousal plan, but the
+    // contributor the attribution needs is not in the plan.
+    const plan = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+      draft.spousalHistory = { [accountId]: { status: 'complete' } }
+    })
+    plan.people = plan.people.filter(person => person.role === 'self')
+    const account = plan.accounts.find(item => item.kind === 'spousalRrsp')!
+    const result = calculatePersonIncome(plan, 2026, [{ id: 'draw', kind: 'rrspWithdrawal', accountId: account.id, amount: 5_000 }])
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.reason).toContain("needs the annuitant's spouse in the plan")
+  })
+
+  it('refuses a stray recorded history on a LIRA instead of silently ignoring it', () => {
+    // A LIRA withdrawal is not an income kind yet, so the routing boundary is
+    // where a stray recorded fact must be answered rather than dropped.
+    const lira = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+      draft.accounts.find(item => item.id === accountId)!.kind = 'lira'
+    })
+    const account = lira.accounts.find(item => item.kind === 'lira')!
+    const routing = resolveSpousalPlan(account, lira.people, { [account.id]: { status: 'complete' } }, [], 2026, 2026)
+    expect(routing.status).toBe('unsupported')
+    if (routing.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(routing.reason).toContain('spousal LIRA')
+    expect(routing.reason).toContain('BE-36')
+    // Without a recorded history the account is simply not a spousal plan.
+    expect(resolveSpousalPlan(account, lira.people, undefined, [], 2026, 2026)).toEqual({ status: 'notSpousal' })
+  })
+
+  it('treats an empty spousalHistory record exactly like no history at all', () => {
+    const run = (kind: 'rrif' | 'spousalRrsp', history: Record<string, { status: 'complete' }> | undefined) => {
+      const plan = spousalPlan((draft, _selfId, _partnerId, accountId) => {
+        const item = draft.accounts.find(account => account.id === accountId)!
+        item.kind = kind
+        item.openedYear = { status: 'known', value: 2020 }
+        item.rrifFactorCategory = { status: 'known', value: 'allOther' }
+        draft.spousalHistory = history
+      })
+      const account = plan.accounts.find(item => item.kind === kind)!
+      return calculatePersonIncome(plan, 2026, [{
+        id: 'draw', kind: kind === 'rrif' ? 'rrifWithdrawal' : 'rrspWithdrawal', accountId: account.id, amount: 5_000,
+      }])
+    }
+    // A plain RRIF is on the owner path either way.
+    const plainWithout = run('rrif', undefined)
+    expect(plainWithout.status).toBe('ok')
+    expect(run('rrif', {})).toEqual(plainWithout)
+    // A spousal RRSP with no recorded history is refused either way, with the
+    // same concrete reason and never a silent zero.
+    const spousalWithout = run('spousalRrsp', undefined)
+    expect(spousalWithout.status).toBe('unsupported')
+    expect(run('spousalRrsp', {})).toEqual(spousalWithout)
   })
 
   /** The reviewer's B1 shape: a recorded history, then the kind becomes `rrif`. */

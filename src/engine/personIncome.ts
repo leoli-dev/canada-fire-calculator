@@ -35,6 +35,19 @@ export type IncomeResult = { status: 'ok'; byPerson: Record<string, PersonIncome
 const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult => ({ status, reason })
 
 /**
+ * Facts the caller knows about the year being taxed that are not on the plan
+ * record itself. `registeredOpeningBalances` is the year's opening balance of
+ * each registered account, keyed by account id: the projection computes the
+ * year's mandatory RRIF minimum from exactly that figure, so the spousal
+ * attribution must use the same one (review fix B1) rather than the frozen
+ * canonical `account.balance`. Absent means the caller has no projected figure
+ * and `minimumForRrif` keeps its base-year default.
+ */
+export interface IncomeYearContext {
+  registeredOpeningBalances?: Record<string, number>
+}
+
+/**
  * Unknown ownership is a tax-capability limit, never a cue to divide by
  * household size. `spousalPremiums` carries the per-account premium state for
  * one year's events so a second payment cannot re-attribute a premium that an
@@ -42,7 +55,7 @@ const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult =
  * `spousalAnnuitantIncome` carries the payments already made from the account
  * this year so the RRIF minimum is consumed once (s.146.3(5.1)(c)).
  */
-function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousalPremiums: Map<string, SpousalPremium[]>, spousalAnnuitantIncome: Map<string, number>): { status: 'ok'; shares: Record<string, number> } | { status: 'invalid' | 'unsupported'; reason: string } {
+function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousalPremiums: Map<string, SpousalPremium[]>, spousalAnnuitantIncome: Map<string, number>, context?: IncomeYearContext): { status: 'ok'; shares: Record<string, number> } | { status: 'invalid' | 'unsupported'; reason: string } {
   if (event.personId && (event.accountId || event.propertyId) || event.accountId && event.propertyId) return { status: 'invalid', reason: `income ownership ambiguous: ${event.id}` }
   if (event.personId && ['rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal'].includes(event.kind))
     return { status: 'invalid', reason: `asset income must cite asset ownership: ${event.id}` }
@@ -62,8 +75,11 @@ function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousa
       // type changed, so a spousal RRIF is attributed above the year's required
       // minimum and an unwired spousal path is refused rather than silently
       // taxed to the annuitant. The routing is shared with the tax panel so the
-      // preview and the kernel cannot drift apart.
-      const routing = resolveSpousalPlan(account, plan.people, plan.spousalHistory, plan.contributions, plan.baseYear, year)
+      // preview and the kernel cannot drift apart. The year's opening balance
+      // comes from the caller, because that is the balance the same year's
+      // mandatory RRIF withdrawal is computed from (review fix B1).
+      const routing = resolveSpousalPlan(account, plan.people, plan.spousalHistory, plan.contributions, plan.baseYear, year,
+        context?.registeredOpeningBalances?.[account.id])
       if (routing.status === 'unsupported') return { status: 'unsupported', reason: `${routing.reason}: ${event.id}` }
       if (routing.status === 'ok') {
         const premiums = spousalPremiums.get(account.id) ?? routing.parties.premiums
@@ -98,7 +114,7 @@ function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousa
   return { status: 'ok', shares: shares.shares }
 }
 
-export function calculatePersonIncome(plan: InputsV2, year: number, events: IncomeEvent[]): IncomeResult {
+export function calculatePersonIncome(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): IncomeResult {
   if (!Number.isInteger(year) || year < plan.baseYear || !Array.isArray(events)) return fail('invalid', 'tax year or events invalid')
   const gate = precisionGate(plan)
   if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
@@ -114,7 +130,7 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
   for (const event of events) {
     if (!event || !event.id || ids.has(event.id) || !INCOME_KINDS.includes(event.kind) || !Number.isFinite(event.amount) || event.amount < 0) return fail('invalid', 'income event invalid or duplicate')
     ids.add(event.id)
-    const ownership = sharesForEvent(plan, event, year, spousalPremiums, spousalAnnuitantIncome)
+    const ownership = sharesForEvent(plan, event, year, spousalPremiums, spousalAnnuitantIncome, context)
     if (ownership.status !== 'ok') return fail(ownership.status, ownership.reason)
     for (const [id, share] of Object.entries(ownership.shares)) {
       const person = byPerson[id]

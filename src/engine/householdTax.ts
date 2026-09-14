@@ -1,6 +1,6 @@
 import type { InputsV2 } from './model'
 import { incomeTax } from './tax'
-import { calculatePersonIncome, type IncomeEvent, type PersonIncome } from './personIncome'
+import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext, type PersonIncome } from './personIncome'
 import { calculateQuebecTax } from './quebecTax'
 
 export interface PersonTaxRow {
@@ -24,8 +24,8 @@ export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record
  * Current 2026 bracket/credit values are a real-dollar projection assumption
  * for future years until BE-38 supplies year-specific full return rules.
  */
-export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[]): HouseholdTaxResult {
-  const income = calculatePersonIncome(plan, year, events)
+export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): HouseholdTaxResult {
+  const income = calculatePersonIncome(plan, year, events, context)
   if (income.status !== 'ok') return income
   const people = structuredClone(income.byPerson)
   const election = plan.taxProfile?.pensionSplit

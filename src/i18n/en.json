@@ -800,6 +800,8 @@
     "spousalYear": "Year the premium was paid",
     "spousalContributor": "Contributor",
     "spousalAmount": "Premium amount (CAD)",
+    "spousalDeductLater": "Deduct this premium in the following year",
+    "spousalDeductionYear": "Recorded deduction year: {{deductionYear}}. The premium was paid in {{contributionYear}}, so attribution still uses {{contributionYear}}.",
     "spousalUnassigned": "Not recorded",
     "spousalAdd": "Add a premium",
     "spousalRemove": "Remove",

@@ -148,7 +148,10 @@ export function spousalPremiumLines(contributions: Contribution[], accountId: st
 /**
  * The required RRIF minimum as a `Known`, reusing `minimumForRrif` so there is
  * one minimum calculation in the engine. `null` means "not a RRIF", which is
- * not the same as an unknown minimum.
+ * not the same as an unknown minimum. `openingBalance` is the balance the year's
+ * mandatory withdrawal is computed from; when the caller has a projected figure
+ * it must be passed, or the minimum here would silently disagree with the
+ * withdrawal enforced in the same year.
  */
 export function knownRrifMinimum(account: Account, people: Person[], baseYear: number, year: number, openingBalance?: number): Known<number> | null {
   if (account.kind !== 'rrif') return null
@@ -173,7 +176,7 @@ export type SpousalPlanRouting =
 
 /** Registered plan name for a concrete refusal reason. */
 function spousalPlanName(kind: Account['kind']): string {
-  return kind === 'rrif' ? 'spousal RRIF' : kind === 'lif' ? 'spousal LIF' : 'spousal RRSP'
+  return kind === 'rrif' ? 'spousal RRIF' : kind === 'lif' ? 'spousal LIF' : kind === 'lira' ? 'spousal LIRA' : 'spousal RRSP'
 }
 
 /**
@@ -188,6 +191,12 @@ function spousalPlanName(kind: Account['kind']): string {
  * `lif` or a plain-`rrsp` contradiction is refused loudly. An account with
  * neither the `spousalRrsp` kind nor a history entry stays on the ordinary
  * owner path, exactly as before this rule existed.
+ *
+ * `openingBalance` is the account's balance at the start of `year`. The income
+ * kernel passes the projected balance the same year's mandatory RRIF withdrawal
+ * is enforced from, so the attribution minimum and the forced withdrawal are
+ * one number (review fix B1); the tax panel passes nothing in the base year,
+ * where `minimumForRrif`'s default (`account.balance`) is that same balance.
  */
 export function resolveSpousalPlan(
   account: Account,
@@ -198,15 +207,17 @@ export function resolveSpousalPlan(
   year: number,
   openingBalance?: number,
 ): SpousalPlanRouting {
-  if (!['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind)) return { status: 'notSpousal' }
+  if (!['rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira'].includes(account.kind)) return { status: 'notSpousal' }
   const history = spousalHistory?.[account.id]
   if (account.kind !== 'spousalRrsp' && history === undefined) return { status: 'notSpousal' }
   const name = spousalPlanName(account.kind)
   // LIF/LIRA minimum and maximum withdrawals are BE-36 territory and stay out
   // of scope; a recorded spousal history must not turn them into a plain owner
-  // answer.
+  // answer, and a stray history entry on a LIRA must not be silently dropped.
   if (account.kind === 'lif')
     return { status: 'unsupported', reason: `a ${name} cannot be attributed yet: LIF minimum and maximum withdrawals need BE-36 rules` }
+  if (account.kind === 'lira')
+    return { status: 'unsupported', reason: `a ${name} cannot be attributed yet: LIRA withdrawal and transfer rules need BE-36 rules` }
   // A plain RRSP kind together with a recorded spousal premium history is a
   // contradiction in the plan's own facts, not a fact to guess from.
   if (account.kind === 'rrsp')

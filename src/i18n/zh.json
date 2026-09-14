@@ -796,6 +796,8 @@
     "spousalYear": "供款实际缴纳年份",
     "spousalContributor": "供款人",
     "spousalAmount": "供款金额（加元）",
+    "spousalDeductLater": "该笔供款留到次年扣除",
+    "spousalDeductionYear": "已记录的扣除年度：{{deductionYear}}。供款在 {{contributionYear}} 年缴纳，归属仍按 {{contributionYear}} 年计算。",
     "spousalUnassigned": "未记录",
     "spousalAdd": "添加一笔供款",
     "spousalRemove": "删除",

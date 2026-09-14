@@ -223,3 +223,31 @@ test('a single-person plan explains why a spousal payment cannot be attributed',
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toHaveCount(0)
   expect(await inViewport(page)).toBe(true)
 })
+
+test('a spousal premium can be deducted in a later year than it was paid', async ({ page }) => {
+  // Review fix N1: the engine already separated the contribution calendar year
+  // (the attribution window) from the deduction year, but the panel always wrote
+  // `null`, so the separation was unreachable from either entry mode.
+  await seed(page)
+  const year = await baseYear(page)
+  await makeSpousal(page)
+  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 4_000 })
+  const contribution = () => page.evaluate((rowId) =>
+    JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.contributions
+      .find((item: { id: string }) => item.id === rowId), ROW0)
+  // By default the premium is deducted in the year it was paid.
+  expect((await contribution()).deductionYear).toBeNull()
+  expect((await contribution()).calendarYear).toBe(year)
+  await page.getByTestId(`spousal-deduct-later-${ROW0}`).check()
+  await expect(page.getByTestId(`spousal-deduction-year-${ROW0}`)).toContainText(String(year + 1))
+  expect((await contribution()).deductionYear).toBe(year + 1)
+  // The attribution window still uses the contribution year, never the deduction
+  // year: a base-year payment attributes the base-year premium.
+  await previewPayment(page, 4_000)
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,000')
+  await page.reload()
+  await expect(page.getByTestId(`spousal-deduct-later-${ROW0}`)).toBeChecked()
+  await expect(page.getByTestId(`spousal-deduction-year-${ROW0}`)).toContainText(String(year + 1))
+  expect(await inViewport(page)).toBe(true)
+})
