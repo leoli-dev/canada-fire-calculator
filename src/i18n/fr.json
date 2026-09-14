@@ -8,25 +8,72 @@
   "be11TerminalComparisonLimit": "La comparaison des successions après impôt est indisponible : l’impôt final individuel n’est pas vérifié pour les deux plans. La valeur nette finale exclut l’impôt successoral et n’est affichée que si la comparaison est prise en charge.",
   "be11AuxiliaryEstimate": "Les outils de calendrier, stratégie et Monte Carlo ci-dessous utilisent encore l’ancienne approximation individuelle; leurs classements sont estimatifs.",
   "be11": {
-    "title": "Bénéficiaire et propriétaire du revenu imposable", "reviewed": "J’ai vérifié ces données fiscales", "unknownStill": "Je ne peux pas encore les confirmer; garder des estimations",
-    "personLedger": "Impôt par personne et par année", "ledgerLimit": "L’impôt annuel utilise les hypothèses de 2026 en dollars réels. L’impôt successoral, les autres solveurs et les événements complexes exigent d’autres règles individuelles.", "person": "Personne", "grossIncome": "Revenu brut", "eligiblePension": "Pension admissible",
+    "title": "Bénéficiaire et propriétaire du revenu imposable",
+    "reviewed": "J’ai vérifié ces données fiscales",
+    "unknownStill": "Je ne peux pas encore les confirmer; garder des estimations",
+    "personLedger": "Impôt par personne et par année",
+    "ledgerLimit": "L’impôt annuel utilise les hypothèses de 2026 en dollars réels. L’impôt successoral, les autres solveurs et les événements complexes exigent d’autres règles individuelles.",
+    "person": "Personne",
+    "grossIncome": "Revenu brut",
+    "eligiblePension": "Pension admissible",
     "explanation": "Les mêmes données fiscales s’appliquent aux modes guidé et professionnel. Indiquez le solde de chaque personne (les comptes enregistrés restent détenus individuellement); les montants doivent totaliser le total du ménage. Aucun total n’est réparti automatiquement. L’impôt pendant l’emploi et les événements non pris en charge restent estimatifs.",
-    "unknown": "Non confirmé", "shared": "Propriété imposable partagée", "splitOwners": "Détenus séparément (répartition enregistrée)", "self": "Vous", "partner": "Conjoint", "yes": "Oui", "no": "Non",
+    "unknown": "Non confirmé",
+    "shared": "Propriété imposable partagée",
+    "splitOwners": "Détenus séparément (répartition enregistrée)",
+    "self": "Vous",
+    "partner": "Conjoint",
+    "yes": "Oui",
+    "no": "Non",
     "earned": "{{person}} : revenu annuel d’emploi actuel (CAD)",
-    "ownership": "Propriété fiscale des comptes et biens", "selfTaxShare": "Votre part imposable (pourcentage)", "propertyOwner": "Propriétaire du bien locatif",
-    "selfAmount": "Votre montant (CAD)", "partnerAmount": "Montant du conjoint (CAD)",
+    "ownership": "Propriété fiscale des comptes et biens",
+    "selfTaxShare": "Votre part imposable (pourcentage)",
+    "propertyOwner": "Propriétaire du bien locatif",
+    "selfAmount": "Votre montant (CAD)",
+    "partnerAmount": "Montant du conjoint (CAD)",
     "splitSum": "Votre montant + celui du conjoint : {{sum}} sur {{total}} CAD",
     "splitMismatch": "Les deux montants doivent totaliser {{total}} CAD, le solde du compte. La propriété reste non confirmée tant qu’ils ne concordent pas.",
     "splitHelp": "Chaque compte enregistré appartient à une seule personne : indiquez le solde de chacun; les deux montants doivent totaliser le total du ménage. Les comptes non enregistrés et les biens indiquent la part de chacun; rien n’est réparti automatiquement.",
     "lockedOwnerResetHelp": "Changer le titulaire du compte immobilisé dans le formulaire principal réenregistre la répartition à 100 % pour ce titulaire.",
     "spouseSupport": "Subvenez-vous aux besoins de votre conjoint avec qui vous vivez pour le montant pour conjoint?",
-    "splitTransferor": "Fractionnement admissible de pension : qui transfère?", "noSplit": "Aucun fractionnement", "splitAmount": "Montant annuel transféré (CAD; au plus 50 % du revenu admissible)",
-    "registeredType": "Type de compte enregistré", "rrifOpenedYear": "Année d’ouverture du FERR", "rrifAgeElection": "Âge choisi lors de l’ouverture du FERR", "noElection": "Âge du titulaire",
-    "rrifFactorCategory": "Catégorie vérifiée du facteur FERR (vérifier les transferts)", "rrifQualifying": "FERR admissible", "rrifAllOther": "Autres FERR",
-    "rrifFactorHelp": "Vérifiez les dossiers d’ouverture, de transfert et de modification du fournisseur avant de choisir. L’année d’ouverture ne prouve pas la catégorie; laissez-la non confirmée pour limiter le minimum et l’impôt précis.", "rrifFactorSource": "Tableau des facteurs prescrits de l’ARC",
+    "splitTransferor": "Fractionnement admissible de pension : qui transfère?",
+    "noSplit": "Aucun fractionnement",
+    "splitAmount": "Montant annuel transféré (CAD; au plus 50 % du revenu admissible)",
+    "registeredType": "Type de compte enregistré",
+    "rrifOpenedYear": "Année d’ouverture du FERR",
+    "rrifAgeElection": "Âge choisi lors de l’ouverture du FERR",
+    "noElection": "Âge du titulaire",
+    "rrifFactorCategory": "Catégorie vérifiée du facteur FERR (vérifier les transferts)",
+    "rrifQualifying": "FERR admissible",
+    "rrifAllOther": "Autres FERR",
+    "rrifFactorHelp": "Vérifiez les dossiers d’ouverture, de transfert et de modification du fournisseur avant de choisir. L’année d’ouverture ne prouve pas la catégorie; laissez-la non confirmée pour limiter le minimum et l’impôt précis.",
+    "rrifFactorSource": "Tableau des facteurs prescrits de l’ARC",
     "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas. Les crédits familiaux, FSS et RAMQ du Québec attendent BE-35."
   },
-  "be35": {"qcSplitTransferor": "Choix québécois de l’annexe Q : qui transfère?","qcSplitAmount": "Revenu de retraite transféré au Québec (CAD/an)","splitHelp": "Le choix québécois est distinct du fractionnement fédéral. La personne qui transfère doit avoir au moins 65 ans; ne choisissez un transfert que si vous faites le choix de l’annexe Q.","coverageTitle": "Assurance médicaments du Québec","coverageHelp": "Ceci ne touche que la prime d’assurance médicaments du Québec (ligne 447 de la déclaration TP-1), dans la ligne fiscale québécoise de chaque personne — rien d’autre. Cela concerne les résidents du Québec couverts par le régime public de la RAMQ, un régime privé admissible ou une exemption vérifiée. Choisissez un statut pour toute l’année; le détail mensuel ne sert que si la couverture a réellement changé en cours d’année. Une année comportant un mois public demeure une estimation étiquetée jusqu’à la publication de l’annexe K 2026.","coveragePerson": "Couverture de {{person}}","mixed": "Mois différents","unknown": "Non confirmé","private": "Régime privé de base","public": "Régime public RAMQ","waived": "Exemption de prime vérifiée","publicLimit": "La prime publique dépend du revenu familial et de l’annexe K de l’année d’imposition, encore inédite pour 2026. Les tarifs RAMQ de juillet à juin ne sont pas un montant annuel d’impôt.","ramqSource": "Périodes tarifaires RAMQ","limit": "Les crédits familiaux et la FSS utilisent les paramètres de 2026. La prime publique reste non vérifiée jusqu’à l’annexe K 2026; les autres cas fiscaux complexes restent estimatifs.","fss": "Cotisation FSS","ramq": "Prime RAMQ","scheduleB": "Crédit annexe B","qcProvincialTax": "Impôt du Québec","federalEligiblePension": "Pension fédérale admissible","qcRetirementEligible": "Revenu de retraite du Québec (lignes 122/123)","annualStatus": "Couverture pour toute l’année","changedDuringYear": "La couverture a changé en cours d’année","monthDetailHelp": "Seulement si la couverture a changé en cours d’année. La prime de l’année d’imposition (annexe K) rapproche séparément les périodes janvier–juin et juillet–décembre; le mois du changement peut donc compter — le maximum de la RAMQ a augmenté le 1er juillet 2026. Un mois public laisse l’impôt du Québec en estimation étiquetée jusqu’à la publication de l’annexe K 2026."},
+  "be35": {
+    "qcSplitTransferor": "Choix québécois de l’annexe Q : qui transfère?",
+    "qcSplitAmount": "Revenu de retraite transféré au Québec (CAD/an)",
+    "splitHelp": "Le choix québécois est distinct du fractionnement fédéral. La personne qui transfère doit avoir au moins 65 ans; ne choisissez un transfert que si vous faites le choix de l’annexe Q.",
+    "coverageTitle": "Assurance médicaments du Québec",
+    "coverageHelp": "Ceci ne touche que la prime d’assurance médicaments du Québec (ligne 447 de la déclaration TP-1), dans la ligne fiscale québécoise de chaque personne — rien d’autre. Cela concerne les résidents du Québec couverts par le régime public de la RAMQ, un régime privé admissible ou une exemption vérifiée. Choisissez un statut pour toute l’année; le détail mensuel ne sert que si la couverture a réellement changé en cours d’année. Une année comportant un mois public demeure une estimation étiquetée jusqu’à la publication de l’annexe K 2026.",
+    "coveragePerson": "Couverture de {{person}}",
+    "mixed": "Mois différents",
+    "unknown": "Non confirmé",
+    "private": "Régime privé de base",
+    "public": "Régime public RAMQ",
+    "waived": "Exemption de prime vérifiée",
+    "publicLimit": "La prime publique dépend du revenu familial et de l’annexe K de l’année d’imposition, encore inédite pour 2026. Les tarifs RAMQ de juillet à juin ne sont pas un montant annuel d’impôt.",
+    "ramqSource": "Périodes tarifaires RAMQ",
+    "limit": "Les crédits familiaux et la FSS utilisent les paramètres de 2026. La prime publique reste non vérifiée jusqu’à l’annexe K 2026; les autres cas fiscaux complexes restent estimatifs.",
+    "fss": "Cotisation FSS",
+    "ramq": "Prime RAMQ",
+    "scheduleB": "Crédit annexe B",
+    "qcProvincialTax": "Impôt du Québec",
+    "federalEligiblePension": "Pension fédérale admissible",
+    "qcRetirementEligible": "Revenu de retraite du Québec (lignes 122/123)",
+    "annualStatus": "Couverture pour toute l’année",
+    "changedDuringYear": "La couverture a changé en cours d’année",
+    "monthDetailHelp": "Seulement si la couverture a changé en cours d’année. La prime de l’année d’imposition (annexe K) rapproche séparément les périodes janvier–juin et juillet–décembre; le mois du changement peut donc compter — le maximum de la RAMQ a augmenté le 1er juillet 2026. Un mois public laisse l’impôt du Québec en estimation étiquetée jusqu’à la publication de l’annexe K 2026."
+  },
   "tagline": "La retraite anticipée à la canadienne - CELI, REER, RPC/RRQ et SV, modélisés correctement.",
   "profile": "Profil",
   "ruleAssumptionsTitle": "Versions des règles fiscales et des prestations",
@@ -640,17 +687,77 @@
   "guidedBasedOnAssumptions": "Selon les hypothèses que vous avez vérifiées",
   "guidedResultSuccess": "La projection finance le plan jusqu’à {{age}} ans. C’est un résultat de modèle, pas une garantie.",
   "guidedResultShortfall": "Premier manque de liquidités à {{age}} ans : besoin {{need}}, fonds {{available}}, manque {{shortfall}}.",
-  "guided": { "meta": {
-    "confirmed": "confirmé", "estimated": "estimé", "unknown": "inconnu", "notApplicable": "sans objet", "legacy": "importé", "example": "exemple"
-  }, "steps": {
-    "household": { "short": "Foyer", "title": "Foyer et objectif", "help": "Commencez par la chronologie à tester.", "question": "Quel type de retraite préparez-vous ?", "why": "Les âges déterminent la durée d’épargne, de financement et le début possible des prestations. Cesser de travailler et commencer les prestations sont deux décisions.", "how": "Utilisez les âges actuels et la province de résidence fiscale prévue.", "example": "Sam a 40 ans, cesse le travail à 55 ans, commence le RPC à 65 ans et teste jusqu’à 95 ans." },
-    "income": { "short": "Revenu", "title": "Revenu et épargne", "help": "Transformez votre habitude réelle en montant annuel.", "question": "Combien ajoutez-vous réellement aux placements ?", "why": "Les nouveaux dépôts font croître le portefeuille avant la retraite. Le salaire ne dit pas ce qui reste après impôt et dépenses.", "how": "Comparez 12 mois de relevés et additionnez les dépôts, sans gains ni transferts.", "example": "2 000 $ déposés par mois donnent 24 000 $ par année." },
-    "accounts": { "short": "Comptes", "title": "Comptes et cotisations", "help": "Identifiez les enveloppes fiscales de vos placements.", "question": "Où se trouve votre argent de retraite aujourd’hui ?", "why": "CELI, REER et comptes non enregistrés peuvent contenir les mêmes fonds, mais retraits et impôts diffèrent.", "how": "Utilisez la valeur marchande actuelle des relevés. N’entrez pas les droits de cotisation, la maison, le REEE ou les prestations futures.", "example": "Un placement valant 100 000 $ et acheté 80 000 $ a un gain latent de 20 000 $; le coût n’est pas la valeur." },
-    "housing": { "short": "Logement", "title": "Propriétés et dettes", "help": "Distinguez la valeur de la maison des liquidités.", "question": "Comment le logement influence-t-il la retraite ?", "why": "La propriété augmente la valeur nette, mais seule une vente produit des fonds de portefeuille. Hypothèque et loyer touchent les dépenses.", "how": "Choisissez location, propriété ou achat prévu. Ne saisissez une hypothèque qu’une fois.", "example": "Une maison de 800 000 $ gardée à vie augmente la valeur nette sans payer automatiquement l’épicerie." },
-    "spending": { "short": "Dépenses", "title": "Dépenses de retraite", "help": "Exprimez la vie souhaitée en pouvoir d’achat actuel.", "question": "Combien coûterait une année de retraite ?", "why": "Cette cible détermine les retraits. Le moteur calcule séparément l’impôt et le financement nécessaires.", "how": "Partez des essentiels mensuels, puis ajoutez voyages, santé et maison annuels. Excluez les prêts déjà saisis.", "example": "3 000 $ par mois donnent 36 000 $ par année avant les dettes modélisées séparément." },
-    "benefits": { "short": "Prestations", "title": "Prestations et hypothèses", "help": "Reliez les revenus publics et d’employeur à la chronologie.", "question": "Quels revenus arrivent après le travail ?", "why": "RPC/RRQ et SV réduisent les retraits plus tard, mais le portefeuille finance les années avant leur début.", "how": "Utilisez l’estimation annuelle à 65 ans de Mon dossier Service Canada ou Retraite Québec. Multipliez un montant mensuel à 65 ans par 12.", "example": "1 000 $ par mois à 65 ans donne 12 000 $ par année à 65 ans." },
-    "review": { "short": "Vérifier", "title": "Vérifier et lire les résultats", "help": "Contrôlez les données et avertissements, puis lisez la conclusion avant les graphiques détaillés." }
-  }},
+  "guided": {
+    "meta": {
+      "confirmed": "confirmé",
+      "estimated": "estimé",
+      "unknown": "inconnu",
+      "notApplicable": "sans objet",
+      "legacy": "importé",
+      "example": "exemple"
+    },
+    "steps": {
+      "household": {
+        "short": "Foyer",
+        "title": "Foyer et objectif",
+        "help": "Commencez par la chronologie à tester.",
+        "question": "Quel type de retraite préparez-vous ?",
+        "why": "Les âges déterminent la durée d’épargne, de financement et le début possible des prestations. Cesser de travailler et commencer les prestations sont deux décisions.",
+        "how": "Utilisez les âges actuels et la province de résidence fiscale prévue.",
+        "example": "Sam a 40 ans, cesse le travail à 55 ans, commence le RPC à 65 ans et teste jusqu’à 95 ans."
+      },
+      "income": {
+        "short": "Revenu",
+        "title": "Revenu et épargne",
+        "help": "Transformez votre habitude réelle en montant annuel.",
+        "question": "Combien ajoutez-vous réellement aux placements ?",
+        "why": "Les nouveaux dépôts font croître le portefeuille avant la retraite. Le salaire ne dit pas ce qui reste après impôt et dépenses.",
+        "how": "Comparez 12 mois de relevés et additionnez les dépôts, sans gains ni transferts.",
+        "example": "2 000 $ déposés par mois donnent 24 000 $ par année."
+      },
+      "accounts": {
+        "short": "Comptes",
+        "title": "Comptes et cotisations",
+        "help": "Identifiez les enveloppes fiscales de vos placements.",
+        "question": "Où se trouve votre argent de retraite aujourd’hui ?",
+        "why": "CELI, REER et comptes non enregistrés peuvent contenir les mêmes fonds, mais retraits et impôts diffèrent.",
+        "how": "Utilisez la valeur marchande actuelle des relevés. N’entrez pas les droits de cotisation, la maison, le REEE ou les prestations futures.",
+        "example": "Un placement valant 100 000 $ et acheté 80 000 $ a un gain latent de 20 000 $; le coût n’est pas la valeur."
+      },
+      "housing": {
+        "short": "Logement",
+        "title": "Propriétés et dettes",
+        "help": "Distinguez la valeur de la maison des liquidités.",
+        "question": "Comment le logement influence-t-il la retraite ?",
+        "why": "La propriété augmente la valeur nette, mais seule une vente produit des fonds de portefeuille. Hypothèque et loyer touchent les dépenses.",
+        "how": "Choisissez location, propriété ou achat prévu. Ne saisissez une hypothèque qu’une fois.",
+        "example": "Une maison de 800 000 $ gardée à vie augmente la valeur nette sans payer automatiquement l’épicerie."
+      },
+      "spending": {
+        "short": "Dépenses",
+        "title": "Dépenses de retraite",
+        "help": "Exprimez la vie souhaitée en pouvoir d’achat actuel.",
+        "question": "Combien coûterait une année de retraite ?",
+        "why": "Cette cible détermine les retraits. Le moteur calcule séparément l’impôt et le financement nécessaires.",
+        "how": "Partez des essentiels mensuels, puis ajoutez voyages, santé et maison annuels. Excluez les prêts déjà saisis.",
+        "example": "3 000 $ par mois donnent 36 000 $ par année avant les dettes modélisées séparément."
+      },
+      "benefits": {
+        "short": "Prestations",
+        "title": "Prestations et hypothèses",
+        "help": "Reliez les revenus publics et d’employeur à la chronologie.",
+        "question": "Quels revenus arrivent après le travail ?",
+        "why": "RPC/RRQ et SV réduisent les retraits plus tard, mais le portefeuille finance les années avant leur début.",
+        "how": "Utilisez l’estimation annuelle à 65 ans de Mon dossier Service Canada ou Retraite Québec. Multipliez un montant mensuel à 65 ans par 12.",
+        "example": "1 000 $ par mois à 65 ans donne 12 000 $ par année à 65 ans."
+      },
+      "review": {
+        "short": "Vérifier",
+        "title": "Vérifier et lire les résultats",
+        "help": "Contrôlez les données et avertissements, puis lisez la conclusion avant les graphiques détaillés."
+      }
+    }
+  },
   "questionnaire": {
     "strategyIntro": "Ce choix fixe l’ordre utilisé par le modèle pour financer les dépenses annuelles après impôt. Les minimums FERR requis passent d’abord. Aucun ordre n’est optimal pour tous; comparez les résultats.",
     "strategyDetails": {
@@ -659,16 +766,85 @@
       "tfsaFirst": "Après le minimum FERR, utiliser CELI → non enregistré → REER. Les retraits CELI n’ajoutent généralement pas de revenu imposable aujourd’hui, mais consomment plus tôt les actifs libres d’impôt et peuvent reporter l’impôt REER.",
       "rrspFirst": "Après le minimum FERR, financer les dépenses par le REER/FERR avant le non enregistré → CELI. Le solde enregistré baisse plus tôt, mais de gros retraits imposables peuvent augmenter l’impôt et réduire les prestations liées au revenu."
     },
-    "strategySourceLabel": "Règles fiscales :", "strategySourceRrsp": "Retraits REER", "strategySourceTfsa": "Traitement CELI", "strategySourceCapital": "Gains en capital", "strategySourceRrif": "Minimums FERR", "strategySourceOas": "Récupération SV",
+    "strategySourceLabel": "Règles fiscales :",
+    "strategySourceRrsp": "Retraits REER",
+    "strategySourceTfsa": "Traitement CELI",
+    "strategySourceCapital": "Gains en capital",
+    "strategySourceRrif": "Minimums FERR",
+    "strategySourceOas": "Récupération SV",
     "targetQuestion": "Avez-vous une cible personnelle d’actifs investissables pour cet âge ?",
     "targetExplanation": "Facultatif : cette cible sert au résultat « Atteindrai-je ma cible ? ». Elle ne détermine pas le capital nécessaire pour votre niveau de vie, calculé séparément.",
     "targetExampleNote": "Le montant de 1 000 000 $ n’est qu’un exemple. Saisissez votre propre montant en dollars d’aujourd’hui pour le confirmer.",
-    "directory": "Répertoire du questionnaire", "categoryCount": "Catégorie {{current}} sur {{total}}", "closeDirectory": "Fermer le répertoire", "chooseOne": "Choisir", "helpTitle": "Pourquoi cette question et où chercher", "findLabel": "Où chercher :", "exampleLabel": "Exemple fictif :",
-    "reviewAnswers": "Vérifier les réponses", "backToQuestions": "Retour au questionnaire", "reviewTitle": "Vérifiez vos réponses", "reviewIntro": "Vérifiez ici vos données et les hypothèses de projection. Modifiez ce qui ne convient pas avant de générer les résultats.", "needsAttention": "Complétez ou vérifiez ces éléments", "generateResults": "Générer mes résultats", "modifyAnswers": "Modifier les réponses", "resultsTitle": "Votre projection de retraite", "resultsIntro": "Ces résultats utilisent les valeurs et hypothèses saisies ou choisies. Les estimations ne garantissent pas l’avenir.", "nextCategory": "Catégorie suivante", "pendingSaved": "À compléter plus tard. Vous pouvez continuer et y revenir depuis la vérification.", "hasHome": "Résidence incluse", "notApplicable": "Cette question ne s’applique pas au parcours actuel.",
-    "monthlySavings": "Nouvelle épargne mensuelle moyenne", "savingFeedback": "{{monthly}} par mois donne {{annual}} par année.", "spendingFeedback": "En dollars d’aujourd’hui, {{monthly}} par mois donne {{annual}} par année.", "housingOtherLimit": "Les immeubles locatifs et les autres dettes ont leurs propres pages de suivi.", "confirmRemoveValue": "Cet élément contient un montant non nul enregistré. Le retirer du plan?", "intentRecommendationLabel": "Selon vos choix, les résultats compareront :", "intentUnsupported": "Un legs fixe ou un don de votre vivant est conservé comme souhait, mais le moteur ne l’impose pas encore comme contrainte.",
-    "reviewAssumptionsTitle": "Hypothèses utilisées dans cette projection", "reviewAssumptionsIntro": "Voici les valeurs actuelles. Une ligne « À vérifier » contient encore des exemples ou un choix manquant; complétez-la avant de générer les résultats.", "reviewAssumptionSet": "Défini", "reviewAssumptionEstimated": "Comprend des estimations", "reviewAssumptionPending": "À vérifier", "reviewEditAssumption": "Modifier {{topic}}", "reviewNotChosen": "Pas encore choisi", "reviewMixTitle": "Répartition et rendement", "reviewMixValue": "{{mix}}; rendement réel annuel moyen prévu {{real}}; volatilité annuelle modélisée {{volatility}}", "reviewFeesTitle": "Frais et inflation", "reviewFeesValue": "Frais de placement totaux {{fees}} par an; inflation à long terme {{inflation}} par an", "reviewTaxTitle": "Placements non enregistrés et impôt avant la retraite", "reviewTaxValue": "Distributions imposables {{distributions}} par an; taux marginal {{rate}}", "reviewStrategyTitle": "Ordre des retraits à la retraite", "reviewPacedStrategy": "Retraits REER échelonnés", "reviewStrategyWithCap": "{{strategy}}; plafond de revenu : {{cap}}", "reviewAssumptionsNote": "Les rendements réels excluent déjà l’inflation; les frais sont retranchés séparément. La volatilité simule les variations annuelles du marché, pas un rendement supplémentaire. Ce sont des estimations, pas des garanties.",
-    "mixReturnExplanation": "Chaque pourcentage ci-dessous est un rendement réel annuel moyen prévu à long terme : l’inflation est déjà retranchée, tandis que les frais de placement (RFG) le seront séparément à la page suivante. Ce n’est ni le rendement de la dernière année ni un rendement garanti.", "mixExpectedReturn": "Rendement réel annuel moyen prévu : {{value}} %", "mixNames": { "allStocks": "100 % actions", "aggressive": "Audacieux 80/20", "balanced": "Équilibré 60/40", "conservative": "Prudent 40/60", "gic": "Échelle de CPG" },
-    "feeTotalLabel": "Frais de placement annuels totaux (%)", "feePresetIntro": "Choisissez un exemple selon la gestion de vos placements ou saisissez votre total. Comptez le RFG et les frais de conseil récurrents une seule fois.", "feePresetGroup": "Exemples de frais de placement", "feePreset": { "etf": "FNB autogéré · 0,2 %", "managed": "Portefeuille de FNB géré · 0,65 %", "mutual": "Fonds commun traditionnel · 2,1 %" }, "feePresetSource": "Frais de produits à titre d’exemple (vérifiez vos relevés) :", "inflationPresetIntro": "Choisissez une hypothèse à long terme ou saisissez la vôtre. L’inflation élevée est un test de résistance, pas une prévision.", "inflationPresetGroup": "Exemples d’hypothèses d’inflation annuelles", "inflationPreset": { "fpCanada": "FP Canada 2026 · 2,1 %", "bankTarget": "Cible de la Banque du Canada · 2,0 %", "stress": "Scénario d’inflation élevée · 3,0 %" }, "inflationPresetSource": "Lignes directrices et cible :",
+    "directory": "Répertoire du questionnaire",
+    "categoryCount": "Catégorie {{current}} sur {{total}}",
+    "closeDirectory": "Fermer le répertoire",
+    "chooseOne": "Choisir",
+    "helpTitle": "Pourquoi cette question et où chercher",
+    "findLabel": "Où chercher :",
+    "exampleLabel": "Exemple fictif :",
+    "reviewAnswers": "Vérifier les réponses",
+    "backToQuestions": "Retour au questionnaire",
+    "reviewTitle": "Vérifiez vos réponses",
+    "reviewIntro": "Vérifiez ici vos données et les hypothèses de projection. Modifiez ce qui ne convient pas avant de générer les résultats.",
+    "needsAttention": "Complétez ou vérifiez ces éléments",
+    "generateResults": "Générer mes résultats",
+    "modifyAnswers": "Modifier les réponses",
+    "resultsTitle": "Votre projection de retraite",
+    "resultsIntro": "Ces résultats utilisent les valeurs et hypothèses saisies ou choisies. Les estimations ne garantissent pas l’avenir.",
+    "nextCategory": "Catégorie suivante",
+    "pendingSaved": "À compléter plus tard. Vous pouvez continuer et y revenir depuis la vérification.",
+    "hasHome": "Résidence incluse",
+    "notApplicable": "Cette question ne s’applique pas au parcours actuel.",
+    "monthlySavings": "Nouvelle épargne mensuelle moyenne",
+    "savingFeedback": "{{monthly}} par mois donne {{annual}} par année.",
+    "spendingFeedback": "En dollars d’aujourd’hui, {{monthly}} par mois donne {{annual}} par année.",
+    "housingOtherLimit": "Les immeubles locatifs et les autres dettes ont leurs propres pages de suivi.",
+    "confirmRemoveValue": "Cet élément contient un montant non nul enregistré. Le retirer du plan?",
+    "intentRecommendationLabel": "Selon vos choix, les résultats compareront :",
+    "intentUnsupported": "Un legs fixe ou un don de votre vivant est conservé comme souhait, mais le moteur ne l’impose pas encore comme contrainte.",
+    "reviewAssumptionsTitle": "Hypothèses utilisées dans cette projection",
+    "reviewAssumptionsIntro": "Voici les valeurs actuelles. Une ligne « À vérifier » contient encore des exemples ou un choix manquant; complétez-la avant de générer les résultats.",
+    "reviewAssumptionSet": "Défini",
+    "reviewAssumptionEstimated": "Comprend des estimations",
+    "reviewAssumptionPending": "À vérifier",
+    "reviewEditAssumption": "Modifier {{topic}}",
+    "reviewNotChosen": "Pas encore choisi",
+    "reviewMixTitle": "Répartition et rendement",
+    "reviewMixValue": "{{mix}}; rendement réel annuel moyen prévu {{real}}; volatilité annuelle modélisée {{volatility}}",
+    "reviewFeesTitle": "Frais et inflation",
+    "reviewFeesValue": "Frais de placement totaux {{fees}} par an; inflation à long terme {{inflation}} par an",
+    "reviewTaxTitle": "Placements non enregistrés et impôt avant la retraite",
+    "reviewTaxValue": "Distributions imposables {{distributions}} par an; taux marginal {{rate}}",
+    "reviewStrategyTitle": "Ordre des retraits à la retraite",
+    "reviewPacedStrategy": "Retraits REER échelonnés",
+    "reviewStrategyWithCap": "{{strategy}}; plafond de revenu : {{cap}}",
+    "reviewAssumptionsNote": "Les rendements réels excluent déjà l’inflation; les frais sont retranchés séparément. La volatilité simule les variations annuelles du marché, pas un rendement supplémentaire. Ce sont des estimations, pas des garanties.",
+    "mixReturnExplanation": "Chaque pourcentage ci-dessous est un rendement réel annuel moyen prévu à long terme : l’inflation est déjà retranchée, tandis que les frais de placement (RFG) le seront séparément à la page suivante. Ce n’est ni le rendement de la dernière année ni un rendement garanti.",
+    "mixExpectedReturn": "Rendement réel annuel moyen prévu : {{value}} %",
+    "mixNames": {
+      "allStocks": "100 % actions",
+      "aggressive": "Audacieux 80/20",
+      "balanced": "Équilibré 60/40",
+      "conservative": "Prudent 40/60",
+      "gic": "Échelle de CPG"
+    },
+    "feeTotalLabel": "Frais de placement annuels totaux (%)",
+    "feePresetIntro": "Choisissez un exemple selon la gestion de vos placements ou saisissez votre total. Comptez le RFG et les frais de conseil récurrents une seule fois.",
+    "feePresetGroup": "Exemples de frais de placement",
+    "feePreset": {
+      "etf": "FNB autogéré · 0,2 %",
+      "managed": "Portefeuille de FNB géré · 0,65 %",
+      "mutual": "Fonds commun traditionnel · 2,1 %"
+    },
+    "feePresetSource": "Frais de produits à titre d’exemple (vérifiez vos relevés) :",
+    "inflationPresetIntro": "Choisissez une hypothèse à long terme ou saisissez la vôtre. L’inflation élevée est un test de résistance, pas une prévision.",
+    "inflationPresetGroup": "Exemples d’hypothèses d’inflation annuelles",
+    "inflationPreset": {
+      "fpCanada": "FP Canada 2026 · 2,1 %",
+      "bankTarget": "Cible de la Banque du Canada · 2,0 %",
+      "stress": "Scénario d’inflation élevée · 3,0 %"
+    },
+    "inflationPresetSource": "Lignes directrices et cible :",
     "taxIntro": "Cette page estime les revenus imposables versés chaque année par les placements non enregistrés et un taux d’impôt simplifié avant l’arrêt du travail à temps plein. Il ne s’agit ni du rendement total ni du taux d’impôt à la retraite.",
     "taxDistributionLabel": "Distributions imposables annuelles en proportion des placements non enregistrés (%)",
     "taxDistributionMeaning": "Incluez intérêts, dividendes imposables et distributions de fonds ou de FNB, même réinvestis automatiquement. Excluez la hausse de valeur des titres non vendus.",
@@ -681,8 +857,26 @@
     "taxRateSource": "les tranches d’imposition de l’ARC",
     "taxWorkedExample": "Par exemple, avec {{balance}} de placements non enregistrés, vos réponses donnent environ {{distribution}} de distributions par an et une ponction fiscale estimée à {{tax}} avant la retraite.",
     "taxModelNote": "Simplification du modèle : ce taux sert aussi à estimer l’impôt avant la retraite sur le loyer net et les prestations RPC / SV ou rentes d’employeur déjà reçues. Les crédits pour dividendes, les gains en capital et les remboursements de capital ne sont pas traités selon le type de distribution. C’est une estimation de planification, pas un avis de cotisation.",
-    "categories": { "family": "Famille et échéancier", "saving": "Épargne courante", "assets": "Épargne existante", "housing": "Logement et prêts", "spending": "Vie à la retraite", "income": "Autres revenus de retraite", "preferences": "Préférences et hypothèses" }, "status": { "answered": "répondu", "pending": "à faire" },
-    "accountNames": { "tfsa": "CELI", "rrsp": "REER / FERR", "nonReg": "Compte non enregistré", "fhsa": "CELIAPP", "locked": "Compte de retraite immobilisé" },
+    "categories": {
+      "family": "Famille et échéancier",
+      "saving": "Épargne courante",
+      "assets": "Épargne existante",
+      "housing": "Logement et prêts",
+      "spending": "Vie à la retraite",
+      "income": "Autres revenus de retraite",
+      "preferences": "Préférences et hypothèses"
+    },
+    "status": {
+      "answered": "répondu",
+      "pending": "à faire"
+    },
+    "accountNames": {
+      "tfsa": "CELI",
+      "rrsp": "REER / FERR",
+      "nonReg": "Compte non enregistré",
+      "fhsa": "CELIAPP",
+      "locked": "Compte de retraite immobilisé"
+    },
     "accountRoles": {
       "tfsa": "L’argent après impôt fructifie et se retire sans impôt, ce qui donne de la souplesse à la retraite.",
       "rrsp": "Les cotisations peuvent réduire l’impôt maintenant; la croissance est différée et les retraits REER/FERR sont imposables.",
@@ -695,30 +889,285 @@
     "allocationComplete": "Les trois parts totalisent 100 %.",
     "allocationRemaining": "Il reste {{difference}} points de pourcentage à répartir.",
     "allocationOver": "Réduisez le total de {{difference}} points de pourcentage.",
-    "choice": { "single": "Planifier pour moi", "couple": "Planifier avec mon conjoint", "noChildren": "Aucun enfant dans ce plan", "hasChildren": "Inclure des enfants", "monthly": "Je connais le montant mensuel", "annual": "Je connais le montant annuel", "noWork": "Aucun revenu de travail ensuite", "someWork": "Je prévois un revenu de travail", "undecided": "Je n’ai pas décidé", "no": "Non", "yes": "Oui", "noRental": "Aucun immeuble locatif", "hasRental": "Inclure un immeuble locatif", "noDebt": "Aucun autre prêt", "hasDebt": "Inclure un autre prêt", "knowBudget": "Je connais mon budget global", "estimateBudget": "M’aider à l’estimer par catégorie", "unknown": "J’y reviendrai", "noPension": "Aucune pension d’employeur", "dbPension": "L’employeur me versera un revenu", "dbDetail": "Une pension à prestations déterminées verse un revenu régulier.", "dcPension": "J’ai un solde de compte", "dcDetail": "Inscrivez le solde CD/CRI dans la section des comptes immobilisés.", "indexedFull": "Elle suit entièrement l’inflation", "indexedPartial": "Une partie suit l’inflation", "indexedFixed": "Le versement reste fixe", "leaveMore": "Maintenir mon niveau de vie et comparer ce qui reste", "noLegacy": "Ne pas réserver un legs précis", "fixedLegacy": "Laisser un montant déterminé", "lifetimeGifts": "Aider de mon vivant", "unsupported": "Nous conserverons ce souhait et expliquerons la limite.", "maintainSpending": "Maintenir mon budget", "exploreCeiling": "Voir le plafond théorique de dépenses", "hasTarget": "J’ai une cible personnelle", "noTarget": "Je n’ai pas encore de cible" },
-    "intentSummary": { "legacy": "Maintenir les dépenses annuelles près de {{spending}} et comparer l’actif après impôt restant.", "spending": "Garder le budget actuel et afficher séparément un plafond théorique.", "sustainability": "Vérifier la durabilité sans prétendre connaître votre préférence successorale." },
+    "choice": {
+      "single": "Planifier pour moi",
+      "couple": "Planifier avec mon conjoint",
+      "noChildren": "Aucun enfant dans ce plan",
+      "hasChildren": "Inclure des enfants",
+      "monthly": "Je connais le montant mensuel",
+      "annual": "Je connais le montant annuel",
+      "noWork": "Aucun revenu de travail ensuite",
+      "someWork": "Je prévois un revenu de travail",
+      "undecided": "Je n’ai pas décidé",
+      "no": "Non",
+      "yes": "Oui",
+      "noRental": "Aucun immeuble locatif",
+      "hasRental": "Inclure un immeuble locatif",
+      "noDebt": "Aucun autre prêt",
+      "hasDebt": "Inclure un autre prêt",
+      "knowBudget": "Je connais mon budget global",
+      "estimateBudget": "M’aider à l’estimer par catégorie",
+      "unknown": "J’y reviendrai",
+      "noPension": "Aucune pension d’employeur",
+      "dbPension": "L’employeur me versera un revenu",
+      "dbDetail": "Une pension à prestations déterminées verse un revenu régulier.",
+      "dcPension": "J’ai un solde de compte",
+      "dcDetail": "Inscrivez le solde CD/CRI dans la section des comptes immobilisés.",
+      "indexedFull": "Elle suit entièrement l’inflation",
+      "indexedPartial": "Une partie suit l’inflation",
+      "indexedFixed": "Le versement reste fixe",
+      "leaveMore": "Maintenir mon niveau de vie et comparer ce qui reste",
+      "noLegacy": "Ne pas réserver un legs précis",
+      "fixedLegacy": "Laisser un montant déterminé",
+      "lifetimeGifts": "Aider de mon vivant",
+      "unsupported": "Nous conserverons ce souhait et expliquerons la limite.",
+      "maintainSpending": "Maintenir mon budget",
+      "exploreCeiling": "Voir le plafond théorique de dépenses",
+      "hasTarget": "J’ai une cible personnelle",
+      "noTarget": "Je n’ai pas encore de cible"
+    },
+    "intentSummary": {
+      "legacy": "Maintenir les dépenses annuelles près de {{spending}} et comparer l’actif après impôt restant.",
+      "spending": "Garder le budget actuel et afficher séparément un plafond théorique.",
+      "sustainability": "Vérifier la durabilité sans prétendre connaître votre préférence successorale."
+    },
     "guidance": {
-      "family": { "essential": "Commencez par les personnes couvertes et l’échéancier à examiner.", "why": "Les âges déterminent les années d’épargne, de retraite et le début des revenus; la province influence l’impôt.", "help": "Utilisez les âges actuels et la province fiscale. L’horizon est une période à tester, pas une prédiction.", "example": "Alex a 40 ans, cesse le travail à temps plein à 55 ans et teste le plan jusqu’à 95 ans." },
-      "saving": { "essential": "Comptez seulement l’argent nouvellement ajouté après impôt, dépenses et prêts.", "why": "Les nouveaux dépôts font croître le portefeuille; le salaire et les gains du marché ne sont pas de l’épargne.", "help": "Examinez 12 mois de dépôts, soustrayez les retraits et excluez les transferts entre vos comptes.", "example": "2 000 $ par mois donnent 24 000 $ par année." },
-      "assets": { "essential": "Identifiez d’abord le type de compte, puis le solde actuel, pas les droits de cotisation.", "why": "CELI, REER et non enregistré sont des enveloppes fiscales; les fonds et actions sont les placements qu’elles contiennent.", "help": "Utilisez une valeur marchande récente. Excluez REEE, résidence et prestations futures.", "example": "Une valeur de 100 000 $ et un coût de 80 000 $ donnent un gain latent de 20 000 $, pas un impôt de 20 000 $." },
-      "housing": { "essential": "Décrivez d’abord où vous vivrez, puis la propriété et les prêts.", "why": "Une résidence ajoute à la valeur nette, mais ne paie pas les factures sans vente; les prêts réduisent le flux de trésorerie.", "help": "Utilisez le relevé hypothécaire récent et inscrivez chaque prêt une seule fois.", "example": "Une maison conservée reste un actif; le paiement mensuel de 2 000 $ demeure une dépense distincte." },
-      "spending": { "essential": "Utilisez les prix d’aujourd’hui et excluez les prêts déjà saisis.", "why": "Il s’agit du niveau de vie après impôt; le moteur calcule séparément les retraits et l’impôt.", "help": "Partez des dépenses récentes et ajustez seulement ce qui changera réellement à la retraite.", "example": "3 000 $ par mois donnent 36 000 $ par année, avant les prêts modélisés séparément." },
-      "income": { "essential": "Distinguez les prestations publiques, la pension régulière et le solde d’un compte.", "why": "Un revenu futur réduit les retraits plus tard; le portefeuille couvre les années précédentes.", "help": "Utilisez l’estimation à 65 ans de Service Canada ou Retraite Québec sans réutiliser un montant déjà ajusté.", "example": "1 000 $ par mois à 65 ans correspond à 12 000 $ par année." },
-      "preferences": { "essential": "Les faits peuvent être estimés; vos préférences doivent être choisies et confirmées par vous.", "why": "Maintenir les dépenses et explorer un plafond répondent à des questions différentes.", "help": "Choisissez la comparaison qui reflète votre intention; les souhaits non pris en charge restent clairement divulgués.", "example": "Vous pouvez voir un plafond de dépenses sans l’appliquer à votre budget." }
+      "family": {
+        "essential": "Commencez par les personnes couvertes et l’échéancier à examiner.",
+        "why": "Les âges déterminent les années d’épargne, de retraite et le début des revenus; la province influence l’impôt.",
+        "help": "Utilisez les âges actuels et la province fiscale. L’horizon est une période à tester, pas une prédiction.",
+        "example": "Alex a 40 ans, cesse le travail à temps plein à 55 ans et teste le plan jusqu’à 95 ans."
+      },
+      "saving": {
+        "essential": "Comptez seulement l’argent nouvellement ajouté après impôt, dépenses et prêts.",
+        "why": "Les nouveaux dépôts font croître le portefeuille; le salaire et les gains du marché ne sont pas de l’épargne.",
+        "help": "Examinez 12 mois de dépôts, soustrayez les retraits et excluez les transferts entre vos comptes.",
+        "example": "2 000 $ par mois donnent 24 000 $ par année."
+      },
+      "assets": {
+        "essential": "Identifiez d’abord le type de compte, puis le solde actuel, pas les droits de cotisation.",
+        "why": "CELI, REER et non enregistré sont des enveloppes fiscales; les fonds et actions sont les placements qu’elles contiennent.",
+        "help": "Utilisez une valeur marchande récente. Excluez REEE, résidence et prestations futures.",
+        "example": "Une valeur de 100 000 $ et un coût de 80 000 $ donnent un gain latent de 20 000 $, pas un impôt de 20 000 $."
+      },
+      "housing": {
+        "essential": "Décrivez d’abord où vous vivrez, puis la propriété et les prêts.",
+        "why": "Une résidence ajoute à la valeur nette, mais ne paie pas les factures sans vente; les prêts réduisent le flux de trésorerie.",
+        "help": "Utilisez le relevé hypothécaire récent et inscrivez chaque prêt une seule fois.",
+        "example": "Une maison conservée reste un actif; le paiement mensuel de 2 000 $ demeure une dépense distincte."
+      },
+      "spending": {
+        "essential": "Utilisez les prix d’aujourd’hui et excluez les prêts déjà saisis.",
+        "why": "Il s’agit du niveau de vie après impôt; le moteur calcule séparément les retraits et l’impôt.",
+        "help": "Partez des dépenses récentes et ajustez seulement ce qui changera réellement à la retraite.",
+        "example": "3 000 $ par mois donnent 36 000 $ par année, avant les prêts modélisés séparément."
+      },
+      "income": {
+        "essential": "Distinguez les prestations publiques, la pension régulière et le solde d’un compte.",
+        "why": "Un revenu futur réduit les retraits plus tard; le portefeuille couvre les années précédentes.",
+        "help": "Utilisez l’estimation à 65 ans de Service Canada ou Retraite Québec sans réutiliser un montant déjà ajusté.",
+        "example": "1 000 $ par mois à 65 ans correspond à 12 000 $ par année."
+      },
+      "preferences": {
+        "essential": "Les faits peuvent être estimés; vos préférences doivent être choisies et confirmées par vous.",
+        "why": "Maintenir les dépenses et explorer un plafond répondent à des questions différentes.",
+        "help": "Choisissez la comparaison qui reflète votre intention; les souhaits non pris en charge restent clairement divulgués.",
+        "example": "Vous pouvez voir un plafond de dépenses sans l’appliquer à votre budget."
+      }
     },
     "pages": {
-      "income_taxFacts": { "question": "Qui reçoit chaque revenu et possède les actifs imposables?" },
-      "family_people": { "question": "Ce plan est-il pour vous seul ou avec un conjoint?" }, "family_ages": { "question": "Quel âge ont aujourd’hui les personnes du plan?" }, "family_children": { "question": "Des enfants doivent-ils être inclus selon leur âge actuel?" }, "family_province": { "question": "Quelle province utiliser pour estimer l’impôt?" }, "time_work": { "question": "Quand cesserez-vous le travail à temps plein et avez-vous une cible d’actifs ?" }, "time_horizon": { "question": "Jusqu’à quel âge voulez-vous tester ce plan?" },
-      "saving_method": { "question": "Préférez-vous répondre par mois ou par année?" }, "saving_amount": { "question": "Combien d’argent nouveau ajoutez-vous réellement?" }, "work_after": { "question": "Prévoyez-vous un revenu de travail après le temps plein?" }, "work_amount": { "question": "Quel revenu de travail annuel prévoyez-vous?" }, "work_period": { "question": "De quel âge à quel âge ce revenu continuera-t-il?" },
-      "assets_identify": { "question": "Quels comptes contiennent l’argent destiné à la retraite?" }, "account_tfsa_balance": { "question": "Quel est le solde total actuel de vos CELI?" }, "account_rrsp_balance": { "question": "Quel est le solde total actuel de vos REER?" }, "account_nonReg_balance": { "question": "Que valent vos placements non enregistrés et quel est leur prix de base?" }, "assets_allocation": { "question": "Comment répartirez-vous la nouvelle épargne?" }, "fhsa_details": { "question": "Quel est le solde CELIAPP et la cotisation annuelle?" }, "fhsa_open": { "question": "Depuis combien d’années le CELIAPP est-il ouvert?" }, "locked_access": { "question": "Quand l’argent immobilisé sera-t-il accessible et à qui appartient-il?" }, "locked_contributions": { "question": "Combien cotisez-vous, vous et l’employeur?" },
-      "home_situation": { "question": "Louez-vous, possédez-vous ou prévoyez-vous acheter?" }, "home_value": { "question": "Quelle est la valeur de la maison et prévoyez-vous la vendre?" }, "home_mortgage": { "question": "Remboursez-vous encore cette maison?" }, "mortgage_balance": { "question": "Quel solde hypothécaire reste-t-il?" }, "mortgage_payment": { "question": "Quel est le paiement et combien d’années restent?" }, "purchase_time": { "question": "À quel âge prévoyez-vous acheter?" }, "purchase_price": { "question": "Quel prix et quelle mise de fonds prévoyez-vous?" }, "purchase_loan": { "question": "Quel paiement et quelle durée hypothécaire supposez-vous?" }, "housing_other": { "question": "Des immeubles locatifs ou d’autres prêts font-ils partie du plan?" },
-      "spending_method": { "question": "Connaissez-vous le budget de retraite ou faut-il l’estimer par catégorie?" }, "spending_total": { "question": "Combien coûterait une année de retraite?" }, "spending_homeFood": { "question": "Combien coûteront logement et alimentation?" }, "spending_travelHealth": { "question": "Combien coûteront voyages et soins de santé?" },
-      "benefits_self": { "question": "Quels revenus RPC/RRQ et SV prévoyez-vous, et quand commenceront-ils?" }, "benefits_partner": { "question": "Quels revenus RPC/RRQ et SV votre conjoint prévoit-il?" }, "pension_self": { "question": "L’employeur versera-t-il une pension ou un solde de compte?" }, "pension_self_details": { "question": "Quel sera le montant de la pension viagère et son début?" }, "pension_self_indexing": { "question": "La pension suivra-t-elle les prix et comporte-t-elle une prestation de raccordement?" },
-      "allocation_tfsa": { "question": "Comment répartirez-vous la nouvelle épargne future entre vos comptes?" }, "locked_balance": { "question": "Quel est le solde actuel du compte de retraite immobilisé?" },
-      "rental_0_value": { "question": "Que vaut l’immeuble locatif et quel était son coût?" }, "rental_0_income": { "question": "Quel loyer net produit-il et quand pourriez-vous le vendre?" }, "rental_0_mortgage": { "question": "Cet immeuble locatif a-t-il une hypothèque?" }, "rental_0_loan": { "question": "Quel solde et quel versement annuel restent sur cette hypothèque?" }, "rental_0_term": { "question": "Combien d’années restent sur l’hypothèque locative?" }, "debt_0_type": { "question": "Quel est le type de cet autre prêt?" }, "debt_0_balance": { "question": "Quel solde reste sur ce prêt?" }, "debt_0_payment": { "question": "Quel est son versement annuel et combien d’années restent?" },
-      "spending_utilitiesTransport": { "question": "Combien coûteront les services publics et le transport?" }, "spending_funOther": { "question": "Combien coûteront les loisirs et les autres besoins?" },
-      "cpp_self": { "question": "Quel montant RPC/RRQ prévoyez-vous et quand le demanderez-vous?" }, "oas_self": { "question": "Quel montant de SV prévoyez-vous et quand le demanderez-vous?" }, "cpp_partner": { "question": "Quel montant RPC/RRQ votre partenaire prévoit-il?" }, "oas_partner": { "question": "Quel montant de SV votre partenaire prévoit-il?" }, "pension_partner": { "question": "Quel type de pension d’employeur votre partenaire a-t-il?" }, "pension_partner_details": { "question": "Quel revenu viager votre partenaire recevra-t-il et quand?" }, "pension_partner_indexing": { "question": "La pension de votre partenaire suivra-t-elle les prix et comporte-t-elle un raccordement?" },
-      "intent_legacy": { "question": "Après votre retraite, souhaitez-vous réserver quelque chose à d’autres personnes ou causes?" }, "intent_spending": { "question": "Souhaitez-vous explorer plus de dépenses ou maintenir le budget?" }, "invest_mix": { "question": "Quelle répartition générale des placements décrit le mieux le plan?" }, "invest_fees": { "question": "Quelles hypothèses de frais et d’inflation faut-il utiliser?" }, "invest_tax": { "question": "Quel revenu imposable vos placements non enregistrés versent-ils chaque année, et à quel taux l’estimer?" }, "invest_strategy": { "question": "Dans quel ordre les comptes devraient-ils financer les dépenses?" }
+      "income_taxFacts": {
+        "question": "Qui reçoit chaque revenu et possède les actifs imposables?"
+      },
+      "family_people": {
+        "question": "Ce plan est-il pour vous seul ou avec un conjoint?"
+      },
+      "family_ages": {
+        "question": "Quel âge ont aujourd’hui les personnes du plan?"
+      },
+      "family_children": {
+        "question": "Des enfants doivent-ils être inclus selon leur âge actuel?"
+      },
+      "family_province": {
+        "question": "Quelle province utiliser pour estimer l’impôt?"
+      },
+      "time_work": {
+        "question": "Quand cesserez-vous le travail à temps plein et avez-vous une cible d’actifs ?"
+      },
+      "time_horizon": {
+        "question": "Jusqu’à quel âge voulez-vous tester ce plan?"
+      },
+      "saving_method": {
+        "question": "Préférez-vous répondre par mois ou par année?"
+      },
+      "saving_amount": {
+        "question": "Combien d’argent nouveau ajoutez-vous réellement?"
+      },
+      "work_after": {
+        "question": "Prévoyez-vous un revenu de travail après le temps plein?"
+      },
+      "work_amount": {
+        "question": "Quel revenu de travail annuel prévoyez-vous?"
+      },
+      "work_period": {
+        "question": "De quel âge à quel âge ce revenu continuera-t-il?"
+      },
+      "assets_identify": {
+        "question": "Quels comptes contiennent l’argent destiné à la retraite?"
+      },
+      "account_tfsa_balance": {
+        "question": "Quel est le solde total actuel de vos CELI?"
+      },
+      "account_rrsp_balance": {
+        "question": "Quel est le solde total actuel de vos REER?"
+      },
+      "account_nonReg_balance": {
+        "question": "Que valent vos placements non enregistrés et quel est leur prix de base?"
+      },
+      "assets_allocation": {
+        "question": "Comment répartirez-vous la nouvelle épargne?"
+      },
+      "fhsa_details": {
+        "question": "Quel est le solde CELIAPP et la cotisation annuelle?"
+      },
+      "fhsa_open": {
+        "question": "Depuis combien d’années le CELIAPP est-il ouvert?"
+      },
+      "locked_access": {
+        "question": "Quand l’argent immobilisé sera-t-il accessible et à qui appartient-il?"
+      },
+      "locked_contributions": {
+        "question": "Combien cotisez-vous, vous et l’employeur?"
+      },
+      "home_situation": {
+        "question": "Louez-vous, possédez-vous ou prévoyez-vous acheter?"
+      },
+      "home_value": {
+        "question": "Quelle est la valeur de la maison et prévoyez-vous la vendre?"
+      },
+      "home_mortgage": {
+        "question": "Remboursez-vous encore cette maison?"
+      },
+      "mortgage_balance": {
+        "question": "Quel solde hypothécaire reste-t-il?"
+      },
+      "mortgage_payment": {
+        "question": "Quel est le paiement et combien d’années restent?"
+      },
+      "purchase_time": {
+        "question": "À quel âge prévoyez-vous acheter?"
+      },
+      "purchase_price": {
+        "question": "Quel prix et quelle mise de fonds prévoyez-vous?"
+      },
+      "purchase_loan": {
+        "question": "Quel paiement et quelle durée hypothécaire supposez-vous?"
+      },
+      "housing_other": {
+        "question": "Des immeubles locatifs ou d’autres prêts font-ils partie du plan?"
+      },
+      "spending_method": {
+        "question": "Connaissez-vous le budget de retraite ou faut-il l’estimer par catégorie?"
+      },
+      "spending_total": {
+        "question": "Combien coûterait une année de retraite?"
+      },
+      "spending_homeFood": {
+        "question": "Combien coûteront logement et alimentation?"
+      },
+      "spending_travelHealth": {
+        "question": "Combien coûteront voyages et soins de santé?"
+      },
+      "benefits_self": {
+        "question": "Quels revenus RPC/RRQ et SV prévoyez-vous, et quand commenceront-ils?"
+      },
+      "benefits_partner": {
+        "question": "Quels revenus RPC/RRQ et SV votre conjoint prévoit-il?"
+      },
+      "pension_self": {
+        "question": "L’employeur versera-t-il une pension ou un solde de compte?"
+      },
+      "pension_self_details": {
+        "question": "Quel sera le montant de la pension viagère et son début?"
+      },
+      "pension_self_indexing": {
+        "question": "La pension suivra-t-elle les prix et comporte-t-elle une prestation de raccordement?"
+      },
+      "allocation_tfsa": {
+        "question": "Comment répartirez-vous la nouvelle épargne future entre vos comptes?"
+      },
+      "locked_balance": {
+        "question": "Quel est le solde actuel du compte de retraite immobilisé?"
+      },
+      "rental_0_value": {
+        "question": "Que vaut l’immeuble locatif et quel était son coût?"
+      },
+      "rental_0_income": {
+        "question": "Quel loyer net produit-il et quand pourriez-vous le vendre?"
+      },
+      "rental_0_mortgage": {
+        "question": "Cet immeuble locatif a-t-il une hypothèque?"
+      },
+      "rental_0_loan": {
+        "question": "Quel solde et quel versement annuel restent sur cette hypothèque?"
+      },
+      "rental_0_term": {
+        "question": "Combien d’années restent sur l’hypothèque locative?"
+      },
+      "debt_0_type": {
+        "question": "Quel est le type de cet autre prêt?"
+      },
+      "debt_0_balance": {
+        "question": "Quel solde reste sur ce prêt?"
+      },
+      "debt_0_payment": {
+        "question": "Quel est son versement annuel et combien d’années restent?"
+      },
+      "spending_utilitiesTransport": {
+        "question": "Combien coûteront les services publics et le transport?"
+      },
+      "spending_funOther": {
+        "question": "Combien coûteront les loisirs et les autres besoins?"
+      },
+      "cpp_self": {
+        "question": "Quel montant RPC/RRQ prévoyez-vous et quand le demanderez-vous?"
+      },
+      "oas_self": {
+        "question": "Quel montant de SV prévoyez-vous et quand le demanderez-vous?"
+      },
+      "cpp_partner": {
+        "question": "Quel montant RPC/RRQ votre partenaire prévoit-il?"
+      },
+      "oas_partner": {
+        "question": "Quel montant de SV votre partenaire prévoit-il?"
+      },
+      "pension_partner": {
+        "question": "Quel type de pension d’employeur votre partenaire a-t-il?"
+      },
+      "pension_partner_details": {
+        "question": "Quel revenu viager votre partenaire recevra-t-il et quand?"
+      },
+      "pension_partner_indexing": {
+        "question": "La pension de votre partenaire suivra-t-elle les prix et comporte-t-elle un raccordement?"
+      },
+      "intent_legacy": {
+        "question": "Après votre retraite, souhaitez-vous réserver quelque chose à d’autres personnes ou causes?"
+      },
+      "intent_spending": {
+        "question": "Souhaitez-vous explorer plus de dépenses ou maintenir le budget?"
+      },
+      "invest_mix": {
+        "question": "Quelle répartition générale des placements décrit le mieux le plan?"
+      },
+      "invest_fees": {
+        "question": "Quelles hypothèses de frais et d’inflation faut-il utiliser?"
+      },
+      "invest_tax": {
+        "question": "Quel revenu imposable vos placements non enregistrés versent-ils chaque année, et à quel taux l’estimer?"
+      },
+      "invest_strategy": {
+        "question": "Dans quel ordre les comptes devraient-ils financer les dépenses?"
+      }
     }
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",
@@ -812,5 +1261,26 @@
     "spousalSource": "Formulaire T2205 de l'ARC",
     "limit": "Votre propre cotisation REER et une cotisation inscrite à un régime de conjoint sont chiffrées selon le droit du cotisant. Le fractionnement REER de l'épargne volontaire du couple, la conversion REER/FERR à 71 ans et l'affectation entre plusieurs comptes ne sont pas mis en œuvre.",
     "source": "ARC T4040 REER et autres régimes enregistrés"
+  },
+  "be36": {
+    "title": "Droits de cotisation au CELIAPP",
+    "explanation": "Les droits de participation au CELIAPP appartiennent au titulaire du compte et sont donc consignés par personne. Relevez l'année d'ouverture, les cotisations antérieures et les droits inutilisés sur l'état des droits de participation ou les feuillets T4CELIAPP. Laissez une ligne vide si vous ne pouvez pas la confirmer : elle reste inconnue, aucune cotisation n'est calculée à partir d'elle, et elle n'est jamais traitée comme zéro ni comme 8 000 $ de droits.",
+    "person": "Droits CELIAPP de {{person}}",
+    "noAccount": "Cette personne n'a pas de CELIAPP à elle : il n'y a donc aucun droit de participation à calculer. Un CELIAPP n'est jamais partagé et un total ménage n'est pas réparti entre deux personnes.",
+    "ambiguousAccount": "Cette personne a plus d'un CELIAPP : une cotisation prévue ne peut pas être attribuée à un seul compte.",
+    "openedYear": "Année d'ouverture du premier CELIAPP",
+    "priorContributions": "Cotisations et transferts REER antérieurs à cette année du plan (relevé de l'ARC)",
+    "openingRoom": "Droits de participation inutilisés reportés sur cette année du plan (relevé de l'ARC)",
+    "openingRoomNote": "Inscrivez les droits laissés par les années précédentes, et non le chiffre du relevé des droits pour cette année : ce chiffre comprend déjà les droits de l'année même.",
+    "planned": "Cotisation CELIAPP prévue cette année",
+    "ledger": "Droits d'ouverture {{opening}} + droits de l'année {{addition}} − cotisations {{applied}} = droits à la fin {{closing}} CAD",
+    "lifetime": "Plafond à vie de {{limit}} CAD : {{used}} utilisés, {{remaining}} restants. La croissance des placements ne l'entame jamais et un transfert n'est jamais déduit deux fois.",
+    "retained": "Conservé et non cotisé : {{retained}} CAD.",
+    "retainedHelp": "Les droits de participation ne sont jamais dépassés et l'argent ne disparaît pas : le reste demeure dans le compte non enregistré.",
+    "unknownRoom": "Les droits de participation au CELIAPP ne sont pas confirmés, donc aucune cotisation n'est calculée : {{reason}}",
+    "maturity": "Ce CELIAPP a atteint sa période de participation de 15 ans. Le transfert légal vers un REER/FRRV n'est pas encore implémenté, donc aucune cotisation n'est calculée pour cette année.",
+    "limit": "Le plafond annuel publié de 8 000 $ et le plafond à vie de 40 000 $ proviennent des pages de l'ARC sur le CELIAPP; ce registre les applique aux cotisations comme aux transferts REER. Ne sont pas encore implémentés : le délai de 15 ans ou l'âge de 71 ans, le transfert vers un REER/FRRV, les retraits admissibles ou non, l'admissibilité à l'achat d'une première habitation et le décès. Les droits de re-participation, les montants désignés et l'impôt sur l'excédent CELIAPP le sont aussi, donc ce registre peut seulement sous-estimer les droits restants.",
+    "source": "ARC : cotiser à son CELIAPP",
+    "scope": "Les droits CELIAPP sont suivis par personne et par année. L'échéance, le transfert, les retraits et l'admissibilité à l'achat d'une première habitation restent hors de cette estimation."
   }
 }

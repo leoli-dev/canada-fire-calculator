@@ -4,10 +4,11 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
+import { fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
-const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
+const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked', 'legacy:account:fhsa'] as const
 const roundCents = (value: number) => Math.round(value * 100) / 100
 
 /** Two per-person amount inputs for one household total. Shows the live
@@ -160,6 +161,136 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
     {ledger.deductedThisYear > 0 && <p className="hint">{t('be12.deductedThisYear', { amount: money(ledger.deductedThisYear), year: plan.baseYear })}</p>}
     {ledger.deferredDeduction > 0 && <p className="hint">{t('be12.deferred', { amount: money(ledger.deferredDeduction), year: plan.baseYear + 1 })}</p>}
     <p className="hint">{t('be12.deductionPolicy')}</p>
+  </div>
+}
+
+/**
+ * BE-36 A: one person's FHSA participation-room row. The room belongs to the
+ * account holder, so this editor is keyed by person and never by a household
+ * total. Expert and guided entry both mount it, the unknown state is explicit,
+ * and the ledger is the same computation the kernel prices. The BE-36 B
+ * maturity clock is displayed as out of scope rather than as room still
+ * available.
+ */
+function FhsaRoomRow({ person, account, plan, onEdit }: {
+  person: Person
+  account: Account | undefined
+  plan: InputsV2
+  onEdit: (change: (draft: InputsV2) => void) => void
+}) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
+  const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  const role = person.role
+  // Only this account's own recorded plan is priced against its own room: a
+  // household FHSA total would mix two people's entitlements. The editor owns
+  // one row per account, and a legacy plan's FHSA row starts at zero, so this
+  // row is the plan the user sees and the kernel prices.
+  const planRow = account ? plan.recurringContributions.find(item => item.id === `be36:fhsa:${account.id}`) : undefined
+  const planShare = roundCents(planRow?.annualAmount ?? 0)
+  const preview = account ? previewFhsaRoomYear(plan, account, planShare) : null
+  const statement = account ? fhsaStatementHistory(plan, account.id) : undefined
+  const ownerLabel = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
+  const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
+  /** Writes a statement line, or clears it back to an explicit unknown. */
+  const writeKnown = (read: () => Known<number>, write: (draft: InputsV2, value: Known<number>) => void, blankReason: string) =>
+    (raw: string) => {
+      const text = raw.trim()
+      const next = text === '' ? null : Number(text)
+      if (next !== null && (!Number.isFinite(next) || next < 0)) return
+      const current = read()
+      if (current.status === 'known' && next === current.value || current.status === 'unknown' && next === null) return
+      onEdit(draft => write(draft, next === null ? { status: 'unknown', reason: blankReason } : { status: 'known', value: next }))
+    }
+  const setOpenedYear = writeKnown(
+    () => account?.openedYear ?? { status: 'unknown', reason: 'FHSA opening year not supplied' },
+    (draft, value) => { for (const item of draft.accounts) if (item.id === account?.id) item.openedYear = value }, 'FHSA opening year not supplied')
+  const setOpeningRoom = writeKnown(
+    () => account?.contributionRoom ?? { status: 'unknown', reason: 'participation-room statement not supplied' },
+    (draft, value) => { for (const item of draft.accounts) if (item.id === account?.id) item.contributionRoom = value }, 'participation-room statement not supplied')
+  const setPriorContributions = writeKnown(
+    () => statement?.cumulativePriorContributions ?? { status: 'unknown', reason: 'FHSA contribution history not supplied' },
+    (draft, value) => {
+      draft.fhsaStatementHistory ??= {}
+      draft.fhsaStatementHistory[account!.id] = {
+        cumulativePriorContributions: value,
+        provenance: { origin: 'user', sourceYear: draft.baseYear },
+      }
+    }, 'FHSA contribution history not supplied')
+  const writePlanned = (amount: number | null) => {
+    if (!account) return
+    const id = `be36:fhsa:${account.id}`
+    onEdit(draft => {
+      draft.recurringContributions = draft.recurringContributions.filter(item => item.id !== id)
+      if (amount === null || amount <= 0) return
+      draft.recurringContributions.push({
+        id, accountId: account.id, contributorId: person.id, annualAmount: amount,
+        funding: 'fromSavings', provenance: { origin: 'user', sourceYear: draft.baseYear },
+      })
+    })
+  }
+  const maturityReached = account?.openedYear.status === 'known' && plan.baseYear - account.openedYear.value >= 15
+  return <div role="group" aria-label={t('be36.person', { person: ownerLabel })} data-testid={`fhsa-statement-${role}`}>
+    <h5>{t('be36.person', { person: ownerLabel })}</h5>
+    <p className="hint">{t('be36.explanation')}</p>
+    {!account
+      ? <p className="hint" role="status" data-testid={`fhsa-no-account-${role}`}>{t('be36.noAccount')}</p>
+      : <>
+        <label>{t('be36.openedYear')}
+          <input type="number" min="1900" max="2200" step="1" data-testid={`fhsa-opened-year-${role}`}
+            key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
+            defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
+            placeholder={t('be12.unknown')}
+            onBlur={event => {
+              const raw = event.currentTarget.value.trim()
+              const year = Number(raw)
+              if (raw && (!Number.isInteger(year) || year < 1900 || year > 2200)) return
+              setOpenedYear(raw)
+            }} />
+        </label>
+        <label>{t('be36.priorContributions')}
+          <input type="number" min="0" step="1" data-testid={`fhsa-prior-contributions-${role}`}
+            key={`prior:${account.id}:${statement?.cumulativePriorContributions.status === 'known' ? statement.cumulativePriorContributions.value : 'unknown'}`}
+            defaultValue={statement?.cumulativePriorContributions.status === 'known' ? statement.cumulativePriorContributions.value : ''}
+            placeholder={t('be12.unknown')}
+            onBlur={event => setPriorContributions(event.currentTarget.value)} />
+        </label>
+        <label>{t('be36.openingRoom')}
+          <input type="number" min="0" step="1" data-testid={`fhsa-opening-room-${role}`}
+            key={`opening:${account.id}:${account.contributionRoom.status === 'known' ? account.contributionRoom.value : 'unknown'}`}
+            defaultValue={account.contributionRoom.status === 'known' ? account.contributionRoom.value : ''}
+            placeholder={t('be12.unknown')}
+            onBlur={event => setOpeningRoom(event.currentTarget.value)} />
+        </label>
+        <p className="hint">{t('be36.openingRoomNote')}</p>
+        <label>{t('be36.planned')}
+          <input type="number" min="0" step="1" data-testid={`fhsa-planned-${role}`}
+            key={`planned:${account.id}:${planShare}`}
+            defaultValue={planShare > 0 ? planShare : ''}
+            placeholder={t('be12.zero')}
+            onBlur={event => {
+              const raw = event.currentTarget.value.trim()
+              const amount = raw === '' ? null : Number(raw)
+              if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return
+              writePlanned(amount)
+            }} />
+        </label>
+        {preview && <p data-testid={`fhsa-ledger-${role}`}>{t('be36.ledger', {
+          opening: shown(preview.ledger.openingRoom), addition: shown(preview.ledger.annualAddition),
+          applied: money(preview.ledger.applied), closing: shown(preview.ledger.closingRoom),
+        })}</p>}
+        {preview && <p className="hint" data-testid={`fhsa-lifetime-${role}`}>{t('be36.lifetime', {
+          remaining: shown(preview.ledger.remainingLifetimeRoom), used: shown(preview.ledger.cumulativeContributions),
+          limit: money(preview.ledger.lifetimeLimit.status === 'known' ? preview.ledger.lifetimeLimit.value : 0),
+        })}</p>}
+        {preview && <p className="hint" data-testid={`fhsa-retained-${role}`}>{t('be36.retained', { retained: money(preview.ledger.retained) })}
+          {preview.ledger.retained > 0 ? ` ${t('be36.retainedHelp')}` : ''}</p>}
+        {preview?.ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`fhsa-room-unknown-${role}`}>
+          {t('be36.unknownRoom', { reason: preview.ledger.closingRoom.reason })}</p>}
+        {maturityReached && <p className="hint" role="status" data-testid={`fhsa-maturity-${role}`}>{t('be36.maturity')}</p>}
+      </>}
+    <p className="hint">{t('be36.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/contributing-your-fhsa.html"
+      target="_blank" rel="noopener noreferrer">{t('be36.source')}</a></p>
   </div>
 }
 
@@ -321,7 +452,19 @@ export function TaxFactsPanel() {
     change(draft)
     draft.migration.ownershipNeedsConfirmation = draft.accounts.some(account => account.kind !== 'nonReg' && !account.ownerId || account.taxableOwnerShares.status === 'unknown') ||
       draft.properties.some(property => property.taxableOwnerShares.status === 'unknown')
-    commitPlan({ inputs: state.inputs, canonical: draft, answerMeta: state.answerMeta,
+    // The legacy form is what rebuilds the account list on the next household
+    // edit, so a recorded FHSA has to exist there too; otherwise the next form
+    // edit or mode switch would silently drop the account and its room row.
+    // The legacy fields themselves stay in step with the canonical account.
+    const fhsa = draft.accounts.find(account => account.kind === 'fhsa')
+    const inputs = fhsa ? { ...state.inputs, fhsa: {
+      balance: fhsa.balance,
+      annualContribution: draft.recurringContributions
+        .filter(item => item.accountId === fhsa.id && item.annualAmount > 0)
+        .reduce((total, item) => total + item.annualAmount, 0),
+      openedYearsAgo: fhsa.openedYear.status === 'known' ? Math.max(0, draft.baseYear - fhsa.openedYear.value) : 0,
+    } } : state.inputs
+    commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta,
       draftByField: state.draftByField })
   }
   const ownerOptions = <>
@@ -569,6 +712,15 @@ export function TaxFactsPanel() {
     <h4>{t('be12.title')}</h4>
     {people.map(person => <RrspRoomRow key={person.id} person={person} plan={current} onEdit={edit} />)}
     <p className="hint">{t('be12.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/t4040/rrsps-other-registered-plans-retirement.html" target="_blank" rel="noopener noreferrer">{t('be12.source')}</a></p>
+    <h4>{t('be36.title')}</h4>
+    {people.map(person => {
+      const resolved = ownFhsaAccount(current, person.id)
+      return <FhsaRoomRow key={person.id} person={person} plan={current} onEdit={edit}
+        account={resolved.accountId ? current.accounts.find(item => item.id === resolved.accountId) : undefined} />
+    })}
+    {people.some(person => ownFhsaAccount(current, person.id).ambiguous) && <p className="hint" role="status" data-testid="fhsa-ambiguous">
+      {t('be36.ambiguousAccount')}</p>}
+    <p className="hint">{t('be36.scope')}</p>
     {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
       const rowIds = [account.id, derivedAccountId(account.id)]
       const setRow = (change: (item: Account) => void) => edit(draft => {

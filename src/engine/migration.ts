@@ -462,6 +462,25 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   // recorded contributions it describes; an ordinary form edit or a mode
   // switch must not drop it back to unknown.
   next.spousalHistory = prior.spousalHistory ? structuredClone(prior.spousalHistory) : undefined
+  // BE-36 A: an FHSA's opening year, participation-room statement line and
+  // contribution history are canonical statement facts entered by the shared
+  // tax panel, exactly like the CRA RRSP statement lines above. The legacy form
+  // carries only a balance and a years-ago count, so an ordinary form edit or a
+  // mode switch must re-apply the recorded canonical facts instead of resetting
+  // them to unknown. A legacy account with no recorded calendar opening year
+  // keeps that unknown: a years-ago count is not an opening year.
+  next.fhsaStatementHistory = prior.fhsaStatementHistory ? structuredClone(prior.fhsaStatementHistory) : undefined
+  if (prior.fhsaStatementHistory) {
+    next.fhsaStatementHistory = Object.fromEntries(Object.entries(next.fhsaStatementHistory ?? {})
+      .filter(([accountId]) => next.accounts.some(account => account.id === accountId)))
+  }
+  for (const account of next.accounts) {
+    if (account.kind !== 'fhsa') continue
+    const old = previousAccounts.get(account.id)
+    if (!old) continue
+    account.openedYear = old.openedYear
+    account.contributionRoom = old.contributionRoom
+  }
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {

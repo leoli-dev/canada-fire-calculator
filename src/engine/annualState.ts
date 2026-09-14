@@ -334,7 +334,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const account = plan.accounts.find(item => item.id === activeFhsaId)!
     const scheduledFhsa = scheduled.filter(contribution => contribution.accountId === activeFhsaId)
     const scheduledFhsaPlanned = sum(scheduledFhsa.map(contribution => contribution.amount))
-    const savingsShare = roundCents(Math.max(0, allocation.fhsa - scheduledFhsaPlanned))
+    // Only this account's own plan is priced against its own room. Two people
+    // each own their FHSA, so the household total would mix their entitlements.
+    const accountPlan = roundCents(sum(plan.recurringContributions
+      .filter(item => item.accountId === activeFhsaId && item.annualAmount > 0)
+      .map(item => item.annualAmount)))
+    const savingsShare = roundCents(Math.max(0, accountPlan - scheduledFhsaPlanned))
     // The opening-year account column holds the statement's unused room from
     // earlier years. Every later year carries the prior year's closing room, so
     // `opening(y) == closing(y-1)` and a rerun changes nothing. The lifetime
