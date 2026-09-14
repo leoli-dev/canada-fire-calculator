@@ -131,9 +131,12 @@ describe('BE-39 A: store-level retirement-age invalidation', () => {
 
 // B3: a hand-typed benefit amount was persisted as `estimated`/`default` because
 // the store inferred an engine rewrite from `next !== previous`, and the two
-// entry modes disagreed on the metadata for the identical estimator Apply. The
-// metadata must follow the action, not the mode, and the pass's own rewrite
-// report — never a value diff — is what labels an engine-replaced amount.
+// entry modes disagreed on the metadata for the identical estimator Apply.
+// Round 3 / BL1: the metadata must follow the amount's *provenance* — identically
+// in both modes — never the last action and never a value diff, so an applied
+// estimator stays `estimated`/`default` and only a typed fact or a re-confirmed
+// statement is `confirmed`/`user`. The pass's own rewrite report is what labels
+// an engine-replaced amount.
 type Mode = 'guided' | 'professional'
 type BenefitField = 'cppAnnualAt65' | 'oasAnnualAt65' | 'partner.cppAnnualAt65' | 'partner.oasAnnualAt65'
 const BENEFIT_FIELDS: BenefitField[] = ['cppAnnualAt65', 'oasAnnualAt65', 'partner.cppAnnualAt65', 'partner.oasAnnualAt65']
@@ -210,7 +213,7 @@ const metaAfter = (mode: Mode, field: BenefitField, act: (mode: Mode, field: Ben
   return metaOf(field)
 }
 
-describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode', () => {
+describe('BE-39 A / B3 / BL1: benefit-amount metadata follows the provenance, identically in both modes', () => {
   it.each(BENEFIT_FIELDS)('records a hand-typed %s as user-confirmed in both modes', (field) => {
     const guided = metaAfter('guided', field, typeAmount)
     const professional = metaAfter('professional', field, typeAmount)

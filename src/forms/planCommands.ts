@@ -21,13 +21,16 @@ export interface PlanFieldSnapshot {
 export type RewrittenBenefitField = PensionBenefitField
 
 /**
- * The benefit amounts one edit wrote *directly*, as the user's own answers.
+ * The benefit amounts one edit wrote *directly* — either the amount box the
+ * user typed in, or a provenance record the patch carried (an estimator Apply,
+ * the source control, a re-confirm). It says which amount the edit touched, not
+ * who owns the number: the label comes from the amount's resolved provenance.
  *
  * A self amount arrives in a narrow patch (`{ cppAnnualAt65 }`), so naming the
  * field is enough. A partner patch is a whole-record replacement — the UI
  * spreads the current partner — so only a changed number or a *different*
  * provenance object records a deliberate write there; a plain spread of an
- * unrelated partner field must not confirm these amounts.
+ * unrelated partner field must not relabel these amounts.
  */
 export function writtenBenefitFields(previous: Inputs, patch: Partial<Inputs>): RewrittenBenefitField[] {
   const fields: RewrittenBenefitField[] = []
@@ -123,10 +126,10 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
     if (account) account.acb = { status: 'known', value: parsed.value }
   }
   // The same bookkeeping `store.set` runs: when the dependency pass replaced the
-  // amount, the field is no longer a user-confirmed answer. Both paths use the
-  // pass's own rewrite report so the metadata cannot drift between them. A
-  // registered field is never one of the four amounts, so nothing was written
-  // directly here.
+  // amount, its label follows the amount's provenance (an estimator record, so
+  // `estimated`/`default`). Both paths use the pass's own rewrite report so the
+  // metadata cannot drift between them. A registered field is never one of the
+  // four amounts, so nothing was written directly here.
   const answerMeta = applyBenefitAnswerMeta(
     { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
     refreshed.rewritten,
