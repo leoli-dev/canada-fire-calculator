@@ -122,6 +122,91 @@ test('professional: a manual amount is a fact that a retirement-age change does 
   expect(saved.inputs.cppAnnualAt65).toBe(11_000)
 })
 
+// Review finding B1: the amount box is a live input. Typing a replacement over
+// an estimator figure must adopt the typed number as a manual fact, never let
+// the dependency pass re-derive the estimate and silently discard the edit.
+test('guided: a figure typed over an estimator amount is kept and recorded as manual', async ({ page }) => {
+  const panel = await applyCppEstimator(page)
+  const amount = page.locator('[data-field="cppAnnualAt65"] input')
+  await expect(amount).toHaveValue('9,278')
+
+  await amount.fill('15000')
+  await expect(amount).toHaveValue('15,000')
+  await amount.blur()
+  // the typed figure survives the blur: it is not silently reverted
+  await expect(amount).toHaveValue('15,000')
+  let saved = await storedPlan(page)
+  expect(saved.inputs.cppAnnualAt65).toBe(15_000)
+  expect(saved.inputs.cppAmountSource.source).toBe('manual')
+  await expect(panel).toHaveAttribute('data-pension-source', 'manual')
+  await expect(page.locator('[data-pension-source-select="cpp"]')).toHaveValue('manual')
+
+  // and it is now a fact: a later retirement-age change leaves it alone
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
+  await fireAge.fill('55')
+  await fireAge.blur()
+  await expect(page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')).toHaveValue('15,000')
+  saved = await storedPlan(page)
+  expect(saved.inputs.cppAnnualAt65).toBe(15_000)
+  expect(saved.inputs.cppAmountSource.source).toBe('manual')
+})
+
+test('professional: a figure typed over an estimator amount is kept and recorded as manual', async ({ page }) => {
+  await page.goto('/#/guided/income/cpp.self')
+  await page.locator('details.estimator', { hasText: 'Estimate from work history' }).locator('summary').click()
+  await page.getByRole('button', { name: 'Apply' }).click()
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const amount = page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')
+  await expect(amount).toHaveValue('9,278')
+  await amount.fill('15000')
+  await amount.blur()
+  await expect(amount).toHaveValue('15,000')
+  const saved = await storedPlan(page)
+  expect(saved.inputs.cppAnnualAt65).toBe(15_000)
+  expect(saved.inputs.cppAmountSource.source).toBe('manual')
+})
+
+// Review finding B2: both entry modes write the FIRE age through the field
+// registry, not `store.set`, so the registry path has to relabel an
+// engine-replaced amount. Both the guided page's status line and the guided
+// review page derive from `answerMeta`, so the metadata is the contract.
+test('a FIRE-age change relabels an engine-replaced amount as an estimate, not a confirmed fact', async ({ page }) => {
+  await applyCppEstimator(page)
+  // the estimator Apply leaves a user-confirmed answer
+  await page.goto('/#/guided/income/cpp.self')
+  await expect(page.locator('[data-field="cppAnnualAt65"] small')).toHaveText('confirmed')
+
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
+  await fireAge.fill('55')
+  await fireAge.blur()
+  await expect(page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')).toHaveValue('13,917')
+
+  // the guided page's own status line stops claiming a user-confirmed number
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/income/cpp.self')
+  await expect(page.locator('[data-field="cppAnnualAt65"] small')).toHaveText('estimate')
+  await expect(page.locator('[data-field="cppAnnualAt65"] small')).not.toHaveText('confirmed')
+
+  // the stored metadata no longer claims the user confirmed the replaced number
+  const saved = await storedPlan(page)
+  expect(saved.inputs.cppAnnualAt65).toBe(CPP_AT_55)
+  expect(saved.answerMeta.cppAnnualAt65.status).toBe('estimated')
+  expect(saved.answerMeta.cppAnnualAt65.assumptionValue).toBe(CPP_AT_55)
+
+  // the guided review page renders from that metadata and still shows the plan
+  // (on the narrow viewport the review link lives behind the directory toggle)
+  const directory = page.locator('button.mobile-directory-trigger')
+  if (await directory.isVisible()) await directory.click()
+  await page.locator('button.review-link').click()
+  await expect(page.locator('.answer-review')).toBeVisible()
+  await expect(page.locator('.review-category-list article', { hasText: 'Other retirement income' })).toBeVisible()
+  // the FIRE-age field itself is still a user-confirmed answer
+  expect(saved.answerMeta.fireAge.status).toBe('confirmed')
+  expect(saved.answerMeta.fireAge.origin).toBe('user')
+})
+
 test('mobile: the provenance controls stay inside the viewport', async ({ page }) => {
   await page.goto('/#/guided/income/cpp.self')
   const panel = page.locator('[data-pension-kind="cpp"]')

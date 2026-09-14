@@ -16,6 +16,51 @@ export interface PlanFieldSnapshot {
   questionAnswers?: Record<string, string | boolean | string[]>
 }
 
+/**
+ * BE-39 A. The benefit answers whose stored *value* the dependency pass
+ * rewrote, so the metadata stops claiming the user confirmed a number the
+ * engine has since replaced. A manual or statement amount never lands here:
+ * its value is not touched. Shared by both write paths — `store.set` and the
+ * field registry's `editField` — so an engine-replaced amount is labelled the
+ * same way whichever control moved the retirement age.
+ */
+export type RewrittenBenefitField = 'cppAnnualAt65' | 'oasAnnualAt65' | 'partner.cppAnnualAt65' | 'partner.oasAnnualAt65'
+
+export function rewrittenBenefitAnswers(
+  before: Inputs,
+  after: Inputs,
+): { field: RewrittenBenefitField; assumptionValue?: number }[] {
+  const fields: { field: RewrittenBenefitField; assumptionValue?: number }[] = []
+  const push = (field: RewrittenBenefitField, previous: number, next: number) => {
+    if (next !== previous) fields.push({ field, assumptionValue: next })
+  }
+  push('cppAnnualAt65', before.cppAnnualAt65, after.cppAnnualAt65)
+  push('oasAnnualAt65', before.oasAnnualAt65, after.oasAnnualAt65)
+  if (before.partner && after.partner) {
+    push('partner.cppAnnualAt65', before.partner.cppAnnualAt65, after.partner.cppAnnualAt65)
+    push('partner.oasAnnualAt65', before.partner.oasAnnualAt65, after.partner.oasAnnualAt65)
+  }
+  return fields
+}
+
+/**
+ * Overlay the rewritten-amount marking onto a metadata map: a value the engine
+ * replaced is an `estimated` answer, not a user-confirmed one. The amount the
+ * engine produced is recorded as the assumption so the review pages can show
+ * it. Returns the map unchanged when the dependency pass moved nothing.
+ */
+export function applyRewrittenBenefitAnswers(
+  meta: Record<string, AnswerMeta>,
+  rewritten: { field: RewrittenBenefitField; assumptionValue?: number }[],
+): Record<string, AnswerMeta> {
+  if (rewritten.length === 0) return meta
+  const updatedAt = new Date().toISOString()
+  const next = { ...meta }
+  for (const { field, assumptionValue } of rewritten)
+    next[field] = { status: 'estimated', origin: 'default', updatedAt, assumptionValue }
+  return next
+}
+
 function revealAccount(answers: Record<string, string | boolean | string[]>, account: 'tfsa' | 'rrsp' | 'nonReg') {
   const selected = (answers['assets.identify'] as string[] | undefined) ?? []
   return { ...answers, 'assets.identify': [...new Set([...selected, account])] }
@@ -36,15 +81,23 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
   // BE-39 A: a registered-field edit that moves the retirement age (the FIRE
   // age is the one that does) must invalidate the estimate-derived amounts.
   // Without this the registry path bypasses the rule `store.set` applies.
-  const inputs = refreshPensionProvenance(fieldRegistry[id].write(state.inputs, parsed.value))
+  const written = fieldRegistry[id].write(state.inputs, parsed.value)
+  const inputs = refreshPensionProvenance(written)
   const canonical = refreshCanonicalFromLegacy(state.canonical, inputs)
   if (id === 'nonRegBook') {
     const account = canonical.accounts.find(item => item.kind === 'nonReg')
     if (account) account.acb = { status: 'known', value: parsed.value }
   }
+  // The same bookkeeping `store.set` runs: when the dependency pass replaced the
+  // amount, the field is no longer a user-confirmed answer. Both paths share
+  // `rewrittenBenefitAnswers` so the metadata cannot drift between them.
+  const answerMeta = applyRewrittenBenefitAnswers(
+    { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
+    rewrittenBenefitAnswers(state.inputs, inputs),
+  )
   return {
     inputs: canonical.legacyProjection, canonical, draftByField,
-    answerMeta: { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
+    answerMeta,
     ...(id.startsWith('balances.') && parsed.value > 0 && state.questionAnswers
       ? { questionAnswers: revealAccount(state.questionAnswers, id.slice('balances.'.length) as 'tfsa' | 'rrsp' | 'nonReg') }
       : {}),

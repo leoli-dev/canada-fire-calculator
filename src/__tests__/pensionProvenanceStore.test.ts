@@ -3,6 +3,7 @@ import { DEFAULT_INPUTS, useStore } from '../store'
 import {
   cppEstimatorProvenance,
   estimateCppAt65,
+  oasEstimatorProvenance as estimatorProvenance,
   statementProvenance,
 } from '../engine'
 
@@ -81,5 +82,46 @@ describe('BE-39 A: store-level retirement-age invalidation', () => {
     // the engine replaced the number, so it is no longer a user-confirmed one
     expect(useStore.getState().answerMeta.cppAnnualAt65?.status).toBe('estimated')
     expect(useStore.getState().answerMeta.cppAnnualAt65?.assumptionValue).toBe(13_917)
+  })
+
+  // B1: the amount box is a live input, so typing a replacement over an
+  // estimator value must adopt the typed figure rather than let the dependency
+  // pass re-derive the estimate and silently discard it.
+  it('keeps a figure typed over an estimator amount and records it as manual', () => {
+    reset()
+    useStore.getState().set({
+      cppAnnualAt65: estimateCppAt65(25, 45, 1),
+      cppAmountSource: cppEstimatorProvenance({ retirementAge: 45, startWorkAge: 25, avgEarningsRatio: 1 }, 2026),
+    })
+    useStore.getState().set({ cppAnnualAt65: 15_000 })
+    expect(useStore.getState().inputs.cppAnnualAt65).toBe(15_000)
+    expect(useStore.getState().inputs.cppAmountSource?.source).toBe('manual')
+    // and a later age change leaves the typed fact alone
+    useStore.getState().set({ fireAge: 55 })
+    expect(useStore.getState().inputs.cppAnnualAt65).toBe(15_000)
+    expect(useStore.getState().inputs.cppAmountSource?.source).toBe('manual')
+  })
+
+  it('keeps a typed OAS figure over an estimator amount, and the partner path too', () => {
+    reset()
+    useStore.getState().set({
+      oasAnnualAt65: 9_278,
+      oasAmountSource: estimatorProvenance({ retirementAge: 45, residenceYearsBy65: 40 }, 2026),
+    })
+    useStore.getState().set({ oasAnnualAt65: 10_500 })
+    expect(useStore.getState().inputs.oasAnnualAt65).toBe(10_500)
+    expect(useStore.getState().inputs.oasAmountSource?.source).toBe('manual')
+
+    useStore.getState().set({
+      partner: {
+        currentAge: 40, cppStartAge: 65, cppAnnualAt65: estimateCppAt65(25, 50, 0.8),
+        oasStartAge: 65, oasAnnualAt65: 8_000,
+        cppAmountSource: cppEstimatorProvenance({ retirementAge: 50, startWorkAge: 25, avgEarningsRatio: 0.8 }, 2026),
+      },
+    })
+    const before = useStore.getState().inputs.partner!.cppAnnualAt65
+    useStore.getState().set({ partner: { ...useStore.getState().inputs.partner!, cppAnnualAt65: before + 2_000 } })
+    expect(useStore.getState().inputs.partner?.cppAnnualAt65).toBe(before + 2_000)
+    expect(useStore.getState().inputs.partner?.cppAmountSource?.source).toBe('manual')
   })
 })

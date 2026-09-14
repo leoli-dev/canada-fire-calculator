@@ -17,6 +17,7 @@ import {
   pensionAmountDisplay,
   pensionAmountFromDisplay,
   pensionAmountWarning,
+  provenanceForTypedAmount,
   reconfirmStatementAmount,
   refreshPensionProvenance,
   statementProvenance,
@@ -166,11 +167,24 @@ describe('BE-39 A: early/late factors are applied exactly once', () => {
     const reliefNow = earlyClaimDilutionRelief(25, 60, 60)
     const reliefStale = earlyClaimDilutionRelief(25, 30, 60)
     expect(reliefNow).not.toBeCloseTo(reliefStale, 4)
-    expect(inputsCppAnnual(inputs, 60, 'ON', inputs.fireAge)).toBeCloseTo(
-      12_000 * cppAnnual(1, 60) * reliefNow, 6)
+    // Literal, not re-derived from the helpers under test: 12,000 × 0.64 ×
+    // 1.1142857142857143 = 8,557.714285714286.
+    expect(inputsCppAnnual(inputs, 60, 'ON', inputs.fireAge)).toBeCloseTo(8_557.714285714286, 6)
     // and the stale snapshot would have produced a different number
     expect(12_000 * cppAnnual(1, 60) * reliefStale).not.toBeCloseTo(
       12_000 * cppAnnual(1, 60) * reliefNow, 2)
+  })
+
+  it('does not reduce an OAS amount already stated at its claim age a second time', () => {
+    const alreadyAt70: Inputs = {
+      ...base(), oasStartAge: 70, oasAnnualAt65: 12_272.64,
+      oasAmountSource: statementProvenance(2026, { basis: 'annual', ageBasis: 70, dollarBasis: 'today' }, 45),
+    }
+    // the statement already states the 70 figure: the ratio to its own basis is 1
+    expect(inputsOasAnnual(alreadyAt70, 70)).toBeCloseTo(12_272.64, 6)
+    // the same number read as an age-65 basis would be increased again
+    const asBasis65: Inputs = { ...alreadyAt70, oasAmountSource: undefined }
+    expect(inputsOasAnnual(asBasis65, 70)).toBeCloseTo(12_272.64 * 1.36, 6)
   })
 })
 
@@ -225,6 +239,32 @@ describe('BE-39 A: the whole plan is made coherent on a retirement-age change', 
     const twice = refreshPensionProvenance(once)
     expect(twice.cppAnnualAt65).toBe(once.cppAnnualAt65)
     expect(twice.cppAmountSource).toEqual(once.cppAmountSource)
+  })
+})
+
+describe('BE-39 A: a typed figure is never silently reverted', () => {
+  it('adopts manual provenance for a figure typed over an estimator amount', () => {
+    const typed = provenanceForTypedAmount(cppEstimate(45, 25, 1))
+    expect(typed?.source).toBe('manual')
+    // and the dependency pass then leaves the typed number exactly as it is
+    const inputs: Inputs = {
+      ...base(), fireAge: 55, cppAnnualAt65: 15_000, cppAmountSource: typed ?? undefined,
+    }
+    const synced = refreshPensionProvenance(inputs)
+    expect(synced.cppAnnualAt65).toBe(15_000)
+    expect(synced.cppAmountSource?.source).toBe('manual')
+    expect(pensionAmountWarning(synced.cppAmountSource, 'cpp', 55)).toBeNull()
+  })
+
+  it('keeps a recorded statement source, whose amount box is its entry channel', () => {
+    const statement = statementProvenance(2026, { basis: 'monthly', ageBasis: 60, dollarBasis: 'today' }, 45)
+    expect(provenanceForTypedAmount(statement)).toBeNull()
+    const manual = manualProvenance(2026)
+    expect(provenanceForTypedAmount(manual)).toBeNull()
+    // no recorded source at all is still "the user typed this"
+    expect(provenanceForTypedAmount(undefined)?.source).toBe('manual')
+    const unknown: PensionAmountProvenance = { source: 'unknown', sourceYear: null, basis: 'annual', ageBasis: null, dollarBasis: 'today' }
+    expect(provenanceForTypedAmount(unknown)?.source).toBe('manual')
   })
 })
 

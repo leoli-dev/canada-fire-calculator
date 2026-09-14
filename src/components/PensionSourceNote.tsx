@@ -19,12 +19,9 @@ type StatementUnit = { basis: 'monthly' | 'annual'; ageBasis: number | null; dol
  */
 export function PensionSourceNote(props: {
   kind: 'cpp' | 'oas'
-  amount: number
   provenance: PensionAmountProvenance | undefined
   /** The plan's current retirement age for this person. */
   retirementAge: number
-  /** Write the recorded value in the units `provenance.basis` states. */
-  onAmount: (value: number) => void
   onProvenance: (provenance: PensionAmountProvenance) => void
   /** Re-adopt the current retirement age as the amount's premise. */
   onReconfirm: () => void

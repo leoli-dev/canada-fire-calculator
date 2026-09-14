@@ -445,9 +445,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={cppSelfDisplay}
           onValue={(value) => set({ cppAnnualAt65: pensionAmountFromDisplay(value, inputs.cppAmountSource) })} />
-        <PensionSourceNote kind="cpp" amount={inputs.cppAnnualAt65} provenance={inputs.cppAmountSource}
+        <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
           retirementAge={inputs.fireAge}
-          onAmount={(value) => set({ cppAnnualAt65: pensionAmountFromDisplay(value, inputs.cppAmountSource) })}
           onProvenance={(cppAmountSource) => set({ cppAmountSource })}
           onReconfirm={() => set(reconfirmStatementAmount(inputs.cppAnnualAt65, inputs.cppAmountSource, inputs.fireAge))} />
         <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ cppAnnualAt65, cppAmountSource, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
@@ -460,9 +459,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         <FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={oasSelfDisplay}
           onValue={(value) => set({ oasAnnualAt65: pensionAmountFromDisplay(value, inputs.oasAmountSource) })} />
-        <PensionSourceNote kind="oas" amount={inputs.oasAnnualAt65} provenance={inputs.oasAmountSource}
+        <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
           retirementAge={inputs.fireAge}
-          onAmount={(value) => set({ oasAnnualAt65: pensionAmountFromDisplay(value, inputs.oasAmountSource) })}
           onProvenance={(oasAmountSource) => set({ oasAmountSource })}
           onReconfirm={() => {
             const next = reconfirmStatementAmount(inputs.oasAnnualAt65, inputs.oasAmountSource, inputs.fireAge)
@@ -478,9 +476,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource)}
           onValue={(value) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.cppAmountSource) } })} />
-        <PensionSourceNote kind="cpp" amount={inputs.partner!.cppAnnualAt65} provenance={inputs.partner!.cppAmountSource}
+        <PensionSourceNote kind="cpp" provenance={inputs.partner!.cppAmountSource}
           retirementAge={partnerRetireAge}
-          onAmount={(value) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.cppAmountSource) } })}
           onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
           onReconfirm={() => {
             const next = reconfirmStatementAmount(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource, partnerRetireAge)
@@ -496,9 +493,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         <FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource)}
           onValue={(value) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.oasAmountSource) } })} />
-        <PensionSourceNote kind="oas" amount={inputs.partner!.oasAnnualAt65} provenance={inputs.partner!.oasAmountSource}
+        <PensionSourceNote kind="oas" provenance={inputs.partner!.oasAmountSource}
           retirementAge={partnerRetireAge}
-          onAmount={(value) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.oasAmountSource) } })}
           onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}
           onReconfirm={() => {
             const next = reconfirmStatementAmount(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource, partnerRetireAge)

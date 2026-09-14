@@ -1,7 +1,11 @@
-// Baseline evidence for BE-39 A. The same three probes were run against a
-// clean e32dd4c worktree, where they failed for the reasons recorded in the PR:
-// the FIRE-age change left the estimator amount stale, an amount already stated
-// at its claim age was reduced a second time, and no source was recorded.
+// Baseline evidence for BE-39 A. This file is a *head* regression test: it
+// imports `cppEstimatorProvenance` / `refreshPensionProvenance` /
+// `statementProvenance` and the `cppAmountSource` field, none of which exist at
+// base `e32dd4c`, so it cannot execute there. The semantic gap it guards is
+// stated as a literal in each case. Only the third case is a genuine semantic
+// baseline failure at `e32dd4c` (the first two are unmatched because the
+// concept did not exist there); the reviewer independently reproduced it with
+// base-only APIs and measured `5_476.94` for the reduce-twice path.
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { refreshCanonicalFromLegacy } from '../migration'
@@ -32,10 +36,16 @@ describe('BE-39 A baseline gaps', () => {
       cppWork: { startWorkAge: 25, retireAge: 60 },
     }
     const row = runProjection(inputs).rows.find(r => r.age === 60)!
-    // 7,680 is the statement's amount AT 60; the engine keeps it at 60 and does
-    // not multiply by the 0.64 claiming factor again. Only the early-claim
-    // dilution relief applies (1.1187608 at a retirement age of 60).
-    expect(row.cpp).toBeCloseTo(7_680 * 1.1187608, 0)
+    // 7,680 is the statement's amount AT 60, so nothing may apply the 0.64
+    // early-claim factor a second time. At base the row was
+    // 7,680 × 0.64 × 1.1142857142857143 (the `cppWork.retireAge` of 60 drove the
+    // relief then) = 5,476.94. Only the dilution relief for the *current*
+    // retirement age applies now. `DEFAULT_INPUTS.fireAge` is 45, and
+    // `earlyClaimDilutionRelief(25, 45, 60) = 1.1187607573149743`, so the row
+    // is 7,680 × 1.1187607573149743 = 8,592.082616179003. The relief is read
+    // from the plan's retirement age, so `cppWork.retireAge` no longer changes
+    // the result (30, 45 and 60 all give this value).
+    expect(row.cpp).toBeCloseTo(8_592.082616179003, 6)
   })
 
   it('records where a CPP amount came from', () => {

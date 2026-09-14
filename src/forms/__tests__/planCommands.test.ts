@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_INPUTS } from '../../store'
+import { cppEstimatorProvenance } from '../../engine'
 import { applyEstimate, changeAccountPresence, changeIntent, editField, reconcileDirectFields, type PlanFieldSnapshot } from '../planCommands'
 import { fieldState } from '../fieldState'
 import { parseField } from '../fieldRegistry'
@@ -139,5 +140,39 @@ describe('shared field commands', () => {
       expect(fieldState(state, id).usable).toBe(false)
       expect(state.inputRevision).toBe(unresolved.inputRevision + 1)
     }
+  })
+
+  // BE-39 A / B2. Both entry modes write the FIRE age through this registry
+  // path, never through `store.set`, so the rewritten-amount bookkeeping has to
+  // run here too. This pins the metadata the guided review page reads.
+  const estimatorPlan = (): PlanFieldSnapshot => {
+    const state = initial()
+    return {
+      ...state,
+      inputs: {
+        ...state.inputs,
+        cppAnnualAt65: 9_278,
+        cppAmountSource: cppEstimatorProvenance({ retirementAge: 45, startWorkAge: 25, avgEarningsRatio: 1 }, 2026),
+      },
+      answerMeta: { cppAnnualAt65: { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01' } },
+    }
+  }
+
+  it('labels an engine-replaced CPP amount as estimated, not user-confirmed, after a FIRE-age edit', () => {
+    const state = estimatorPlan()
+    const next = { ...state, ...editField(state, 'fireAge', '55') } as PlanFieldSnapshot
+    // the value was replaced by the estimator under the new retirement age
+    expect(next.inputs.cppAnnualAt65).toBe(13_917)
+    expect(next.inputs.cppAmountSource?.premises?.retirementAge).toBe(55)
+    // and the metadata no longer claims the user confirmed that number
+    expect(next.answerMeta.cppAnnualAt65).toMatchObject({ status: 'estimated', origin: 'default', assumptionValue: 13_917 })
+    expect(next.answerMeta.fireAge).toMatchObject({ status: 'confirmed', origin: 'user' })
+  })
+
+  it('leaves a confirmed answer alone when the edit moves no benefit amount', () => {
+    const state = estimatorPlan()
+    const next = { ...state, ...editField(state, 'lifeExpectancy', '92') } as PlanFieldSnapshot
+    expect(next.inputs.cppAnnualAt65).toBe(9_278)
+    expect(next.answerMeta.cppAnnualAt65).toMatchObject({ status: 'confirmed', origin: 'user' })
   })
 })

@@ -316,6 +316,23 @@ export function manualProvenance(sourceYear: number): PensionAmountProvenance {
 }
 
 /**
+ * The source a direct amount edit produces. BE-39 A: a figure typed over an
+ * *estimate* is the user taking manual control of the number, so it adopts
+ * `manual` and the dependency pass leaves it alone; without this the estimator
+ * re-derived its own value and the typed figure vanished on blur. A recorded
+ * `statement` (or `manual`) entry is different — its amount box is the
+ * documented entry channel for the figure — so typing there keeps the source
+ * and the recorded unit. The dependency pass never overwrites either.
+ * Returns null when the recorded source stays as it is.
+ */
+export function provenanceForTypedAmount(
+  recorded: PensionAmountProvenance | undefined,
+): PensionAmountProvenance | null {
+  if (recorded?.source === 'statement' || recorded?.source === 'manual') return null
+  return manualProvenance(new Date().getFullYear())
+}
+
+/**
  * A statement value entered as monthly or annual at its own stated age. The
  * retirement age assumed at entry is recorded so a later change can raise the
  * review flag instead of silently re-pricing the statement.

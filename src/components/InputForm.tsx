@@ -809,9 +809,8 @@ export function InputForm() {
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
         <Num label={t('cppAnnualAt65')} value={cppSelfDisplay} step={500}
           onChange={(v) => set({ cppAnnualAt65: pensionAmountFromDisplay(v, inputs.cppAmountSource) })} />
-        <PensionSourceNote kind="cpp" amount={inputs.cppAnnualAt65} provenance={inputs.cppAmountSource}
+        <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
           retirementAge={inputs.fireAge}
-          onAmount={(v) => set({ cppAnnualAt65: pensionAmountFromDisplay(v, inputs.cppAmountSource) })}
           onProvenance={(cppAmountSource) => set({ cppAmountSource })}
           onReconfirm={() => set(reconfirmStatementAmount(inputs.cppAnnualAt65, inputs.cppAmountSource, inputs.fireAge))} />
         <CppEstimator retireAge={inputs.fireAge}
@@ -819,9 +818,8 @@ export function InputForm() {
         <Num label={t('oasStartAge')} value={inputs.oasStartAge} onChange={(v) => set({ oasStartAge: v })} />
         <Num label={t('oasAnnualAt65')} value={oasSelfDisplay} step={100}
           onChange={(v) => set({ oasAnnualAt65: pensionAmountFromDisplay(v, inputs.oasAmountSource) })} />
-        <PensionSourceNote kind="oas" amount={inputs.oasAnnualAt65} provenance={inputs.oasAmountSource}
+        <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
           retirementAge={inputs.fireAge}
-          onAmount={(v) => set({ oasAnnualAt65: pensionAmountFromDisplay(v, inputs.oasAmountSource) })}
           onProvenance={(oasAmountSource) => set({ oasAmountSource })}
           onReconfirm={() => {
             const next = reconfirmStatementAmount(inputs.oasAnnualAt65, inputs.oasAmountSource, inputs.fireAge)
@@ -865,9 +863,8 @@ export function InputForm() {
               onChange={(v) => set({ partner: { ...inputs.partner!, cppStartAge: v } })} />
             <Num label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner.cppAnnualAt65, inputs.partner.cppAmountSource)} step={500}
               onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.cppAmountSource) } })} />
-            <PensionSourceNote kind="cpp" amount={inputs.partner.cppAnnualAt65} provenance={inputs.partner.cppAmountSource}
+            <PensionSourceNote kind="cpp" provenance={inputs.partner.cppAmountSource}
               retirementAge={partnerRetireAge}
-              onAmount={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.cppAmountSource) } })}
               onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
               onReconfirm={() => {
                 const next = reconfirmStatementAmount(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource, partnerRetireAge)
@@ -882,9 +879,8 @@ export function InputForm() {
               onChange={(v) => set({ partner: { ...inputs.partner!, oasStartAge: v } })} />
             <Num label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner.oasAnnualAt65, inputs.partner.oasAmountSource)} step={100}
               onChange={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.oasAmountSource) } })} />
-            <PensionSourceNote kind="oas" amount={inputs.partner.oasAnnualAt65} provenance={inputs.partner.oasAmountSource}
+            <PensionSourceNote kind="oas" provenance={inputs.partner.oasAmountSource}
               retirementAge={partnerRetireAge}
-              onAmount={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.oasAmountSource) } })}
               onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}
               onReconfirm={() => {
                 const next = reconfirmStatementAmount(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource, partnerRetireAge)

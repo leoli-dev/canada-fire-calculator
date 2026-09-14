@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import type { AccountType, AssetMix, Child, Fhsa, Inputs, LockedRetirement, Partner, Pension } from './engine'
-import { blendedReturn, blendedVolatility, manualProvenance, refreshPensionProvenance } from './engine'
+import { blendedReturn, blendedVolatility, provenanceForTypedAmount, refreshPensionProvenance } from './engine'
 import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
-import { changeAccountPresence, changeIntent, editField, reconcileDirectFields } from './forms/planCommands'
+import { applyRewrittenBenefitAnswers, changeAccountPresence, changeIntent, editField, reconcileDirectFields, rewrittenBenefitAnswers } from './forms/planCommands'
 import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
@@ -305,29 +305,33 @@ function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<In
   const selfPatch = { ...patch }
   delete selfPatch.partner
   const withSelf: Inputs = { ...inputs }
-  // Only an amount that had no provenance, or one already recorded as manual,
-  // becomes manual when it is retyped. Typing over a `statement` value or an
-  // `estimator` value must not silently relabel where the figure came from —
-  // the source control is what changes a source.
-  const becomesManual = (recorded: Inputs['cppAmountSource']) =>
-    recorded === undefined || recorded.source === 'unknown' || recorded.source === 'manual'
+  // A patch that changes an amount without carrying its own provenance is a
+  // direct user edit. It must never be silently reverted: an estimator value is
+  // adopted as a manual fact, a statement/manual entry keeps its recorded
+  // source (which the dependency pass then leaves alone anyway). The source
+  // control is what deliberately changes a source.
+  const typedSource = (recorded: Inputs['cppAmountSource']) => provenanceForTypedAmount(recorded) ?? undefined
   if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined &&
-      inputs.cppAnnualAt65 !== state.cppAnnualAt65 && becomesManual(state.cppAmountSource))
-    withSelf.cppAmountSource = manualProvenance(new Date().getFullYear())
+      inputs.cppAnnualAt65 !== state.cppAnnualAt65)
+    withSelf.cppAmountSource = typedSource(state.cppAmountSource) ?? state.cppAmountSource
   if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined &&
-      inputs.oasAnnualAt65 !== state.oasAnnualAt65 && becomesManual(state.oasAmountSource))
-    withSelf.oasAmountSource = manualProvenance(new Date().getFullYear())
-  // A partner patch is a whole-record replacement, so it can carry its own
-  // provenance; when it only moves the amount, record that as manual too.
+      inputs.oasAnnualAt65 !== state.oasAnnualAt65)
+    withSelf.oasAmountSource = typedSource(state.oasAmountSource) ?? state.oasAmountSource
+  // A partner patch is a whole-record replacement (the UI spreads the current
+  // partner and overrides one key), so an unchanged provenance reference is not
+  // a directive — only a *different* object records a deliberate source change.
+  // The same rule as above then applies to the amount the patch moved.
   if (partnerPatched && inputs.partner) {
     const before = state.partner
     const partner = { ...inputs.partner }
-    if (partnerPatched.cppAmountSource === undefined && before && partner.cppAnnualAt65 !== before.cppAnnualAt65 &&
-        becomesManual(before.cppAmountSource))
-      partner.cppAmountSource = manualProvenance(new Date().getFullYear())
-    if (partnerPatched.oasAmountSource === undefined && before && partner.oasAnnualAt65 !== before.oasAnnualAt65 &&
-        becomesManual(before.oasAmountSource))
-      partner.oasAmountSource = manualProvenance(new Date().getFullYear())
+    const sourceDirective = (patched: Inputs['cppAmountSource'], recorded: Inputs['cppAmountSource']) =>
+      patched !== undefined && patched !== recorded
+    if (!sourceDirective(partnerPatched.cppAmountSource, before?.cppAmountSource) && before &&
+        partner.cppAnnualAt65 !== before.cppAnnualAt65)
+      partner.cppAmountSource = typedSource(before.cppAmountSource) ?? before.cppAmountSource
+    if (!sourceDirective(partnerPatched.oasAmountSource, before?.oasAmountSource) && before &&
+        partner.oasAnnualAt65 !== before.oasAnnualAt65)
+      partner.oasAmountSource = typedSource(before.oasAmountSource) ?? before.oasAmountSource
     withSelf.partner = partner
   }
   // The dependency pass runs after the source is decided, so a manual edit is
@@ -336,21 +340,10 @@ function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<In
 }
 
 /**
- * The answers whose stored *value* was rewritten by the dependency pass, so
- * their metadata stops claiming a user confirmed a number the engine has since
- * replaced. A statement amount never lands here: its value is not touched.
+ * BE-39 A: the rewritten-amount bookkeeping lives in `planCommands`, so
+ * `store.set` and the field registry's `editField` apply exactly the same rule
+ * to `answerMeta`.
  */
-function rewrittenBenefitAnswers(
-  before: Inputs,
-  after: Inputs,
-): { field: 'cppAnnualAt65' | 'partner.cppAnnualAt65'; assumptionValue?: number }[] {
-  const fields: { field: 'cppAnnualAt65' | 'partner.cppAnnualAt65'; assumptionValue?: number }[] = []
-  if (after.cppAnnualAt65 !== before.cppAnnualAt65)
-    fields.push({ field: 'cppAnnualAt65', assumptionValue: after.cppAnnualAt65 })
-  if (after.partner && before.partner && after.partner.cppAnnualAt65 !== before.partner.cppAnnualAt65)
-    fields.push({ field: 'partner.cppAnnualAt65', assumptionValue: after.partner.cppAnnualAt65 })
-  return fields
-}
 
 export const useStore = create<Store>()(
   persist(
@@ -391,12 +384,7 @@ export const useStore = create<Store>()(
           const reconciled = reconcileLegacyInputs(s, inputs)
           const shared = reconcileDirectFields(s, patch, reconciled.inputs)
           const rewritten = rewrittenBenefitAnswers(s.inputs, reconciled.inputs)
-          const answerMeta = rewritten.length === 0 ? shared.answerMeta : (() => {
-            const next = { ...shared.answerMeta }
-            for (const { field, assumptionValue } of rewritten)
-              next[field] = { status: 'estimated', origin: 'default', updatedAt: new Date().toISOString(), assumptionValue }
-            return next
-          })()
+          const answerMeta = applyRewrittenBenefitAnswers(shared.answerMeta, rewritten)
           return {
             ...reconciled,
             draftByField: shared.draftByField,

@@ -46,6 +46,7 @@ export {
   cppEstimatorProvenance,
   oasEstimatorProvenance,
   manualProvenance,
+  provenanceForTypedAmount,
   statementProvenance,
   reconfirmStatementAmount,
   personCppAnnual,
