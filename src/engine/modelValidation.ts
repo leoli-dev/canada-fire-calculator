@@ -290,5 +290,18 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
       else requireShape(entry.status === 'complete', `spousalHistory.${accountId}.status`)
     }
   }
+  // BE-36 A: optional, so an old persisted envelope without it still hydrates.
+  // An entry that is present must be a real FHSA statement fact; an absent
+  // entry means the history is unknown, never a real zero.
+  if (plan.fhsaStatementHistory !== undefined) {
+    requireShape(object(plan.fhsaStatementHistory), 'fhsaStatementHistory')
+    for (const [accountId, entry] of Object.entries(plan.fhsaStatementHistory)) {
+      requireShape(accounts.has(accountId), `fhsaStatementHistory.${accountId}.account`)
+      requireShape(plan.accounts.some(account => account.id === accountId && account.kind === 'fhsa'), `fhsaStatementHistory.${accountId}.kind`)
+      requireShape(object(entry), `fhsaStatementHistory.${accountId}`)
+      knownNonnegative(entry.cumulativePriorContributions, `fhsaStatementHistory.${accountId}.cumulativePriorContributions`)
+      provenance(entry.provenance, `fhsaStatementHistory.${accountId}.provenance`)
+    }
+  }
   requireShape(object(plan.migration) && integer(plan.migration.sourcePersistVersion) && typeof plan.migration.ownershipNeedsConfirmation === 'boolean' && typeof plan.migration.ageBasisNeedsConfirmation === 'boolean' && typeof plan.migration.savingsBasisNeedsConfirmation === 'boolean', 'migration')
 }
