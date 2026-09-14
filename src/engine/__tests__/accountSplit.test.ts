@@ -192,6 +192,30 @@ describe('FE-35 A per-person account balances (registered)', () => {
     expect(() => assertCanonicalPlan(dangling)).toThrow('ownershipAmounts.legacy:account:rrsp.ghost.owner')
   })
 
+  it('validates the recorded spousal premium history and survives a legacy form edit', () => {
+    const before = plan()
+    const account = before.accounts.find(item => item.kind === 'rrsp')!
+    account.kind = 'spousalRrsp'
+    // An unconfirmed history is an explicit state, not an absent one.
+    before.spousalHistory = { [account.id]: { status: 'unknown', reason: 'premium history not supplied' } }
+    expect(() => assertCanonicalPlan(before)).not.toThrow()
+    before.spousalHistory = { [account.id]: { status: 'complete' } }
+    expect(() => assertCanonicalPlan(before)).not.toThrow()
+    // A claim about an account that does not exist, or a status with no
+    // meaning, is refused instead of being carried into the engine.
+    const ghost = structuredClone(before)
+    ghost.spousalHistory = { 'legacy:account:ghost': { status: 'complete' } }
+    expect(() => assertCanonicalPlan(ghost)).toThrow('spousalHistory.legacy:account:ghost.account')
+    const reasonless = structuredClone(before)
+    reasonless.spousalHistory = { [account.id]: { status: 'unknown' } as never }
+    expect(() => assertCanonicalPlan(reasonless)).toThrow(`spousalHistory.${account.id}.reason`)
+    // An ordinary legacy-form edit must not drop the recorded history claim.
+    const refreshed = refreshCanonicalFromLegacy(before, { ...before.legacyProjection, annualSavings: 1234 })
+    expect(refreshed.spousalHistory).toEqual({ [account.id]: { status: 'complete' } })
+    expect(refreshed.accounts.find(item => item.id === account.id)?.kind).toBe('spousalRrsp')
+    expect(() => assertCanonicalPlan(refreshed)).not.toThrow()
+  })
+
   it('matches cents-scale splits on a tolerance relative to the household total', () => {
     // A 1-cent total split in half: exact amounts pass and the shares stay valid.
     const tiny = migratePersistedPlan({ inputs: { ...couple(), balances: { tfsa: 0, rrsp: 0, nonReg: 0.01 } } }, 10, 2026)

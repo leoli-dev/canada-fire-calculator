@@ -563,26 +563,82 @@ describe('BE-12 A RRSP room ledger wiring', () => {
     expect(result.issues[0].detail).toContain('CRA statement')
   })
 
-  it('keeps spousal attribution and a contributor who is not the owner explicitly unsupported', () => {
-    const spousal = clause({ kind: 'spousalRrsp' })
-    expect(annualStep(spousal.canonical, ok(initializeState(spousal.canonical)), cashProviders(20000))).toMatchObject({
-      status: 'unsupported', issues: [{ detail: expect.stringContaining('spousal RRSP attribution') }],
-    })
-    const couple = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+  it('prices a spousal contribution against the contributor room instead of rejecting the spousal shape', () => {
+    const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
       savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
       partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+    const self = canonical.people.find(person => person.role === 'self')!
+    const partner = canonical.people.find(person => person.role === 'partner')!
+    for (const account of canonical.accounts) {
+      account.ownerId = self.id
+      account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    const spousal = canonical.accounts.find(account => account.kind === 'rrsp')!
+    spousal.kind = 'spousalRrsp'
+    // Statement vector for the contributor: deduction limit 20,000 with 12,000
+    // already contributed but not deducted leaves 8,000 of room. The 6,000
+    // spousal premium applies in full and leaves 2,000.
+    partner.rrspDeductionLimit = { status: 'known', value: 20000 }
+    partner.rrspUnusedUndeducted = { status: 'known', value: 12000 }
+    partner.rrspAvailableRoom = { status: 'unknown', reason: 'available room not typed separately' }
+    canonical.contributions = [{ id: 'spousal-plan', accountId: spousal.id, contributorId: partner.id,
+      calendarYear: canonical.baseYear, amount: 6000, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: canonical.baseYear } }]
+    const { state, row } = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000)))
+    expect(row.rrspLedger[partner.id].applied).toBe(6000)
+    expect(row.rrspLedger[partner.id].retained).toBe(0)
+    expect(row.rrspLedger[partner.id].closingRoom).toEqual({ status: 'known', value: 2000 })
+    expect(state.byPerson[partner.id].rrspRoom).toEqual({ status: 'known', value: 2000 })
+    // The annuitant pays no room for the spouse's premium.
+    expect(row.rrspLedger[self.id].planned).toBe(0)
+    expect(row.byAccount[spousal.id].contribution).toBe(6000)
+    expect(state.contributionHistory).toContainEqual(expect.objectContaining({
+      id: 'spousal-plan', accountId: spousal.id, contributorId: partner.id, amount: 6000, calendarYear: canonical.baseYear,
+    }))
+  })
+
+  it('still refuses a spousal premium whose plan holder or contributor is not recorded', () => {
+    const spousalClause = (mutate: (plan: InputsV2) => void) => {
+      const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+        savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+        partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+      const self = canonical.people.find(person => person.role === 'self')!
+      const partner = canonical.people.find(person => person.role === 'partner')!
+      for (const account of canonical.accounts) {
+        account.ownerId = self.id
+        account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+      }
+      const spousal = canonical.accounts.find(account => account.kind === 'rrsp')!
+      spousal.kind = 'spousalRrsp'
+      canonical.contributions = [{ id: 'spousal-plan', accountId: spousal.id, contributorId: partner.id,
+        calendarYear: canonical.baseYear, amount: 6000, deductionYear: null,
+        provenance: { origin: 'user', sourceYear: canonical.baseYear } }]
+      mutate(canonical)
+      return canonical
+    }
+    // A contributor that is not the holder is only supported on a spousal plan.
+    const plain = spousalClause(draft => { draft.accounts.find(account => account.kind === 'spousalRrsp')!.kind = 'rrsp' })
+    expect(annualStep(plain, ok(initializeState(plain)), cashProviders(20000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('contributor differs from the account owner') }],
+    })
+    // An unrecorded contributor stays unknown, never inferred from ownership.
+    const noContributor = spousalClause(draft => { draft.contributions[0].contributorId = null })
+    expect(annualStep(noContributor, ok(initializeState(noContributor)), cashProviders(20000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('contributor not recorded') }],
+    })
+  })
+
+  it('keeps the couple voluntary-split RRSP path explicitly unsupported', () => {
+    const couple = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+      savingsSplit: { tfsa: 0, rrsp: 1, nonReg: 0 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
     const self = couple.people.find(person => person.role === 'self')!
-    const partner = couple.people.find(person => person.role === 'partner')!
     for (const account of couple.accounts) {
       account.ownerId = self.id
       account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
     }
-    self.rrspAvailableRoom = { status: 'known', value: 15000 }
-    const rrsp = couple.accounts.find(account => account.kind === 'rrsp')!
-    couple.contributions = [{ id: 'spousal-ish', accountId: rrsp.id, contributorId: partner.id, calendarYear: couple.baseYear,
-      amount: 5000, deductionYear: null, provenance: { origin: 'user', sourceYear: couple.baseYear } }]
     expect(annualStep(couple, ok(initializeState(couple)), cashProviders(20000))).toMatchObject({
-      status: 'unsupported', issues: [{ detail: expect.stringContaining('contributor differs from the account owner') }],
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('couple RRSP contributor') }],
     })
   })
 

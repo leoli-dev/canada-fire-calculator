@@ -458,6 +458,10 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     })
   }
   next.contributions = prior.contributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
+  // A recorded spousal premium-history claim is a canonical fact like the
+  // recorded contributions it describes; an ordinary form edit or a mode
+  // switch must not drop it back to unknown.
+  next.spousalHistory = prior.spousalHistory ? structuredClone(prior.spousalHistory) : undefined
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {

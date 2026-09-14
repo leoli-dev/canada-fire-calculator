@@ -281,5 +281,14 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
     }
   }
   assertLegacyInputs(plan.legacyProjection)
+  if (plan.spousalHistory !== undefined) {
+    requireShape(object(plan.spousalHistory), 'spousalHistory')
+    for (const [accountId, entry] of Object.entries(plan.spousalHistory)) {
+      requireShape(accounts.has(accountId), `spousalHistory.${accountId}.account`)
+      requireShape(object(entry), `spousalHistory.${accountId}`)
+      if (entry.status === 'unknown') requireShape(text(entry.reason), `spousalHistory.${accountId}.reason`)
+      else requireShape(entry.status === 'complete', `spousalHistory.${accountId}.status`)
+    }
+  }
   requireShape(object(plan.migration) && integer(plan.migration.sourcePersistVersion) && typeof plan.migration.ownershipNeedsConfirmation === 'boolean' && typeof plan.migration.ageBasisNeedsConfirmation === 'boolean' && typeof plan.migration.savingsBasisNeedsConfirmation === 'boolean', 'migration')
 }

@@ -6,6 +6,13 @@ export type Known<T> = { status: 'known'; value: T } | { status: 'unknown'; reas
 export type QcDrugCoverage = 'public' | 'private' | 'waived' | 'unknown'
 export type Provenance = { origin: 'user' | 'legacy' | 'estimated' | 'unknown'; sourceYear: number | null; note?: string }
 export type TaxShares = { status: 'known'; shares: Record<EntityId, number> } | { status: 'unknown'; reason: string }
+/**
+ * Whether the contributions recorded for one spousal plan are its complete
+ * premium history. `unknown` is never "no premiums": attribution stays
+ * unsupported until the history is confirmed, and a `complete` entry with no
+ * rows is a real zero-premium history.
+ */
+export type SpousalHistoryStatus = { status: 'complete' } | { status: 'unknown'; reason: string }
 export interface Person {
   id: EntityId
   role: 'self' | 'partner'
@@ -160,6 +167,13 @@ export interface InputsV2 {
    * properties, whose `taxableOwnerShares` are the durable fact.
    */
   ownershipAmounts?: Record<string, Record<EntityId, number>>
+  /**
+   * Per spousal-plan account, whether the rows in `contributions` are the
+   * plan's complete premium history. Absent means not confirmed, so the T2205
+   * attribution is explicitly unsupported rather than assuming the annuitant
+   * paid every premium. See BE-12 B.
+   */
+  spousalHistory?: Record<EntityId, SpousalHistoryStatus>
   migration: { sourcePersistVersion: number; ownershipNeedsConfirmation: boolean; ageBasisNeedsConfirmation: boolean; savingsBasisNeedsConfirmation: boolean }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
