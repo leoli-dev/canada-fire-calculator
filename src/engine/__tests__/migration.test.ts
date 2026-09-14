@@ -153,6 +153,39 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     expect(reunited.people[1].pension).toEqual(input.partner?.pension)
     expect(reunited.accounts.find(a => a.kind === 'lira')?.ownerId).toBe(original.people[1].id)
   })
+  it('keeps CRA RRSP statement facts through a legacy form edit and completes older snapshots', () => {
+    const plan = migratePersistedPlan({ inputs: fixture() }, 10, 2026)
+    const self = plan.people[0]
+    self.rrspDeductionLimit = { status: 'known', value: 20000 }
+    self.rrspAvailableRoom = { status: 'known', value: 15000 }
+    self.rrspUnusedUndeducted = { status: 'known', value: 5000 }
+    self.rrspPensionAdjustment = { status: 'known', value: 1000 }
+    self.rrspPspa = { status: 'known', value: 200 }
+    self.rrspPar = { status: 'known', value: 300 }
+    const edited = refreshCanonicalFromLegacy(plan, { ...plan.legacyProjection, annualSavings: 41000 })
+    expect(edited.people[0].rrspDeductionLimit).toEqual({ status: 'known', value: 20000 })
+    expect(edited.people[0].rrspAvailableRoom).toEqual({ status: 'known', value: 15000 })
+    expect(edited.people[0].rrspUnusedUndeducted).toEqual({ status: 'known', value: 5000 })
+    expect(edited.people[0].rrspPensionAdjustment).toEqual({ status: 'known', value: 1000 })
+    expect(edited.people[0].rrspPspa).toEqual({ status: 'known', value: 200 })
+    expect(edited.people[0].rrspPar).toEqual({ status: 'known', value: 300 })
+    // A v11 snapshot written before these fields existed is completed unknown,
+    // never rejected and never backfilled with a guessed figure.
+    const older = structuredClone(plan) as unknown as { people: Record<string, unknown>[] }
+    for (const person of older.people) {
+      delete person.rrspUnusedUndeducted
+      delete person.rrspPensionAdjustment
+      delete person.rrspPspa
+      delete person.rrspPar
+    }
+    const completed = completeCanonicalFacts(older as unknown as typeof plan, fixture())
+    assertCanonicalPlan(completed)
+    expect(completed.people[0].rrspUnusedUndeducted).toEqual({ status: 'unknown', reason: 'CRA statement not supplied' })
+    expect(completed.people[0].rrspPensionAdjustment).toEqual({ status: 'unknown', reason: 'CRA statement not supplied' })
+    expect(completed.people[0].rrspPspa).toEqual({ status: 'unknown', reason: 'CRA statement not supplied' })
+    expect(completed.people[0].rrspPar).toEqual({ status: 'unknown', reason: 'CRA statement not supplied' })
+  })
+
   it('retains known recurring cash-flow instructions without relying on the legacy projection', () => {
     const input = fixture()
     input.savingsSplit = { tfsa: .1, rrsp: .2, nonReg: .7 }

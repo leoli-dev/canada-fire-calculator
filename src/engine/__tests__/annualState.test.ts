@@ -151,7 +151,9 @@ describe('BE-14 A nominal annual state kernel', () => {
   })
 
   it('uses the same deterministic return interface for fixed and zero-volatility MC providers', () => {
-    const canonical = plan({ ...input(), debts: [], inflation: .02, annualSavings: 50 })
+    // A TFSA-only split keeps this return-interface check two years long; an
+    // RRSP carry needs a sourced room-addition rule after the statement year.
+    const canonical = plan({ ...input(), debts: [], inflation: .02, annualSavings: 50, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 } })
     const initial = ok(initializeState(canonical))
     const balanced = { evaluate: ({ state }: { state: typeof initial }) => ({ byPerson: { [canonical.people[0].id]: {
       income: 120 + state.year - canonical.baseYear, earnedIncome: 120 + state.year - canonical.baseYear,
@@ -164,7 +166,7 @@ describe('BE-14 A nominal annual state kernel', () => {
       expect(zeroVol.rows[year].byAccount[account.id].closing).toBeCloseTo(fixed.rows[year].byAccount[account.id].closing, 10)
     }
     expect(sumInvestableAssets(zeroVol.state)).toBeCloseTo(sumInvestableAssets(fixed.state), 10)
-    expect(fixed.rows[0].byAccount[canonical.accounts[0].id].returnAmount).toBeCloseTo(125 * ((1.1 * 1.02) - 1), 8)
+    expect(fixed.rows[0].byAccount[canonical.accounts[0].id].returnAmount).toBeCloseTo(150 * ((1.1 * 1.02) - 1), 8)
   })
 
   it('counts FHSA and locked assets once and withholds unknown FHSA rollover timing', () => {
@@ -493,5 +495,226 @@ describe('BE-14 A nominal annual state kernel', () => {
     const opening = ok(initializeState(invalid))
     expect(annualStep(invalid, opening, { evaluate, returns: (_context, id) => id === invalid.accounts[1].id ? Number.NaN : .1 }).status).toBe('invalid')
     expect(sumInvestableAssets(opening)).toBe(200)
+  })
+})
+
+/** Cash, tax and spending chosen so evaluated household cash equals the
+ * savings budget; the total is split evenly so a couple still sums to cash. */
+const cashProviders = (cash: number, earnedIncome = 0): AnnualProviders => ({
+  evaluate: ({ state }) => {
+    const ids = Object.keys(state.byPerson)
+    return { byPerson: Object.fromEntries(ids.map(id => [id, {
+      income: cash / ids.length, earnedIncome, benefits: 0, tax: 0, spending: 0, taxableIncome: cash / ids.length,
+      benefitIncomeForNextYear: { status: 'known' as const, value: cash / ids.length },
+    }])) }
+  },
+  returns: () => 0,
+})
+
+describe('BE-12 A RRSP room ledger wiring', () => {
+  /** CRA statement vector: 20k deduction limit, 5k already contributed but not
+   * deducted, so 15k is available; a planned 16k clips to 15k and retains 1k. */
+  function clause(overrides: { amount?: number; deductionYear?: number | null; kind?: 'rrsp' | 'spousalRrsp'; cash?: number; scheduleYear?: number } = {}) {
+    const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: overrides.cash ?? 20000,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    const self = canonical.people.find(person => person.role === 'self')!
+    const rrsp = canonical.accounts.find(account => account.kind === 'rrsp')!
+    if (overrides.kind) rrsp.kind = overrides.kind
+    self.rrspDeductionLimit = { status: 'known', value: 20000 }
+    self.rrspUnusedUndeducted = { status: 'known', value: 5000 }
+    self.rrspAvailableRoom = { status: 'unknown', reason: 'available room not typed separately' }
+    canonical.contributions = [{
+      id: `plan:${self.id}:${overrides.scheduleYear ?? canonical.baseYear}`, accountId: rrsp.id, contributorId: self.id,
+      calendarYear: overrides.scheduleYear ?? canonical.baseYear, amount: overrides.amount ?? 16000,
+      deductionYear: overrides.deductionYear === undefined ? null : overrides.deductionYear,
+      provenance: { origin: 'user', sourceYear: canonical.baseYear },
+    }]
+    return { canonical, self, rrsp, nonReg: canonical.accounts.find(account => account.kind === 'nonReg')! }
+  }
+
+  it('prices an own contribution against known room, clips it and retains the remainder', () => {
+    const { canonical, self, rrsp, nonReg } = clause()
+    const opening = ok(initializeState(canonical))
+    const { state, row } = ok(annualStep(canonical, opening, cashProviders(20000)))
+    expect(row.rrspLedger[self.id].openingRoom).toEqual({ status: 'known', value: 15000 })
+    expect(row.rrspLedger[self.id].applied).toBe(15000)
+    expect(row.rrspLedger[self.id].retained).toBe(1000)
+    expect(row.rrspLedger[self.id].closingRoom).toEqual({ status: 'known', value: 0 })
+    expect(row.byAccount[rrsp.id].contribution).toBe(15000)
+    // 4,000 of the reserved cash that the split did not send to the RRSP plus
+    // the clipped 1,000 stay visible in the non-registered account.
+    expect(row.byAccount[nonReg.id].contribution).toBe(5000)
+    expect(row.cashLedger.retainedContributions).toBe(1000)
+    expect(row.cashLedger.voluntaryContributions).toBe(4000)
+    expect(state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 0 })
+    expect(state.contributionHistory).toContainEqual(expect.objectContaining({ id: 'plan:' + self.id + ':2026', amount: 15000, calendarYear: 2026 }))
+    // 100 opening TFSA + 15,000 applied RRSP + 5,000 retained/voluntary nonReg.
+    expect(sumInvestableAssets(state)).toBe(20100)
+  })
+
+  it('still withholds an unknown room with an explicit reason instead of treating it as zero or unlimited', () => {
+    const { canonical, self } = clause()
+    self.rrspDeductionLimit = { status: 'unknown', reason: 'CRA statement not supplied' }
+    self.rrspUnusedUndeducted = { status: 'unknown', reason: 'CRA statement not supplied' }
+    const result = annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain('RRSP room not verified')
+    expect(result.issues[0].detail).toContain('CRA statement')
+  })
+
+  it('keeps spousal attribution and a contributor who is not the owner explicitly unsupported', () => {
+    const spousal = clause({ kind: 'spousalRrsp' })
+    expect(annualStep(spousal.canonical, ok(initializeState(spousal.canonical)), cashProviders(20000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('spousal RRSP attribution') }],
+    })
+    const couple = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+    const self = couple.people.find(person => person.role === 'self')!
+    const partner = couple.people.find(person => person.role === 'partner')!
+    for (const account of couple.accounts) {
+      account.ownerId = self.id
+      account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    self.rrspAvailableRoom = { status: 'known', value: 15000 }
+    const rrsp = couple.accounts.find(account => account.kind === 'rrsp')!
+    couple.contributions = [{ id: 'spousal-ish', accountId: rrsp.id, contributorId: partner.id, calendarYear: couple.baseYear,
+      amount: 5000, deductionYear: null, provenance: { origin: 'user', sourceYear: couple.baseYear } }]
+    expect(annualStep(couple, ok(initializeState(couple)), cashProviders(20000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('contributor differs from the account owner') }],
+    })
+  })
+
+  it('does not invent room from a high current income when last year was zero and no statement exists', () => {
+    const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: 30000, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
+    const self = canonical.people.find(person => person.role === 'self')!
+    self.previousYearEarnedIncome = { status: 'known', value: 0 }
+    self.rrspDeductionLimit = { status: 'unknown', reason: 'CRA statement not supplied' }
+    self.rrspAvailableRoom = { status: 'unknown', reason: 'CRA statement not supplied' }
+    self.rrspUnusedUndeducted = { status: 'unknown', reason: 'CRA statement not supplied' }
+    const rrsp = canonical.accounts.find(account => account.kind === 'rrsp')!
+    canonical.contributions = [{ id: 'hopeful', accountId: rrsp.id, contributorId: self.id, calendarYear: canonical.baseYear,
+      amount: 10000, deductionYear: null, provenance: { origin: 'user', sourceYear: canonical.baseYear } }]
+    const result = annualStep(canonical, ok(initializeState(canonical)), cashProviders(30000, 200000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain('RRSP room not verified')
+  })
+
+  it('lets a person with no salary contribute from a carried-forward statement room', () => {
+    const { canonical, self, rrsp } = clause({ amount: 3000 })
+    self.previousYearEarnedIncome = { status: 'known', value: 0 }
+    const { row } = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000, 0)))
+    expect(row.rrspLedger[self.id].applied).toBe(3000)
+    expect(row.byAccount[rrsp.id].contribution).toBe(3000)
+    expect(row.rrspLedger[self.id].closingRoom).toEqual({ status: 'known', value: 12000 })
+  })
+
+  it('records a later deduction year without changing the year the room is used', () => {
+    const { canonical, self, rrsp } = clause({ amount: 4000, deductionYear: 2027 })
+    const { state, row } = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000)))
+    expect(row.rrspLedger[self.id].deductedThisYear).toBe(0)
+    expect(row.rrspLedger[self.id].deferredDeduction).toBe(4000)
+    expect(row.byAccount[rrsp.id].contribution).toBe(4000)
+    expect(state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 11000 })
+  })
+
+  it('refuses a contribution whose deduction year precedes it rather than guessing the first-60-days rule', () => {
+    const { canonical } = clause({ amount: 4000, deductionYear: 2025 })
+    expect(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('first-60-days') }],
+    })
+  })
+
+  it('marks a later year unsupported because no sourced room-addition rule exists', () => {
+    const { canonical, self } = clause({ amount: 0, scheduleYear: 2026 })
+    canonical.contributions = []
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000)))
+    expect(first.state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 15000 })
+    const rrsp = canonical.accounts.find(account => account.kind === 'rrsp')!
+    canonical.contributions = [{ id: 'next-year', accountId: rrsp.id, contributorId: self.id, calendarYear: 2027,
+      amount: 5000, deductionYear: null, provenance: { origin: 'user', sourceYear: 2027 } }]
+    const second = annualStep(canonical, first.state, cashProviders(20000))
+    expect(second.status).toBe('unsupported')
+    if (second.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(second.issues[0].detail).toContain('18% of prior-year earned income')
+  })
+
+  it('carries closing room into the next snapshot without double counting a continuation', () => {
+    const { canonical, self, rrsp } = clause({ amount: 5000 })
+    const opening = ok(initializeState(canonical))
+    const first = ok(annualStep(canonical, opening, cashProviders(20000)))
+    expect(first.state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 10000 })
+    expect(first.row.rrspLedger[self.id].closingRoom).toEqual(first.state.byPerson[self.id].rrspRoom)
+    const resumed = ok(projectFromState(canonical, first.state, 0, cashProviders(20000)))
+    expect(resumed.state).toEqual(first.state)
+    const again = ok(annualStep(canonical, first.state, cashProviders(20000)))
+    expect(again.row.rrspLedger[self.id].planned).toBe(0)
+    // opening(year + 1) is exactly closing(year); the next closing is unknown
+    // only because no sourced room-addition rule exists for 2027.
+    expect(again.row.rrspLedger[self.id].openingRoom).toEqual(first.row.rrspLedger[self.id].closingRoom)
+    expect(again.row.rrspLedger[self.id].closingRoom.status).toBe('unknown')
+    expect(again.state.byAccount[rrsp.id].balance).toBe(first.state.byAccount[rrsp.id].balance)
+  })
+
+  it('rejects a base-year snapshot that forges a statement fact', () => {
+    const { canonical, self } = clause()
+    const opening = ok(initializeState(canonical))
+    const forgeries: Array<(snapshot: typeof opening) => void> = [
+      snapshot => { snapshot.byPerson[self.id].rrspDeductionLimit = { status: 'known', value: 1 } },
+      snapshot => { snapshot.byPerson[self.id].rrspUnusedUndeducted = { status: 'known', value: 1 } },
+      snapshot => { snapshot.byPerson[self.id].rrspPensionAdjustment = { status: 'known', value: 1 } },
+      snapshot => { snapshot.byPerson[self.id].rrspPspa = { status: 'known', value: 1 } },
+      snapshot => { snapshot.byPerson[self.id].rrspPar = { status: 'known', value: 1 } },
+    ]
+    for (const mutate of forgeries) {
+      const forged = structuredClone(opening)
+      mutate(forged)
+      expect(projectFromState(canonical, forged, 0, cashProviders(20000)).status).toBe('invalid')
+      expect(annualStep(canonical, forged, cashProviders(20000)).status).toBe('invalid')
+    }
+  })
+
+  it('prices each partner against their own room and their own contributor', () => {
+    const canonical = plan({ ...input(), debts: [], inflation: 0, annualSavings: 20000,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } })
+    const self = canonical.people.find(person => person.role === 'self')!
+    const partner = canonical.people.find(person => person.role === 'partner')!
+    const base = canonical.accounts.find(account => account.kind === 'rrsp')!
+    for (const account of canonical.accounts) {
+      account.ownerId = self.id
+      account.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
+    const partnerRrsp = { ...structuredClone(base), id: `${base.id}:partner`, ownerId: partner.id, balance: 0,
+      taxableOwnerShares: { status: 'known' as const, shares: { [partner.id]: 1 } } }
+    canonical.accounts.push(partnerRrsp)
+    self.rrspAvailableRoom = { status: 'known', value: 10000 }
+    partner.rrspAvailableRoom = { status: 'known', value: 4000 }
+    canonical.contributions = [
+      { id: 'self-plan', accountId: base.id, contributorId: self.id, calendarYear: canonical.baseYear, amount: 8000, deductionYear: null, provenance: { origin: 'user', sourceYear: canonical.baseYear } },
+      { id: 'partner-plan', accountId: partnerRrsp.id, contributorId: partner.id, calendarYear: canonical.baseYear, amount: 6000, deductionYear: null, provenance: { origin: 'user', sourceYear: canonical.baseYear } },
+    ]
+    const { state, row } = ok(annualStep(canonical, ok(initializeState(canonical)), cashProviders(20000)))
+    expect(row.rrspLedger[self.id].applied).toBe(8000)
+    expect(row.rrspLedger[self.id].retained).toBe(0)
+    expect(row.rrspLedger[partner.id].applied).toBe(4000)
+    expect(row.rrspLedger[partner.id].retained).toBe(2000)
+    expect(state.byPerson[self.id].rrspRoom).toEqual({ status: 'known', value: 2000 })
+    expect(state.byPerson[partner.id].rrspRoom).toEqual({ status: 'known', value: 0 })
+    expect(row.byAccount[base.id].contribution).toBe(8000)
+    expect(row.byAccount[partnerRrsp.id].contribution).toBe(4000)
+    // 6,000 voluntary nonReg + the partner's clipped 2,000 retained in nonReg.
+    const nonReg = canonical.accounts.find(account => account.kind === 'nonReg')!
+    expect(row.byAccount[nonReg.id].contribution).toBe(8000)
+    expect(row.cashLedger.retainedContributions).toBe(2000)
+  })
+
+  it('reports a scheduled contribution the year cannot fund as unsupported, not a conservation error', () => {
+    const { canonical } = clause({ amount: 16000, cash: 1000 })
+    expect(annualStep(canonical, ok(initializeState(canonical)), cashProviders(1000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('exceeds the year net savings') }],
+    })
   })
 })

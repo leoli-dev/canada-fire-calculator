@@ -1,14 +1,20 @@
 import type { InputsV2, Known, AccountKind } from './model'
 import { ageReachedInYear, precisionGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
-import { allocateContributions, type FundingGap } from './funding'
+import { resolveYearAllocation, type FundingGap } from './funding'
 import { impliedRate } from './debts'
+import {
+  RRSP_ADDITION_RULE_MISSING, plannedRrspLines, rrspRoomYear, statementOpeningRoom,
+  type RrspRoomLimitation, type RrspRoomYear,
+} from './rrspRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
 export interface AnnualState {
   year: number
   baseYear: number
-  byPerson: Record<string, { age: number; retirementAge: number; previousYearEarnedIncome: Known<number>; rrspRoom: Known<number>; tfsaRoom: Known<number> }>
+  byPerson: Record<string, { age: number; retirementAge: number; previousYearEarnedIncome: Known<number>; rrspRoom: Known<number>; tfsaRoom: Known<number>
+    rrspDeductionLimit: Known<number>; rrspUnusedUndeducted: Known<number>
+    rrspPensionAdjustment: Known<number>; rrspPspa: Known<number>; rrspPar: Known<number> }>
   byAccount: Record<string, { kind: AccountKind; ownerId: string; balance: number; acb: Known<number>; room: Known<number>; openedYear: Known<number> }>
   byDependent: Record<string, { age: number }>
   byDebt: Record<string, { principal: number; annualPayment: number; yearsRemaining: number; propertyId: string | null }>
@@ -37,8 +43,10 @@ export interface YearRow {
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
-  cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; unallocated: number }
+  cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
   taxLedger: Record<string, { taxableIncome: number; tax: number }>
+  /** BE-12 A per-person room ledger; every year is recomputable from its parts. */
+  rrspLedger: Record<string, RrspRoomYear>
   issues: AnnualIssue[]
 }
 export type KernelResult<T> = { status: 'ok'; value: T } | { status: 'invalid' | 'unsupported'; issues: AnnualIssue[] }
@@ -69,6 +77,8 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
   const byPerson = Object.fromEntries(plan.people.map(person => [person.id, {
     age: ageReachedInYear(person, plan.baseYear, plan.baseYear), retirementAge: person.retirementAge,
     previousYearEarnedIncome: clone(person.previousYearEarnedIncome), rrspRoom: clone(person.rrspAvailableRoom), tfsaRoom: clone(person.tfsaAvailableRoom),
+    rrspDeductionLimit: clone(person.rrspDeductionLimit), rrspUnusedUndeducted: clone(person.rrspUnusedUndeducted),
+    rrspPensionAdjustment: clone(person.rrspPensionAdjustment), rrspPspa: clone(person.rrspPspa), rrspPar: clone(person.rrspPar),
   }]))
   const byAccount = Object.fromEntries(plan.accounts.map(account => [account.id, {
     kind: account.kind, ownerId: account.ownerId!, balance: account.balance, acb: clone(account.acb), room: clone(account.contributionRoom), openedYear: clone(account.openedYear),
@@ -96,7 +106,9 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
         Object.keys(opening.byProperty ?? {}).sort().join('|') !== plan.properties.map(p => p.id).sort().join('|')) return 'snapshot entity IDs'
     if (Object.values(opening.byAccount).some(a => !finiteNonnegative(a.balance)) ||
         Object.values(opening.byDebt).some(d => !finiteNonnegative(d.principal) || !finiteNonnegative(d.annualPayment) || !Number.isInteger(d.yearsRemaining) || d.yearsRemaining < 0 || (d.principal > 0 && d.yearsRemaining === 0))) return 'snapshot balance or debt term'
-    if (Object.values(opening.byPerson).some(p => !validKnownAmount(p.previousYearEarnedIncome) || !validKnownAmount(p.rrspRoom, true) || !validKnownAmount(p.tfsaRoom, true)) ||
+    if (Object.values(opening.byPerson).some(p => !validKnownAmount(p.previousYearEarnedIncome) || !validKnownAmount(p.rrspRoom, true) || !validKnownAmount(p.tfsaRoom, true) ||
+        !validKnownAmount(p.rrspDeductionLimit, true) || !validKnownAmount(p.rrspUnusedUndeducted, true) ||
+        !validKnownAmount(p.rrspPensionAdjustment, true) || !validKnownAmount(p.rrspPspa, true) || !validKnownAmount(p.rrspPar, true)) ||
         Object.values(opening.byAccount).some(a => !validKnownAmount(a.acb, true) || !validKnownAmount(a.room, true) || !validKnownAmount(a.openedYear) || (a.openedYear.status === 'known' && !Number.isInteger(a.openedYear.value))) ||
         Object.values(opening.byProperty).some(p => !finiteNonnegative(p.value) || !validKnownAmount(p.acb, true)) ||
         Object.values(opening.benefitIncomeLag ?? {}).some(v => !validKnownAmount(v)) ||
@@ -124,6 +136,11 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
         opening.byDebt[debt.id].yearsRemaining !== debt.yearsRemaining) ||
       plan.people.some(person => !sameKnown(opening.byPerson[person.id].rrspRoom, person.rrspAvailableRoom) ||
         !sameKnown(opening.byPerson[person.id].tfsaRoom, person.tfsaAvailableRoom) ||
+        !sameKnown(opening.byPerson[person.id].rrspDeductionLimit, person.rrspDeductionLimit) ||
+        !sameKnown(opening.byPerson[person.id].rrspUnusedUndeducted, person.rrspUnusedUndeducted) ||
+        !sameKnown(opening.byPerson[person.id].rrspPensionAdjustment, person.rrspPensionAdjustment) ||
+        !sameKnown(opening.byPerson[person.id].rrspPspa, person.rrspPspa) ||
+        !sameKnown(opening.byPerson[person.id].rrspPar, person.rrspPar) ||
         !sameKnown(opening.byPerson[person.id].previousYearEarnedIncome, person.previousYearEarnedIncome)) ||
       plan.people.some(person => !sameKnown(opening.benefitIncomeLag[person.id], { status: 'unknown', reason: 'benefit income basis not supplied' })) ||
       opening.unfundedEvents.length !== 0 ||
@@ -172,7 +189,22 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     return opened.status === 'known' && year - opened.value >= 15
   })) return fail('unsupported', 'FHSA statutory rollover not yet wired')
   if (plan.recurringContributions.some(contribution => state.byAccount[contribution.accountId]?.kind === 'fhsa' && contribution.annualAmount > 0)) return fail('unsupported', 'FHSA contribution annual and lifetime rules not yet wired')
-  if (plan.contributions.some(contribution => contribution.calendarYear === year)) return fail('unsupported', 'scheduled contribution funding and deduction rule not yet wired')
+  // BE-12 A: a scheduled contribution is priced by the person's own RRSP room
+  // ledger. Spousal or attributed contributions stay explicitly unsupported.
+  const scheduled = plan.contributions.filter(contribution => contribution.calendarYear === year && contribution.amount > 0)
+  const scheduledByPerson: Record<string, { accountId: string; planned: number }> = {}
+  for (const contribution of scheduled) {
+    if (!finiteNonnegative(contribution.amount) || (contribution.deductionYear !== null && !Number.isInteger(contribution.deductionYear))) return fail('invalid', `scheduled contribution facts: ${contribution.id}`)
+    const account = state.byAccount[contribution.accountId]
+    if (!account) return fail('invalid', `scheduled contribution account missing: ${contribution.id}`)
+    if (account.kind === 'spousalRrsp') return fail('unsupported', `spousal RRSP attribution (T2205) is not wired: ${contribution.id}`)
+    if (account.kind !== 'rrsp') return fail('unsupported', `scheduled ${account.kind} contribution rule not yet wired: ${contribution.id}`)
+    if (contribution.contributorId === null) return fail('unsupported', `scheduled RRSP contributor not recorded: ${contribution.id}`)
+    if (contribution.contributorId !== account.ownerId) return fail('unsupported', `RRSP contributor differs from the account owner; spousal attribution is not wired: ${contribution.id}`)
+    const bucket = scheduledByPerson[contribution.contributorId] ??= { accountId: contribution.accountId, planned: 0 }
+    if (bucket.accountId !== contribution.accountId) return fail('unsupported', `one person has scheduled RRSP contributions to more than one account: ${contribution.contributorId}`)
+    bucket.planned += contribution.amount
+  }
   const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
   let evaluation: AnnualEvaluation
   try { evaluation = providers.evaluate(view()) } catch { return fail('invalid', 'tax/benefit evaluator failed') }
@@ -218,12 +250,19 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
   const recurring = plan.recurringContributions.filter(c => state.byAccount[c.accountId])
   if (recurring.length !== plan.recurringContributions.length) return fail('invalid', 'recurring contribution account missing')
-  const fhsa = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'fhsa' && c.funding === 'fromSavings').map(c => c.annualAmount))
-  const employee = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'lira' && c.funding === 'fromSavings').map(c => c.annualAmount))
-  const employer = sum(recurring.filter(c => c.funding === 'employerAdditional').map(c => c.annualAmount))
   if (recurring.some(c => !finiteNonnegative(c.annualAmount) || !['fhsa', 'lira'].includes(state.byAccount[c.accountId].kind) || (state.byAccount[c.accountId].kind === 'fhsa' && c.funding !== 'fromSavings'))) return fail('unsupported', 'recurring contribution rule not yet wired')
-  const allocation = allocateContributions({ age: state.byPerson[self.id].age, budget: cash, fhsa, employee, employer, split: plan.savingsAllocation.shares })
+  const scheduledPlanned = sum(Object.values(scheduledByPerson).map(bucket => bucket.planned))
+  // A scheduled contribution is funded from the year's net savings, like the
+  // configured voluntary split; it is never extra money the plan does not have.
+  if (scheduledPlanned > cash + 1e-8) return fail('unsupported', 'scheduled RRSP contribution exceeds the year net savings')
+  // One allocation resolver serves the kernel and the panel preview, so the
+  // voluntary RRSP share priced here is the same number the panel shows.
+  const allocation = resolveYearAllocation(plan, year)
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
+  if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
+  const rrspDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'rrsp')
+  if (allocation.voluntary.rrsp > 0 && rrspDestinations.length !== 1) return fail('unsupported', 'ambiguous rrsp contribution destination')
+  const nonRegDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'nonReg')
   const accountRows: YearRow['byAccount'] = {}
   for (const [id, account] of Object.entries(state.byAccount)) accountRows[id] = { opening: account.balance, contribution: 0, withdrawal: 0, returnAmount: 0, closing: account.balance, acb: clone(account.acb), ownerId: account.ownerId }
   for (const contribution of recurring) {
@@ -231,31 +270,80 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[contribution.accountId].contribution += amount
     state.contributionHistory.push({ id: `${contribution.id}:${year}`, accountId: contribution.accountId, contributorId: contribution.contributorId, calendarYear: year, amount, deductionYear: null })
   }
-  for (const kind of ['tfsa', 'rrsp', 'nonReg'] as const) {
-    const amount = allocation.voluntary[kind]
-    const destinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === kind)
-    if (amount > 0 && destinations.length !== 1) return fail('unsupported', `ambiguous ${kind} contribution destination`)
-    if (destinations.length === 1) {
-      accountRows[destinations[0][0]].contribution += amount
-      if (amount > 0) state.contributionHistory.push({ id: `annual:${year}:${kind}`, accountId: destinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount, deductionYear: null })
+  // TFSA keeps its existing account/person room check; RRSP room is owned by
+  // the per-person ledger below so an over-contribution is clipped, not refused.
+  if (allocation.voluntary.tfsa > 0) {
+    const destinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'tfsa')
+    if (destinations.length !== 1) return fail('unsupported', 'ambiguous tfsa contribution destination')
+    accountRows[destinations[0][0]].contribution += allocation.voluntary.tfsa
+    state.contributionHistory.push({ id: `annual:${year}:tfsa`, accountId: destinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: allocation.voluntary.tfsa, deductionYear: null })
+  }
+  const rrspLedger: Record<string, RrspRoomYear> = {}
+  for (const person of plan.people) {
+    const facts = state.byPerson[person.id]
+    const bucket = scheduledByPerson[person.id]
+    const voluntary = plan.people.length === 1 ? allocation.voluntary.rrsp : 0
+    // The same line set `previewRrspRoomYear` prices for the panel: recorded
+    // rows plus the resolved savings-split RRSP share.
+    const lines = plannedRrspLines({ contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
+    const statementYear = year === plan.baseYear
+    let openingRoom = facts.rrspRoom
+    let mismatch: RrspRoomLimitation | null = null
+    if (statementYear) {
+      const derived = statementOpeningRoom({
+        rrspDeductionLimit: facts.rrspDeductionLimit, rrspAvailableRoom: facts.rrspRoom, rrspUnusedUndeducted: facts.rrspUnusedUndeducted,
+        rrspPensionAdjustment: facts.rrspPensionAdjustment, rrspPspa: facts.rrspPspa, rrspPar: facts.rrspPar,
+      })
+      openingRoom = derived.room
+      mismatch = derived.mismatch
     }
+    const row = rrspRoomYear({
+      personId: person.id, year, openingRoom,
+      // The statement's available room already includes the statement year's
+      // addition. A later year would need the missing sourced cap/18% rule.
+      additions: statementYear ? { status: 'known', value: 0 } : { status: 'unknown', reason: RRSP_ADDITION_RULE_MISSING },
+      adjustments: { pensionAdjustment: facts.rrspPensionAdjustment, pspa: facts.rrspPspa, par: facts.rrspPar },
+      adjustmentBasis: statementYear ? 'includedInStatement' : 'appliedHere',
+      unusedUndeducted: facts.rrspUnusedUndeducted, deductionLimit: facts.rrspDeductionLimit, mismatch, lines,
+    })
+    rrspLedger[person.id] = row
+    const blocking = row.limitations.filter(limitation => limitation.code !== 'deductionYearBeforeContribution')
+    if (row.planned > 0 && blocking.length) return fail('unsupported', `RRSP room not verified for ${person.id}: ${blocking.map(item => item.detail).join('; ')}`)
+    const backdated = row.limitations.find(limitation => limitation.code === 'deductionYearBeforeContribution')
+    if (backdated) return fail('unsupported', backdated.detail)
+    facts.rrspRoom = row.closingRoom
+    for (const line of row.lines) {
+      if (line.applied <= 0) continue
+      const accountId = bucket?.accountId ?? rrspDestinations[0]?.[0]
+      if (!accountId) return fail('unsupported', `RRSP contribution has no account: ${person.id}`)
+      accountRows[accountId].contribution += line.applied
+      state.contributionHistory.push({ id: line.id, accountId, contributorId: person.id, calendarYear: line.calendarYear, amount: line.applied, deductionYear: line.deductionYear })
+    }
+  }
+  // Money an RRSP plan could not legally execute is retained, visibly, in the
+  // non-registered account instead of being deleted or rerouted to registered room.
+  const retainedContributions = sum(Object.values(rrspLedger).map(row => row.retained))
+  const nonRegAmount = allocation.voluntary.nonReg + retainedContributions
+  if (nonRegAmount > 0) {
+    if (nonRegDestinations.length !== 1) return fail('unsupported', 'ambiguous nonReg contribution destination')
+    accountRows[nonRegDestinations[0][0]].contribution += nonRegAmount
+    state.contributionHistory.push({ id: `annual:${year}:nonReg`, accountId: nonRegDestinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: nonRegAmount, deductionYear: null })
   }
   for (const [id, row] of Object.entries(accountRows)) {
     if (row.contribution <= 0) continue
     const account = state.byAccount[id]
-    if (!['tfsa', 'rrsp', 'spousalRrsp', 'fhsa'].includes(account.kind)) continue
-    if (plan.people.length > 1 && ['rrsp', 'spousalRrsp'].includes(account.kind)) return fail('unsupported', `couple RRSP contributor and room attribution not yet wired: ${id}`)
+    if (!['tfsa', 'fhsa'].includes(account.kind)) continue
     if (account.room.status !== 'known') return fail('unsupported', `contribution room unknown: ${id}`)
     if (row.contribution > account.room.value + 1e-8) return fail('unsupported', `contribution exceeds account room: ${id}`)
     const person = state.byPerson[account.ownerId]
-    const personRoom = account.kind === 'fhsa' ? undefined : account.kind === 'tfsa' ? person?.tfsaRoom : person?.rrspRoom
+    const personRoom = account.kind === 'fhsa' ? undefined : person?.tfsaRoom
     if (account.kind !== 'fhsa' && (!personRoom || personRoom.status !== 'known')) return fail('unsupported', `person contribution room unknown: ${account.ownerId}`)
     if (personRoom?.status === 'known' && row.contribution > personRoom.value + 1e-8) return fail('unsupported', `contribution exceeds person room: ${account.ownerId}`)
     account.room.value -= row.contribution
     if (personRoom?.status === 'known') personRoom.value -= row.contribution
   }
   const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
-  if (Math.abs(totalContributions - cash - employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
+  if (Math.abs(totalContributions - cash - allocation.employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
   // Every provider evaluates the same settled, pre-growth portfolio. Neither
   // account order nor a provider mutating its own context may affect peers.
   for (const [id, account] of Object.entries(state.byAccount)) {
@@ -293,8 +381,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
   const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
-      employerContributions: employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), unallocated: 0 },
-    taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), issues: [] }
+      employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
+    taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, issues: [] }
   return { status: 'ok', value: { state, row } }
 }
 

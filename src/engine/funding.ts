@@ -1,4 +1,6 @@
 import type { AccountType, PlannedResidence } from './types'
+import type { AccountKind, InputsV2 } from './model'
+import { ageReachedInYear } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 
 export interface FundingGap {
@@ -201,4 +203,36 @@ export function allocateContributions(args: {
         amount: employeeGap, reason: 'employeeContribution' as const }] : []),
     ],
   }
+}
+
+/**
+ * Resolve one plan-year's contribution allocation from the plan alone: nominal
+ * net savings for the year, less the scheduled RRSP contributions already
+ * reserved from it, less FHSA/mandatory employee money, then the configured
+ * voluntary split. The annual kernel and the panel's RRSP ledger preview both
+ * call this, so the voluntary RRSP share that the RRSP room is priced against
+ * is one computation rather than a kernel figure and a separate panel guess.
+ */
+export function resolveYearAllocation(plan: InputsV2, year: number): ContributionAllocation {
+  const self = plan.people.find(person => person.role === 'self') ?? plan.people[0]
+  const age = self ? ageReachedInYear(self, plan.baseYear, year) : 0
+  const split = plan.savingsAllocation.shares
+  // No savings budget means no voluntary split to allocate; the kernel refuses
+  // such a plan earlier, and the panel shows statement facts only.
+  if (plan.budget.kind !== 'savingsBudget') return allocateContributions({ age, budget: 0, fhsa: 0, employee: 0, employer: 0, split })
+  const cash = plan.budget.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
+  const scheduledPlanned = plan.contributions
+    .filter(contribution => contribution.calendarYear === year && contribution.amount > 0)
+    .reduce((total, contribution) => total + contribution.amount, 0)
+  const kindOf = (accountId: string) => plan.accounts.find(account => account.id === accountId)?.kind
+  const fromSavings = (kind: AccountKind) => plan.recurringContributions
+    .filter(contribution => kindOf(contribution.accountId) === kind && contribution.funding === 'fromSavings')
+    .reduce((total, contribution) => total + contribution.annualAmount, 0)
+  const employer = plan.recurringContributions
+    .filter(contribution => contribution.funding === 'employerAdditional')
+    .reduce((total, contribution) => total + contribution.annualAmount, 0)
+  return allocateContributions({
+    age, budget: cash - scheduledPlanned,
+    fhsa: fromSavings('fhsa'), employee: fromSavings('lira'), employer, split,
+  })
 }

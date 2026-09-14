@@ -16,6 +16,14 @@ export interface Person {
   previousYearEarnedIncome: Known<number>
   rrspDeductionLimit: Known<number>
   rrspAvailableRoom: Known<number>
+  /** Contributions already made but not yet deducted; separate from room. */
+  rrspUnusedUndeducted: Known<number>
+  /** Pension adjustment from the prior year's T4. */
+  rrspPensionAdjustment: Known<number>
+  /** Past service pension adjustment. */
+  rrspPspa: Known<number>
+  /** Pension adjustment reversal. */
+  rrspPar: Known<number>
   tfsaAvailableRoom: Known<number>
   cppAnnualAt65: number
   oasAnnualAt65: number

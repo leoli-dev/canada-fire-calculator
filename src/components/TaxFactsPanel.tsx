@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Account, InputsV2, QcDrugCoverage } from '../engine/model'
+import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine/model'
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
+import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -52,6 +53,115 @@ function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTestId, par
 
 /** One editor for both entry modes. Editing canonical facts is one store
  * transaction; the legacy form cannot turn an unknown owner into 50/50. */
+const RRSP_STATEMENT_FIELDS = [
+  ['rrspDeductionLimit', 'be12.deductionLimit'],
+  ['rrspAvailableRoom', 'be12.availableRoom'],
+  ['rrspUnusedUndeducted', 'be12.unusedUndeducted'],
+  ['rrspPensionAdjustment', 'be12.pa'],
+  ['rrspPspa', 'be12.pspa'],
+  ['rrspPar', 'be12.par'],
+] as const
+
+/** BE-12 A statement facts and the recomputed room row, shared by both modes.
+ * Unknown is a real, visible state and is never coerced to zero. */
+function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
+  const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  const commit = (field: typeof RRSP_STATEMENT_FIELDS[number][0], raw: string) => {
+    const text = raw.trim()
+    const next = text === '' ? null : Number(text)
+    if (next !== null && (!Number.isFinite(next) || next < 0)) return
+    const current = person[field]
+    if (current.status === 'known' && next === current.value || current.status === 'unknown' && next === null) return
+    onEdit(draft => {
+      draft.people.find(item => item.id === person.id)![field] = next === null
+        ? { status: 'unknown', reason: 'CRA statement line not supplied' } : { status: 'known', value: next }
+    })
+  }
+  const resolved = ownRrspAccount(plan, person.id)
+  const planned = plan.contributions.find(contribution => contribution.contributorId === person.id &&
+    contribution.calendarYear === plan.baseYear && contribution.accountId === resolved.accountId)
+  const planId = `be12:${person.id}:${resolved.accountId}:${plan.baseYear}`
+  const writePlanned = (amount: number | null, deductLater: boolean) => {
+    if (!resolved.accountId) return
+    onEdit(draft => {
+      const existing = draft.contributions.find(contribution => contribution.id === planId)
+      if (amount === null || amount <= 0) {
+        draft.contributions = draft.contributions.filter(contribution => contribution.id !== planId)
+        return
+      }
+      const deductionYear = deductLater ? draft.baseYear + 1 : null
+      if (existing) { existing.amount = amount; existing.deductionYear = deductionYear; return }
+      draft.contributions.push({ id: planId, accountId: resolved.accountId!, contributorId: person.id,
+        calendarYear: draft.baseYear, amount, deductionYear, provenance: { origin: 'user', sourceYear: draft.baseYear } })
+    })
+  }
+  // One shared preview with the kernel: the statement arithmetic, the recorded
+  // rows and the resolved savings-split RRSP share are the same computation
+  // `annualStep` prices, so the panel cannot show a partial ledger (B1). The
+  // statement's available room already includes the statement year's own
+  // addition, so the panel adds nothing for that year; a later year would need
+  // the sourced cap/18% rule, which is why the panel only prices the first year.
+  const { opening, ledger, savingsShare } = previewRrspRoomYear(plan, person)
+  const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
+  const role = person.role
+  return <div role="group" aria-label={t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}
+    data-testid={`rrsp-statement-${role}`}>
+    <h5>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</h5>
+    <p className="hint">{t('be12.explanation')}</p>
+    {RRSP_STATEMENT_FIELDS.map(([field, label]) => <label key={field}>{t(label)}
+      <input type="number" min="0" step="1" data-testid={`${field === 'rrspDeductionLimit' ? 'rrsp-deduction-limit' :
+        field === 'rrspAvailableRoom' ? 'rrsp-available-room' :
+        field === 'rrspUnusedUndeducted' ? 'rrsp-unused-undeducted' :
+        field === 'rrspPensionAdjustment' ? 'rrsp-pa' : field === 'rrspPspa' ? 'rrsp-pspa' : 'rrsp-par'}-${role}`}
+        key={`${field}:${person.id}:${person[field].status === 'known' ? person[field].value : 'unknown'}`}
+        defaultValue={person[field].status === 'known' ? person[field].value : ''}
+        placeholder={t('be12.unknown')}
+        onBlur={event => commit(field, event.currentTarget.value)} />
+    </label>)}
+    <p className="hint">{t('be12.adjustmentNote')}</p>
+    {opening.mismatch && <p className="hint" role="status" data-testid={`rrsp-mismatch-${role}`}>{t('be12.mismatch')}</p>}
+    {opening.overContribution > 0 && <p className="hint" role="status" data-testid={`rrsp-over-contribution-${role}`}>
+      {t('be12.overContribution', { amount: money(opening.overContribution) })}</p>}
+    {resolved.ambiguous
+      ? <p className="hint" role="status" data-testid={`rrsp-no-account-${role}`}>{t('be12.ambiguousAccount')}</p>
+      : resolved.accountId
+        ? <>
+          <label>{t('be12.planned')}
+            <input type="number" min="0" step="1" data-testid={`rrsp-planned-${role}`}
+              key={`planned:${person.id}:${planned?.amount ?? 'none'}`}
+              defaultValue={planned?.amount ?? ''}
+              placeholder={t('be12.zero')}
+              onBlur={event => {
+                const text = event.currentTarget.value.trim()
+                const amount = text === '' ? null : Number(text)
+                if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return
+                writePlanned(amount, planned?.deductionYear !== null && planned?.deductionYear !== undefined)
+              }} />
+          </label>
+          <label className="hint">{t('be12.deductLater')}
+            <input type="checkbox" data-testid={`rrsp-deduct-later-${role}`}
+              checked={planned !== undefined && planned.deductionYear !== null}
+              onChange={event => writePlanned(planned?.amount ?? 0, event.target.checked)} />
+          </label>
+        </>
+        : <p className="hint" role="status" data-testid={`rrsp-no-account-${role}`}>{t('be12.noOwnAccount')}</p>}
+    <p data-testid={`rrsp-ledger-${role}`}>{t('be12.ledger', {
+      opening: shown(ledger.openingRoom), additions: shown(ledger.additions), adjustments: shown(ledger.adjustments),
+      applied: money(ledger.applied), closing: shown(ledger.closingRoom),
+    })}</p>
+    <p className="hint" data-testid={`rrsp-retained-${role}`}>{t('be12.retained', { retained: money(ledger.retained) })}
+      {ledger.retained > 0 ? ` ${t('be12.retainedHelp')}` : ''}</p>
+    {savingsShare > 0 && <p className="hint" data-testid={`rrsp-savings-share-${role}`}>
+      {t('be12.savingsShare', { amount: money(savingsShare) })}</p>}
+    {ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`rrsp-room-unknown-${role}`}>{t('be12.unknownRoom')}</p>}
+    {ledger.deductedThisYear > 0 && <p className="hint">{t('be12.deductedThisYear', { amount: money(ledger.deductedThisYear), year: plan.baseYear })}</p>}
+    {ledger.deferredDeduction > 0 && <p className="hint">{t('be12.deferred', { amount: money(ledger.deferredDeduction), year: plan.baseYear + 1 })}</p>}
+    <p className="hint">{t('be12.deductionPolicy')}</p>
+  </div>
+}
+
 export function TaxFactsPanel() {
   const { t, i18n } = useTranslation()
   const plan = useStore(state => state.canonical)
@@ -316,6 +426,9 @@ export function TaxFactsPanel() {
       })}
       <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>
     </div>}
+    <h4>{t('be12.title')}</h4>
+    {people.map(person => <RrspRoomRow key={person.id} person={person} plan={current} onEdit={edit} />)}
+    <p className="hint">{t('be12.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/t4040/rrsps-other-registered-plans-retirement.html" target="_blank" rel="noopener noreferrer">{t('be12.source')}</a></p>
     {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
       const rowIds = [account.id, derivedAccountId(account.id)]
       const setRow = (change: (item: Account) => void) => edit(draft => {
