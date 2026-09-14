@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Inputs } from '../types'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy, removePerson, swapPersonRoles } from '../migration'
+import { fhsaPlanRowId } from '../fhsaPlan'
 import { ageReachedInYear } from '../model'
 import { assertCanonicalPlan } from '../modelValidation'
 
@@ -236,6 +237,54 @@ describe('BE-10 migration fixtures T01/T13/T17', () => {
     expect(() => migratePersistedPlan({ inputs: {} }, 10, 2026)).toThrow()
     expect(() => migratePersistedPlan({ inputs: { ...fixture(), balances: { tfsa: null, rrsp: 2, nonReg: 3 } } }, 10, 2026)).toThrow('balances.tfsa')
     expect(() => migratePersistedPlan({ inputs: fixture() }, 99, 2026)).toThrow()
+  })
+  it('records the planned FHSA contribution under the canonical row the panel writes', () => {
+    const plan = migratePersistedPlan({ inputs: fixture() }, 10, 2026)
+    const account = plan.accounts.find(a => a.kind === 'fhsa')!
+    const rows = plan.recurringContributions.filter(c => c.accountId === account.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ id: `be36:fhsa:${account.id}`, annualAmount: 8000, funding: 'fromSavings' })
+    expect(rows[0].id).toBe(fhsaPlanRowId(account.id))
+  })
+  it('keeps the recorded FHSA plan through an unrelated shared-field edit', () => {
+    const input = fixture()
+    const plan = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const account = plan.accounts.find(a => a.kind === 'fhsa')!
+    const person = plan.people[0]
+    // The tax panel records 6,000: one canonical row, and the legacy mirror in
+    // step with it. This is exactly the state the panel commits.
+    plan.recurringContributions = plan.recurringContributions.filter(c => c.accountId !== account.id)
+    plan.recurringContributions.push({
+      id: fhsaPlanRowId(account.id), accountId: account.id, contributorId: person.id,
+      annualAmount: 6000, funding: 'fromSavings', provenance: { origin: 'user', sourceYear: 2026 },
+    })
+    const mirrored = { ...input, annualSavings: 41000, fhsa: { ...input.fhsa!, annualContribution: 6000 } }
+    const edited = refreshCanonicalFromLegacy(plan, mirrored)
+    expect(edited.recurringContributions.filter(c => c.accountId === account.id)).toEqual([
+      expect.objectContaining({ id: fhsaPlanRowId(account.id), annualAmount: 6000 }),
+    ])
+    expect(edited.legacyProjection.fhsa?.annualContribution).toBe(6000)
+    expect(edited.budget.kind === 'savingsBudget' && edited.budget.annualNetSavings).toBe(41000)
+  })
+  it('collapses a duplicate FHSA plan row left by an earlier build to the recorded plan', () => {
+    const input = fixture()
+    const plan = migratePersistedPlan({ inputs: input }, 10, 2026)
+    const account = plan.accounts.find(a => a.kind === 'fhsa')!
+    const person = plan.people[0]
+    // The earlier build wrote both the recorded row and a legacy mirror row,
+    // and mirrored their sum into the legacy form. The recorded row is the plan.
+    plan.recurringContributions = plan.recurringContributions.map(c =>
+      c.accountId === account.id ? { ...c, annualAmount: 6000 } : c)
+    plan.recurringContributions.push({
+      id: 'legacy:contribution:fhsa', accountId: account.id, contributorId: person.id,
+      annualAmount: 8000, funding: 'fromSavings', provenance: { origin: 'legacy', sourceYear: null },
+    })
+    plan.legacyProjection = { ...input, fhsa: { ...input.fhsa!, annualContribution: 14000 } }
+    const edited = refreshCanonicalFromLegacy(plan, plan.legacyProjection)
+    const rows = edited.recurringContributions.filter(c => c.accountId === account.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ id: fhsaPlanRowId(account.id), annualAmount: 6000 })
+    expect(edited.legacyProjection.fhsa?.annualContribution).toBe(6000)
   })
   it('validates complete v11 canonical shape and cross-references before hydration', () => {
     const plan = migratePersistedPlan({ inputs: fixture(true) }, 10, 2026)

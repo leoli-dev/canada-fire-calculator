@@ -1,6 +1,7 @@
 import type { AccountType, PlannedResidence } from './types'
 import type { AccountKind, InputsV2 } from './model'
 import { ageReachedInYear } from './model'
+import { plannedFhsaContribution } from './fhsaPlan'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 
 export interface FundingGap {
@@ -228,11 +229,17 @@ export function resolveYearAllocation(plan: InputsV2, year: number): Contributio
   const fromSavings = (kind: AccountKind) => plan.recurringContributions
     .filter(contribution => kindOf(contribution.accountId) === kind && contribution.funding === 'fromSavings')
     .reduce((total, contribution) => total + contribution.annualAmount, 0)
+  // BE-36 A: one recorded plan per FHSA account, read through the same accessor
+  // the panel and the kernel price with. A stale duplicate row for the same
+  // account is never allocated as a second plan.
+  const fhsa = plan.accounts
+    .filter(account => account.kind === 'fhsa')
+    .reduce((total, account) => total + plannedFhsaContribution(plan, account.id), 0)
   const employer = plan.recurringContributions
     .filter(contribution => contribution.funding === 'employerAdditional')
     .reduce((total, contribution) => total + contribution.annualAmount, 0)
   return allocateContributions({
     age, budget: cash - scheduledPlanned,
-    fhsa: fromSavings('fhsa'), employee: fromSavings('lira'), employer, split,
+    fhsa, employee: fromSavings('lira'), employer, split,
   })
 }

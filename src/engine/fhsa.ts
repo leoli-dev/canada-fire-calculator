@@ -1,4 +1,5 @@
 import type { Account, InputsV2, Known, Provenance } from './model'
+import { plannedFhsaContribution } from './fhsaPlan'
 import { selectFhsaRules } from './rules'
 import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
 
@@ -6,10 +7,10 @@ import { RRSP_MONEY_TOLERANCE } from './rrspRoom'
  * BE-36 A: a recomputable per-person FHSA participation-room ledger.
  *
  * Scope of this module: the annual participation room, the carry-forward of
- * unused room, the lifetime limit on cumulative contributions and RRSP
- * transfers, and statement-driven history. Money never disappears — a
- * contribution the room cannot execute is clipped and retained — and room
- * never goes negative.
+ * unused room (bounded by its published maximum), the lifetime limit on
+ * cumulative contributions and RRSP transfers, and statement-driven history.
+ * Money never disappears — a contribution the room cannot execute is clipped
+ * and retained — and room never goes negative.
  *
  * Explicitly out of scope (BE-36 B), refused by the kernel rather than
  * half-implemented here: the 15-year / age-71 maturity clock, the closure
@@ -38,11 +39,34 @@ export const FHSA_TRANSFER_HISTORY_UNVERIFIED =
 export const FHSA_LIFETIME_SIMPLIFICATION =
   'remaining lifetime room is the published lifetime limit less all prior contributions and RRSP transfers recorded on the statement; the ledger does not add back FHSA re-participation room, designated amounts or taxable withdrawals, because none of those amounts is supplied'
 
+/**
+ * The lifetime limit bounds the whole spendable room, so a history that is
+ * already past it can only be refused. Clamping it to zero would hide the
+ * overshoot instead of naming it.
+ */
+export const FHSA_LIFETIME_EXCEEDED =
+  'the recorded prior contributions and RRSP transfers already exceed the published lifetime limit, so the excess-FHSA-amount treatment would be needed; it is not implemented (BE-36 B) and no further contribution is priced'
+
+/**
+ * The statute caps how much unused participation room one year may carry
+ * forward, so idle years cannot accumulate room without limit.
+ */
+export const FHSA_CARRY_FORWARD_CAPPED = (limit: number) =>
+  `the unused room carried into the year is capped at the published participation-room carryforward maximum of ${limit} CAD; the room above that maximum is not spendable in the year`
+
 export const FHSA_MATURITY_UNSUPPORTED =
   'the FHSA 15-year / age-71 maturity clock, RRSP/RRIF rollover, qualifying and non-qualifying withdrawals, home-purchase eligibility, and the death event are not implemented (BE-36 B)'
 
 export const FHSA_OUT_OF_SCOPE =
   'FHSA maturity, rollover, qualifying and non-qualifying withdrawals, home-purchase eligibility and the death event remain unsupported (BE-36 B)'
+
+/**
+ * One person-year is priced against one account's participation room. More than
+ * one active account cannot be attributed to a single ledger, so it is refused
+ * with a reason instead of being dropped into a conservation failure.
+ */
+export const FHSA_MULTIPLE_ACTIVE_ACCOUNTS =
+  'more than one active FHSA cannot be attributed to a single participation-room ledger; BE-36 A prices at most one active FHSA per plan (BE-36 B owns per-person accounts)'
 
 export type FhsaRoomLimitationCode =
   | 'openingYearUnknown'
@@ -51,7 +75,9 @@ export type FhsaRoomLimitationCode =
   | 'accountNotOpen'
   | 'notYetOpen'
   | 'lifetimeCapped'
+  | 'lifetimeExceeded'
   | 'annualCapped'
+  | 'carryForwardCapped'
   | 'carryForwardUnavailable'
   | 'maturityUnsupported'
   | 'transferUnverified'
@@ -102,8 +128,11 @@ export interface FhsaRoomRequest {
    * Participation room carried into `year` from earlier years. It is **not**
    * the CRA participation-room statement's figure for `year`, which already
    * contains the year's own addition; it is the unused room from before. It is
-   * zero in the opening year and is the prior year's closing room after that,
-   * so `closing = openingRoom + annualAddition − applied` holds in every year.
+   * zero in the opening year and is the prior year's closing room after that.
+   * The room actually spendable this year is `carryForward + annualAddition`,
+   * where `carryForward` is this figure capped at the published participation-
+   * room carryforward maximum, so `openingRoom` may hold room the statute does
+   * not let the year use.
    */
   openingRoom: Known<number>
   /** Prior contributions and RRSP transfers. Absent means not supplied. */
@@ -117,13 +146,16 @@ export interface FhsaRoomYear {
   accountId: string
   year: number
   openingYear: Known<number>
-  /** Participation room carried in from earlier years. */
+  /** Participation room carried in from earlier years, before any statutory cap. */
   openingRoom: Known<number>
   /** The sourced room this year adds: the published annual limit, lifetime-bound. */
   annualAddition: Known<number>
-  /** Carry-forward inside `annualAddition`: the published limit less what was added. */
+  /** The carried-in room this year may actually use, capped by the sourced maximum. */
   carryForward: Known<number>
-  /** Annual room this year, including any carry-forward, before clipping. */
+  /**
+   * Annual room this year, including the capped carry-forward, before clipping
+   * by the lifetime ceiling.
+   */
   availableRoom: Known<number>
   /** RRSP transfers applied this year that occupy participation room. */
   rrspTransfers: Known<number>
@@ -133,7 +165,11 @@ export interface FhsaRoomYear {
   /** Money the room could not execute; retained, never deleted. */
   retained: number
   closingRoom: Known<number>
-  /** Lifetime limit less all prior and this year's contributions/transfers. */
+  /**
+   * Lifetime limit less all prior and this year's contributions/transfers. It
+   * is a signed figure: a negative value is a real overshoot the caller must
+   * refuse, never a room-floored zero.
+   */
   remainingLifetimeRoom: Known<number>
   lifetimeLimit: Known<number>
   /** Cumulative contributions and RRSP transfers, prior plus applied. */
@@ -171,7 +207,7 @@ const minKnown = (limit: number, remaining: Known<number>): Known<number> =>
 
 const BLOCKING: ReadonlySet<FhsaRoomLimitationCode> = new Set([
   'openingYearUnknown', 'historyUnknown', 'openingRoomUnknown', 'accountNotOpen',
-  'notYetOpen', 'transferUnverified', 'ownershipUnknown', 'ambiguousAccount',
+  'notYetOpen', 'transferUnverified', 'ownershipUnknown', 'ambiguousAccount', 'lifetimeExceeded',
 ])
 
 const unknownFrom = (limitations: FhsaRoomLimitation[]): Known<number> =>
@@ -180,8 +216,10 @@ const unknownFrom = (limitations: FhsaRoomLimitation[]): Known<number> =>
 /**
  * Price one person-year of FHSA participation room. Clipping happens line by
  * line so each retained amount stays attached to the contribution that could
- * not execute, and `closing = opening + annualAddition − applied` holds to
- * cents.
+ * not execute, and
+ * `closing = carryForward + annualAddition − applied` holds to cents, where
+ * `carryForward` is the carried-in room after the published carryforward cap
+ * (so a capped `openingRoom` is never spendable on top of the lifetime limit).
  */
 export function fhsaRoomYear(request: FhsaRoomRequest): FhsaRoomYear {
   const rules = selectFhsaRules()
@@ -210,24 +248,42 @@ export function fhsaRoomYear(request: FhsaRoomRequest): FhsaRoomYear {
   if (implausibleOpening) limitations.push({ code: 'accountNotOpen', detail: 'the recorded opening year is implausibly early for this person' })
   if (notYetOpen) limitations.push({ code: 'notYetOpen', detail: `the FHSA is not open until ${(openedYear as { value: number }).value}, so ${request.year} has no participation room` })
 
-  const blocked = limitations.some(item => BLOCKING.has(item.code))
   // A conservative lifetime basis: every prior contribution and RRSP transfer
-  // consumes the published lifetime limit. It can only understate room.
+  // consumes the published lifetime limit. An over-contributed history is not
+  // silently clamped to zero room — that would hide a real overshoot — it is
+  // refused with its own blocking reason.
+  if (cumulativePrior.status === 'known' && cumulativePrior.value > lifetimeLimit.value + FHSA_MONEY_TOLERANCE)
+    limitations.push({ code: 'lifetimeExceeded', detail: FHSA_LIFETIME_EXCEEDED })
+  const blocked = limitations.some(item => BLOCKING.has(item.code))
   const remainingLifetimeBefore = subtractKnown(lifetimeLimit, cumulativePrior)
   const annualAddition: Known<number> = blocked || notYetOpen || implausibleOpening
     ? { status: 'known', value: 0 }
     : minKnown(rules.annualLimit, remainingLifetimeBefore)
-  // The part of the year's room that is a carried-forward entitlement rather
-  // than this year's own addition.
-  const carryForward: Known<number> = annualAddition.status === 'known'
-    ? { status: 'known', value: roundCents(Math.max(0, rules.annualLimit - annualAddition.value)) }
-    : annualAddition
-  if (remainingLifetimeBefore.status === 'known' && remainingLifetimeBefore.value < rules.annualLimit)
-    limitations.push({ code: 'lifetimeCapped', detail: FHSA_LIFETIME_SIMPLIFICATION })
-
+  // The carried-in room is the year's participation-room carryforward, which the
+  // statute caps at a published maximum. This ledger does not model unused
+  // re-participation room (a taxable-withdrawal entitlement), so the whole
+  // carried-in figure is bounded by that maximum: idle years can never
+  // accumulate unlimited room, and the cap understates rather than overstates.
+  const carryForward: Known<number> = blocked
+    ? unknownFrom(limitations)
+    : minKnown(rules.participationRoomCarryForwardLimit, openingRoom)
+  const carryForwardCapped = !blocked && openingRoom.status === 'known' &&
+    openingRoom.value > rules.participationRoomCarryForwardLimit + FHSA_MONEY_TOLERANCE
+  if (carryForwardCapped)
+    limitations.push({ code: 'carryForwardCapped', detail: FHSA_CARRY_FORWARD_CAPPED(rules.participationRoomCarryForwardLimit) })
+  // The year's room is the capped carry-forward plus this year's addition, and
+  // the lifetime limit bounds that whole total. A carried-in room can therefore
+  // never be spent on top of the remaining lifetime room.
+  const roomBeforeLifetime: Known<number> = blocked
+    ? unknownFrom(limitations)
+    : { status: 'known', value: roundCents(Math.max(0, knownValue(carryForward) + knownValue(annualAddition))) }
   const availableRoom: Known<number> = blocked
     ? unknownFrom(limitations)
-    : { status: 'known', value: roundCents(Math.max(0, knownValue(openingRoom) + knownValue(annualAddition))) }
+    : minKnown(knownValue(roomBeforeLifetime), remainingLifetimeBefore)
+  const lifetimeBindsYear = !blocked && remainingLifetimeBefore.status === 'known' &&
+    (knownValue(annualAddition) < rules.annualLimit - FHSA_MONEY_TOLERANCE ||
+      knownValue(roomBeforeLifetime) > remainingLifetimeBefore.value + FHSA_MONEY_TOLERANCE)
+  if (lifetimeBindsYear) limitations.push({ code: 'lifetimeCapped', detail: FHSA_LIFETIME_SIMPLIFICATION })
 
   const lines: FhsaLineResult[] = request.lines.map(line => {
     const amount = Math.max(0, roundCents(line.amount))
@@ -235,33 +291,37 @@ export function fhsaRoomYear(request: FhsaRoomRequest): FhsaRoomYear {
   })
   if (!blocked) {
     let remaining = roundCents(Math.max(0, knownValue(availableRoom)))
-    // The lifetime bound and the annual bound are both already inside
-    // `availableRoom`, so one running remainder applies both without ever
-    // double counting a transfer or a contribution.
+    // The lifetime ceiling, the carry-forward maximum and the annual limit are
+    // all already inside `availableRoom`, so one running remainder applies all
+    // three without ever double counting a transfer or a contribution.
     for (const result of lines) {
       const applied = roundCents(Math.min(result.planned, remaining))
       result.applied = applied
       result.retained = roundCents(result.planned - applied)
       remaining = roundCents(Math.max(0, remaining - applied))
       if (result.retained > FHSA_MONEY_TOLERANCE) limitations.push({
-        // When the year's addition is below the published annual limit, the
-        // binding constraint was the remaining lifetime room, not the year.
-        code: knownValue(annualAddition) < rules.annualLimit - FHSA_MONEY_TOLERANCE ? 'lifetimeCapped' : 'annualCapped',
+        // Name the constraint that actually shrank the year: the lifetime
+        // ceiling first, then the statutory carry-forward cap, then the year.
+        code: lifetimeBindsYear ? 'lifetimeCapped' : carryForwardCapped ? 'carryForwardCapped' : 'annualCapped',
         detail: result.kind === 'rrspTransfer'
           ? `RRSP transfer ${result.id} of ${result.planned} exceeds FHSA participation room; ${result.retained} is retained and not transferred`
           : `contribution ${result.id} of ${result.planned} exceeds FHSA participation room; ${result.retained} is retained and not contributed`,
       })
     }
   }
-  // `blocked` is `false` here whenever the lines were priced, so this is the
-  // year's closing room, floored at zero.
+  // `blocked` is `false` here whenever the lines were priced, so this
+  // is the year's closing room, floored at zero.
   const closing = blocked
     ? unknownFrom(limitations)
     : { status: 'known' as const, value: roundCents(Math.max(0, knownValue(availableRoom) - sum(lines.map(line => line.applied)))) }
   const cumulativeContributions = blocked
     ? unknownFrom(limitations)
     : ({ status: 'known' as const, value: roundCents(knownValue(cumulativePrior) + sum(lines.map(line => line.applied))) } as Known<number>)
-  const remainingLifetimeRoom = blocked ? unknownFrom(limitations) : subtractKnown(lifetimeLimit, cumulativeContributions)
+  // Signed, not floored: the invariant is `cumulative <= lifetimeLimit`, and an
+  // overshoot must stay visible instead of reading as "no room left".
+  const remainingLifetimeRoom: Known<number> = blocked
+    ? unknownFrom(limitations)
+    : { status: 'known' as const, value: roundCents(lifetimeLimit.value - knownValue(cumulativeContributions)) }
   return {
     personId: request.personId,
     accountId: request.accountId,
@@ -310,7 +370,7 @@ export function fhsaStatementHistory(plan: Pick<InputsV2, 'fhsaStatementHistory'
  * priced (see `FHSA_TRANSFER_HISTORY_UNVERIFIED`), so they are never invented
  * here. Both entry modes call this, so the panel and the kernel agree.
  */
-export function plannedFhsaLines(args: { year: number; savingsShare: number }): FhsaLineRequestLine[] {
+function plannedFhsaLines(args: { year: number; savingsShare: number }): FhsaLineRequestLine[] {
   const share = roundCents(Math.max(0, args.savingsShare))
   return share > 0
     ? [{ id: `annual:${args.year}:fhsa`, calendarYear: args.year, amount: share, kind: 'ordinary' }]
@@ -332,7 +392,7 @@ export function fhsaOpeningRoom(plan: InputsV2, account: Account): Known<number>
 }
 
 /** One account's statement row is the whole fact set the ledger needs. */
-export function fhsaAccountYearRequest(args: {
+function fhsaAccountYearRequest(args: {
   plan: InputsV2
   account: Account
   year: number
@@ -350,27 +410,54 @@ export function fhsaAccountYearRequest(args: {
   }
 }
 
+/**
+ * One account's whole plan for one year, read from the plan by the one accessor
+ * that records it (`plannedFhsaContribution`): the account's scheduled rows plus
+ * its recorded recurring plan. The kernel and the panel preview both build their
+ * request here, so they price the same lines and cannot drift apart.
+ */
+export function fhsaPlannedYearRequest(args: { plan: InputsV2; account: Account; year: number }): FhsaPlannedRequest {
+  const { plan, account, year } = args
+  const scheduled = plan.contributions.filter(contribution =>
+    contribution.accountId === account.id && contribution.calendarYear === year && contribution.amount > 0)
+  const recordedPlan = plannedFhsaContribution(plan, account.id)
+  const scheduledPlanned = roundCents(sum(scheduled.map(contribution => contribution.amount)))
+  // The recorded plan is the account's total annual plan; a scheduled row for
+  // the same year is already part of it, so it is never added twice.
+  const savingsShare = roundCents(Math.max(0, recordedPlan - scheduledPlanned))
+  return {
+    savingsShare,
+    request: fhsaAccountYearRequest({
+      plan, account, year,
+      lines: [
+        ...scheduled.map(contribution => ({ id: contribution.id, calendarYear: year, amount: contribution.amount, kind: 'ordinary' as const })),
+        ...plannedFhsaLines({ year, savingsShare }),
+      ],
+    }),
+  }
+}
+
+export interface FhsaPlannedRequest {
+  request: FhsaRoomRequest
+  /** The recurring plan the recorded row owns, after the scheduled rows. */
+  savingsShare: number
+}
+
 export interface FhsaRoomPreview {
   account: Account
   ledger: FhsaRoomYear
-  /** FHSA share of the year's resolved voluntary savings split, inside `ledger`. */
+  /** The account's recorded recurring plan, inside `ledger`. */
   savingsShare: number
 }
 
 /**
  * The panel-facing base-year ledger for one owned FHSA account. It reuses the
- * same statement arithmetic, the same planned-line set and the same resolved
- * allocation as `annualStep`.
+ * same statement arithmetic, the same recorded plan and the same line set as
+ * `annualStep`.
  */
-export function previewFhsaRoomYear(plan: InputsV2, account: Account, savingsShare: number): FhsaRoomPreview {
-  const share = roundCents(Math.max(0, savingsShare))
-  return {
-    account,
-    savingsShare: share,
-    ledger: fhsaRoomYear(fhsaAccountYearRequest({
-      plan, account, year: plan.baseYear, lines: plannedFhsaLines({ year: plan.baseYear, savingsShare: share }),
-    })),
-  }
+export function previewFhsaRoomYear(plan: InputsV2, account: Account): FhsaRoomPreview {
+  const planned = fhsaPlannedYearRequest({ plan, account, year: plan.baseYear })
+  return { account, savingsShare: planned.savingsShare, ledger: fhsaRoomYear(planned.request) }
 }
 
 /** Closing room for the next year, or `null` when the row cannot carry it. */

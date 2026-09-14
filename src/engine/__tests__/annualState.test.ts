@@ -4,7 +4,8 @@ import { migratePersistedPlan } from '../migration'
 import type { InputsV2 } from '../model'
 import { impliedRate } from '../debts'
 import { annualStep, fixedReturnProvider, initializeState, projectFromState, sumInvestableAssets, sumNetWorth, type AnnualProviders } from '../annualState'
-import { FHSA_HISTORY_MISSING } from '../fhsa'
+import { FHSA_HISTORY_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS } from '../fhsa'
+import { plannedFhsaContribution } from '../fhsaPlan'
 
 const input = (): Inputs => ({
   currentAge: 40, fireAge: 60, lifeExpectancy: 90, province: 'ON', annualSavings: 40,
@@ -936,5 +937,116 @@ describe('BE-36 A FHSA participation room in the annual kernel', () => {
     if (result.status !== 'unsupported') throw new Error('expected unsupported')
     expect(result.issues[0].detail).toContain('scheduled FHSA contributor not recorded')
     expect(person.id).toBe(canonical.people[0].id)
+  })
+
+  /**
+   * The reviewer's two B1 reproductions, pinned at the kernel level. Every
+   * number below is a hand calculation from the published limits.
+   */
+  it('never lets carried-forward room breach the 40,000 lifetime limit over seven years', () => {
+    // First-year FHSA in 2026, confirmed zero statement, 7,000 planned a year,
+    // no growth. Before the fix this path reached 42,000 in 2031 and 45,000 in
+    // 2032, the last 5,000 being priced after the breach.
+    const { canonical, person } = fhsaPlan({ cash: 7000, annualFhsa: 7000 })
+    const seven = ok(projectFromState(canonical, ok(initializeState(canonical)), 7, budgetProviders(7000)))
+    const ledgers = seven.rows.map(row => row.fhsaLedger[person.id])
+    const cumulative = ledgers.map(ledger => {
+      if (ledger.cumulativeContributions.status !== 'known') throw new Error('expected known cumulative contributions')
+      return ledger.cumulativeContributions.value
+    })
+    // 7,000 a year until the lifetime ceiling, then nothing: the cap binds.
+    expect(cumulative).toEqual([7000, 14000, 21000, 28000, 35000, 40000, 40000])
+    for (const total of cumulative) expect(total).toBeLessThanOrEqual(40000)
+    // 2031 has 5,000 of lifetime room plus 5,000 carried in; only the lifetime
+    // room may execute and 2,000 of the plan is retained.
+    expect(ledgers[5].carryForward).toEqual({ status: 'known', value: 5000 })
+    expect(ledgers[5].annualAddition).toEqual({ status: 'known', value: 5000 })
+    expect(ledgers[5].availableRoom).toEqual({ status: 'known', value: 5000 })
+    expect(ledgers[5].applied).toBe(5000)
+    expect(ledgers[5].retained).toBe(2000)
+    expect(ledgers[5].closingRoom).toEqual({ status: 'known', value: 0 })
+    // 2032 is exhausted: nothing is priced and the whole plan is retained.
+    expect(ledgers[6].applied).toBe(0)
+    expect(ledgers[6].retained).toBe(7000)
+    expect(ledgers[6].remainingLifetimeRoom).toEqual({ status: 'known', value: 0 })
+  })
+
+  it('caps a 40,000 plan at 8,000 of annual room plus 8,000 of carry-forward', () => {
+    // An older account with 32,000 of unused room on the statement. Before the
+    // fix the ledger reported 40,000 of room in the year and executed all of it,
+    // creating a 24,000 excess FHSA amount the app called legal.
+    const { canonical, person, account } = fhsaPlan({ cash: 40000, annualFhsa: 40000, openedYear: 2020 })
+    account.contributionRoom = { status: 'known', value: 32000 }
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(40000)))
+    const ledger = first.row.fhsaLedger[person.id]
+    expect(ledger.openingRoom).toEqual({ status: 'known', value: 32000 })
+    expect(ledger.carryForward).toEqual({ status: 'known', value: 8000 })
+    expect(ledger.annualAddition).toEqual({ status: 'known', value: 8000 })
+    expect(ledger.availableRoom).toEqual({ status: 'known', value: 16000 })
+    expect(ledger.applied).toBe(16000)
+    expect(ledger.retained).toBe(24000)
+    expect(ledger.closingRoom).toEqual({ status: 'known', value: 0 })
+    expect(ledger.limitations.map(item => item.code)).toContain('carryForwardCapped')
+    // The 24,000 the room could not execute is retained, never deleted.
+    expect(first.row.cashLedger.retainedContributions).toBe(24000)
+  })
+
+  it('keeps cumulative contributions at or below the lifetime limit across a long projection', () => {
+    const { canonical, person } = fhsaPlan({ cash: 8000, annualFhsa: 8000 })
+    const many = ok(projectFromState(canonical, ok(initializeState(canonical)), 10, budgetProviders(8000)))
+    let previous = 0
+    for (const row of many.rows) {
+      const ledger = row.fhsaLedger[person.id]
+      if (ledger.cumulativeContributions.status !== 'known') throw new Error('expected known cumulative contributions')
+      const cumulative = ledger.cumulativeContributions.value
+      expect(cumulative).toBeGreaterThanOrEqual(previous)
+      expect(cumulative).toBeLessThanOrEqual(40000)
+      // The invariant `closing = carryForward + annualAddition - applied` holds
+      // to cents in every year of the run.
+      const closing = ledger.closingRoom.status === 'known' ? ledger.closingRoom.value : NaN
+      const carryForward = ledger.carryForward.status === 'known' ? ledger.carryForward.value : NaN
+      const addition = ledger.annualAddition.status === 'known' ? ledger.annualAddition.value : NaN
+      expect(closing).toBeCloseTo(Math.max(0, carryForward + addition - ledger.applied), 6)
+      previous = cumulative
+    }
+    // 2026-2030 execute 8,000 a year; 2031 and later have no lifetime room left.
+    expect(previous).toBe(40000)
+    expect(many.rows[4].fhsaLedger[person.id].applied).toBe(8000)
+    expect(many.rows[5].fhsaLedger[person.id].applied).toBe(0)
+    expect(many.rows[5].fhsaLedger[person.id].retained).toBe(8000)
+  })
+
+  it('refuses two active FHSAs with a typed reason instead of a conservation failure', () => {
+    const { canonical, person, account } = fhsaPlan({ cash: 10000, annualFhsa: 6000 })
+    // A second owned FHSA with a balance is active but has no ledger of its own.
+    canonical.accounts.push({
+      ...account, id: 'fhsa:second', balance: 5000,
+      taxableOwnerShares: { status: 'known', shares: { [person.id]: 1 } },
+    })
+    const result = annualStep(canonical, ok(initializeState(canonical)), budgetProviders(10000))
+    expect(result.status).toBe('unsupported')
+    if (result.status !== 'unsupported') throw new Error('expected unsupported')
+    expect(result.issues[0].detail).toContain(FHSA_MULTIPLE_ACTIVE_ACCOUNTS)
+    expect(result.issues[0].detail).toContain('fhsa:second')
+    expect(result.issues[0].detail).not.toContain('conservation')
+  })
+
+  it('prices the one recorded plan row and never a stale duplicate as well', () => {
+    // A plan saved by an earlier build could carry a legacy mirror row next to
+    // the recorded row. The recorded row is the plan: pricing both would make
+    // the 6,000 plan 14,000 and break cash conservation.
+    const { canonical, person, account } = fhsaPlan({ cash: 6000, annualFhsa: 6000 })
+    canonical.recurringContributions.push({
+      id: 'legacy:contribution:fhsa', accountId: account.id, contributorId: person.id,
+      annualAmount: 8000, funding: 'fromSavings', provenance: { origin: 'legacy', sourceYear: null },
+    })
+    expect(plannedFhsaContribution(canonical, account.id)).toBe(6000)
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(6000)))
+    const ledger = first.row.fhsaLedger[person.id]
+    expect(ledger.planned).toBe(6000)
+    expect(ledger.applied).toBe(6000)
+    expect(ledger.ordinaryPlanned).toBe(6000)
+    expect(first.row.byAccount[account.id].contribution).toBe(6000)
+    expect(first.row.cashLedger.retainedContributions).toBe(0)
   })
 })

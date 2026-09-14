@@ -5,6 +5,7 @@ import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonic
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
+import { fhsaPlanRowId, plannedFhsaContribution } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
@@ -182,13 +183,12 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
   const role = person.role
-  // Only this account's own recorded plan is priced against its own room: a
-  // household FHSA total would mix two people's entitlements. The editor owns
-  // one row per account, and a legacy plan's FHSA row starts at zero, so this
-  // row is the plan the user sees and the kernel prices.
-  const planRow = account ? plan.recurringContributions.find(item => item.id === `be36:fhsa:${account.id}`) : undefined
-  const planShare = roundCents(planRow?.annualAmount ?? 0)
-  const preview = account ? previewFhsaRoomYear(plan, account, planShare) : null
+  // One recorded row per FHSA account is the whole plan, and the kernel reads
+  // the same accessor, so the panel and the projection can never price a
+  // different amount. A legacy plan's row carries the canonical id too, so the
+  // box shows the plan the kernel prices instead of a blank field.
+  const planShare = account ? plannedFhsaContribution(plan, account.id) : 0
+  const preview = account ? previewFhsaRoomYear(plan, account) : null
   const statement = account ? fhsaStatementHistory(plan, account.id) : undefined
   const ownerLabel = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
   const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
@@ -219,9 +219,12 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
     }, 'FHSA contribution history not supplied')
   const writePlanned = (amount: number | null) => {
     if (!account) return
-    const id = `be36:fhsa:${account.id}`
+    const id = fhsaPlanRowId(account.id)
     onEdit(draft => {
-      draft.recurringContributions = draft.recurringContributions.filter(item => item.id !== id)
+      // Replacing the plan means removing every row for this account, not only
+      // the canonical one: a legacy mirror row left behind would be a second
+      // copy of the same plan and would be added to the recorded amount.
+      draft.recurringContributions = draft.recurringContributions.filter(item => item.accountId !== account.id)
       if (amount === null || amount <= 0) return
       draft.recurringContributions.push({
         id, accountId: account.id, contributorId: person.id, annualAmount: amount,
@@ -455,13 +458,12 @@ export function TaxFactsPanel() {
     // The legacy form is what rebuilds the account list on the next household
     // edit, so a recorded FHSA has to exist there too; otherwise the next form
     // edit or mode switch would silently drop the account and its room row.
-    // The legacy fields themselves stay in step with the canonical account.
+    // The legacy field is a mirror of the one recorded plan, never a second
+    // copy of it: it is written from the same accessor the kernel reads.
     const fhsa = draft.accounts.find(account => account.kind === 'fhsa')
     const inputs = fhsa ? { ...state.inputs, fhsa: {
       balance: fhsa.balance,
-      annualContribution: draft.recurringContributions
-        .filter(item => item.accountId === fhsa.id && item.annualAmount > 0)
-        .reduce((total, item) => total + item.annualAmount, 0),
+      annualContribution: plannedFhsaContribution(draft, fhsa.id),
       openedYearsAgo: fhsa.openedYear.status === 'known' ? Math.max(0, draft.baseYear - fhsa.openedYear.value) : 0,
     } } : state.inputs
     commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta,

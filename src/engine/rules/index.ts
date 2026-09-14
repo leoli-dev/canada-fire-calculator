@@ -54,7 +54,14 @@ export interface FhsaRulePack extends Provenance {
   annualLimit: number
   /** The most that can be contributed or transferred in a lifetime. */
   lifetimeLimit: number
-  fieldSources: { annualLimit: string; lifetimeLimit: string }
+  /**
+   * The most unused participation room one year can carry into the next
+   * ("FHSA participation room carryforward" is the lesser of $8,000 and a
+   * contribution-adjusted figure). Without this bound a ledger would let idle
+   * years accumulate unlimited room.
+   */
+  participationRoomCarryForwardLimit: number
+  fieldSources: { annualLimit: string; lifetimeLimit: string; participationRoomCarryForwardLimit: string }
   assumedFutureRule: boolean
   assumedAnnualRate?: number
   basedOnRuleId?: string
@@ -156,12 +163,17 @@ const FHSA_PACKS: FhsaRulePack[] = [
     id: 'CA-FHSA-limit-v1',
     annualLimit: 8000,
     lifetimeLimit: 40000,
+    participationRoomCarryForwardLimit: 8000,
     sourceURL: FHSA_PARTICIPATING,
-    fieldSources: { annualLimit: FHSA_PARTICIPATING, lifetimeLimit: FHSA_DEFINITIONS },
+    fieldSources: {
+      annualLimit: FHSA_PARTICIPATING,
+      lifetimeLimit: FHSA_DEFINITIONS,
+      participationRoomCarryForwardLimit: FHSA_DEFINITIONS,
+    },
     additionalSourceURLs: [FHSA_DEFINITIONS],
     effectiveDate: '2023-04-01', verifiedAt: '2026-02-05', indexationRule: 'frozen',
     rounding: 'nearest-dollar', coverage: 'modeled',
-    limitation: 'Both limits are the statutory federal participation limits and are not indexed. The ledger does not add back FHSA re-participation room, designated amounts or taxable withdrawals, and does not model the excess-FHSA-amount tax; it therefore treats all prior contributions and RRSP transfers as consuming the lifetime limit, which can only understate remaining room, never overstate it.',
+    limitation: 'The $8,000 annual limit, the $40,000 lifetime limit and the $8,000 participation-room carryforward maximum are statutory federal figures and are not indexed. The year\u2019s spendable room is the published annual limit plus at most the carryforward maximum (the CRA participation-room formula is unused re-participation room plus the lesser of $8,000 plus participation-room carryforward less the prior excess, or $40,000 less prior contributions and transfers), and the lifetime limit bounds that whole total, so a carried-in room can never be spent on top of the remaining lifetime room. The ledger does not add back FHSA re-participation room, designated amounts or taxable withdrawals, and does not model the excess-FHSA-amount tax, so those unmodelled amounts can only reduce the room it reports; it never reports room the published limits would not allow.',
     assumedFutureRule: false,
   },
 ]
@@ -233,9 +245,11 @@ export function publishRulePack<T extends TaxRulePack | BenefitRulePack | FhsaRu
         !p.fieldSources || !validURL(p.fieldSources.amounts) || !validURL(p.fieldSources.thresholds))
       throw new Error('Benefit pack lacks valid values, sources or period')
   } else if ('annualLimit' in p) {
-    if (!amount(p.annualLimit) || !amount(p.lifetimeLimit) || p.annualLimit <= 0 ||
-        p.lifetimeLimit < p.annualLimit || !p.fieldSources ||
-        !validURL(p.fieldSources.annualLimit) || !validURL(p.fieldSources.lifetimeLimit))
+    if (!amount(p.annualLimit) || !amount(p.lifetimeLimit) || !amount(p.participationRoomCarryForwardLimit) ||
+        p.annualLimit <= 0 || p.lifetimeLimit < p.annualLimit ||
+        p.participationRoomCarryForwardLimit <= 0 || !p.fieldSources ||
+        !validURL(p.fieldSources.annualLimit) || !validURL(p.fieldSources.lifetimeLimit) ||
+        !validURL(p.fieldSources.participationRoomCarryForwardLimit))
       throw new Error('FHSA pack lacks valid limits or sources')
   }
   return candidate as T

@@ -1,5 +1,6 @@
 import type { Inputs, InvestmentProperty } from './types'
 import type { Account, Debt, IncomeSource, InputsV2, Person, Property, Provenance, TaxShares } from './model'
+import { fhsaPlanRowId } from './fhsaPlan'
 import { assertLegacyInputs } from './modelValidation'
 
 const unknown = (reason: string): { status: 'unknown'; reason: string } => ({ status: 'unknown', reason })
@@ -313,7 +314,7 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
     schemaVersion: 2, baseYear, province: input.province, inflation: finite(input.inflation, 0.021),
     budget: { kind: 'savingsBudget', annualNetSavings: finite(input.annualSavings), retirementSpending: finite(input.retirementSpending), debtIncluded: unknown('legacy savings/debt treatment needs confirmation'), taxBenefitIncluded: unknown('legacy tax benefit treatment needs confirmation') },
     people, accounts, contributions: [], recurringContributions: [
-      ...(input.fhsa ? [{ id: legacyId('contribution:fhsa'), accountId: legacyId('account:fhsa'), contributorId: couple ? null : selfId, annualAmount: input.fhsa.annualContribution, funding: 'fromSavings' as const, provenance: source }] : []),
+      ...(input.fhsa ? [{ id: fhsaPlanRowId(legacyId('account:fhsa')), accountId: legacyId('account:fhsa'), contributorId: couple ? null : selfId, annualAmount: input.fhsa.annualContribution, funding: 'fromSavings' as const, provenance: source }] : []),
       ...(input.lockedRetirement ? [
         { id: legacyId('contribution:lira:employee'), accountId: legacyId('account:locked'), contributorId: input.lockedRetirement.owner === 'partner' ? (couple ? partnerId : null) : selfId, annualAmount: input.lockedRetirement.employeeContribution, funding: 'fromSavings' as const, provenance: source },
         { id: legacyId('contribution:lira:employer'), accountId: legacyId('account:locked'), contributorId: input.lockedRetirement.owner === 'partner' ? (couple ? partnerId : null) : selfId, annualAmount: input.lockedRetirement.employerContribution, funding: 'employerAdditional' as const, provenance: source },
@@ -482,6 +483,31 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     account.contributionRoom = old.contributionRoom
   }
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
+  // BE-36 A: exactly one recorded FHSA plan per account, under the canonical id
+  // the shared tax panel writes. Migration already emits that id, so a
+  // panel-recorded plan survives an unrelated legacy or shared-field edit. A
+  // plan saved by an earlier build could carry two rows for one account (a
+  // legacy mirror plus the recorded row); the recorded row is the plan, so the
+  // duplicate is dropped and the legacy mirror is rewritten to the recorded
+  // amount. The two can then never both be priced and the recorded amount is
+  // not lost on the next edit.
+  const recordedFhsaOverrides = new Map<string, number>()
+  for (const account of next.accounts) {
+    if (account.kind !== 'fhsa') continue
+    const rows = prior.recurringContributions.filter(item => item.accountId === account.id)
+    const recorded = rows.find(item => item.id === fhsaPlanRowId(account.id))
+    if (recorded && rows.length > 1) recordedFhsaOverrides.set(account.id, recorded.annualAmount)
+  }
+  if (recordedFhsaOverrides.size > 0) {
+    next.recurringContributions = next.recurringContributions.map(item => {
+      const recorded = recordedFhsaOverrides.get(item.accountId)
+      return recorded === undefined ? item : { ...item, id: fhsaPlanRowId(item.accountId), annualAmount: recorded }
+    })
+    const legacyFhsaId = legacyId('account:fhsa')
+    const recordedLegacy = recordedFhsaOverrides.get(legacyFhsaId)
+    if (recordedLegacy !== undefined && next.legacyProjection?.fhsa)
+      next.legacyProjection = { ...next.legacyProjection, fhsa: { ...next.legacyProjection.fhsa, annualContribution: recordedLegacy } }
+  }
   next.orphanedPeople = prior.orphanedPeople?.filter(person => !live.has(person.id))
   next.taxProfile = prior.taxProfile && !expandedHousehold ? prior.taxProfile : {
     spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null,

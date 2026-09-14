@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   FHSA_HISTORY_MISSING,
+  FHSA_LIFETIME_EXCEEDED,
   FHSA_MATURITY_UNSUPPORTED,
   FHSA_MONEY_TOLERANCE,
   FHSA_TRANSFER_HISTORY_UNVERIFIED,
-  fhsaAccountYearRequest,
   fhsaNextOpeningRoom,
+  fhsaPlannedYearRequest,
   fhsaRoomYear,
   fhsaStatementHistory,
   ownFhsaAccount,
-  plannedFhsaLines,
   previewFhsaRoomYear,
   type FhsaLineRequestLine,
   type FhsaRoomRequest,
   type FhsaRoomYear,
 } from '../fhsa'
+import { fhsaPlanRowId, plannedFhsaContribution } from '../fhsaPlan'
 import { selectFhsaRules } from '../rules'
 import { assertCanonicalPlan } from '../modelValidation'
 import type { Account, InputsV2, Known, Provenance } from '../model'
@@ -71,15 +72,13 @@ describe('BE-36 A FHSA room ledger — published limits', () => {
 })
 
 describe('BE-36 A audit P12 — cumulative contributions at the lifetime limit', () => {
-  it('stops executing further contributions after 40,000 of cumulative contributions', () => {
-    // Audit P12 case: 8,000 a year for 10 years is 80,000 contributed, against a
-    // 40,000 lifetime limit. The statement records the 80,000 (five years past
-    // the limit) and the account has since grown well beyond it. Growth is
-    // legitimate; further contributions are not.
+  it('stops executing further contributions once 40,000 of cumulative contributions is reached', () => {
+    // Audit P12 case: the statement already records the full 40,000 lifetime
+    // limit, so the year has no room at all and the whole plan is retained.
     const row = fhsaRoomYear(request({
       openedYear: known(2016),
       openingRoom: known(0),
-      history: history(80000),
+      history: history(40000),
       lines: [line('c1', 8000)],
     }))
     expect(remainingLifetime(row)).toBe(0)
@@ -90,9 +89,30 @@ describe('BE-36 A audit P12 — cumulative contributions at the lifetime limit',
     expect(row.limitations.map(item => item.code)).toContain('lifetimeCapped')
     // A deliberate second run proves the refusal is stable, not a fluke.
     const rerun = fhsaRoomYear(request({
-      openedYear: known(2016), openingRoom: known(0), history: history(80000), lines: [line('c1', 8000)],
+      openedYear: known(2016), openingRoom: known(0), history: history(40000), lines: [line('c1', 8000)],
     }))
     expect(rerun).toEqual(row)
+  })
+
+  it('refuses a history already past the lifetime limit instead of flooring the overshoot to zero', () => {
+    // 80,000 recorded against a 40,000 limit is a real excess FHSA amount. The
+    // ledger must name that refusal, not report "0 remaining" as if the year
+    // simply had no room, and it must not hide the overshoot behind a floor.
+    const row = fhsaRoomYear(request({
+      openedYear: known(2016),
+      openingRoom: known(0),
+      history: history(80000),
+      lines: [line('c1', 8000)],
+    }))
+    expect(row.limitations.map(item => item.code)).toContain('lifetimeExceeded')
+    expect(row.limitations.find(item => item.code === 'lifetimeExceeded')?.detail).toBe(FHSA_LIFETIME_EXCEEDED)
+    expect(row.applied).toBe(0)
+    expect(row.retained).toBe(8000)
+    expect(row.applied + row.retained).toBe(row.planned)
+    // Unknown, not a floored zero: the overshoot is refused rather than hidden.
+    expect(row.remainingLifetimeRoom.status).toBe('unknown')
+    expect(row.closingRoom.status).toBe('unknown')
+    expect(row.cumulativeContributions.status).toBe('unknown')
   })
 
   it('caps at exactly the remaining lifetime limit and lets a growth-only balance stay legitimate', () => {
@@ -108,9 +128,69 @@ describe('BE-36 A audit P12 — cumulative contributions at the lifetime limit',
     expect(row.applied).toBe(1000)
     expect(row.retained).toBe(4000)
     expect(remainingLifetime(row)).toBe(0)
-    // The ledger has no balance input at all, so investment growth can never
-    // create room and a large balance can never be a violation.
-    expect(Object.keys(row)).not.toContain('balance')
+    // The ledger has no balance input at all: a $250,000 balance cannot create
+    // room, and the same request prices the same 1,000 whether or not the
+    // account grew. Only the recorded statement facts matter.
+    const grew = { ...request({
+      openedYear: known(2020), openingRoom: known(0), history: history(39000), lines: [line('c1', 5000)],
+    }), balance: 250000 } as FhsaRoomRequest & { balance: number }
+    expect(fhsaRoomYear(grew)).toEqual(row)
+  })
+})
+
+describe('BE-36 A participation-room carryforward maximum', () => {
+  it('takes the carryforward maximum from the sourced rule pack', () => {
+    const rules = selectFhsaRules()
+    // CRA "FHSA participation room carryforward": the lesser of $8,000 and a
+    // contribution-adjusted figure, so unused room can never carry more than
+    // $8,000 into a year.
+    expect(rules.participationRoomCarryForwardLimit).toBe(8000)
+    expect(rules.fieldSources.participationRoomCarryForwardLimit).toBe(rules.fieldSources.lifetimeLimit)
+    expect(rules.limitation).toContain('participation-room carryforward')
+  })
+
+  it('caps the carried-in room so idle years cannot accumulate unlimited room', () => {
+    // Five idle years: opening room grows by the annual limit every year, but
+    // the statutory carryforward maximum means the year can never hold more
+    // than 8,000 + 8,000 = 16,000.
+    let opening = known(0)
+    const available: number[] = []
+    for (let year = 2026; year <= 2032; year++) {
+      const row = fhsaRoomYear(request({
+        year, openedYear: known(2020), openingRoom: opening, history: history(0), lines: [],
+      }))
+      expect(row.availableRoom.status).toBe('known')
+      available.push(row.availableRoom.status === 'known' ? row.availableRoom.value : NaN)
+      opening = fhsaNextOpeningRoom(row)!
+    }
+    // A $40,000 plan in the fifth idle year executes only the legal 16,000.
+    expect(available).toEqual([8000, 16000, 16000, 16000, 16000, 16000, 16000])
+    const plan = fhsaRoomYear(request({
+      year: 2030, openedYear: known(2020), openingRoom: known(32000), history: history(0), lines: [line('c1', 40000)],
+    }))
+    expect(plan.availableRoom).toEqual(known(16000))
+    expect(plan.applied).toBe(16000)
+    expect(plan.retained).toBe(24000)
+    expect(plan.limitations.map(item => item.code)).toContain('carryForwardCapped')
+    expect(plan.applied + plan.retained).toBe(plan.planned)
+  })
+
+  it('never spends carried-in room on top of the remaining lifetime room', () => {
+    // 35,000 already contributed leaves 5,000 of lifetime room. 5,000 of room
+    // is carried in, and the year adds the published 8,000, so the year's room
+    // would be 13,000 — but the lifetime limit binds the whole total at 5,000.
+    const row = fhsaRoomYear(request({
+      openedYear: known(2020), openingRoom: known(5000), history: history(35000), lines: [line('c1', 7000)],
+    }))
+    expect(row.carryForward).toEqual(known(5000))
+    expect(row.annualAddition).toEqual(known(5000))
+    expect(row.availableRoom).toEqual(known(5000))
+    expect(row.applied).toBe(5000)
+    expect(row.retained).toBe(2000)
+    expect(row.cumulativeContributions).toEqual(known(40000))
+    expect(remainingLifetime(row)).toBe(0)
+    expect(closing(row)).toBe(0)
+    expect(row.limitations.map(item => item.code)).toContain('lifetimeCapped')
   })
 })
 
@@ -167,7 +247,7 @@ describe('BE-36 A annual boundary and carry-forward', () => {
     expect(remainingLifetime(third)).toBe(16000)
   })
 
-  it('holds the identity closing = opening + annualAddition - applied and never goes negative', () => {
+  it('holds the identity closing = carryForward + annualAddition - applied and never goes negative', () => {
     const row = fhsaRoomYear(request({
       openedYear: known(2024),
       openingRoom: known(9000),
@@ -175,13 +255,18 @@ describe('BE-36 A annual boundary and carry-forward', () => {
       lines: [line('c1', 4000), line('c2', 3000)],
     }))
     // Lifetime room at the start is 30,000, so the year adds the full 8,000 on
-    // top of the 9,000 carried in: 17,000 available, 7,000 executed, 10,000 left.
+    // top of the carried-in room — but the carried-in room is itself capped at
+    // the published 8,000 carryforward maximum, so 16,000 is available, 7,000 is
+    // executed and 9,000 is left. The 1,000 of opening room above the maximum is
+    // not spendable this year.
+    expect(row.carryForward).toEqual(known(8000))
     expect(row.annualAddition).toEqual(known(8000))
-    expect(row.availableRoom).toEqual(known(17000))
+    expect(row.availableRoom).toEqual(known(16000))
     expect(row.applied).toBe(7000)
-    expect(closing(row)).toBe(10000)
-    expect(closing(row)).toBeCloseTo(9000 + 8000 - 7000, 6)
+    expect(closing(row)).toBe(9000)
+    expect(closing(row)).toBeCloseTo(8000 + 8000 - 7000, 6)
     expect(row.applied + row.retained).toBe(row.planned)
+    expect(closing(row)).toBeGreaterThanOrEqual(0)
   })
 
   it('re-runs idempotently and continues a snapshot without resetting or double counting', () => {
@@ -212,9 +297,12 @@ describe('BE-36 A RRSP transfers', () => {
     expect(row.retained).toBe(8000)
     expect(row.limitations.map(item => item.code)).toContain('transferUnverified')
     expect(row.limitations.find(item => item.code === 'transferUnverified')?.detail).toBe(FHSA_TRANSFER_HISTORY_UNVERIFIED)
-    // A transfer produces no deduction, so the ledger has no deduction field at
-    // all: a transfer can never be double counted.
-    expect(Object.keys(row)).not.toContain('deductedThisYear')
+    // A refused transfer is money the room could not execute: it is retained and
+    // never counted as an ordinary contribution, so it cannot be deducted twice
+    // or silently converted into a contribution.
+    expect(row.ordinaryPlanned).toBe(0)
+    expect(row.rrspTransfers.status).toBe('unknown')
+    expect(row.retained).toBe(row.planned)
   })
 
   it('refuses a mixed year rather than pricing the ordinary half and guessing at the transfer', () => {
@@ -335,17 +423,32 @@ describe('BE-36 A two people and two modes share one ledger', () => {
     expect(remainingLifetime(alice)).toBe(32000)
   })
 
-  it('prices the panel preview and the kernel from the same account facts', () => {
+  it('prices the panel preview and the kernel from the one recorded plan row', () => {
     const plan = planWith({})
     const account = plan.accounts.find(item => item.kind === 'fhsa')!
-    const preview = previewFhsaRoomYear(plan, account, 11000)
-    const kernel = fhsaRoomYear(fhsaAccountYearRequest({
-      plan, account, year: plan.baseYear, lines: plannedFhsaLines({ year: plan.baseYear, savingsShare: 11000 }),
-    }))
-    expect(preview.ledger).toEqual(kernel)
+    // The one row the panel writes is the only plan the account has.
+    plan.recurringContributions.push({
+      id: fhsaPlanRowId(account.id), accountId: account.id, contributorId: account.ownerId,
+      annualAmount: 11000, funding: 'fromSavings', provenance,
+    })
+    const preview = previewFhsaRoomYear(plan, account)
+    const planned = fhsaPlannedYearRequest({ plan, account, year: plan.baseYear })
+    expect(preview.savingsShare).toBe(11000)
+    expect(planned.savingsShare).toBe(11000)
+    // The preview *is* the kernel's request, not a parallel computation.
+    expect(preview.ledger).toEqual(fhsaRoomYear(planned.request))
     expect(preview.ledger.applied).toBe(8000)
     expect(preview.ledger.retained).toBe(3000)
     expect(fhsaStatementHistory(plan, account.id)?.cumulativePriorContributions).toEqual(known(0))
+    // A stale second row for the same account is not priced on top of it, in
+    // the accessor, the preview or the kernel request.
+    plan.recurringContributions.push({
+      id: 'legacy:contribution:fhsa', accountId: account.id, contributorId: account.ownerId,
+      annualAmount: 7000, funding: 'fromSavings', provenance,
+    })
+    expect(plannedFhsaContribution(plan, account.id)).toBe(11000)
+    expect(previewFhsaRoomYear(plan, account).ledger).toEqual(preview.ledger)
+    expect(fhsaRoomYear(fhsaPlannedYearRequest({ plan, account, year: plan.baseYear }).request)).toEqual(preview.ledger)
   })
 })
 
