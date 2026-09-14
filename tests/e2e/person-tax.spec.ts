@@ -96,6 +96,8 @@ test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/income/income.taxFacts')
   await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('private')
+  // A mid-year change first reveals the month detail, then edits one month.
+  await page.getByTestId('qc-coverage-changed-self').check()
   await page.getByTestId('qc-coverage-self-7').selectOption('public')
   await page.reload()
   await expect(page.getByTestId('qc-coverage-self-7')).toHaveValue('public')
