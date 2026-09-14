@@ -1146,6 +1146,30 @@ describe('BE-36 A FHSA participation room in the annual kernel', () => {
     expect(first.row.byAccount[nonReg].contribution).toBe(33500)
   })
 
+  it('never routes the voluntary RRSP share to the account of a scheduled FHSA row', () => {
+    // The scheduled FHSA row used to park an RRSP destination, so the RRSP
+    // ledger paid its applied amount into the FHSA account. The two ledgers now
+    // keep their own destinations.
+    const { canonical, person, account } = fhsaPlan({ cash: 40000, annualFhsa: 0 })
+    person.rrspDeductionLimit = { status: 'known', value: 8000 }
+    person.rrspUnusedUndeducted = { status: 'known', value: 0 }
+    person.rrspAvailableRoom = { status: 'known', value: 8000 }
+    canonical.savingsAllocation.shares = { tfsa: 0, rrsp: 1, nonReg: 0 }
+    const rrsp = canonical.accounts.find(item => item.kind === 'rrsp')!.id
+    canonical.contributions.push({
+      id: 'sched-fhsa', accountId: account.id, contributorId: person.id, calendarYear: 2026, amount: 2000, deductionYear: null,
+      provenance: { origin: 'user', sourceYear: 2026 },
+    })
+    const first = ok(annualStep(canonical, ok(initializeState(canonical)), budgetProviders(40000)))
+    expect(first.row.fhsaLedger[person.id].applied).toBe(2000)
+    // The 38,000 voluntary RRSP share is clipped to its own 8,000 of room.
+    expect(first.row.rrspLedger[person.id].planned).toBe(38000)
+    expect(first.row.rrspLedger[person.id].applied).toBe(8000)
+    expect(first.row.byAccount[account.id].contribution).toBe(2000)
+    expect(first.row.byAccount[rrsp].contribution).toBe(8000)
+    expect(first.row.byAccount[account.id].contribution).not.toBe(10000)
+  })
+
   it('takes the largest stale row, never their sum, when no recorded plan row exists', () => {
     // N-2: two non-canonical rows used to be added together (8,000 + 6,000 =
     // 14,000), resurrecting the doubling B2 removed.
