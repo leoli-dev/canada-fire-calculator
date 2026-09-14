@@ -7,6 +7,7 @@ import {
   oasEstimatorProvenance as estimatorProvenance,
   pensionAmountWarning,
   statementProvenance,
+  typedAmountSource,
 } from '../engine'
 
 // BE-39 A. The store is the one place every edit funnels through, so it is
@@ -156,34 +157,42 @@ const sourceOf = (field: BenefitField) => {
 
 /** The whole difference between the two UIs for a typed amount: guided's
  * `FactNumber` confirms the answer after the write, professional's `Num` has no
- * such call. Both still commit through `store.set`. */
-const typeAmount = (mode: Mode, field: BenefitField) => {
-  const value = field.endsWith('cppAnnualAt65') ? 11_000 : 9_000
-  const partner = useStore.getState().inputs.partner
+ * such call. Both commit through `store.set`, and both amount boxes send the
+ * source typing implies (`typedAmountSource`), so neither relies on a value
+ * diff to say "the user typed this". */
+const typeAmount = (mode: Mode, field: BenefitField, value = field.endsWith('cppAnnualAt65') ? 11_000 : 9_000) => {
+  const inputs = useStore.getState().inputs
+  const partner = inputs.partner
   useStore.getState().set(
-    field === 'cppAnnualAt65' ? { cppAnnualAt65: value }
-      : field === 'oasAnnualAt65' ? { oasAnnualAt65: value }
-      : field === 'partner.cppAnnualAt65' ? { partner: { ...partner!, cppAnnualAt65: value } }
-      : { partner: { ...partner!, oasAnnualAt65: value } },
+    field === 'cppAnnualAt65' ? { cppAnnualAt65: value, cppAmountSource: typedAmountSource(inputs.cppAmountSource) }
+      : field === 'oasAnnualAt65' ? { oasAnnualAt65: value, oasAmountSource: typedAmountSource(inputs.oasAmountSource) }
+      : field === 'partner.cppAnnualAt65' ? { partner: { ...partner!, cppAnnualAt65: value, cppAmountSource: typedAmountSource(partner!.cppAmountSource) } }
+      : { partner: { ...partner!, oasAnnualAt65: value, oasAmountSource: typedAmountSource(partner!.oasAmountSource) } },
   )
   if (mode === 'guided') useStore.getState().markAnswers([field], 'confirmed')
 }
 
-/** An `Apply` from the work-history / residence estimator. The handler is now
+/** An `Apply` from the work-history / residence estimator. The handler is
  * identical in both modes (the guided-only `markAnswers` repair was removed),
- * so the mode changes nothing here — which is the point. */
+ * so the mode changes nothing here — which is the point. The estimator is
+ * handed the plan's own retirement age, exactly as the panels pass it, so an
+ * Apply is itself never a premise rewrite. */
 const applyEstimator = (mode: Mode, field: BenefitField) => {
   void mode
-  const partner = useStore.getState().inputs.partner
+  const inputs = useStore.getState().inputs
+  const partner = inputs.partner
   // The partner retires when the primary does: age 35 + (45 - 35) = 45.
+  const retireAge = field.startsWith('partner.')
+    ? partner!.currentAge + (inputs.fireAge - inputs.currentAge)
+    : inputs.fireAge
   if (field === 'cppAnnualAt65')
-    useStore.getState().set({ cppAnnualAt65: estimateCppAt65(25, 45, 1), cppAmountSource: cppEstimatorProvenance({ retirementAge: 45, startWorkAge: 25, avgEarningsRatio: 1 }, 2026) })
+    useStore.getState().set({ cppAnnualAt65: estimateCppAt65(25, retireAge, 1), cppAmountSource: cppEstimatorProvenance({ retirementAge: retireAge, startWorkAge: 25, avgEarningsRatio: 1 }, 2026) })
   else if (field === 'oasAnnualAt65')
-    useStore.getState().set({ oasAnnualAt65: estimateOasAt65(40), oasAmountSource: estimatorProvenance({ retirementAge: 45, residenceYearsBy65: 40 }, 2026) })
+    useStore.getState().set({ oasAnnualAt65: estimateOasAt65(40), oasAmountSource: estimatorProvenance({ retirementAge: retireAge, residenceYearsBy65: 40 }, 2026) })
   else if (field === 'partner.cppAnnualAt65')
-    useStore.getState().set({ partner: { ...partner!, cppAnnualAt65: estimateCppAt65(25, 45, 0.8), cppAmountSource: cppEstimatorProvenance({ retirementAge: 45, startWorkAge: 25, avgEarningsRatio: 0.8 }, 2026) } })
+    useStore.getState().set({ partner: { ...partner!, cppAnnualAt65: estimateCppAt65(25, retireAge, 0.8), cppAmountSource: cppEstimatorProvenance({ retirementAge: retireAge, startWorkAge: 25, avgEarningsRatio: 0.8 }, 2026) } })
   else
-    useStore.getState().set({ partner: { ...partner!, oasAnnualAt65: estimateOasAt65(40), oasAmountSource: estimatorProvenance({ retirementAge: 45, residenceYearsBy65: 40 }, 2026) } })
+    useStore.getState().set({ partner: { ...partner!, oasAnnualAt65: estimateOasAt65(40), oasAmountSource: estimatorProvenance({ retirementAge: retireAge, residenceYearsBy65: 40 }, 2026) } })
 }
 
 /** Both modes write the FIRE age through the shared field registry. */
@@ -220,17 +229,49 @@ describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode
   it.each(BENEFIT_FIELDS)('records an estimator Apply to %s identically in both modes', (field) => {
     const guided = metaAfter('guided', field, applyEstimator)
     const professional = metaAfter('professional', field, applyEstimator)
-    // the user chose to apply the estimate, so it is their answer — the same
-    // rule guided mode already recorded before this slice
-    expect(guided).toEqual({ status: 'confirmed', origin: 'user' })
+    // BL1 / round 3: applying the estimator is invoking a computation, not
+    // asserting a fact, so the answer is `estimated`/`default` — the same label
+    // every other applied engine value in this questionnaire carries (mix, fee
+    // and inflation presets, the DB-pension default, `applyEstimate`).
+    expect(guided).toEqual({ status: 'estimated', origin: 'default' })
     expect(professional).toEqual(guided)
     // while the number and its recorded source are the estimator's
     expect(sourceOf(field)?.source).toBe('estimator')
+    // independent literals: `estimateCppAt65(25, 45, 1)` = 9,278 and
+    // `estimateCppAt65(25, 45, 0.8)` = 7,422, `estimateOasAt65(40)` = 9,024
     expect(amountOf(field)).toBe(
-      field.endsWith('cppAnnualAt65')
-        ? Math.round(estimateCppAt65(25, 45, field.startsWith('partner.') ? 0.8 : 1))
-        : estimateOasAt65(40),
+      field === 'cppAnnualAt65' ? 9_278 : field === 'partner.cppAnnualAt65' ? 7_422 : 9_024,
     )
+  })
+
+  // BL1 pin: an estimator Apply must never be recorded as a user-confirmed
+  // fact. The label is a function of the amount's provenance, not of which
+  // control wrote it last, so this holds for every field in both modes.
+  it.each(BENEFIT_FIELDS)('never records an estimator Apply to %s as a user-confirmed fact', (field) => {
+    for (const mode of ['guided', 'professional'] as Mode[]) {
+      const meta = metaAfter(mode, field, applyEstimator)
+      expect(sourceOf(field)?.source).toBe('estimator')
+      expect(meta).not.toEqual({ status: 'confirmed', origin: 'user' })
+      // and the invariant: estimator provenance can only ever read `estimated`
+      expect(meta?.status).toBe('estimated')
+      expect(meta?.origin).toBe('default')
+    }
+  })
+
+  it.each(BENEFIT_FIELDS)('adopts a %s re-typed at exactly the recorded estimator figure', (field) => {
+    const recorded = metaAfter('professional', field, applyEstimator)
+    expect(recorded?.status).toBe('estimated')
+    const applied = amountOf(field)
+    // typing the *same* number is still the user's own answer: the amount box
+    // sends the source typing implies, so nothing has to diff values
+    typeAmount('professional', field, applied)
+    expect(metaOf(field)).toEqual({ status: 'confirmed', origin: 'user' })
+    expect(sourceOf(field)?.source).toBe('manual')
+    // and a later FIRE-age change leaves the typed fact alone
+    changeFireAge('professional', field, '55')
+    expect(amountOf(field)).toBe(applied)
+    expect(sourceOf(field)?.source).toBe('manual')
+    expect(metaOf(field)).toEqual({ status: 'confirmed', origin: 'user' })
   })
 
   it.each(['cppAnnualAt65', 'partner.cppAnnualAt65'] as BenefitField[])(
@@ -245,14 +286,15 @@ describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode
     })
 
   it.each(['oasAnnualAt65', 'partner.oasAnnualAt65'] as BenefitField[])(
-    'keeps an applied OAS estimate as the user answer and flags the moved premise (%s)', (field) => {
+    'keeps an applied OAS estimate flagged, with its estimate label (%s)', (field) => {
       const act = (mode: Mode, f: BenefitField) => { applyEstimator(mode, f); changeFireAge(mode, f, '55') }
       const guided = metaAfter('guided', field, act)
       const professional = metaAfter('professional', field, act)
       // the pass never re-prices an OAS amount (residence is not an age), so the
-      // recorded answer stands and the premise is flagged instead
-      expect(guided).toEqual({ status: 'confirmed', origin: 'user' })
+      // amount stands, stays the estimator's, and the premise is flagged
+      expect(guided).toEqual({ status: 'estimated', origin: 'default' })
       expect(professional).toEqual(guided)
+      expect(amountOf(field)).toBe(9_024)
       const provenance = sourceOf(field)
       // the household retires at 55, so the partner's retirement age is 55 too
       expect(pensionAmountWarning(provenance, 'oas', 55)).toEqual({ kind: 'estimatorNeedsReview' })
@@ -261,15 +303,18 @@ describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode
   // The explicit rewrite signal, pinned: the capped estimator returns the same
   // number at retirement 64 and 70, so a value-diff heuristic sees no rewrite
   // and would leave the amount labelled user-confirmed. The pass reports the
-  // moved premise, which is the fact the metadata must record.
+  // moved premise, which is the fact the metadata must record. The Apply itself
+  // uses the plan's own retirement age, so it is not a rewrite of its own.
   it('relabels a moved premise even when the capped estimate is numerically unchanged', () => {
-    expect(estimateCppAt65(25, 64, 1)).toBe(estimateCppAt65(25, 70, 1))
+    expect(estimateCppAt65(25, 64, 1)).toBe(18_092)
+    expect(estimateCppAt65(25, 70, 1)).toBe(18_092)
     for (const mode of ['guided', 'professional'] as Mode[]) {
       reset()
       useStore.getState().editSharedField('fireAge', '64')
       applyEstimator(mode, 'cppAnnualAt65')
       const applied = amountOf('cppAnnualAt65')
-      expect(metaOf('cppAnnualAt65')).toEqual({ status: 'confirmed', origin: 'user' })
+      expect(applied).toBe(18_092)
+      expect(metaOf('cppAnnualAt65')).toEqual({ status: 'estimated', origin: 'default' })
       changeFireAge(mode, 'cppAnnualAt65', '70')
       expect(amountOf('cppAnnualAt65')).toBe(applied)
       expect(metaOf('cppAnnualAt65')).toEqual({ status: 'estimated', origin: 'default', assumptionValue: applied })
@@ -281,8 +326,8 @@ describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode
       reset()
       applyEstimator(mode, 'cppAnnualAt65')
       useStore.getState().set({ lifeExpectancy: 92 })
-      expect(metaOf('cppAnnualAt65')).toEqual({ status: 'confirmed', origin: 'user' })
-      expect(amountOf('cppAnnualAt65')).toBe(Math.round(estimateCppAt65(25, 45, 1)))
+      expect(metaOf('cppAnnualAt65')).toEqual({ status: 'estimated', origin: 'default' })
+      expect(amountOf('cppAnnualAt65')).toBe(9_278)
     }
   })
 })

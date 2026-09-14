@@ -1,4 +1,4 @@
-import type { Inputs } from '../engine'
+import type { Inputs, PensionAmountProvenance } from '../engine'
 import type { InputsV2 } from '../engine/model'
 import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
@@ -54,26 +54,44 @@ export function writtenBenefitFields(previous: Inputs, patch: Partial<Inputs>): 
  * `rewritten` is the dependency pass's own report of the amounts it re-derived
  * because a retirement-age premise moved — never a before/after value diff,
  * which also fires on a direct edit and used to persist a hand-typed figure as
- * `estimated`/`default`. `written` are the amounts the same edit wrote
- * directly: the user owns those numbers, in both entry modes, so they are
- * `confirmed`/`user` and win over an estimate overlay — including when the
- * apply button used the estimator, because choosing to apply it is the user's
- * answer.
+ * `estimated`/`default`. `written` are the amounts this edit wrote directly and
+ * `inputs` is the plan *after* the edit, because the label is a function of
+ * where the number came from, not of which control wrote it last: an applied
+ * estimator is this app's arithmetic (`estimated`/`default`, like every other
+ * applied preset), while a typed figure and a re-confirmed statement are facts
+ * the user asserts (`confirmed`/`user`). Deriving the label from the action
+ * instead recorded an estimator Apply as a user-confirmed fact.
  */
 export function applyBenefitAnswerMeta(
   meta: Record<string, AnswerMeta>,
   rewritten: PensionBenefitRewrite[],
   written: RewrittenBenefitField[],
+  inputs: Inputs,
 ): Record<string, AnswerMeta> {
   if (rewritten.length === 0 && written.length === 0) return meta
   const updatedAt = new Date().toISOString()
   const next = { ...meta }
-  for (const field of written) next[field] = { status: 'confirmed', origin: 'user', updatedAt }
+  for (const field of written) {
+    next[field] = benefitProvenance(inputs, field)?.source === 'estimator'
+      ? { status: 'estimated', origin: 'default', updatedAt }
+      : { status: 'confirmed', origin: 'user', updatedAt }
+  }
   for (const { field, assumptionValue } of rewritten) {
     if (written.includes(field)) continue
     next[field] = { status: 'estimated', origin: 'default', updatedAt, assumptionValue }
   }
   return next
+}
+
+/** Read one recorded benefit amount's provenance out of a plan. */
+export function benefitProvenance(
+  inputs: Inputs,
+  field: RewrittenBenefitField,
+): PensionAmountProvenance | undefined {
+  if (field === 'cppAnnualAt65') return inputs.cppAmountSource
+  if (field === 'oasAnnualAt65') return inputs.oasAmountSource
+  if (field === 'partner.cppAnnualAt65') return inputs.partner?.cppAmountSource
+  return inputs.partner?.oasAmountSource
 }
 
 function revealAccount(answers: Record<string, string | boolean | string[]>, account: 'tfsa' | 'rrsp' | 'nonReg') {
@@ -113,6 +131,7 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
     { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
     refreshed.rewritten,
     [],
+    inputs,
   )
   return {
     inputs: canonical.legacyProjection, canonical, draftByField,

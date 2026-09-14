@@ -482,7 +482,7 @@ export const CPP_OAS_UNSUPPORTED_PATHS: BenefitUnsupportedPath[] = [
   },
   {
     id: 'oas-residence-eligibility',
-    reason: 'OAS residence is modelled only as a prorated 0-40 year scale; the 10-year minimum for in-Canada benefits, the 20-year requirement for benefits outside Canada and social-security-agreement years are not modelled, so a residence count below the minimum is refused as unsupported rather than priced',
+    reason: 'OAS residence is modelled only as a prorated 0-40 year scale, so a count below 40 is priced in proportion to it (3 years is priced at 676.80) and no minimum is applied. The 10-year minimum for in-Canada benefits, the 20-year requirement for benefits outside Canada and social-security-agreement years are not modelled, so the eligibility step those rules decide is absent',
   },
   {
     id: 'db-indexation-start',

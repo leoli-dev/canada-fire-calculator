@@ -48,6 +48,7 @@ export {
   oasEstimatorProvenance,
   manualProvenance,
   provenanceForTypedAmount,
+  typedAmountSource,
   statementProvenance,
   reconfirmStatementAmount,
   personCppAnnual,

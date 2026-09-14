@@ -295,7 +295,7 @@ function reconcileLegacyInputs(state: Store, inputs: Inputs) {
 /** What one `store.set` did to the recorded benefit amounts. */
 interface PensionProvenanceEdit {
   inputs: Inputs
-  /** The amount boxes this patch wrote: the user owns those numbers. */
+  /** The amount boxes this patch wrote, whatever provenance they ended with. */
   written: RewrittenBenefitField[]
   /** The amounts the dependency pass re-derived because a premise moved. */
   rewritten: PensionBenefitRewrite[]
@@ -305,32 +305,36 @@ interface PensionProvenanceEdit {
  * BE-39 A. Invalidate the CPP/QPP and OAS figures whose premise the edit just
  * moved. It has to run here: `store.set` only shallow-merges a patch, so before
  * this a stale `cppWork` survived a `fireAge` change untouched. A patch that
- * carries an explicit provenance record wins (the estimator's Apply); a patch
- * that changes an amount with no provenance is a manual fact; anything else
- * keeps the recorded source. Only an estimator amount is ever rewritten, and
- * only the pass itself says so.
+ * carries an explicit provenance record wins (the estimator's Apply, the source
+ * control, a re-confirm); a patch that names an amount with no provenance is a
+ * manual fact; anything else keeps the recorded source. Only an estimator
+ * amount is ever rewritten, and only the pass itself says so.
  */
 function applyPensionProvenance(state: Inputs, inputs: Inputs, patch: Partial<Inputs>): PensionProvenanceEdit {
   const partnerPatched = patch.partner
   const selfPatch = { ...patch }
   delete selfPatch.partner
   const withSelf: Inputs = { ...inputs }
-  // A patch that changes an amount without carrying its own provenance is a
+  // A patch that *names* an amount without carrying a provenance record is a
   // direct user edit. It must never be silently reverted: an estimator value is
   // adopted as a manual fact, a statement/manual entry keeps its recorded
-  // source (which the dependency pass then leaves alone anyway). The source
-  // control is what deliberately changes a source.
+  // source (which the dependency pass then leaves alone anyway). The decision is
+  // the presence of the amount directive, never a before/after value diff — a
+  // re-typed figure equal to the current one is still the user's answer. The
+  // amount boxes also send the source typing implies (`typedAmountSource`), so
+  // this is the fallback for callers that write the number alone.
   const typedSource = (recorded: Inputs['cppAmountSource']) => provenanceForTypedAmount(recorded) ?? undefined
-  if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined &&
-      inputs.cppAnnualAt65 !== state.cppAnnualAt65)
+  if (selfPatch.cppAmountSource === undefined && selfPatch.cppAnnualAt65 !== undefined)
     withSelf.cppAmountSource = typedSource(state.cppAmountSource) ?? state.cppAmountSource
-  if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined &&
-      inputs.oasAnnualAt65 !== state.oasAnnualAt65)
+  if (selfPatch.oasAmountSource === undefined && selfPatch.oasAnnualAt65 !== undefined)
     withSelf.oasAmountSource = typedSource(state.oasAmountSource) ?? state.oasAmountSource
   // A partner patch is a whole-record replacement (the UI spreads the current
   // partner and overrides one key), so an unchanged provenance reference is not
   // a directive — only a *different* object records a deliberate source change.
-  // The same rule as above then applies to the amount the patch moved.
+  // The amount boxes therefore send the source a typed figure implies; the
+  // value fallback below only serves raw callers that override the number alone
+  // (it cannot see a re-typed identical number, so the metadata label reads the
+  // plan's resolved provenance rather than assuming the user owns the write).
   if (partnerPatched && inputs.partner) {
     const before = state.partner
     const partner = { ...inputs.partner }
@@ -402,7 +406,7 @@ export const useStore = create<Store>()(
           const reconciled = reconcileLegacyInputs(s, provenance.inputs)
           const shared = reconcileDirectFields(s, patch, reconciled.inputs)
           const answerMeta = applyBenefitAnswerMeta(
-            shared.answerMeta, provenance.rewritten, provenance.written,
+            shared.answerMeta, provenance.rewritten, provenance.written, reconciled.inputs,
           )
           return {
             ...reconciled,

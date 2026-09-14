@@ -2,14 +2,15 @@
 // imports `cppEstimatorProvenance` / `refreshPensionProvenance` /
 // `statementProvenance` and the `cppAmountSource` field, none of which exist at
 // base `e32dd4c`, so it cannot execute there. The semantic gap it guards is
-// stated as a literal in each case. Only the third case is a genuine semantic
-// baseline failure at `e32dd4c` (the first two are unmatched because the
-// concept did not exist there); the reviewer independently reproduced it with
-// base-only APIs and measured `5_476.94` for the reduce-twice path.
+// stated as a literal in each case. Only the **third** case is a genuine
+// semantic *baseline failure* at `e32dd4c` (the first two are unmatched because
+// the concept did not exist there, so at base they are not failures at all);
+// the reviewer independently reproduced it with base-only APIs and measured
+// `5_476.94` for the reduce-twice path. In other words: 1 of these 3 cases is
+// baseline evidence, the other 2 are head-only regression pins.
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { refreshCanonicalFromLegacy } from '../migration'
-import { estimateCppAt65 } from '../benefits'
 import { cppEstimatorProvenance, refreshPensionProvenance } from '../pensionProvenance'
 import { statementProvenance } from '../pensionProvenance'
 import { DEFAULT_INPUTS } from '../../store'
@@ -19,11 +20,12 @@ describe('BE-39 A baseline gaps', () => {
   it('a retirement-age change reprices an estimator CPP amount', () => {
     const at45: Inputs = {
       ...structuredClone(DEFAULT_INPUTS), fireAge: 45,
-      cppAnnualAt65: Math.round(estimateCppAt65(25, 45, 1)),
+      // literal `estimateCppAt65(25, 45, 1)`, not a re-derivation
+      cppAnnualAt65: 9_278,
       cppAmountSource: cppEstimatorProvenance({ retirementAge: 45, startWorkAge: 25, avgEarningsRatio: 1 }, 2026),
     }
     const at55 = refreshPensionProvenance({ ...at45, fireAge: 55 })
-    expect(at55.cppAnnualAt65).toBe(Math.round(estimateCppAt65(25, 55, 1)))
+    expect(at55.cppAnnualAt65).toBe(13_917)
     // and the plan still records that this is an estimate, now premised on 55
     expect(at55.cppAmountSource?.source).toBe('estimator')
     expect(at55.cppAmountSource?.premises?.retirementAge).toBe(55)

@@ -9,6 +9,7 @@ import {
   deriveOasAmount,
   earlyClaimDilutionRelief,
   estimateCppAt65,
+  estimateOasAt65,
   inputsCppAnnual,
   inputsOasAnnual,
   manualProvenance,
@@ -40,11 +41,12 @@ describe('BE-39 A: CPP/QPP amount provenance', () => {
   it('recomputes an estimator amount from the same estimator when the retirement age moves', () => {
     const at45 = cppEstimate(45, 25, 1)
     const applied = deriveCppAmount(0, at45, 45)
-    expect(applied.value).toBe(Math.round(estimateCppAt65(25, 45, 1)))
+    // independent literal, not a re-derivation: `estimateCppAt65(25, 45, 1)`
+    expect(applied.value).toBe(9_278)
     expect(applied.provenance.premises?.retirementAge).toBe(45)
 
     const moved = deriveCppAmount(applied.value, applied.provenance, 55)
-    expect(moved.value).toBe(Math.round(estimateCppAt65(25, 55, 1)))
+    expect(moved.value).toBe(13_917)
     // 30 credited years of 39 instead of 20 — the estimate must move, not rot.
     expect(moved.value).toBeGreaterThan(applied.value)
     expect(moved.provenance.premises?.retirementAge).toBe(55)
@@ -223,14 +225,15 @@ describe('BE-39 A: the whole plan is made coherent on a retirement-age change', 
       },
     }
     const synced = refreshPensionProvenance(inputs)
-    expect(synced.cppAnnualAt65).toBe(Math.round(estimateCppAt65(25, 55, 1)))
+    expect(synced.cppAnnualAt65).toBe(13_917)
     expect(synced.cppAmountSource?.premises?.retirementAge).toBe(55)
     // a statement is a recorded fact: number and source both survive
     expect(synced.oasAnnualAt65).toBe(14_000)
     expect(synced.oasAmountSource?.source).toBe('statement')
     expect(synced.oasAmountSource?.premisesNeedReview).toBe(true)
-    // the partner retires when the primary does (age 60)
-    expect(synced.partner?.cppAnnualAt65).toBe(Math.round(estimateCppAt65(25, 60, 0.8)))
+    // the partner retires when the primary does (age 60); literal
+    // `estimateCppAt65(25, 60, 0.8)` = 12,989
+    expect(synced.partner?.cppAnnualAt65).toBe(12_989)
     expect(synced.partner?.cppAmountSource?.premises?.retirementAge).toBe(60)
   })
 
@@ -276,7 +279,8 @@ describe('BE-39 A / B3: the pass reports its own rewrites, never a value diff', 
     // diff cannot see this rewrite; the pass's own premise-based signal must.
     const at64 = deriveCppAmount(0, cppEstimate(64, 25, 1), 64)
     const at70 = deriveCppAmount(at64.value, at64.provenance, 70)
-    expect(estimateCppAt65(25, 64, 1)).toBe(estimateCppAt65(25, 70, 1))
+    expect(estimateCppAt65(25, 64, 1)).toBe(18_092)
+    expect(estimateCppAt65(25, 70, 1)).toBe(18_092)
     expect(at70.value).toBe(at64.value)
     expect(at70.stale).toBe(true)
     expect(at70.rewritten).toBe(true)
@@ -302,7 +306,7 @@ describe('BE-39 A / B3: the pass reports its own rewrites, never a value diff', 
   it('reports exactly the amounts the plan-level pass re-derived', () => {
     const inputs: Inputs = { ...base(), fireAge: 55, cppAnnualAt65: 9_278, cppAmountSource: cppEstimate(45, 25, 1) }
     expect(refreshPensionProvenanceReport(inputs).rewritten)
-      .toEqual([{ field: 'cppAnnualAt65', assumptionValue: Math.round(estimateCppAt65(25, 55, 1)) }])
+      .toEqual([{ field: 'cppAnnualAt65', assumptionValue: 13_917 }])
     // an edit that moves no premise reports nothing: the settled plan is stable
     const settled = refreshPensionProvenance(inputs)
     expect(refreshPensionProvenanceReport(settled).rewritten).toEqual([])
@@ -339,5 +343,18 @@ describe('BE-39 A: statutory reference points', () => {
     const inputs: Inputs = { ...base(), cppAnnualAt65: 12_000, cppAmountSource: unknown }
     expect(inputsCppAnnual(inputs, 65, 'ON', inputs.fireAge)).toBeCloseTo(12_000, 6)
     expect(refreshPensionProvenance(inputs).cppAmountSource?.source).toBe('unknown')
+  })
+
+  // N1 / round 3: the declared `oas-residence-eligibility` reason must describe
+  // what the code does. Residence below the 10-year minimum is *priced* by the
+  // prorated 0-40 scale, not refused, so the copy says so and this pins both the
+  // behaviour and the absence of the false refusal clause.
+  it('prices sub-minimum residence by the prorated scale, and says so', () => {
+    expect(estimateOasAt65(3)).toBeCloseTo(676.8, 6)
+    expect(estimateOasAt65(9)).toBeCloseTo(2_030.4, 6)
+    expect(estimateOasAt65(40)).toBeCloseTo(9_024, 6)
+    const reason = CPP_OAS_UNSUPPORTED_PATHS.find(path => path.id === 'oas-residence-eligibility')?.reason ?? ''
+    expect(reason).not.toContain('refused')
+    expect(reason).toContain('prorated')
   })
 })

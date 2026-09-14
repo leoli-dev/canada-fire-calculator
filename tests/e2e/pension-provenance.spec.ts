@@ -36,6 +36,9 @@ test('guided: an estimator amount is repriced when the retirement age changes, a
   expect(saved.inputs.cppAnnualAt65).toBe(CPP_AT_45)
   expect(saved.inputs.cppAmountSource.source).toBe('estimator')
   expect(saved.inputs.cppAmountSource.premises.retirementAge).toBe(45)
+  // BL1: the applied estimate is recorded as the app's estimate, not as a fact
+  expect(saved.answerMeta.cppAnnualAt65.status).toBe('estimated')
+  expect(saved.answerMeta.cppAnnualAt65.origin).toBe('default')
 
   // change the retirement age through the normal professional field
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
@@ -57,6 +60,22 @@ test('guided: an estimator amount is repriced when the retirement age changes, a
   await page.goto('/#/guided/income/cpp.self')
   await expect(page.locator('[data-pension-kind="cpp"]')).toHaveAttribute('data-pension-source', 'estimator')
   await expect(page.locator('[data-field="cppAnnualAt65"] input')).toHaveValue('13,917')
+})
+
+test('professional: an estimator Apply is recorded as an estimate, not a user-confirmed fact', async ({ page }) => {
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const estimator = page.locator('details.estimator', { hasText: 'Estimate from work history' })
+  await estimator.locator('summary').click()
+  await estimator.getByRole('button', { name: 'Apply' }).click()
+
+  await expect(page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')).toHaveValue('9,278')
+  const saved = await storedPlan(page)
+  expect(saved.inputs.cppAnnualAt65).toBe(CPP_AT_45)
+  expect(saved.inputs.cppAmountSource.source).toBe('estimator')
+  // BL1: the app computed this number, so it is `estimated`/`default` — never
+  // the user's confirmed fact
+  expect(saved.answerMeta.cppAnnualAt65.status).toBe('estimated')
+  expect(saved.answerMeta.cppAnnualAt65.origin).toBe('default')
 })
 
 test('guided: a statement amount is never overwritten and asks for review instead', async ({ page }) => {
@@ -173,9 +192,16 @@ test('professional: a figure typed over an estimator amount is kept and recorded
 // review page derive from `answerMeta`, so the metadata is the contract.
 test('a FIRE-age change relabels an engine-replaced amount as an estimate, not a confirmed fact', async ({ page }) => {
   await applyCppEstimator(page)
-  // the estimator Apply leaves a user-confirmed answer
+  // round 3 / BL1: applying the estimator invokes a computation, so the recorded
+  // answer is the app's estimate — the same label every other applied engine
+  // value carries — and the provenance select above it agrees
   await page.goto('/#/guided/income/cpp.self')
-  await expect(page.locator('[data-field="cppAnnualAt65"] small')).toHaveText('confirmed')
+  await expect(page.locator('[data-field="cppAnnualAt65"] small')).toHaveText('estimate')
+  await expect(page.locator('[data-field="cppAnnualAt65"] small')).not.toHaveText('confirmed')
+  const applied = await storedPlan(page)
+  expect(applied.answerMeta.cppAnnualAt65.status).toBe('estimated')
+  expect(applied.answerMeta.cppAnnualAt65.origin).toBe('default')
+  expect(applied.inputs.cppAmountSource.source).toBe('estimator')
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')

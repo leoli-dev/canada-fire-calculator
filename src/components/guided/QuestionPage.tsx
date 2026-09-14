@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
+import { blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -444,7 +444,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'cpp.self':
       control = <>
         <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={cppSelfDisplay}
-          onValue={(value) => set({ cppAnnualAt65: pensionAmountFromDisplay(value, inputs.cppAmountSource) })} />
+          onValue={(value) => set({ cppAnnualAt65: pensionAmountFromDisplay(value, inputs.cppAmountSource), cppAmountSource: typedAmountSource(inputs.cppAmountSource) })} />
         <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
           retirementAge={inputs.fireAge}
           onProvenance={(cppAmountSource) => set({ cppAmountSource })}
@@ -461,7 +461,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'oas.self':
       control = <>
         <FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={oasSelfDisplay}
-          onValue={(value) => set({ oasAnnualAt65: pensionAmountFromDisplay(value, inputs.oasAmountSource) })} />
+          onValue={(value) => set({ oasAnnualAt65: pensionAmountFromDisplay(value, inputs.oasAmountSource), oasAmountSource: typedAmountSource(inputs.oasAmountSource) })} />
         <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
           retirementAge={inputs.fireAge}
           onProvenance={(oasAmountSource) => set({ oasAmountSource })}
@@ -478,7 +478,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'cpp.partner':
       control = <>
         <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource)}
-          onValue={(value) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.cppAmountSource) } })} />
+          onValue={(value) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.cppAmountSource), cppAmountSource: typedAmountSource(inputs.partner!.cppAmountSource) } })} />
         <PensionSourceNote kind="cpp" provenance={inputs.partner!.cppAmountSource}
           retirementAge={partnerRetireAge}
           onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
@@ -495,7 +495,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'oas.partner':
       control = <>
         <FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource)}
-          onValue={(value) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.oasAmountSource) } })} />
+          onValue={(value) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.oasAmountSource), oasAmountSource: typedAmountSource(inputs.partner!.oasAmountSource) } })} />
         <PensionSourceNote kind="oas" provenance={inputs.partner!.oasAmountSource}
           retirementAge={partnerRetireAge}
           onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}

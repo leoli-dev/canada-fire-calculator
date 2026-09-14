@@ -16,6 +16,7 @@ import {
   pensionAmountDisplay,
   pensionAmountFromDisplay,
   reconfirmStatementAmount,
+  typedAmountSource,
   validateInputs,
   type AccountType,
   type DebtKind,
@@ -808,7 +809,7 @@ export function InputForm() {
         {inputs.partner && <p className="subhead">{t('benefitsSelf')}</p>}
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
         <Num label={t('cppAnnualAt65')} value={cppSelfDisplay} step={500}
-          onChange={(v) => set({ cppAnnualAt65: pensionAmountFromDisplay(v, inputs.cppAmountSource) })} />
+          onChange={(v) => set({ cppAnnualAt65: pensionAmountFromDisplay(v, inputs.cppAmountSource), cppAmountSource: typedAmountSource(inputs.cppAmountSource) })} />
         <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
           retirementAge={inputs.fireAge}
           onProvenance={(cppAmountSource) => set({ cppAmountSource })}
@@ -817,7 +818,7 @@ export function InputForm() {
           onApply={(v, cppAmountSource, cppWork) => set({ cppAnnualAt65: v, cppAmountSource, cppWork })} />
         <Num label={t('oasStartAge')} value={inputs.oasStartAge} onChange={(v) => set({ oasStartAge: v })} />
         <Num label={t('oasAnnualAt65')} value={oasSelfDisplay} step={100}
-          onChange={(v) => set({ oasAnnualAt65: pensionAmountFromDisplay(v, inputs.oasAmountSource) })} />
+          onChange={(v) => set({ oasAnnualAt65: pensionAmountFromDisplay(v, inputs.oasAmountSource), oasAmountSource: typedAmountSource(inputs.oasAmountSource) })} />
         <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
           retirementAge={inputs.fireAge}
           onProvenance={(oasAmountSource) => set({ oasAmountSource })}
@@ -862,7 +863,7 @@ export function InputForm() {
             <Num label={t('cppStartAge')} value={inputs.partner.cppStartAge}
               onChange={(v) => set({ partner: { ...inputs.partner!, cppStartAge: v } })} />
             <Num label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner.cppAnnualAt65, inputs.partner.cppAmountSource)} step={500}
-              onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.cppAmountSource) } })} />
+              onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.cppAmountSource), cppAmountSource: typedAmountSource(inputs.partner!.cppAmountSource) } })} />
             <PensionSourceNote kind="cpp" provenance={inputs.partner.cppAmountSource}
               retirementAge={partnerRetireAge}
               onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
@@ -878,7 +879,7 @@ export function InputForm() {
             <Num label={t('oasStartAge')} value={inputs.partner.oasStartAge}
               onChange={(v) => set({ partner: { ...inputs.partner!, oasStartAge: v } })} />
             <Num label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner.oasAnnualAt65, inputs.partner.oasAmountSource)} step={100}
-              onChange={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.oasAmountSource) } })} />
+              onChange={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.oasAmountSource), oasAmountSource: typedAmountSource(inputs.partner!.oasAmountSource) } })} />
             <PensionSourceNote kind="oas" provenance={inputs.partner.oasAmountSource}
               retirementAge={partnerRetireAge}
               onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}

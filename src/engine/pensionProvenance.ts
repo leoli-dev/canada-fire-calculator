@@ -398,6 +398,20 @@ export function provenanceForTypedAmount(
 }
 
 /**
+ * The provenance a hand-typed amount writes *with* the number. The amount boxes
+ * send this so the store never has to infer "the user typed this" from the
+ * value: a re-typed figure equal to the recorded one is still a typed fact, and
+ * a before/after diff cannot tell the two apart. It is the recorded source when
+ * that source's own entry channel is the amount box (`manual`/`statement`), and
+ * otherwise the `manual` fact typing produces.
+ */
+export function typedAmountSource(
+  recorded: PensionAmountProvenance | undefined,
+): PensionAmountProvenance | undefined {
+  return provenanceForTypedAmount(recorded) ?? recorded
+}
+
+/**
  * A statement value entered as monthly or annual at its own stated age. The
  * retirement age assumed at entry is recorded so a later change can raise the
  * review flag instead of silently re-pricing the statement.
