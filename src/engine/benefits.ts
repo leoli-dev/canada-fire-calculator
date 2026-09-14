@@ -136,32 +136,17 @@ function onlyPensionerIndex(
 
 /**
  * Whether the Allowance is in pay, which decides which of the two
- * one-pensioner rows applies. Supplying `grossIncome` makes this the engine's
- * own income-tested judgement: a household whose combined income is at or past
- * the Allowance cut-off is not receiving it, so the pensioner's GIS falls back
- * to the row whose cut-off is 54,624. Without an income the only thing known is
- * age eligibility, and the caller can still pin the answer.
+ * one-pensioner rows applies. It is only reached when the caller has not
+ * pinned the answer: a 60-64 spouse is read as a recipient unless the income
+ * test says otherwise, and a spouse outside 60-64 never is. A household whose
+ * combined income is at or past the Allowance cut-off is not receiving it, so
+ * the pensioner's GIS falls back to the row whose cut-off is 54,624. Without
+ * an income the only thing known is age eligibility.
  */
-function allowanceInPay(
-  oasIdx: number,
-  agesPerPerson: number[],
-  options: GisCategoryOptions,
-): { receivingAllowance: boolean } | { reason: string } {
+function allowanceInPay(oasIdx: number, agesPerPerson: number[], income: number | undefined): boolean {
   const otherAge = agesPerPerson[1 - oasIdx]
-  const eligible = otherAge >= 60 && otherAge < 65
-  if (!eligible) {
-    if (options.receivingAllowance) {
-      return { reason: 'the Allowance is only payable to a spouse/common-law partner aged 60 to 64' }
-    }
-    return { receivingAllowance: false }
-  }
-  if (options.receivingAllowance !== undefined) {
-    return { receivingAllowance: options.receivingAllowance }
-  }
-  if (options.grossIncome !== undefined && options.grossIncome >= GIS_RULES.allowance.annualCutoff) {
-    return { receivingAllowance: false }
-  }
-  return { receivingAllowance: true }
+  if (otherAge < 60 || otherAge >= 65) return false
+  return income === undefined || income < GIS_RULES.allowance.annualCutoff
 }
 
 /**
@@ -207,12 +192,11 @@ export function gisHouseholdCategory(
   if (oasIdx === null) {
     return { status: 'unsupported', reason: 'the one-pensioner couple rows need both ages: a spouse aged 60 to 64 is the Allowance row, an older or younger one is the row whose cut-off is 54,624' }
   }
-  const inPay = allowanceInPay(oasIdx, agesPerPerson, options)
-  if ('reason' in inPay) return { status: 'unsupported', reason: inPay.reason }
+  const inPay = allowanceInPay(oasIdx, agesPerPerson, options.grossIncome)
   return {
     status: 'modeled',
-    receivingAllowance: inPay.receivingAllowance,
-    category: inPay.receivingAllowance ? 'couple-partner-allowance' : 'couple-partner-no-oas-no-allowance',
+    receivingAllowance: inPay,
+    category: inPay ? 'couple-partner-allowance' : 'couple-partner-no-oas-no-allowance',
   }
 }
 
