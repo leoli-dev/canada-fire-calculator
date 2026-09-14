@@ -710,4 +710,11 @@ describe('BE-12 A RRSP room ledger wiring', () => {
     expect(row.byAccount[nonReg.id].contribution).toBe(8000)
     expect(row.cashLedger.retainedContributions).toBe(2000)
   })
+
+  it('reports a scheduled contribution the year cannot fund as unsupported, not a conservation error', () => {
+    const { canonical } = clause({ amount: 16000, cash: 1000 })
+    expect(annualStep(canonical, ok(initializeState(canonical)), cashProviders(1000))).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringContaining('exceeds the year net savings') }],
+    })
+  })
 })

@@ -258,6 +258,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const scheduledPlanned = sum(Object.values(scheduledByPerson).map(bucket => bucket.planned))
   // A scheduled contribution is funded from the year's net savings, like the
   // configured voluntary split; it is never extra money the plan does not have.
+  // A scheduled contribution is funded from the year's net savings, like the
+  // configured voluntary split; it is never extra money the plan does not have.
+  if (scheduledPlanned > cash + 1e-8) return fail('unsupported', 'scheduled RRSP contribution exceeds the year net savings')
   const allocation = allocateContributions({ age: state.byPerson[self.id].age, budget: cash - scheduledPlanned, fhsa, employee, employer, split: plan.savingsAllocation.shares })
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
   if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
