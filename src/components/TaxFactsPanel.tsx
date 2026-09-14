@@ -1,7 +1,53 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { InputsV2, QcDrugCoverage } from '../engine/model'
-import { refreshCanonicalFromLegacy } from '../engine/migration'
+import type { Account, InputsV2, QcDrugCoverage } from '../engine/model'
+import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy } from '../engine/migration'
 import { useStore } from '../store'
+
+const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
+const roundCents = (value: number) => Math.round(value * 100) / 100
+
+/** Two per-person amount inputs for one household total. Shows the live
+ * arithmetic and commits only while the two amounts add up to the total; a
+ * mismatch stays visible and never writes a partial split. */
+function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTestId, partnerTestId, onCommit }: {
+  rowId: string
+  total: number
+  selfAmount: number | undefined
+  partnerAmount: number | undefined
+  selfTestId: string
+  partnerTestId: string
+  onCommit: (selfAmount: number, partnerAmount: number) => void
+}) {
+  const { t, i18n } = useTranslation()
+  const [selfRaw, setSelfRaw] = useState(selfAmount === undefined ? '' : String(roundCents(selfAmount)))
+  const [partnerRaw, setPartnerRaw] = useState(partnerAmount === undefined ? '' : String(roundCents(partnerAmount)))
+  const parse = (raw: string): number | null => {
+    const text = raw.trim()
+    if (!text) return null
+    const value = Number(text)
+    return Number.isFinite(value) && value >= 0 ? value : null
+  }
+  const selfValue = parse(selfRaw)
+  const partnerValue = parse(partnerRaw)
+  const sum = selfValue !== null && partnerValue !== null ? selfValue + partnerValue : null
+  const matches = sum !== null && Math.abs(sum - total) <= 1e-8
+  const unchanged = sum !== null && selfAmount !== undefined && partnerAmount !== undefined &&
+    Math.abs(selfValue! - selfAmount) <= 1e-8 && Math.abs(partnerValue! - partnerAmount) <= 1e-8
+  const locale = i18n.language
+  const confirm = () => { if (matches && !unchanged) onCommit(selfValue!, partnerValue!) }
+  return <>
+    <label>{t('be11.selfAmount')}
+      <input type="number" min="0" step="1" data-testid={selfTestId} value={selfRaw}
+        onChange={event => setSelfRaw(event.target.value)} onBlur={confirm} /></label>
+    <label>{t('be11.partnerAmount')}
+      <input type="number" min="0" step="1" data-testid={partnerTestId} value={partnerRaw}
+        onChange={event => setPartnerRaw(event.target.value)} onBlur={confirm} /></label>
+    <p data-testid={`ownership-sum-${rowId}`}>{t('be11.splitSum', {
+      sum: sum === null ? '—' : sum.toLocaleString(locale), total: total.toLocaleString(locale) })}</p>
+    {!matches && <p className="hint" role="status" data-testid={`ownership-mismatch-${rowId}`}>{t('be11.splitMismatch', { total: total.toLocaleString(locale) })}</p>}
+  </>
+}
 
 /** One editor for both entry modes. Editing canonical facts is one store
  * transaction; the legacy form cannot turn an unknown owner into 50/50. */
@@ -27,8 +73,14 @@ export function TaxFactsPanel() {
   const ownerOptions = <>
     <option value="">{t('be11.unknown')}</option>
     <option value="shared" disabled>{t('be11.shared')}</option>
+    <option value="split" disabled>{t('be11.splitOwners')}</option>
     {people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
   </>
+  const rowAccounts = SPLIT_ROW_BASE_IDS.map((baseId): { baseId: string; base: Account | undefined; derived: Account | undefined } => ({
+    baseId,
+    base: current.accounts.find(account => account.id === baseId),
+    derived: current.accounts.find(account => account.id === derivedAccountId(baseId)),
+  })).filter((row): row is { baseId: string; base: Account | undefined; derived: Account | undefined } => !!row.base || !!row.derived)
   return <section className="hint" data-testid="person-tax-facts" aria-label={t('be11.title')}>
     <h3>{t('be11.title')}</h3>
     <p>{t('be11.explanation')}</p>
@@ -48,61 +100,112 @@ export function TaxFactsPanel() {
             ? { status: 'unknown', reason: 'employment amount not supplied' } : { status: 'known', value: next } })
         }} />
     </label>)}
-    {partner && <>
+    {partner && self && <>
       <h4>{t('be11.ownership')}</h4>
-      {current.accounts.filter(account => ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'nonReg'].includes(account.kind)).map(account => <div key={account.id}>
-        <label>{account.kind} — {account.balance.toLocaleString()} CAD
-          <select data-testid={`owner-${account.id}`} value={account.ownerId ?? (account.kind === 'nonReg' && account.taxableOwnerShares.status === 'known' ? 'shared' : '')} onChange={event => edit(draft => {
-            const item = draft.accounts.find(candidate => candidate.id === account.id)!
-            item.ownerId = event.target.value || null
-            item.taxableOwnerShares = item.ownerId ? { status: 'known', shares: { [item.ownerId]: 1 } }
-              : { status: 'unknown', reason: 'account owner not assigned' }
-          })}>{ownerOptions}</select>
-        </label>
-        {account.kind === 'nonReg' && self && partner && <label>{t('be11.selfTaxShare')}
-          <input type="number" min="0" max="100" step="1" data-testid={`account-self-share-${account.id}`}
-            key={`share:${account.id}:${account.taxableOwnerShares.status === 'known' ? account.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
-            defaultValue={account.taxableOwnerShares.status === 'known' ? (account.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
-            onBlur={event => {
-              const raw = event.currentTarget.value.trim()
-              if (!raw) return
-              const pct = Number(raw)
-              if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
-              if (account.taxableOwnerShares.status === 'known' && Math.abs((account.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
-              edit(draft => {
-                const item = draft.accounts.find(candidate => candidate.id === account.id)!
-                item.taxableOwnerShares = { status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 } }
-                item.ownerId = pct === 100 ? self.id : pct === 0 ? partner.id : null
-              })
-            }} />%
-        </label>}
-      </div>)}
-      {current.properties.filter(property => property.kind === 'investment').map(property => <label key={property.id}>
-        {t('be11.propertyOwner')}
-        <select data-testid={`property-owner-${property.id}`}
-          value={property.taxableOwnerShares.status === 'known' ? Object.keys(property.taxableOwnerShares.shares).find(id => property.taxableOwnerShares.status === 'known' && property.taxableOwnerShares.shares[id] === 1) ?? 'shared' : ''}
-          onChange={event => edit(draft => {
-            const item = draft.properties.find(candidate => candidate.id === property.id)!
-            item.taxableOwnerShares = event.target.value ? { status: 'known', shares: { [event.target.value]: 1 } }
-              : { status: 'unknown', reason: 'property taxable owner not assigned' }
-          })}>{ownerOptions}</select>
-      </label>)}
-      {current.properties.filter(property => property.kind === 'investment').map(property => self && partner && <label key={`${property.id}:shares`}>
-        {t('be11.selfTaxShare')}
-        <input type="number" min="0" max="100" step="1" data-testid={`property-self-share-${property.id}`}
-          key={`share:${property.id}:${property.taxableOwnerShares.status === 'known' ? property.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
-          defaultValue={property.taxableOwnerShares.status === 'known' ? (property.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
-          onBlur={event => {
-            const raw = event.currentTarget.value.trim()
-            if (!raw) return
-            const pct = Number(raw)
-            if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
-            if (property.taxableOwnerShares.status === 'known' && Math.abs((property.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
-            edit(draft => { draft.properties.find(item => item.id === property.id)!.taxableOwnerShares = {
-              status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 },
-            } })
-          }} />%
-      </label>)}
+      <p>{t('be11.splitHelp')}</p>
+      {rowAccounts.map(({ baseId, base, derived }) => {
+        const account = base ?? derived!
+        const total = (base?.balance ?? 0) + (derived?.balance ?? 0)
+        const registered = account.kind !== 'nonReg'
+        const entry = current.ownershipAmounts?.[baseId]
+        let selfAmount: number | undefined
+        let partnerAmount: number | undefined
+        if (registered) {
+          selfAmount = entry ? entry[self.id] : account.ownerId === self.id ? total : account.ownerId === partner.id ? 0 : undefined
+          partnerAmount = entry ? entry[partner.id] : account.ownerId === partner.id ? total : account.ownerId === self.id ? 0 : undefined
+        } else if (account.taxableOwnerShares.status === 'known') {
+          const selfShare = account.taxableOwnerShares.shares[self.id] ?? 0
+          selfAmount = roundCents(selfShare * total)
+          partnerAmount = roundCents(total - selfAmount)
+        }
+        const selectValue = registered
+          ? derived && derived.ownerId && base && base.ownerId && derived.ownerId !== base.ownerId ? 'split' : account.ownerId ?? ''
+          : account.ownerId ?? (account.taxableOwnerShares.status === 'known' ? 'shared' : '')
+        return <div key={`${baseId}:${account.kind}:${total}:${JSON.stringify(entry ?? null)}:${base?.ownerId ?? ''}:${derived?.ownerId ?? ''}:${JSON.stringify(account.taxableOwnerShares)}`}
+          data-testid={`ownership-row-${baseId}`}>
+          <label>{account.kind} — {total.toLocaleString()} CAD
+            <select data-testid={`owner-${baseId}`} value={selectValue} onChange={event => edit(draft => {
+              const value = event.target.value
+              if (!registered) {
+                const item = draft.accounts.find(candidate => candidate.id === baseId)!
+                item.ownerId = value || null
+                item.taxableOwnerShares = item.ownerId ? { status: 'known', shares: { [item.ownerId]: 1 } }
+                  : { status: 'unknown', reason: 'account owner not assigned' }
+                return
+              }
+              if (!value) {
+                for (const item of draft.accounts) if (item.id === baseId || item.id === derivedAccountId(baseId)) {
+                  item.ownerId = null
+                  item.taxableOwnerShares = { status: 'unknown', reason: 'account owner not assigned' }
+                }
+                if (draft.ownershipAmounts?.[baseId]) {
+                  const { [baseId]: _dropped, ...rest } = draft.ownershipAmounts
+                  draft.ownershipAmounts = Object.keys(rest).length ? rest : undefined
+                }
+                return
+              }
+              if (value === self.id) applyAccountSplit(draft, baseId, total, 0, { zeroOwnerId: self.id })
+              else if (value === partner.id) applyAccountSplit(draft, baseId, 0, total, { zeroOwnerId: partner.id })
+            })}>{ownerOptions}</select>
+          </label>
+          <SplitAmounts rowId={baseId} total={total} selfAmount={selfAmount} partnerAmount={partnerAmount}
+            selfTestId={`account-self-amount-${baseId}`} partnerTestId={`account-partner-amount-${baseId}`}
+            onCommit={(selfAmt, partnerAmt) => edit(draft => applyAccountSplit(draft, baseId, selfAmt, partnerAmt))} />
+          {!registered && <label>{t('be11.selfTaxShare')}
+            <input type="number" min="0" max="100" step="1" data-testid={`account-self-share-${baseId}`}
+              key={`share:${baseId}:${account.taxableOwnerShares.status === 'known' ? account.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
+              defaultValue={account.taxableOwnerShares.status === 'known' ? (account.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
+              onBlur={event => {
+                const raw = event.currentTarget.value.trim()
+                if (!raw) return
+                const pct = Number(raw)
+                if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
+                if (account.taxableOwnerShares.status === 'known' && Math.abs((account.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
+                edit(draft => {
+                  const item = draft.accounts.find(candidate => candidate.id === baseId)!
+                  item.taxableOwnerShares = { status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 } }
+                  item.ownerId = pct === 100 ? self.id : pct === 0 ? partner.id : null
+                })
+              }} />%
+          </label>}
+        </div>
+      })}
+      {current.properties.filter(property => property.kind === 'investment').map(property => {
+        const selfAmount = property.taxableOwnerShares.status === 'known'
+          ? roundCents((property.taxableOwnerShares.shares[self.id] ?? 0) * property.value) : undefined
+        const partnerAmount = property.taxableOwnerShares.status === 'known' && selfAmount !== undefined
+          ? roundCents(property.value - selfAmount) : undefined
+        return <div key={`${property.id}:${property.value}:${JSON.stringify(property.taxableOwnerShares)}`}
+          data-testid={`ownership-row-${property.id}`}>
+          <label>{t('be11.propertyOwner')}
+            <select data-testid={`property-owner-${property.id}`}
+              value={property.taxableOwnerShares.status === 'known' ? Object.keys(property.taxableOwnerShares.shares).find(id => property.taxableOwnerShares.status === 'known' && property.taxableOwnerShares.shares[id] === 1) ?? 'shared' : ''}
+              onChange={event => edit(draft => {
+                const item = draft.properties.find(candidate => candidate.id === property.id)!
+                item.taxableOwnerShares = event.target.value ? { status: 'known', shares: { [event.target.value]: 1 } }
+                  : { status: 'unknown', reason: 'property taxable owner not assigned' }
+              })}>{ownerOptions}</select>
+          </label>
+          <SplitAmounts rowId={property.id} total={property.value} selfAmount={selfAmount} partnerAmount={partnerAmount}
+            selfTestId={`property-self-amount-${property.id}`} partnerTestId={`property-partner-amount-${property.id}`}
+            onCommit={(selfAmt, partnerAmt) => edit(draft => applyPropertySplit(draft, property.id, selfAmt, partnerAmt))} />
+          <label>{t('be11.selfTaxShare')}
+            <input type="number" min="0" max="100" step="1" data-testid={`property-self-share-${property.id}`}
+              key={`share:${property.id}:${property.taxableOwnerShares.status === 'known' ? property.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
+              defaultValue={property.taxableOwnerShares.status === 'known' ? (property.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
+              onBlur={event => {
+                const raw = event.currentTarget.value.trim()
+                if (!raw) return
+                const pct = Number(raw)
+                if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
+                if (property.taxableOwnerShares.status === 'known' && Math.abs((property.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
+                edit(draft => { draft.properties.find(item => item.id === property.id)!.taxableOwnerShares = {
+                  status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 },
+                } })
+              }} />%
+          </label>
+        </div>
+      })}
       <label>{t('be11.spouseSupport')}
         <select data-testid="spouse-support" value={current.taxProfile?.spouseSupported.status === 'known' ? String(current.taxProfile.spouseSupported.value) : 'unknown'}
           onChange={event => edit(draft => {
@@ -188,50 +291,56 @@ export function TaxFactsPanel() {
       })}
       <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>
     </div>}
-    {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind)).map(account => <div key={account.id}>
-      <label>{t('be11.registeredType')}
-        <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => edit(draft => {
-          draft.accounts.find(item => item.id === account.id)!.kind = event.target.value as 'rrsp' | 'spousalRrsp' | 'rrif' | 'lif'
-        })}><option value="rrsp">RRSP</option><option value="spousalRrsp">Spousal RRSP</option><option value="rrif">RRIF</option><option value="lif">LIF</option></select>
-      </label>
-      {account.kind === 'rrif' && <>
-        <label>{t('be11.rrifOpenedYear')}
-          <input type="number" min="1950" max="2200" step="1" data-testid="rrif-opened-year"
-            key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
-            defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
-            onBlur={event => {
-              const raw = event.currentTarget.value.trim()
-              const year = Number(raw)
-              if (raw && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
-              if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && !raw) return
-              edit(draft => { draft.accounts.find(item => item.id === account.id)!.openedYear = raw
-                ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
-            }} />
+    {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
+      const rowIds = [account.id, derivedAccountId(account.id)]
+      const setRow = (change: (item: Account) => void) => edit(draft => {
+        for (const item of draft.accounts) if (rowIds.includes(item.id)) change(item)
+      })
+      return <div key={account.id}>
+        <label>{t('be11.registeredType')}
+          <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => setRow(item => {
+            item.kind = event.target.value as 'rrsp' | 'spousalRrsp' | 'rrif' | 'lif'
+          })}><option value="rrsp">RRSP</option><option value="spousalRrsp">Spousal RRSP</option><option value="rrif">RRIF</option><option value="lif">LIF</option></select>
         </label>
-        <label>{t('be11.rrifFactorCategory')}
-          <select data-testid={`rrif-factor-category-${account.id}`}
-            value={account.rrifFactorCategory?.status === 'known' ? account.rrifFactorCategory.value : 'unknown'}
-            onChange={event => edit(draft => { draft.accounts.find(item => item.id === account.id)!.rrifFactorCategory =
-              event.target.value === 'unknown' ? { status: 'unknown', reason: 'RRIF factor qualification not confirmed' }
-                : { status: 'known', value: event.target.value as 'qualifying' | 'allOther' } })}>
-            <option value="unknown">{t('be11.unknown')}</option>
-            <option value="qualifying">{t('be11.rrifQualifying')}</option>
-            <option value="allOther">{t('be11.rrifAllOther')}</option>
-          </select>
-        </label>
-        <p className="hint">{t('be11.rrifFactorHelp')}{' '}
-          <a href="https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/chart-prescribed-factors.html"
-            target="_blank" rel="noopener noreferrer">{t('be11.rrifFactorSource')}</a>
-        </p>
-        {partner && <label>{t('be11.rrifAgeElection')}
-          <select data-testid="rrif-age-election" value={account.rrifAgeElection?.personId ?? ''}
-            onChange={event => edit(draft => { draft.accounts.find(item => item.id === account.id)!.rrifAgeElection = event.target.value
-              ? { personId: event.target.value, electedAtOpening: true } : null })}>
-            <option value="">{t('be11.noElection')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
-          </select>
-        </label>}
-      </>}
-    </div>)}
+        {account.kind === 'rrif' && <>
+          <label>{t('be11.rrifOpenedYear')}
+            <input type="number" min="1950" max="2200" step="1" data-testid="rrif-opened-year"
+              key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
+              defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
+              onBlur={event => {
+                const raw = event.currentTarget.value.trim()
+                const year = Number(raw)
+                if (raw && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
+                if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && !raw) return
+                setRow(item => { item.openedYear = raw
+                  ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
+              }} />
+          </label>
+          <label>{t('be11.rrifFactorCategory')}
+            <select data-testid={`rrif-factor-category-${account.id}`}
+              value={account.rrifFactorCategory?.status === 'known' ? account.rrifFactorCategory.value : 'unknown'}
+              onChange={event => setRow(item => { item.rrifFactorCategory =
+                event.target.value === 'unknown' ? { status: 'unknown', reason: 'RRIF factor qualification not confirmed' }
+                  : { status: 'known', value: event.target.value as 'qualifying' | 'allOther' } })}>
+              <option value="unknown">{t('be11.unknown')}</option>
+              <option value="qualifying">{t('be11.rrifQualifying')}</option>
+              <option value="allOther">{t('be11.rrifAllOther')}</option>
+            </select>
+          </label>
+          <p className="hint">{t('be11.rrifFactorHelp')}{' '}
+            <a href="https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/chart-prescribed-factors.html"
+              target="_blank" rel="noopener noreferrer">{t('be11.rrifFactorSource')}</a>
+          </p>
+          {partner && <label>{t('be11.rrifAgeElection')}
+            <select data-testid="rrif-age-election" value={account.rrifAgeElection?.personId ?? ''}
+              onChange={event => setRow(item => { item.rrifAgeElection = event.target.value
+                ? { personId: event.target.value, electedAtOpening: true } : null })}>
+              <option value="">{t('be11.noElection')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
+            </select>
+          </label>}
+        </>}
+      </div>
+    })}
     <p>{t(current.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
   </section>
 }
