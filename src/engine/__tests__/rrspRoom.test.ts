@@ -83,10 +83,10 @@ describe('BE-12 A RRSP room ledger', () => {
     expect(contradictory.room.status).toBe('unknown')
     expect(contradictory.mismatch?.code).toBe('statementMismatch')
     expect(contradictory.overContribution).toBe(0)
-    // The same floored arithmetic also decides a consistent explicit line, so
-    // unknown and a known zero stay distinguishable.
+    // The same floored arithmetic also accepts a consistent explicit line, and
+    // a derived 15,000 stays distinct from a derived zero.
     expect(statementOpeningRoom({ ...statement, rrspAvailableRoom: known(15000) }).room).toEqual(known(15000))
-    expect(statementOpeningRoom({ ...statement, rrspAvailableRoom: known(0) }).room).toEqual(known(0))
+    expect(statementOpeningRoom({ ...statement, rrspUnusedUndeducted: known(20000), rrspAvailableRoom: known(0) }).room).toEqual(known(0))
     // A known zero room prices no contribution and retains all of it, with no
     // statement-mismatch limitation.
     const row = rrspRoomYear(request({ openingRoom: overstated.room, mismatch: overstated.mismatch }))
