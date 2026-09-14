@@ -18,6 +18,7 @@
     "splitSum": "Your amount + partner's amount: {{sum}} of {{total}} CAD",
     "splitMismatch": "These two amounts must add up to the account's {{total}} CAD balance. Ownership stays unconfirmed until they match.",
     "splitHelp": "Registered accounts are owned by one person each: enter each person's balance, and the two amounts must add up to the household total. Non-registered accounts and properties record each person's share; nothing is divided automatically.",
+    "lockedOwnerResetHelp": "Changing the locked-in account's owner in the main form re-records the split as 100% to that owner.",
     "spouseSupport": "Do you support and live with your spouse for the spouse amount?",
     "splitTransferor": "Elective eligible pension split: who transfers?", "noSplit": "No pension split", "splitAmount": "Annual amount transferred (CAD; at most 50% of eligible income)",
     "registeredType": "Registered account type", "rrifOpenedYear": "RRIF opening year", "rrifAgeElection": "Age elected when RRIF opened", "noElection": "Use owner’s age",

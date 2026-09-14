@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, QcDrugCoverage } from '../engine/model'
-import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy } from '../engine/migration'
+import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -31,17 +31,17 @@ function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTestId, par
   const selfValue = parse(selfRaw)
   const partnerValue = parse(partnerRaw)
   const sum = selfValue !== null && partnerValue !== null ? selfValue + partnerValue : null
-  const matches = sum !== null && Math.abs(sum - total) <= 1e-8
+  const matches = sum !== null && splitAmountsMatch(selfValue!, partnerValue!, total)
   const unchanged = sum !== null && selfAmount !== undefined && partnerAmount !== undefined &&
     Math.abs(selfValue! - selfAmount) <= 1e-8 && Math.abs(partnerValue! - partnerAmount) <= 1e-8
   const locale = i18n.language
   const confirm = () => { if (matches && !unchanged) onCommit(selfValue!, partnerValue!) }
   return <>
     <label>{t('be11.selfAmount')}
-      <input type="number" min="0" step="1" data-testid={selfTestId} value={selfRaw}
+      <input type="number" min="0" step="0.01" data-testid={selfTestId} value={selfRaw}
         onChange={event => setSelfRaw(event.target.value)} onBlur={confirm} /></label>
     <label>{t('be11.partnerAmount')}
-      <input type="number" min="0" step="1" data-testid={partnerTestId} value={partnerRaw}
+      <input type="number" min="0" step="0.01" data-testid={partnerTestId} value={partnerRaw}
         onChange={event => setPartnerRaw(event.target.value)} onBlur={confirm} /></label>
     <p data-testid={`ownership-sum-${rowId}`}>{t('be11.splitSum', {
       sum: sum === null ? '—' : sum.toLocaleString(locale), total: total.toLocaleString(locale) })}</p>
@@ -151,6 +151,7 @@ export function TaxFactsPanel() {
           <SplitAmounts rowId={baseId} total={total} selfAmount={selfAmount} partnerAmount={partnerAmount}
             selfTestId={`account-self-amount-${baseId}`} partnerTestId={`account-partner-amount-${baseId}`}
             onCommit={(selfAmt, partnerAmt) => edit(draft => applyAccountSplit(draft, baseId, selfAmt, partnerAmt))} />
+          {baseId === 'legacy:account:locked' && <p className="hint">{t('be11.lockedOwnerResetHelp')}</p>}
           {!registered && <label>{t('be11.selfTaxShare')}
             <input type="number" min="0" max="100" step="1" data-testid={`account-self-share-${baseId}`}
               key={`share:${baseId}:${account.taxableOwnerShares.status === 'known' ? account.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}

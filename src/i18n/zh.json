@@ -18,6 +18,7 @@
     "splitSum": "本人金额 + 伴侣金额：{{sum}} / {{total}} 加元",
     "splitMismatch": "两项金额之和必须等于账户余额 {{total}} 加元；在金额一致之前，归属保持未确认。",
     "splitHelp": "注册账户各自属于一人：请分别填写两人的余额，两项之和须等于家庭总额。非注册账户与房产记录各自份额；任何金额都不会被自动分摊。",
+    "lockedOwnerResetHelp": "在主表单中更改锁定账户的所有者，会把拆分重新记录为该所有者 100%。",
     "spouseSupport": "您是否与伴侣同住并提供扶养，以申领配偶抵免？",
     "splitTransferor": "合格养老金显式分拆：由谁转出？", "noSplit": "不分拆养老金", "splitAmount": "年度转出金额（加元；不超过合格收入的50%）",
     "registeredType": "注册账户类型", "rrifOpenedYear": "RRIF 开户年份", "rrifAgeElection": "RRIF 开户时选用的年龄", "noElection": "使用账户持有人年龄",

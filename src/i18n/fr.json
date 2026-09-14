@@ -18,6 +18,7 @@
     "splitSum": "Votre montant + celui du conjoint : {{sum}} sur {{total}} CAD",
     "splitMismatch": "Les deux montants doivent totaliser {{total}} CAD, le solde du compte. La propriété reste non confirmée tant qu’ils ne concordent pas.",
     "splitHelp": "Chaque compte enregistré appartient à une seule personne : indiquez le solde de chacun; les deux montants doivent totaliser le total du ménage. Les comptes non enregistrés et les biens indiquent la part de chacun; rien n’est réparti automatiquement.",
+    "lockedOwnerResetHelp": "Changer le titulaire du compte immobilisé dans le formulaire principal réenregistre la répartition à 100 % pour ce titulaire.",
     "spouseSupport": "Subvenez-vous aux besoins de votre conjoint avec qui vous vivez pour le montant pour conjoint?",
     "splitTransferor": "Fractionnement admissible de pension : qui transfère?", "noSplit": "Aucun fractionnement", "splitAmount": "Montant annuel transféré (CAD; au plus 50 % du revenu admissible)",
     "registeredType": "Type de compte enregistré", "rrifOpenedYear": "Année d’ouverture du FERR", "rrifAgeElection": "Âge choisi lors de l’ouverture du FERR", "noElection": "Âge du titulaire",
