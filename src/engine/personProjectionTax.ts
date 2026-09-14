@@ -69,12 +69,15 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     if (gain) annualEvents.push({ id: `nonreg:gain:${f.year}`, kind: 'realizedGain', accountId: nonReg[0].id, amount: gain })
   }
   const registered = plan.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind))
+  // A genuine two-owner registered split must never be attributed through the
+  // single-account path below: any household registered balance or withdrawal
+  // with more than one registered account is BE-14 B territory.
+  if ((f.withdrawals.rrsp || f.registeredBalance > 0) && registered.length !== 1)
+    return { status: 'unsupported', reason: 'multiple or missing registered accounts need BE-14 B allocation' }
   if (registered.length === 1 && registered[0].kind === 'rrif' && f.registeredBalance > 0) {
     const minimum = minimumForRrif(registered[0], plan.people, plan.baseYear, f.year, f.registeredBalance)
     if (minimum.status !== 'ok') return minimum
   }
-  if (f.withdrawals.rrsp && registered.length !== 1)
-    return { status: 'unsupported', reason: 'multiple or missing registered accounts need BE-14 B allocation' }
   if (registered.length === 1 && f.registeredBalance > 0) {
     if (registered[0].kind === 'lif') return { status: 'unsupported', reason: 'LIF minimum and maximum withdrawals require BE-36 rules' }
     const owner = plan.people.find(person => person.id === registered[0].ownerId)

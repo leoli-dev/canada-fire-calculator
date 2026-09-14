@@ -172,8 +172,8 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
     provenanceMap(person.provenance, `people.${index}.provenance`)
   }
   requireShape(roles.has('self'), 'people.self')
+  const orphanIds = plan.orphanedPeople !== undefined ? uniqueIds(plan.orphanedPeople, 'orphanedPeople') : new Set<string>()
   if (plan.orphanedPeople !== undefined) {
-    const orphanIds = uniqueIds(plan.orphanedPeople, 'orphanedPeople')
     for (const [index, person] of plan.orphanedPeople.entries()) {
       requireShape(!people.has(person.id) && orphanIds.has(person.id), `orphanedPeople.${index}.id`)
       requireShape(['self', 'partner'].includes(person.role) && finite(person.ageInBaseYear) && finite(person.retirementAge), `orphanedPeople.${index}.identity`)
@@ -259,6 +259,19 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
   requireShape(['meltdownPaced', 'rrspFirst', 'nonRegFirst', 'tfsaFirst'].includes(plan.strategy as string), 'strategy')
   requireShape(['legacy', 'dieWithZero'].includes(plan.goal as string) && finite(plan.lifeExpectancy), 'goal/lifeExpectancy')
   known(plan.targetAssets, 'targetAssets')
+  if (plan.ownershipAmounts !== undefined) {
+    requireShape(object(plan.ownershipAmounts), 'ownershipAmounts')
+    for (const [baseId, amounts] of Object.entries(plan.ownershipAmounts)) {
+      requireShape(object(amounts), `ownershipAmounts.${baseId}`)
+      for (const [personId, amount] of Object.entries(amounts)) {
+        // A recorded split may stay keyed by a removed person's id so that
+        // re-adding the partner can restore it; those ids live on in
+        // orphanedPeople. Ids that reference nobody at all are still rejected.
+        requireShape(people.has(personId) || orphanIds.has(personId), `ownershipAmounts.${baseId}.${personId}.owner`)
+        requireShape(finite(amount) && (amount as number) >= 0, `ownershipAmounts.${baseId}.${personId}`)
+      }
+    }
+  }
   assertLegacyInputs(plan.legacyProjection)
   requireShape(object(plan.migration) && integer(plan.migration.sourcePersistVersion) && typeof plan.migration.ownershipNeedsConfirmation === 'boolean' && typeof plan.migration.ageBasisNeedsConfirmation === 'boolean' && typeof plan.migration.savingsBasisNeedsConfirmation === 'boolean', 'migration')
 }
