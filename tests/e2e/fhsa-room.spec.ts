@@ -468,3 +468,183 @@ test('a recorded plan survives an unrelated shared-field edit and a reload', asy
   expect(reloaded.kernelAllocation).toBe(6000)
   expect(await inViewport(page)).toBe(true)
 })
+
+/**
+ * Round 3 blocking defect: the panel offered a couple an owner selector for the
+ * household FHSA account, but `applyAccountSplit` rejected the kind, so the
+ * control threw `account kind cannot be split: fhsa`, discarded the selection
+ * and left the account unowned. A couple could not record a single FHSA fact.
+ *
+ * An FHSA is one person's account like an RRSP, so a recorded holder is one
+ * account with that owner, and a genuine two-way split is two FHSAs — which
+ * BE-36 A refuses with its typed multiple-active reason instead of pricing one.
+ *
+ * `ageBasis`/`savingsBasis` are the plan's own confirmations, not BE-36 facts,
+ * and are pre-cleared so the ownership gate this test exercises is the one that
+ * stays closed until the holder is actually recorded.
+ */
+async function seedCoupleFhsa(page: Page, options: { balance: number; guided?: boolean }) {
+  await page.goto('/')
+  await page.evaluate(async ({ balance, guided }) => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 40_000, retirementSpending: 40_000,
+      savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0,
+      fhsa: { balance, annualContribution: 0, openedYearsAgo: 0 },
+      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    canonical.migration.ageBasisNeedsConfirmation = false
+    canonical.migration.savingsBasisNeedsConfirmation = false
+    canonical.budget = { kind: 'savingsBudget', annualNetSavings: inputs.annualSavings, retirementSpending: inputs.retirementSpending,
+      debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs, canonical, entryMode: guided ? 'guided' : 'professional', guidedView: guided ? 'results' : 'questionnaire',
+      inputRevision: 0, resultRevision: guided ? 0 : null,
+    } }))
+  }, options)
+  await page.reload()
+}
+
+/** The FHSA accounts and ownership facts the panel recorded in the stored plan. */
+const ownershipState = (page: Page) => page.evaluate(async () => {
+  const { useStore } = await import('/src/store.ts')
+  const plan = useStore.getState().canonical!
+  const fhsa = plan.accounts.filter((account: { kind: string }) => account.kind === 'fhsa')
+  return {
+    ownerIds: fhsa.map((account: { ownerId: string | null }) => account.ownerId).sort(),
+    total: fhsa.reduce((sum: number, account: { balance: number }) => sum + account.balance, 0),
+    rowIds: plan.contributions.filter((row: { accountId: string }) =>
+      fhsa.some((account: { id: string }) => account.id === row.accountId)).map((row: { id: string }) => row.id),
+    ownershipNeedsConfirmation: plan.migration.ownershipNeedsConfirmation,
+  }
+})
+
+/** Attribute the household's other registered accounts so the ownership gate
+ * the FHSA control closes is the one under test. */
+async function attributeHouseholdAccounts(page: Page) {
+  await page.getByTestId('owner-legacy:account:tfsa').selectOption('legacy:person:self')
+  await page.getByTestId('owner-legacy:account:rrsp').selectOption('legacy:person:partner')
+  await page.getByTestId('owner-legacy:account:nonReg').selectOption('legacy:person:self')
+}
+
+test('professional records a couple FHSA holder and can then enter its statement', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(String(error)))
+  await seedCoupleFhsa(page, { balance: 0 })
+  // The row is offered and starts unowned: the control's whole job.
+  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('')
+  await attributeHouseholdAccounts(page)
+  await page.getByTestId('owner-legacy:account:fhsa').selectOption('legacy:person:self')
+  // The control itself must never escape an exception.
+  await page.waitForTimeout(50)
+  expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
+  expect(await ownershipState(page)).toMatchObject({
+    ownerIds: ['legacy:person:self'], total: 0, ownershipNeedsConfirmation: false })
+  // The holder owns the account, so the holder's block is usable and the other
+  // person's says plainly that they have none.
+  await expect(page.getByTestId('fhsa-no-account-self')).toHaveCount(0)
+  await expect(page.getByTestId('fhsa-no-account-partner')).toHaveCount(1)
+  await recordStatement(page, 'self', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
+  await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('6,000 used')
+  // The holder and the recorded fact survive reload.
+  await page.reload()
+  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:self')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6000')
+  expect(await ownershipState(page)).toMatchObject({ ownerIds: ['legacy:person:self'] })
+  expect(errors).toEqual([])
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('guided records the same couple FHSA holder and survives the mode switch', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(String(error)))
+  await seedCoupleFhsa(page, { balance: 0, guided: true })
+  await page.goto('/#/guided/income/income.taxFacts')
+  await expect(page.getByTestId('person-tax-facts')).toBeVisible()
+  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('')
+  await attributeHouseholdAccounts(page)
+  await page.getByTestId('owner-legacy:account:fhsa').selectOption('legacy:person:partner')
+  await page.waitForTimeout(50)
+  expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
+  expect(await ownershipState(page)).toMatchObject({
+    ownerIds: ['legacy:person:partner'], ownershipNeedsConfirmation: false })
+  await expect(page.getByTestId('fhsa-no-account-self')).toHaveCount(1)
+  await expect(page.getByTestId('fhsa-no-account-partner')).toHaveCount(0)
+  await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
+  await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('contributions 6,000')
+  await page.reload()
+  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:partner')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6000')
+  // The holder survives the guided/professional switch, which rebuilds the
+  // canonical plan from the legacy form.
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:partner')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6000')
+  expect(await ownershipState(page)).toMatchObject({
+    ownerIds: ['legacy:person:partner'], ownershipNeedsConfirmation: false })
+  expect(errors).toEqual([])
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('a genuine couple FHSA split reaches the typed multiple-active refusal, never an exception', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(String(error)))
+  await seedCoupleFhsa(page, { balance: 12000 })
+  await attributeHouseholdAccounts(page)
+  // The user records a genuine per-person split: 6,000 to each spouse.
+  await page.getByTestId('account-self-amount-legacy:account:fhsa').fill('6000')
+  await page.getByTestId('account-partner-amount-legacy:account:fhsa').fill('6000')
+  await page.getByTestId('account-partner-amount-legacy:account:fhsa').blur()
+  await page.waitForTimeout(50)
+  expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
+  // Two person-owned FHSAs, the household total conserved to the cent.
+  expect(await ownershipState(page)).toMatchObject({
+    ownerIds: ['legacy:person:partner', 'legacy:person:self'], total: 12000, ownershipNeedsConfirmation: false })
+  // Both per-person blocks are usable, and the panel says where the user acts
+  // that BE-36 A prices at most one active FHSA.
+  await expect(page.getByTestId('fhsa-no-account-self')).toHaveCount(0)
+  await expect(page.getByTestId('fhsa-no-account-partner')).toHaveCount(0)
+  await expect(page.getByTestId('fhsa-multiple-active')).toBeVisible()
+  await expect(page.getByTestId('fhsa-multiple-active')).toContainText('one active FHSA per plan')
+  // The kernel refuses the year with the typed reason instead of a conservation
+  // failure, exactly as the hand-seeded case did.
+  const refused = await kernelStatus(page)
+  expect(refused.status).toBe('unsupported')
+  expect(refused.details.join(' ')).toContain('more than one active FHSA')
+  expect(refused.details.join(' ')).not.toContain('conservation')
+  expect(errors).toEqual([])
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('a two-way FHSA split keeps both balances and the partner plan across a legacy edit', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(String(error)))
+  await seedCoupleFhsa(page, { balance: 12000 })
+  await attributeHouseholdAccounts(page)
+  await page.getByTestId('account-self-amount-legacy:account:fhsa').fill('6000')
+  await page.getByTestId('account-partner-amount-legacy:account:fhsa').fill('6000')
+  await page.getByTestId('account-partner-amount-legacy:account:fhsa').blur()
+  // Record a plan on the partner-owned account, then edit an unrelated shared
+  // field: the legacy form can mirror only one FHSA, so the partner row must be
+  // carried across the rebuild instead of silently disappearing.
+  await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '3000' })
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  await page.evaluate(async () => {
+    const { useStore } = await import('/src/store.ts')
+    useStore.getState().editSharedField('annualSavings', '41000')
+  })
+  const edited = await ownershipState(page)
+  expect(edited.total).toBe(12000)
+  expect(edited.ownerIds).toEqual(['legacy:person:partner', 'legacy:person:self'])
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  await page.reload()
+  expect((await ownershipState(page)).total).toBe(12000)
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  expect(errors).toEqual([])
+  expect(await inViewport(page)).toBe(true)
+})
