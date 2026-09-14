@@ -303,5 +303,23 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
       provenance(entry.provenance, `fhsaStatementHistory.${accountId}.provenance`)
     }
   }
+  // BE-27 A: optional, so an old persisted envelope without it still hydrates.
+  // An entry that is present must be a real per-person TFSA statement fact; an
+  // absent entry means the history is unknown, never a real zero.
+  if (plan.tfsaStatement !== undefined) {
+    requireShape(object(plan.tfsaStatement), 'tfsaStatement')
+    for (const [personId, entry] of Object.entries(plan.tfsaStatement)) {
+      requireShape(people.has(personId), `tfsaStatement.${personId}.person`)
+      requireShape(object(entry), `tfsaStatement.${personId}`)
+      requireShape(Array.isArray(entry.withdrawals), `tfsaStatement.${personId}.withdrawals`)
+      const withdrawalIds = new Set<string>()
+      for (const [index, withdrawal] of entry.withdrawals.entries()) {
+        requireShape(object(withdrawal) && text(withdrawal.id) && !withdrawalIds.has(withdrawal.id), `tfsaStatement.${personId}.withdrawals.${index}.id`)
+        withdrawalIds.add(withdrawal.id)
+        requireShape(integer(withdrawal.calendarYear) && finite(withdrawal.amount) && withdrawal.amount >= 0, `tfsaStatement.${personId}.withdrawals.${index}.amounts`)
+      }
+      provenance(entry.provenance, `tfsaStatement.${personId}.provenance`)
+    }
+  }
   requireShape(object(plan.migration) && integer(plan.migration.sourcePersistVersion) && typeof plan.migration.ownershipNeedsConfirmation === 'boolean' && typeof plan.migration.ageBasisNeedsConfirmation === 'boolean' && typeof plan.migration.savingsBasisNeedsConfirmation === 'boolean', 'migration')
 }
