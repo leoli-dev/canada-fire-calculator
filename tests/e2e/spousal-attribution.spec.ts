@@ -162,12 +162,17 @@ test('the spousal attribution block explains itself in EN, FR and ZH', async ({ 
   const editor = page.getByTestId(`spousal-attribution-${ACCOUNT}`)
   await expect(editor).toContainText('Spousal RRSP attribution (T2205)')
   await expect(editor).toContainText('first-in-first-out')
+  // Review fix B2: the base-year attribution convention is stated in the UI
+  // rather than assumed silently.
+  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('attributed at most once')
   await page.getByRole('button', { name: 'FR', exact: true }).click()
   await expect(editor).toContainText('Attribution REER de conjoint (T2205)')
   await expect(editor).toContainText('premier entré, premier sorti')
+  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText("attribuée qu'une seule fois")
   await page.getByRole('button', { name: '中文' }).click()
   await expect(editor).toContainText('配偶 RRSP 归属（T2205）')
   await expect(editor).toContainText('先进先出')
+  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('最多只能归属一次')
   expect(await inViewport(page)).toBe(true)
 })
 
