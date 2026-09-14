@@ -274,6 +274,21 @@ describe('BE-39 A / B3: benefit-amount metadata follows the action, not the mode
     expect(metaOf(field)).toEqual({ status: 'confirmed', origin: 'user' })
   })
 
+  // The store's own fallback for a caller that writes the amount alone, with no
+  // source directive: the decision is the *presence* of the amount, never a
+  // before/after value diff, so re-typing the recorded number is still the
+  // user's answer rather than a silent re-adoption of the estimate.
+  it('adopts a raw amount-only patch even when the number is unchanged', () => {
+    reset()
+    applyEstimator('professional', 'cppAnnualAt65')
+    expect(useStore.getState().inputs.cppAnnualAt65).toBe(9_278)
+    useStore.getState().set({ cppAnnualAt65: 9_278 })
+    expect(useStore.getState().inputs.cppAmountSource?.source).toBe('manual')
+    useStore.getState().set({ fireAge: 55 })
+    expect(useStore.getState().inputs.cppAnnualAt65).toBe(9_278)
+    expect(useStore.getState().inputs.cppAmountSource?.source).toBe('manual')
+  })
+
   it.each(['cppAnnualAt65', 'partner.cppAnnualAt65'] as BenefitField[])(
     'keeps the B2 behaviour: a FIRE-age rewrite of %s is estimated in both modes', (field) => {
       const act = (mode: Mode, f: BenefitField) => { applyEstimator(mode, f); changeFireAge(mode, f, '55') }
