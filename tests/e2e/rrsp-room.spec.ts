@@ -48,8 +48,8 @@ test('professional mode prices a stated 20k/5k statement and retains the clipped
   // 24,000 sends another 12,000 to the RRSP, so the plan contributes 28,000
   // against 15,000 of room and 13,000 is retained. The panel must show the
   // kernel's figure, not a partial 1,000 from the recorded row alone.
-  await expect(page.getByTestId('rrsp-savings-share-self')).toContainText('12,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
+  await expect(page.getByTestId('rrsp-savings-share-self')).toContainText('12,000')
   await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   const person = saved.canonical.people.find((item: { role: string }) => item.role === 'self')
@@ -102,13 +102,15 @@ test('unknown, zero and a contradictory statement stay distinguishable', async (
   await enterStatement(page, { room: '0', planned: '5000' })
   await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('0')
-  // 5,000 recorded plus the default split's 12,000 cannot execute against zero room.
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('17,000')
+  // 5,000 recorded leaves 35,000 to split, so the default RRSP share is 17,500
+  // and none of the 22,500 planned can execute against zero room.
+  await expect(page.getByTestId('rrsp-savings-share-self')).toContainText('17,500')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('22,500')
   // Two statement lines that disagree are refused instead of guessing.
   await enterStatement(page, { limit: '20000', unused: '5000', room: '12000' })
   await expect(page.getByTestId('rrsp-mismatch-self')).toBeVisible()
   await expect(page.getByTestId('rrsp-room-unknown-self')).toBeVisible()
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('17,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('22,500')
   expect(await inViewport(page)).toBe(true)
 })
 
