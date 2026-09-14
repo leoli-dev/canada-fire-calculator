@@ -19,8 +19,16 @@ const normalizeListIds = <T extends { id?: string }>(items: T[], kind: string): 
 export const derivedAccountId = (baseId: string): string => `${baseId}:partner`
 
 /** Base account ids whose household total can be recorded per person. */
-const SPLIT_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:locked'] as const
-const SPLIT_KINDS: readonly Account['kind'][] = ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira']
+const SPLIT_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:locked', 'legacy:account:fhsa'] as const
+/**
+ * The registered kinds whose household total can be recorded per person.
+ * An FHSA belongs here for the same reason an RRSP does: it is one person's
+ * account, never jointly owned, so a household total that two people hold is
+ * two accounts. BE-36 A prices at most one active FHSA, so a recorded two-way
+ * split is refused with its own typed reason by the ledger, not silently
+ * attributed to one holder.
+ */
+const SPLIT_KINDS: readonly Account['kind'][] = ['tfsa', 'rrsp', 'spousalRrsp', 'rrif', 'lif', 'lira', 'fhsa']
 const userOrigin: Provenance = { origin: 'user', sourceYear: null }
 
 const assertSplitAmounts = (selfAmount: number, partnerAmount: number): void => {
@@ -483,6 +491,20 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     account.contributionRoom = old.contributionRoom
   }
   next.recurringContributions = next.recurringContributions.map(c => ({ ...c, contributorId: c.contributorId && live.has(c.contributorId) ? c.contributorId : null }))
+  // BE-36 A: the legacy form mirrors exactly one FHSA account, so a recorded
+  // per-person split's partner-owned account has no legacy field to rebuild its
+  // plan from. Its rows are canonical facts the form cannot express; carry them
+  // over so an unrelated legacy or shared-field edit cannot silently drop a
+  // recorded plan (the account itself is restored by `reconcileOwnershipSplit`).
+  const mirroredRecurringAccounts = new Set(next.recurringContributions.map(row => row.accountId))
+  const carriedFhsaRows = prior.recurringContributions.filter(row =>
+    !mirroredRecurringAccounts.has(row.accountId) &&
+    next.accounts.some(account => account.id === row.accountId && account.kind === 'fhsa'))
+  if (carriedFhsaRows.length > 0) next.recurringContributions.push(...carriedFhsaRows.map(row => ({
+    ...row,
+    contributorId: row.contributorId && live.has(row.contributorId) ? row.contributorId : null,
+    provenance: { ...row.provenance },
+  })))
   // BE-36 A: exactly one recorded FHSA plan per account, under the canonical id
   // the shared tax panel writes. Migration already emits that id, so a
   // panel-recorded plan survives an unrelated legacy or shared-field edit. A

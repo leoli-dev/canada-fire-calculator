@@ -471,10 +471,13 @@ export function TaxFactsPanel() {
     // edit or mode switch would silently drop the account and its room row.
     // The legacy field is a mirror of the one recorded plan, never a second
     // copy of it: it is written from the same accessor the panel box and the
-    // kernel read.
-    const fhsa = draft.accounts.find(account => account.kind === 'fhsa')
+    // kernel read. The balance is the household total across every FHSA account,
+    // so a recorded per-person split reconciles back onto both accounts instead
+    // of folding the partner's balance into the base one.
+    const fhsaAccounts = draft.accounts.filter(account => account.kind === 'fhsa')
+    const fhsa = fhsaAccounts.find(account => account.id === 'legacy:account:fhsa') ?? fhsaAccounts[0]
     const inputs = fhsa ? { ...state.inputs, fhsa: {
-      balance: fhsa.balance,
+      balance: roundCents(fhsaAccounts.reduce((total, account) => total + account.balance, 0)),
       annualContribution: plannedFhsaYearTotal(draft, fhsa.id, draft.baseYear),
       openedYearsAgo: fhsa.openedYear.status === 'known' ? Math.max(0, draft.baseYear - fhsa.openedYear.value) : 0,
     } } : state.inputs
