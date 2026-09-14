@@ -247,7 +247,10 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
   const person = (id: string, role: 'self' | 'partner', age: number, cpp: number, oas: number, pension: import('./types').Pension | null): Person => ({
     id, role, ageInBaseYear: finite(age), retirementAge: role === 'self' ? finite(input.fireAge) : finite(input.fireAge) - finite(input.currentAge) + finite(age),
     earnedIncome: unknown('not present in legacy plan'), previousYearEarnedIncome: unknown('not present in legacy plan'),
-    rrspDeductionLimit: unknown('CRA statement not supplied'), rrspAvailableRoom: unknown('CRA statement not supplied'), tfsaAvailableRoom: unknown('CRA statement not supplied'),
+    rrspDeductionLimit: unknown('CRA statement not supplied'), rrspAvailableRoom: unknown('CRA statement not supplied'),
+    rrspUnusedUndeducted: unknown('CRA statement not supplied'), rrspPensionAdjustment: unknown('CRA statement not supplied'),
+    rrspPspa: unknown('CRA statement not supplied'), rrspPar: unknown('CRA statement not supplied'),
+    tfsaAvailableRoom: unknown('CRA statement not supplied'),
     cppAnnualAt65: finite(cpp), oasAnnualAt65: finite(oas), pensionAnnual: finite(pension?.annualAmount), pension,
     cppWork: role === 'self' ? input.cppWork ?? null : input.partner?.cppWork ?? null,
     provenance: { ageInBaseYear: source, retirementAge: source, cppAnnualAt65: source, oasAnnualAt65: source, pensionAnnual: source },
@@ -377,6 +380,10 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     previousYearEarnedIncome: returningPartner.previousYearEarnedIncome,
     rrspDeductionLimit: returningPartner.rrspDeductionLimit,
     rrspAvailableRoom: returningPartner.rrspAvailableRoom,
+    rrspUnusedUndeducted: returningPartner.rrspUnusedUndeducted,
+    rrspPensionAdjustment: returningPartner.rrspPensionAdjustment,
+    rrspPspa: returningPartner.rrspPspa,
+    rrspPar: returningPartner.rrspPar,
     tfsaAvailableRoom: returningPartner.tfsaAvailableRoom,
     provenance: { ...returningPartner.provenance, ...person.provenance },
   } : person)
@@ -387,7 +394,16 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.people = next.people.map(person => {
     const old = prior.people.find(item => item.id === person.id)
     return old ? { ...person, earnedIncome: old.earnedIncome,
-      previousYearEarnedIncome: old.previousYearEarnedIncome } : person
+      previousYearEarnedIncome: old.previousYearEarnedIncome,
+      // CRA statement facts are entered by the shared tax panel. An ordinary
+      // legacy-form edit or a mode switch must not reset them to unknown.
+      rrspDeductionLimit: old.rrspDeductionLimit,
+      rrspAvailableRoom: old.rrspAvailableRoom,
+      rrspUnusedUndeducted: old.rrspUnusedUndeducted ?? person.rrspUnusedUndeducted,
+      rrspPensionAdjustment: old.rrspPensionAdjustment ?? person.rrspPensionAdjustment,
+      rrspPspa: old.rrspPspa ?? person.rrspPspa,
+      rrspPar: old.rrspPar ?? person.rrspPar,
+      tfsaAvailableRoom: old.tfsaAvailableRoom } : person
   })
   const expandedHousehold = prior.people.length === 1 && next.people.length === 2
   const live = new Set(next.people.map(person => person.id))
@@ -492,8 +508,16 @@ export function completeCanonicalFacts(plan: InputsV2, inputs: Inputs): InputsV2
     recurringContributions: plan.recurringContributions ?? facts.recurringContributions,
     projectionAssumptions: plan.projectionAssumptions ?? facts.projectionAssumptions,
     taxProfile: plan.taxProfile ?? facts.taxProfile,
-    people: plan.people.map(person => ({ ...person, cppWork: person.cppWork === undefined ? facts.people.find(item => item.id === person.id)?.cppWork ?? null : person.cppWork })),
-    orphanedPeople: plan.orphanedPeople?.map(person => ({ ...person, cppWork: person.cppWork ?? null })),
+    people: plan.people.map(person => ({ ...person, cppWork: person.cppWork === undefined ? facts.people.find(item => item.id === person.id)?.cppWork ?? null : person.cppWork,
+      rrspUnusedUndeducted: person.rrspUnusedUndeducted ?? unknown('CRA statement not supplied'),
+      rrspPensionAdjustment: person.rrspPensionAdjustment ?? unknown('CRA statement not supplied'),
+      rrspPspa: person.rrspPspa ?? unknown('CRA statement not supplied'),
+      rrspPar: person.rrspPar ?? unknown('CRA statement not supplied') })),
+    orphanedPeople: plan.orphanedPeople?.map(person => ({ ...person, cppWork: person.cppWork ?? null,
+      rrspUnusedUndeducted: person.rrspUnusedUndeducted ?? unknown('CRA statement not supplied'),
+      rrspPensionAdjustment: person.rrspPensionAdjustment ?? unknown('CRA statement not supplied'),
+      rrspPspa: person.rrspPspa ?? unknown('CRA statement not supplied'),
+      rrspPar: person.rrspPar ?? unknown('CRA statement not supplied') })),
     accounts: plan.accounts.map(account => ({ ...account, openedYearsAgoAtBaseYear: account.openedYearsAgoAtBaseYear === undefined ? facts.accounts.find(item => item.id === account.id)?.openedYearsAgoAtBaseYear ?? null : account.openedYearsAgoAtBaseYear })),
     properties: plan.properties.map(property => {
       const fact = facts.properties.find(item => item.id === property.id)

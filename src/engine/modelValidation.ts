@@ -26,6 +26,12 @@ function known(value: unknown, path: string, kind: 'number' | 'boolean' = 'numbe
     requireShape(kind === 'number' ? finite(value.value) : typeof value.value === 'boolean', `${path}.value`)
   }
 }
+/** A CRA room/adjustment amount is a finite nonnegative nominal figure. */
+function knownNonnegative(value: unknown, path: string) {
+  known(value, path)
+  const fact = value as { status: string; value?: number }
+  requireShape(fact.status === 'unknown' || (fact.value as number) >= 0, `${path}.value`)
+}
 function taxShares(value: unknown, people: Set<string>, path: string) {
   requireShape(object(value), path)
   if (value.status === 'unknown') { requireShape(text(value.reason), `${path}.reason`); return }
@@ -165,7 +171,8 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
     requireShape(!roles.has(person.role), `people.${index}.duplicateRole`)
     roles.add(person.role)
     requireShape(finite(person.ageInBaseYear) && finite(person.retirementAge) && finite(person.cppAnnualAt65) && finite(person.oasAnnualAt65) && finite(person.pensionAnnual), `people.${index}.amounts`)
-    for (const key of ['earnedIncome', 'previousYearEarnedIncome', 'rrspDeductionLimit', 'rrspAvailableRoom', 'tfsaAvailableRoom'] as const) known(person[key], `people.${index}.${key}`)
+    for (const key of ['earnedIncome', 'previousYearEarnedIncome'] as const) known(person[key], `people.${index}.${key}`)
+    for (const key of ['rrspDeductionLimit', 'rrspAvailableRoom', 'tfsaAvailableRoom', 'rrspUnusedUndeducted', 'rrspPensionAdjustment', 'rrspPspa', 'rrspPar'] as const) knownNonnegative(person[key], `people.${index}.${key}`)
     requireShape(person.pension === null || object(person.pension), `people.${index}.pension`)
     requireShape(person.cppWork === null || object(person.cppWork) && finite(person.cppWork.startWorkAge) && finite(person.cppWork.retireAge), `people.${index}.cppWork`)
     if (person.pension) for (const key of ['annualAmount', 'startAge', 'indexation', 'bridgeAnnual']) requireShape(finite(person.pension[key]), `people.${index}.pension.${key}`)
@@ -178,7 +185,8 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
       requireShape(!people.has(person.id) && orphanIds.has(person.id), `orphanedPeople.${index}.id`)
       requireShape(['self', 'partner'].includes(person.role) && finite(person.ageInBaseYear) && finite(person.retirementAge), `orphanedPeople.${index}.identity`)
       requireShape(finite(person.cppAnnualAt65) && finite(person.oasAnnualAt65) && finite(person.pensionAnnual), `orphanedPeople.${index}.amounts`)
-      for (const key of ['earnedIncome', 'previousYearEarnedIncome', 'rrspDeductionLimit', 'rrspAvailableRoom', 'tfsaAvailableRoom'] as const) known(person[key], `orphanedPeople.${index}.${key}`)
+      for (const key of ['earnedIncome', 'previousYearEarnedIncome'] as const) known(person[key], `orphanedPeople.${index}.${key}`)
+      for (const key of ['rrspDeductionLimit', 'rrspAvailableRoom', 'tfsaAvailableRoom', 'rrspUnusedUndeducted', 'rrspPensionAdjustment', 'rrspPspa', 'rrspPar'] as const) knownNonnegative(person[key], `orphanedPeople.${index}.${key}`)
       requireShape(person.pension === null || object(person.pension), `orphanedPeople.${index}.pension`)
       requireShape(person.cppWork === null || object(person.cppWork) && finite(person.cppWork.startWorkAge) && finite(person.cppWork.retireAge), `orphanedPeople.${index}.cppWork`)
       if (person.pension) for (const key of ['annualAmount', 'startAge', 'indexation', 'bridgeAnnual'] as const) requireShape(finite(person.pension[key]), `orphanedPeople.${index}.pension.${key}`)
