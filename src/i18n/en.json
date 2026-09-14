@@ -1265,6 +1265,7 @@
     "openingRoom": "Unused participation room carried into this plan year (CRA statement)",
     "openingRoomNote": "Enter the room left over from earlier years, not the participation-room statement's figure for this year: that figure already includes this year's own room.",
     "planned": "Planned FHSA contribution this year",
+    "scheduledRecorded": "A scheduled contribution of {{amount}} CAD is recorded for this plan year, so the plan shown is the larger of that schedule and the recorded amount.",
     "ledger": "Opening room {{opening}} + this year's room {{addition}} − contributions {{applied}} = closing room {{closing}} CAD",
     "lifetime": "Lifetime limit {{limit}} CAD: {{used}} used, {{remaining}} remaining. Investment growth never counts against it, and a transfer is never deducted twice.",
     "retained": "Retained and not contributed: {{retained}} CAD.",

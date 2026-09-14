@@ -1274,6 +1274,7 @@
     "openingRoom": "Droits de participation inutilisés reportés sur cette année du plan (relevé de l'ARC)",
     "openingRoomNote": "Inscrivez les droits laissés par les années précédentes, et non le chiffre du relevé des droits pour cette année : ce chiffre comprend déjà les droits de l'année même.",
     "planned": "Cotisation CELIAPP prévue cette année",
+    "scheduledRecorded": "Une cotisation planifiée de {{amount}} CAD est consignée pour cette année du plan : le plan affiché correspond au montant le plus élevé entre cette cotisation planifiée et le montant consigné.",
     "ledger": "Droits d'ouverture {{opening}} + droits de l'année {{addition}} − cotisations {{applied}} = droits à la fin {{closing}} CAD",
     "lifetime": "Plafond à vie de {{limit}} CAD : {{used}} utilisés, {{remaining}} restants. La croissance des placements ne l'entame jamais et un transfert n'est jamais déduit deux fois.",
     "retained": "Conservé et non cotisé : {{retained}} CAD.",

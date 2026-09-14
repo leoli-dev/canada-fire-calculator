@@ -58,6 +58,52 @@ async function seedLegacyPlan(page: Page, annualContribution: number, openedYear
   await page.reload()
 }
 
+/**
+ * A plan whose FHSA contribution arrives as a scheduled `plan.contributions`
+ * row instead of a recurring row. No UI path creates this shape; it is what
+ * persisted or imported canonical data can carry, and it is the shape that
+ * Blocking B-1 silently routed through the RRSP ledger.
+ */
+async function seedScheduledFhsa(page: Page, options: { history: boolean }) {
+  await page.goto('/')
+  await page.evaluate(async ({ history }) => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+      annualSavings: 40_000, retirementSpending: 40_000,
+      savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
+      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      cppAnnualAt65: 0, oasAnnualAt65: 0, fhsa: null, partner: null }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    // The kernel refuses an unconfirmed ownership/age/savings basis before it
+    // prices anything; that is the plan's own confirmation, not a BE-36 fact.
+    canonical.migration.ownershipNeedsConfirmation = false
+    canonical.migration.ageBasisNeedsConfirmation = false
+    canonical.migration.savingsBasisNeedsConfirmation = false
+    canonical.budget = { kind: 'savingsBudget', annualNetSavings: inputs.annualSavings, retirementSpending: inputs.retirementSpending,
+      debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }
+    const person = canonical.people.find((item: { role: string }) => item.role === 'self')
+    const account = {
+      id: 'e2e:fhsa:scheduled', kind: 'fhsa', ownerId: person.id, balance: 0, realReturn: 0.043,
+      volatility: null, annualFee: 0.002, acb: { status: 'unknown', reason: 'not applicable' },
+      taxableOwnerShares: { status: 'known', shares: { [person.id]: 1 } },
+      contributionRoom: { status: 'known', value: 0 }, openedYear: { status: 'known', value: 2026 },
+      rrifFactorCategory: { status: 'unknown', reason: 'not applicable' },
+      openedYearsAgoAtBaseYear: null, provenance: {},
+    }
+    canonical.accounts.push(account)
+    if (history) canonical.fhsaStatementHistory = { [account.id]: {
+      cumulativePriorContributions: { status: 'known', value: 0 }, provenance: { origin: 'user', sourceYear: 2026 } } }
+    canonical.contributions.push({ id: 'e2e:scheduled:fhsa', accountId: account.id, contributorId: person.id,
+      calendarYear: 2026, amount: 8000, deductionYear: null, provenance: { origin: 'user', sourceYear: 2026 } })
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs, canonical, entryMode: 'professional', guidedView: 'questionnaire', inputRevision: 0, resultRevision: null,
+    } }))
+  }, options)
+  await page.reload()
+}
+
 /** The plan the panel shows, the rows it is recorded in, and the amount the
  * kernel's own allocation and line builder price from the same plan. */
 const fhsaPlanState = (page: Page) => page.evaluate(async () => {
@@ -81,6 +127,52 @@ const fhsaPlanState = (page: Page) => page.evaluate(async () => {
 
 const inViewport = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+
+/**
+ * Run the kernel's own base-year step on the stored canonical plan, so a panel
+ * assertion can be backed by the number the projection actually prices. The
+ * evaluated cash equals the plan's net savings, which is the kernel's own
+ * consistency requirement.
+ */
+const kernelStatus = (page: Page) => page.evaluate(async () => {
+  const { useStore } = await import('/src/store.ts')
+  const { annualStep, initializeState } = await import('/src/engine/annualState.ts')
+  const empty = {
+    details: [] as string[], fhsaLedgerPlanned: null as number | null, fhsaApplied: null as number | null,
+    rrspPlanned: null as number | null, rrspLineIds: [] as string[], fhsaContribution: null as number | null,
+    rrspContribution: null as number | null, cashFhsa: null as number | null,
+  }
+  const plan = useStore.getState().canonical!
+  const opening = initializeState(plan)
+  if (opening.status !== 'ok') return { ...empty, status: opening.status, details: opening.issues.map(item => item.detail) }
+  const savings = plan.budget.kind === 'savingsBudget' ? plan.budget.annualNetSavings : 0
+  const providers = {
+    evaluate: ({ state }: { state: { byPerson: Record<string, unknown> } }) => ({
+      byPerson: Object.fromEntries(Object.keys(state.byPerson).map(id => [id, {
+        income: savings * 2, earnedIncome: savings * 2, benefits: 0, tax: 0, spending: savings,
+        taxableIncome: savings * 2, benefitIncomeForNextYear: { status: 'known' as const, value: savings * 2 },
+      }])),
+    }),
+    returns: () => 0,
+  }
+  const result = annualStep(plan, opening.value, providers as never)
+  if (result.status !== 'ok') return { ...empty, status: result.status, details: result.issues.map(item => item.detail) }
+  const row = result.value.row
+  const person = plan.people.find(item => item.role === 'self')!
+  const fhsa = plan.accounts.find(item => item.kind === 'fhsa')
+  const rrsp = plan.accounts.find(item => item.kind === 'rrsp')
+  return {
+    ...empty,
+    status: 'ok' as const,
+    fhsaLedgerPlanned: fhsa ? row.fhsaLedger[person.id]?.planned ?? null : null,
+    fhsaApplied: fhsa ? row.fhsaLedger[person.id]?.applied ?? null : null,
+    rrspPlanned: row.rrspLedger[person.id]?.planned ?? null,
+    rrspLineIds: (row.rrspLedger[person.id]?.lines ?? []).map(item => item.id),
+    fhsaContribution: fhsa ? row.byAccount[fhsa.id].contribution : null,
+    rrspContribution: rrsp ? row.byAccount[rrsp.id].contribution : null,
+    cashFhsa: row.cashLedger.fhsaContributions,
+  }
+})
 
 /** Record one person's statement: opening year, prior contributions and the plan. */
 async function recordStatement(page: Page, role: string, values: { openedYear?: string; prior?: string; opening?: string; planned?: string }) {
@@ -186,8 +278,20 @@ test('two people with different FHSA facts get independent room rows', async ({ 
       cppAnnualAt65: 0, oasAnnualAt65: 0, fhsa: null,
       partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } }
     const canonical = refreshCanonicalFromLegacy(null, inputs)
+    canonical.migration.ownershipNeedsConfirmation = false
+    canonical.migration.ageBasisNeedsConfirmation = false
+    canonical.migration.savingsBasisNeedsConfirmation = false
+    canonical.budget = { kind: 'savingsBudget', annualNetSavings: inputs.annualSavings, retirementSpending: inputs.retirementSpending,
+      debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }
     const self = canonical.people.find((person: { role: string }) => person.role === 'self')
     const partner = canonical.people.find((person: { role: string }) => person.role === 'partner')
+    // A household account has no recorded owner; the kernel refuses an
+    // unowned registered account before it prices anything, which is not a
+    // BE-36 fact. Attribute them so the FHSA refusal can be reached.
+    for (const item of canonical.accounts) {
+      item.ownerId = self.id
+      item.taxableOwnerShares = { status: 'known', shares: { [self.id]: 1 } }
+    }
     const fhsa = (id: string, ownerId: string, openedYear: number, room: number, prior: number) => ({
       id, kind: 'fhsa', ownerId, balance: 0, realReturn: 0.043, volatility: null, annualFee: 0.002,
       acb: { status: 'unknown', reason: 'not applicable' },
@@ -219,6 +323,56 @@ test('two people with different FHSA facts get independent room rows', async ({ 
   await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('6,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('Opening room 0')
   await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('40,000 remaining')
+  // With a plan on each person's own account the plan has two active FHSAs.
+  // BE-36 A prices at most one, so the panel says so where the user records the
+  // accounts, and the kernel refuses the year with the typed reason instead of
+  // a conservation failure.
+  await recordStatement(page, 'self', { planned: '6000' })
+  await expect(page.getByTestId('fhsa-multiple-active')).toBeVisible()
+  await expect(page.getByTestId('fhsa-multiple-active')).toContainText('one active FHSA per plan')
+  const refused = await kernelStatus(page)
+  expect(refused.status).toBe('unsupported')
+  expect(refused.details.join(' ')).toContain('more than one active FHSA')
+  expect(refused.details.join(' ')).not.toContain('conservation')
+  expect(await inViewport(page)).toBe(true)
+})
+
+/**
+ * Blocking B-1: a scheduled FHSA row used to be priced as an RRSP line, spend
+ * RRSP room and skip participation room entirely. This seeds the exact shape
+ * the reviewer built — a scheduled canonical row with no recurring plan — and
+ * checks the panel, the allocation and the kernel all agree.
+ */
+test('a scheduled FHSA row is priced by participation room, never by the RRSP ledger', async ({ page }) => {
+  await seedScheduledFhsa(page, { history: true })
+  // The panel box shows the whole year's plan, which is what the ledger prices.
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8000')
+  await expect(page.getByTestId('fhsa-scheduled-self')).toBeVisible()
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 8,000')
+  await expect(page.getByTestId('fhsa-ledger-self')).toContainText('closing room 0')
+  await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('8,000 used')
+  const kernel = await kernelStatus(page)
+  expect(kernel.status).toBe('ok')
+  expect(kernel.fhsaLedgerPlanned).toBe(8000)
+  expect(kernel.fhsaApplied).toBe(8000)
+  // The FHSA row consumes no RRSP room and is not an RRSP planned line, while
+  // the FHSA account receives exactly what the participation ledger applied.
+  expect(kernel.rrspPlanned).toBe(0)
+  expect(kernel.rrspLineIds).toEqual([])
+  expect(kernel.fhsaContribution).toBe(8000)
+  expect(kernel.rrspContribution).toBe(0)
+  expect(kernel.cashFhsa).toBe(8000)
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('a scheduled FHSA row with no statement history is refused, never executed', async ({ page }) => {
+  await seedScheduledFhsa(page, { history: false })
+  // The room stays unknown, so nothing is priced against it.
+  await expect(page.getByTestId('fhsa-room-unknown-self')).toBeVisible()
+  const kernel = await kernelStatus(page)
+  expect(kernel.status).toBe('unsupported')
+  expect(kernel.details.join(' ')).toContain('FHSA participation room not verified')
+  expect(kernel.details.join(' ')).toContain('contribution history is not confirmed')
   expect(await inViewport(page)).toBe(true)
 })
 

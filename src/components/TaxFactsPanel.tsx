@@ -5,7 +5,7 @@ import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonic
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
-import { fhsaPlanRowId, plannedFhsaContribution } from '../engine/fhsaPlan'
+import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { useStore } from '../store'
 
@@ -187,7 +187,13 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
   // the same accessor, so the panel and the projection can never price a
   // different amount. A legacy plan's row carries the canonical id too, so the
   // box shows the plan the kernel prices instead of a blank field.
-  const planShare = account ? plannedFhsaContribution(plan, account.id) : 0
+  // The box is the account's whole plan for the year — the recorded row, or the
+  // scheduled rows when they are larger — read through the same accessor the
+  // kernel prices. A plan imported with a scheduled row therefore shows (and
+  // prices) one amount, not a blank box next to a priced ledger.
+  const planShare = account ? plannedFhsaYearTotal(plan, account.id, plan.baseYear) : 0
+  const scheduled = account ? fhsaScheduledContributions(plan, account.id, plan.baseYear) : []
+  const scheduledAmount = scheduled.reduce((total, item) => total + item.amount, 0)
   const preview = account ? previewFhsaRoomYear(plan, account) : null
   const statement = account ? fhsaStatementHistory(plan, account.id) : undefined
   const ownerLabel = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
@@ -221,10 +227,13 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
     if (!account) return
     const id = fhsaPlanRowId(account.id)
     onEdit(draft => {
-      // Replacing the plan means removing every row for this account, not only
-      // the canonical one: a legacy mirror row left behind would be a second
-      // copy of the same plan and would be added to the recorded amount.
+      // Replacing the plan means removing every recurring row for this account,
+      // not only the canonical one: a legacy mirror row left behind would be a
+      // second copy of the same plan and would be added to the recorded amount.
       draft.recurringContributions = draft.recurringContributions.filter(item => item.accountId !== account.id)
+      // A scheduled row for this plan year is part of the amount this box shows,
+      // so an explicit edit replaces it too. Other years' rows are left alone.
+      draft.contributions = draft.contributions.filter(item => !(item.accountId === account.id && item.calendarYear === draft.baseYear))
       if (amount === null || amount <= 0) return
       draft.recurringContributions.push({
         id, accountId: account.id, contributorId: person.id, annualAmount: amount,
@@ -278,6 +287,8 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
               writePlanned(amount)
             }} />
         </label>
+        {scheduled.length > 0 && <p className="hint" role="status" data-testid={`fhsa-scheduled-${role}`}>
+          {t('be36.scheduledRecorded', { amount: money(scheduledAmount) })}</p>}
         {preview && <p data-testid={`fhsa-ledger-${role}`}>{t('be36.ledger', {
           opening: shown(preview.ledger.openingRoom), addition: shown(preview.ledger.annualAddition),
           applied: money(preview.ledger.applied), closing: shown(preview.ledger.closingRoom),
@@ -459,11 +470,12 @@ export function TaxFactsPanel() {
     // edit, so a recorded FHSA has to exist there too; otherwise the next form
     // edit or mode switch would silently drop the account and its room row.
     // The legacy field is a mirror of the one recorded plan, never a second
-    // copy of it: it is written from the same accessor the kernel reads.
+    // copy of it: it is written from the same accessor the panel box and the
+    // kernel read.
     const fhsa = draft.accounts.find(account => account.kind === 'fhsa')
     const inputs = fhsa ? { ...state.inputs, fhsa: {
       balance: fhsa.balance,
-      annualContribution: plannedFhsaContribution(draft, fhsa.id),
+      annualContribution: plannedFhsaYearTotal(draft, fhsa.id, draft.baseYear),
       openedYearsAgo: fhsa.openedYear.status === 'known' ? Math.max(0, draft.baseYear - fhsa.openedYear.value) : 0,
     } } : state.inputs
     commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta,

@@ -1274,6 +1274,7 @@
     "openingRoom": "结转到本计划年度的未使用参与额度（CRA 对账单）",
     "openingRoomNote": "请填写往年剩余的额度，而不是参与额度对账单上本年度的数字：该数字已经包含本年度的新增额度。",
     "planned": "本年计划 FHSA 供款",
+    "scheduledRecorded": "本计划年度记录了一笔 {{amount}} 加元的计划供款：显示的计划金额取该计划供款与已记录金额中的较大者。",
     "ledger": "期初空间 {{opening}} + 本年新增 {{addition}} − 已供款 {{applied}} = 期末空间 {{closing}} 加元",
     "lifetime": "终身上限 {{limit}} 加元：已使用 {{used}}，剩余 {{remaining}}。投资增值从不占用该上限，转入也不会被重复扣减。",
     "retained": "保留而未供款：{{retained}} 加元。",
