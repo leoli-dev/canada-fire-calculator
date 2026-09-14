@@ -13,11 +13,11 @@ import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
+  basisAnnualAmount,
   benefitIncomeBasis,
   ccbAnnual,
   cppAnnual,
   earlyClaimDilutionRelief,
-  gisAnnual,
   oasAnnual,
   oasAfterClawback,
   type BenefitBasis,
@@ -202,17 +202,14 @@ function evaluate(
   // than added from a household-wide helper.
   const receivingOas = oasGrossPerPerson.map((o) => o > 0)
   const gisIncome = pooledTaxable + extraIncome
-  // Whether the 60-64 spouse ever draws OAS decides whether the Allowance can
-  // ever be payable to them; an OAS start age past 65 means it cannot.
-  const spouseWillReceiveOas = agesPerPerson.length === 2
-    ? (agesPerPerson[0] >= 65 && inputs.partner ? inputs.partner.oasStartAge < 100 : inputs.oasStartAge < 100)
-    : false
+  // One classification decides the row, the amount and the Allowance in pay.
+  // The projection always has both spouses' ages and OAS flags, so the only
+  // non-modelled outcome here is `none` (nobody draws OAS, so neither the GIS
+  // nor the Allowance is payable) — a real zero, via `basisAnnualAmount`.
   const legacyBasis = benefitIncomeBasis(receivingOas, agesPerPerson, gisIncome, {
-    workIncome: extraIncome, spouseWillReceiveOas,
+    workIncome: extraIncome,
   })
-  const gis = legacyBasis.status === 'modeled'
-    ? legacyBasis.gis + legacyBasis.allowance
-    : gisAnnual(receivingOas, gisIncome, extraIncome, { agesPerPerson })
+  const gis = basisAnnualAmount(legacyBasis)
   // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
@@ -244,10 +241,8 @@ function evaluate(
       // The same basis object the legacy path uses, so the year row's category
       // and cut-off describe whichever income basis was actually priced.
       const personBasis = benefitIncomeBasis(receivingOas, agesPerPerson, person.taxableExOas,
-        { workIncome: person.earnedWork, spouseWillReceiveOas })
-      const personGis = personBasis.status === 'modeled'
-        ? personBasis.gis + personBasis.allowance
-        : gisAnnual(receivingOas, person.taxableExOas, person.earnedWork, { agesPerPerson })
+        { workIncome: person.earnedWork })
+      const personGis = basisAnnualAmount(personBasis)
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, gisBasis: personBasis.status === 'modeled' ? personBasis : undefined, ccb: personCcb,

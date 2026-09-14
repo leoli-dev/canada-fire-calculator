@@ -53,7 +53,8 @@ describe('dated rule selection', () => {
     expect(gis.categories['couple-both-pensioners']).toMatchObject({ maxMonthly: 2 * 676.09, annualCutoff: 30096 })
     expect(gis.categories['couple-partner-allowance']).toMatchObject({ maxMonthly: 676.09, annualCutoff: 42144 })
     expect(gis.categories['couple-partner-no-oas-no-allowance']).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 54624 })
-    expect(gis.allowance).toEqual({ maxMonthly: 1428.06, annualCutoff: 42144, topUpIncome: 8800 })
+    expect(gis.allowance).toMatchObject({ maxMonthly: 1428.06, annualCutoff: 42144, topUpIncome: 8800 })
+    expect(gis.unsupportedPaths.map(p => p.id)).toContain('prior-year-base-period')
     // A quarter the pack does not publish has no amounts at all: there is no
     // indexation mechanism for a quarterly table, so a new quarter needs a new
     // pack rather than an interpolated number.
@@ -77,7 +78,16 @@ describe('dated rule selection', () => {
       reductionSegments: [{ rate: 0, upTo: 100 }, { rate: 0.5, upTo: 50 }],
     }))).toThrow()
     expect(() => publishRulePack({ ...gis, allowance: { ...gis.allowance, topUpIncome: 99999 } })).toThrow()
-    expect(() => publishRulePack({ ...gis, fieldSources: { ...gis.fieldSources, topUpIncome: '' } })).toThrow()
+    expect(() => publishRulePack({ ...gis, allowance: { ...gis.allowance, reductionSegments: [] } })).toThrow()
+    // A fitted reduction must cite the table it was fitted to, and its
+    // recorded bound must be a small finite number.
+    expect(() => publishRulePack(withSingle({ fieldSources: { ...gis.categories.single.fieldSources, reductionSegments: '' } }))).toThrow()
+    expect(() => publishRulePack(withSingle({ maxMonthlyDeviation: 0 }))).toThrow()
+    expect(() => publishRulePack(withSingle({ maxMonthlyDeviation: 99 }))).toThrow()
+    // Every path the pack does not model needs a machine-readable reason.
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [] })).toThrow()
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: '' }] })).toThrow()
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: 'y' }, { id: 'x', reason: 'z' }] })).toThrow()
     expect(() => publishRulePack({ ...gis, basedOnIncomeYear: 2024 })).toThrow()
     expect(() => publishRulePack({ ...gis, paymentPeriod: '2026-10/2026-12' })).toThrow()
     // Exactly one shape discriminator per pack: a GIS pack is never accepted

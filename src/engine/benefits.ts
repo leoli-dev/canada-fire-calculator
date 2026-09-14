@@ -1,6 +1,6 @@
 // CPP/QPP and OAS start-age adjustments and OAS clawback. 2025 figures.
 
-import { selectGisRules, type GisCategoryRule, type GisHouseholdRuleCategory, type GisRulePack } from './rules'
+import { selectGisRules, type GisHouseholdRuleCategory, type GisReductionSegment, type GisRulePack } from './rules'
 
 /**
  * CPP/QPP: -0.6%/month before 65 (floor age 60), +0.7%/month after.
@@ -98,6 +98,9 @@ export const GIS_HOUSEHOLD_CATEGORIES: GisHouseholdRuleCategory[] = [
  */
 export type GisHouseholdClassification =
   | { status: 'modeled'; category: GisHouseholdRuleCategory; receivingAllowance: boolean }
+  /** Nobody in the household receives OAS, so no GIS or Allowance is payable. */
+  | { status: 'none'; reason: string }
+  /** A fact needed to pick the row is unknown. Never priced as zero. */
   | { status: 'unsupported'; reason: string }
 
 export interface GisCategoryOptions {
@@ -108,13 +111,6 @@ export interface GisCategoryOptions {
    * Allowance, whose household uses the 54,624 cut-off.
    */
   receivingAllowance?: boolean
-  /**
-   * Whether the 60-64 spouse ever becomes an OAS pensioner. `false` means the
-   * Allowance can never be payable to them (an OAS start age past 65, or a
-   * failed residence test), so the household uses the row whose cut-off is
-   * 54,624 even though their age alone looks eligible.
-   */
-  spouseWillReceiveOas?: boolean
   /**
    * The household's GIS test income. When given, a couple at or past the
    * Allowance cut-off is not receiving it, so the one-pensioner household falls
@@ -181,7 +177,7 @@ export function gisHouseholdCategory(
 ): GisHouseholdClassification {
   const receives = receivingOas.filter(Boolean).length
   if (receives === 0) {
-    return { status: 'unsupported', reason: 'GIS requires at least one spouse receiving an OAS pension; the Allowance requires a GIS recipient' }
+    return { status: 'none', reason: 'GIS requires at least one spouse receiving an OAS pension; the Allowance requires a GIS recipient' }
   }
   if (receivingOas.length === 1) {
     return { status: 'modeled', category: 'single', receivingAllowance: false }
@@ -189,22 +185,24 @@ export function gisHouseholdCategory(
   if (receives === 2) {
     return { status: 'modeled', category: 'couple-both-pensioners', receivingAllowance: false }
   }
-  // An explicit pin outranks an inferred age: a caller that says the Allowance
-  // is in pay gets that row even without the ages that would have implied it.
-  if (options.receivingAllowance === true) {
-    return agesPerPerson.length === 2
-      ? { status: 'modeled', category: 'couple-partner-allowance', receivingAllowance: true }
-      : { status: 'unsupported', reason: 'the Allowance is only payable to a 60 to 64 spouse/common-law partner, so its household row needs both ages' }
+  // An explicit pin decides the row without needing the ages that would
+  // otherwise infer it: a caller that says the Allowance is (or is not) in pay
+  // has answered the only question the ages were there to answer. Pinning it
+  // *on* still needs both ages, because the allowance row's own maximum is the
+  // 60-64 spouse's.
+  if (options.receivingAllowance !== undefined) {
+    if (options.receivingAllowance && agesPerPerson.length !== 2) {
+      return { status: 'unsupported', reason: 'the Allowance is only payable to a 60 to 64 spouse/common-law partner, so its household row needs both ages' }
+    }
+    return {
+      status: 'modeled',
+      receivingAllowance: options.receivingAllowance,
+      category: options.receivingAllowance ? 'couple-partner-allowance' : 'couple-partner-no-oas-no-allowance',
+    }
   }
-  // The Allowance is only payable to the spouse of a GIS recipient, and GIS
-  // requires OAS. A 60-64 spouse who is not yet receiving OAS can still be a
-  // future Allowance recipient, but a spouse on an OAS start age past 65 (or
-  // who failed the residence test) never draws one, so the row whose cut-off
-  // is 54,624 applies instead. `options.receivingAllowance === false` above
-  // covers the eligible-looking spouse who simply does not claim it.
-  if (options.spouseWillReceiveOas === false) {
-    return { status: 'modeled', category: 'couple-partner-no-oas-no-allowance', receivingAllowance: false }
-  }
+  // Otherwise the ages decide: a 60-64 spouse is read as an Allowance
+  // recipient unless the income test says it is no longer in pay
+  // (`allowanceInPay`). Without them the row is unknown, never guessed.
   const oasIdx = onlyPensionerIndex(receivingOas, agesPerPerson)
   if (oasIdx === null) {
     return { status: 'unsupported', reason: 'the one-pensioner couple rows need both ages: a spouse aged 60 to 64 is the Allowance row, an older or younger one is the row whose cut-off is 54,624' }
@@ -229,15 +227,16 @@ export function gisWorkExemption(workIncome: number): number {
 }
 
 /**
- * The official tables' piecewise reduction, in annual dollars: the first
+ * The published tables' piecewise reduction, in annual dollars: the first
  * segment's rate applies up to its `upTo`, the next from there, and so on.
- * The table's own steps change slope where the top-up itself starts to reduce,
- * which is why this is piecewise rather than one line to the cut-off.
+ * The tables change slope where the top-up itself starts to reduce and again
+ * where it runs out, which is why this is piecewise rather than one line to
+ * the cut-off.
  */
-function segmentReduction(rule: GisCategoryRule, income: number): number {
+function segmentReduction(segments: GisReductionSegment[], income: number): number {
   let reduction = 0
   let lower = 0
-  for (const segment of rule.reductionSegments) {
+  for (const segment of segments) {
     const inside = Math.max(0, Math.min(income, segment.upTo) - lower)
     reduction += inside * segment.rate
     lower = segment.upTo
@@ -263,29 +262,36 @@ function categoryAmounts(
   // per-pensioner maximum (both pensioners) has two of them, which is why the
   // official reduction is 1/48 of joint income per pensioner and 1/4 for the
   // household.
-  const gis = Math.max(0, rule.maxMonthly * 12 - segmentReduction(rule, income))
-  // The pensioner's own GIS is flat while the Allowance is in pay, and the
-  // Allowance has its own maximum and cut-off — never a GIS maximum borrowed
-  // from a category that does not correspond to it.
+  const gis = Math.max(0, rule.maxMonthly * 12 - segmentReduction(rule.reductionSegments, income))
+  // The Allowance has its own maximum, top-up income and cut-off — never a GIS
+  // maximum borrowed from a category that does not correspond to it — and its
+  // own fitted reduction, which the pensioner-side GIS follows rather than
+  // staying flat.
   const allowance = receivingAllowance
-    ? Math.max(0, GIS_RULES.allowance.maxMonthly * 12 *
-        (1 - Math.max(0, income - GIS_RULES.allowance.topUpIncome) /
-          (GIS_RULES.allowance.annualCutoff - GIS_RULES.allowance.topUpIncome)))
+    ? Math.max(0, GIS_RULES.allowance.maxMonthly * 12 -
+        segmentReduction(GIS_RULES.allowance.reductionSegments, income))
     : 0
   return { gis, allowance }
 }
 
-/** Annual Allowance for a 60–64 spouse of a GIS recipient. */
+/**
+ * Annual Allowance for a 60-64 spouse of a GIS recipient. Its income basis is
+ * `benefitIncomeBasis`'s, so the Allowance-in-pay test, the work exemption and
+ * the amount all come from one classification rather than from two that can
+ * disagree near the 42,144 cut-off.
+ *
+ * Returns `null` — not zero — when the household's row cannot be determined
+ * from the facts supplied.
+ */
 export function allowanceAnnual(
   receivingOas: boolean[],
   agesPerPerson: number[],
   householdIncome: number,
-  options: GisCategoryOptions = {},
-): number {
-  const income = Math.max(0, householdIncome)
-  const classification = gisHouseholdCategory(receivingOas, agesPerPerson, { ...options, grossIncome: income })
-  if (classification.status !== 'modeled' || !classification.receivingAllowance) return 0
-  return categoryAmounts(classification.category, true, income).allowance
+  options: GisCategoryOptions & { workIncome?: number } = {},
+): number | null {
+  const basis = benefitIncomeBasis(receivingOas, agesPerPerson, householdIncome, options)
+  if (basis.status === 'modeled') return basis.allowance
+  return basis.status === 'none' ? 0 : null
 }
 
 /**
@@ -304,32 +310,34 @@ export function allowanceAnnual(
  * function the audit faulted: a couple with exactly one pensioner previously
  * took the single table (13,478.04 max, 22,800 cut-off) even when the other
  * spouse had no OAS and no Allowance, whose correct cut-off is 54,624.
+ *
+ * Ages decide the two one-pensioner couple rows, so this returns `null` — not
+ * a guessed age and not zero — when they are missing. `benefitIncomeBasis`
+ * carries the concrete reason; `none` (nobody draws OAS) is a real zero.
  */
 export function gisAnnual(
   receivingOas: boolean[],
   householdIncome: number,
   workIncome = 0,
   options: GisCategoryOptions & { agesPerPerson?: number[] } = {},
-): number {
-  const income = Math.max(0, householdIncome - gisWorkExemption(workIncome))
-  const classification = gisHouseholdCategory(
-    receivingOas, options.agesPerPerson ?? defaultAges(receivingOas), { ...options, grossIncome: income },
-  )
-  if (classification.status !== 'modeled') return 0
-  const amounts = categoryAmounts(classification.category, classification.receivingAllowance, income)
-  return amounts.gis + amounts.allowance
+): number | null {
+  const basis = benefitIncomeBasis(receivingOas, options.agesPerPerson ?? [], householdIncome, {
+    ...options, workIncome,
+  })
+  if (basis.status === 'modeled') return basis.gis + basis.allowance
+  return basis.status === 'none' ? 0 : null
 }
 
 /**
- * `gisAnnual`'s pre-BE-26 callers passed the OAS flags and the income test but
- * not ages. Ages only exist to tell the two one-pensioner couple rows apart, so
- * a call without them answers that question conservatively instead of guessing
- * an age: with exactly one pensioner and no ages the household is read as "no
- * OAS and no Allowance" (the 54,624 cut-off), never as the Allowance row. The
- * single and both-pensioners rows never needed ages at all.
+ * The GIS + Allowance cash amount for a household whose basis is already
+ * classified. `none` is a real zero (nobody draws OAS, so neither the GIS nor
+ * the Allowance is payable); an `unsupported` classification means a fact is
+ * missing and is refused rather than priced at zero.
  */
-function defaultAges(receivingOas: boolean[]): number[] {
-  return receivingOas.length === 2 ? [65, 65] : [65]
+export function basisAnnualAmount(basis: BenefitBasis): number {
+  if (basis.status === 'modeled') return basis.gis + basis.allowance
+  if (basis.status === 'none') return 0
+  throw new Error(`GIS household basis is unsupported: ${basis.reason}`)
 }
 
 /**
@@ -360,12 +368,17 @@ export interface BenefitIncomeBasis {
 }
 export type BenefitBasis =
   | BenefitIncomeBasis
+  /** Nobody draws OAS, so no GIS or Allowance is payable: a real zero. */
+  | { status: 'none'; reason: string }
+  /** A fact the row needs is unknown. Never reported as zero. */
   | { status: 'unsupported'; reason: string }
 
 /**
  * `grossIncome` is the GIS test income (taxable income excluding OAS);
  * `workIncome` is its employment portion; `agesPerPerson` is what
- * distinguishes a 60-64 spouse from a younger or older one.
+ * distinguishes a 60-64 spouse from a younger or older one. This is the single
+ * entry point: `gisAnnual` and `allowanceAnnual` are thin wrappers over it, so
+ * the Allowance-in-pay test and the amount cannot use different bases.
  */
 export function benefitIncomeBasis(
   receivingOas: boolean[],

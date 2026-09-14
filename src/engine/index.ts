@@ -11,6 +11,7 @@ export {
   estimateOasAt65,
   allowanceAnnual,
   gisAnnual,
+  basisAnnualAmount,
   benefitIncomeBasis,
   gisHouseholdCategory,
   gisWorkExemption,
