@@ -1284,5 +1284,26 @@
     "limit": "Le plafond annuel publié de 8 000 $, le plafond à vie de 40 000 $ et le maximum de report des droits de participation de 8 000 $ proviennent des pages de l'ARC sur le CELIAPP. Les droits de l'année correspondent aux 8 000 $ de l'année plus, au plus, ce maximum reporté, et le plafond à vie limite ce total entier : les droits reportés des années précédentes ne sont donc jamais utilisés en plus des droits à vie restants. Ne sont pas encore implémentés : le délai de 15 ans ou l'âge de 71 ans, le transfert vers un REER/FRRV, les retraits admissibles ou non, l'admissibilité à l'achat d'une première habitation et le décès. Les droits de re-participation, les montants désignés et l'impôt sur l'excédent CELIAPP le sont aussi : ce registre ne déclare donc que les droits que les plafonds publiés autorisent.",
     "source": "ARC : cotiser à son CELIAPP",
     "scope": "Les droits CELIAPP sont suivis par personne et par année. L'échéance, le transfert, les retraits et l'admissibilité à l'achat d'une première habitation restent hors de cette estimation."
+  },
+  "be27": {
+    "title": "Droits de cotisation au CELI",
+    "person": "Droits CELI de {{person}}",
+    "explanation": "Les droits de cotisation au CELI appartiennent à la personne, pas à un compte : un seul chiffre de l'ARC couvre tous vos CELI, donc ils sont saisis et calculés par personne. Copiez les droits de cotisation disponibles depuis votre compte de l'ARC et inscrivez tout retrait CELI effectué. Laissez le champ vide si vous ne pouvez pas le confirmer : une ligne vide reste inconnue, aucune nouvelle cotisation n'est exécutée et elle n'est jamais traitée comme des droits illimités ni comme zéro.",
+    "availableRoom": "Droits de cotisation CELI disponibles (compte de l'ARC)",
+    "availableRoomNote": "Entrez le chiffre de l'ARC pour l'année du plan, au 1er janvier. Ce chiffre contient déjà le plafond annuel de l'année et tous les retraits faits lors d'une année antérieure : ce registre n'ajoute donc rien pour le plafond de l'année et ne rétablit pas ces retraits antérieurs une seconde fois.",
+    "withdrawalsHelp": "Les retraits faits depuis ce chiffre rétablissent des droits l'année suivante, jamais l'année du retrait. Un transfert direct entre vos propres CELI n'est pas un retrait et n'est pas inscrit ici.",
+    "withdrawalYear": "Année du retrait",
+    "withdrawalAmount": "Montant retiré",
+    "withdrawalAdd": "Inscrire un retrait",
+    "withdrawalRemove": "Retirer",
+    "ledger": "Droits d'ouverture {{opening}} + ajout de l'année {{addition}} + droits rétablis {{restored}} − cotisations {{applied}} = droits de clôture {{closing}} CAD",
+    "savingsShare": "Le plan cotise {{amount}} CAD au CELI de cette personne cette année, selon la répartition de l'épargne résolue.",
+    "restoredNext": "Les retraits inscrits pour {{year}} rétablissent {{amount}} CAD de droits en {{nextYear}}, pas en {{year}}.",
+    "retained": "Conservé et non cotisé : {{retained}} CAD.",
+    "retainedHelp": "Les droits de cotisation ne sont jamais dépassés et l'argent ne disparaît pas : le reste demeure dans le compte non enregistré.",
+    "unknownRoom": "Les droits de cotisation au CELI ne sont pas confirmés, donc aucune nouvelle cotisation n'est exécutée et l'argent est conservé : {{reason}}",
+    "limit": "Selon l'ARC, les droits de cotisation sont le plafond annuel du CELI, plus les droits inutilisés des années précédentes, plus les retraits faits lors des années précédentes (à l'exclusion des transferts directs). C'est la règle que ce registre recalcule. Le plafond annuel lui-même n'est pas encodé : il est indexé par tranches de 500 $ et aucun jeu de règles sourcé n'est publié, donc une année postérieure à l'année du relevé n'ajoute aucun droit ici et le dit au lieu de deviner.",
+    "source": "ARC : cotiser à un CELI",
+    "scope": "Pas encore mis en œuvre (BE-27 B), donc aucun argent n'y est acheminé ici : la politique de remplissage des surplus à la retraite et des surplus de trésorerie, l'interaction de réinvestissement du surplus forcé d'un FERR, la comparaison des stratégies de surplus et le traitement des transferts internes conformes."
   }
 }

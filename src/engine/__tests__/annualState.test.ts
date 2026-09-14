@@ -44,7 +44,12 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(state.byDebt.loan.principal).toBe(0)
     expect(state.byPerson[canonical.people[0].id].age).toBe(41)
     expect(state.benefitIncomeLag[canonical.people[0].id]).toEqual({ status: 'known', value: 120 })
-    expect(state.byAccount[tfsa].room).toEqual({ status: 'known', value: 980 })
+    // BE-27 A: TFSA room belongs to the person, so the account's own
+    // `contributionRoom` column is no longer decremented; the priced room lives
+    // on the per-person ledger, where 20 of the 1,000 applied leaves 980.
+    expect(state.byAccount[tfsa].room).toEqual({ status: 'known', value: 1000 })
+    expect(row.tfsaLedger[canonical.people[0].id]).toMatchObject({
+      applied: 20, retained: 0, closingRoom: { status: 'known', value: 980 } })
     expect(state.contributionHistory).toContainEqual(expect.objectContaining({ accountId: tfsa, contributorId: canonical.people[0].id, amount: 20, calendarYear: 2026 }))
     expect(opening.byAccount[tfsa].balance).toBe(100)
     expect(opening.byDebt.loan.principal).toBe(10)
@@ -118,15 +123,23 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(projectFromState(noPurchase, unclonable, 1, providers()).status).toBe('invalid')
   })
 
-  it('gates unknown ownership and unverified room instead of inventing an assignment or tax rule', () => {
+  it('gates unknown ownership and retains, rather than refuses, an unverified TFSA room', () => {
     const canonical = plan()
     canonical.accounts[0].ownerId = null
     canonical.accounts[0].taxableOwnerShares = { status: 'unknown', reason: 'unassigned' }
     expect(initializeState(canonical).status).toBe('unsupported')
+    // BE-27 A: TFSA room is per person, so the account's own `contributionRoom`
+    // column is no longer the gate. An unconfirmed person room prices nothing,
+    // retains the whole planned amount where the user can see it, and never
+    // becomes unlimited room or a real zero.
     const valid = plan()
-    valid.accounts[0].contributionRoom = { status: 'unknown', reason: 'statement missing' }
+    valid.people[0].tfsaAvailableRoom = { status: 'unknown', reason: 'statement missing' }
     const opening = ok(initializeState(valid))
-    expect(annualStep(valid, opening, providers()).status).toBe('unsupported')
+    const step = ok(annualStep(valid, opening, providers(120)))
+    expect(step.row.byAccount[valid.accounts[0].id].contribution).toBe(0)
+    expect(step.row.cashLedger.retainedContributions).toBe(20)
+    expect(step.row.tfsaLedger[valid.people[0].id].closingRoom.status).toBe('unknown')
+    expect(step.row.tfsaLedger[valid.people[0].id].limitations.map(item => item.code)).toContain('unexecuted')
     expect(opening.byAccount[valid.accounts[0].id].balance).toBe(100)
   })
 

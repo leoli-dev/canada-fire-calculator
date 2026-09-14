@@ -13,6 +13,7 @@ import {
   fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
 import { plannedFhsaContribution } from './fhsaPlan'
+import { annualTfsaAdditionFor, plannedTfsaLines, tfsaRoomYear, tfsaStatement, type TfsaRoomYear } from './tfsaRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
 export interface AnnualState {
@@ -61,6 +62,8 @@ export interface YearRow {
   rrspLedger: Record<string, RrspRoomYear>
   /** BE-36 A per-person FHSA participation-room ledger. */
   fhsaLedger: Record<string, FhsaRoomYear>
+  /** BE-27 A per-person TFSA contribution-room ledger. */
+  tfsaLedger: Record<string, TfsaRoomYear>
   issues: AnnualIssue[]
 }
 export type KernelResult<T> = { status: 'ok'; value: T } | { status: 'invalid' | 'unsupported'; issues: AnnualIssue[] }
@@ -312,6 +315,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const allocation = resolveYearAllocation(plan, year)
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
   if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
+  // TFSA room belongs to one person, so a couple's contribution cannot be
+  // attributed to a room ledger. It is refused rather than parked on an
+  // unidentified owner, exactly as the RRSP share above is.
+  if (plan.people.length > 1 && allocation.voluntary.tfsa > 0) return fail('unsupported', 'couple TFSA contributor and room attribution not yet wired')
   const rrspDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'rrsp')
   if (allocation.voluntary.rrsp > 0 && rrspDestinations.length !== 1) return fail('unsupported', 'ambiguous rrsp contribution destination')
   const nonRegDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'nonReg')
@@ -396,13 +403,39 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       })
     }
   }
-  // TFSA keeps its existing account/person room check; RRSP room is owned by
-  // the per-person ledger below so an over-contribution is clipped, not refused.
-  if (allocation.voluntary.tfsa > 0) {
-    const destinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'tfsa')
-    if (destinations.length !== 1) return fail('unsupported', 'ambiguous tfsa contribution destination')
-    accountRows[destinations[0][0]].contribution += allocation.voluntary.tfsa
-    state.contributionHistory.push({ id: `annual:${year}:tfsa`, accountId: destinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: allocation.voluntary.tfsa, deductionYear: null })
+  // BE-27 A: the TFSA share of the year's savings is priced against the
+  // person's own room ledger. TFSA room belongs to the person, so it is never
+  // read from — or written back to — an account's own `contributionRoom`
+  // column, and an unconfirmed room is never a refusal: the contribution is
+  // clipped and the money is retained visibly in the non-registered account.
+  // The statement year drives the addition and the restoration, and both come
+  // from the same functions the panel uses, so the two cannot drift.
+  const tfsaDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'tfsa')
+  if (allocation.voluntary.tfsa > 0 && tfsaDestinations.length !== 1) return fail('unsupported', 'ambiguous tfsa contribution destination')
+  const tfsaAccountId = tfsaDestinations.length === 1 ? tfsaDestinations[0][0] : null
+  const tfsaLedger: Record<string, TfsaRoomYear> = {}
+  for (const person of plan.people) {
+    const facts = state.byPerson[person.id]
+    const statement = tfsaStatement(plan, person.id)
+    const row = tfsaRoomYear({
+      personId: person.id, year,
+      // The recorded CRA figure is the plan year's own room, exactly as the RRSP
+      // statement is read; every later year carries the prior row's closing
+      // room, so `opening(y) == closing(y-1)`.
+      statementYear: plan.baseYear,
+      openingRoom: facts.tfsaRoom,
+      annualAddition: annualTfsaAdditionFor(year, plan.baseYear),
+      withdrawals: statement?.withdrawals ?? [],
+      lines: plannedTfsaLines({ personId: person.id, year, savingsShare: plan.people.length === 1 ? allocation.voluntary.tfsa : 0 }),
+    })
+    tfsaLedger[person.id] = row
+    facts.tfsaRoom = row.closingRoom
+    for (const line of row.lines) {
+      if (line.applied <= 0) continue
+      if (!tfsaAccountId) return fail('unsupported', `TFSA contribution has no account: ${person.id}`)
+      accountRows[tfsaAccountId].contribution += line.applied
+      state.contributionHistory.push({ id: line.id, accountId: tfsaAccountId, contributorId: person.id, calendarYear: line.calendarYear, amount: line.applied, deductionYear: null })
+    }
   }
   const rrspLedger: Record<string, RrspRoomYear> = {}
   for (const person of plan.people) {
@@ -446,35 +479,18 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       state.contributionHistory.push({ id: line.id, accountId, contributorId: person.id, calendarYear: line.calendarYear, amount: line.applied, deductionYear: line.deductionYear })
     }
   }
-  // Money an RRSP or FHSA plan could not legally execute is retained, visibly,
-  // in the non-registered account instead of being deleted or rerouted to
-  // registered room.
+  // Money an RRSP, FHSA or TFSA plan could not legally execute is retained,
+  // visibly, in the non-registered account instead of being deleted or rerouted
+  // to registered room.
   const retainedContributions = roundCents(
     sum(Object.values(rrspLedger).map(row => row.retained)) +
-    sum(Object.values(fhsaLedger).map(row => row.retained)))
+    sum(Object.values(fhsaLedger).map(row => row.retained)) +
+    sum(Object.values(tfsaLedger).map(row => row.retained)))
   const nonRegAmount = allocation.voluntary.nonReg + retainedContributions
   if (nonRegAmount > 0) {
     if (nonRegDestinations.length !== 1) return fail('unsupported', 'ambiguous nonReg contribution destination')
     accountRows[nonRegDestinations[0][0]].contribution += nonRegAmount
     state.contributionHistory.push({ id: `annual:${year}:nonReg`, accountId: nonRegDestinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: nonRegAmount, deductionYear: null })
-  }
-  for (const [id, row] of Object.entries(accountRows)) {
-    if (row.contribution <= 0) continue
-    const account = state.byAccount[id]
-    // BE-36 A: FHSA room is not the account column. The participation ledger
-    // above already clipped the contribution to the year's room and to the
-    // lifetime limit, so re-checking `contributionRoom` here would reject a
-    // legal contribution that the ledger priced.
-    if (account.kind === 'fhsa') continue
-    if (account.kind !== 'tfsa') continue
-    if (account.room.status !== 'known') return fail('unsupported', `contribution room unknown: ${id}`)
-    if (row.contribution > account.room.value + 1e-8) return fail('unsupported', `contribution exceeds account room: ${id}`)
-    const person = state.byPerson[account.ownerId]
-    const personRoom = person?.tfsaRoom
-    if (!personRoom || personRoom.status !== 'known') return fail('unsupported', `person contribution room unknown: ${account.ownerId}`)
-    if (row.contribution > personRoom.value + 1e-8) return fail('unsupported', `contribution exceeds person room: ${account.ownerId}`)
-    account.room.value -= row.contribution
-    personRoom.value -= row.contribution
   }
   const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
   if (Math.abs(totalContributions - cash - allocation.employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
@@ -517,7 +533,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
-    taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, issues: [] }
+    taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
   return { status: 'ok', value: { state, row } }
 }
 

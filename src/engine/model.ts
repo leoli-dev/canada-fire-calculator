@@ -182,6 +182,14 @@ export interface InputsV2 {
    * treated as evidence of room. See BE-36 A.
    */
   fhsaStatementHistory?: Record<EntityId, { cumulativePriorContributions: Known<number>; provenance: Provenance }>
+  /**
+   * Per person, the CRA TFSA statement facts the per-person room ledger needs
+   * and that the room figure alone cannot supply: the withdrawals made since it,
+   * which are the only thing that restores room. Absent means the history is not
+   * confirmed, so no withdrawal is treated as restoring room and no room
+   * addition is assumed. See BE-27 A.
+   */
+  tfsaStatement?: Record<EntityId, { withdrawals: { id: string; calendarYear: number; amount: number }[]; provenance: Provenance }>
   migration: { sourcePersistVersion: number; ownershipNeedsConfirmation: boolean; ageBasisNeedsConfirmation: boolean; savingsBasisNeedsConfirmation: boolean }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
