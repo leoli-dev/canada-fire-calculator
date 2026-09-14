@@ -1275,5 +1275,26 @@
     "limit": "The published $8,000 annual limit, $40,000 lifetime limit and $8,000 participation-room carryforward maximum come from the CRA FHSA pages. The year's room is this year's $8,000 plus at most that carryforward maximum, and the lifetime limit bounds that whole total, so room carried in from earlier years is never spent on top of the remaining lifetime room. Not implemented yet: the 15-year / age-71 clock, rollover into an RRSP/RRIF, qualifying and non-qualifying withdrawals, home-purchase eligibility and the death event. FHSA re-participation room, designated amounts and the excess-FHSA-amount tax are out of scope too, so this ledger reports only room the published limits allow.",
     "source": "CRA: participating in your FHSAs",
     "scope": "FHSA room is tracked per person and per year. Maturity, rollover, withdrawals and home-purchase eligibility remain outside this estimate."
+  },
+  "be27": {
+    "title": "TFSA contribution room",
+    "person": "{{person}} TFSA room",
+    "explanation": "TFSA contribution room belongs to the person, not to an account: one CRA figure covers every TFSA you hold, so it is recorded per person and priced per person. Copy the available contribution room from your CRA account and record any TFSA withdrawal you made. Leave the room blank if you cannot confirm it: a blank line stays unknown, no new contribution is executed against it, and it is never treated as unlimited room or as zero.",
+    "availableRoom": "Available TFSA contribution room (CRA account)",
+    "availableRoomNote": "Enter the CRA figure for this plan year, as of January 1. That figure already contains the year's annual dollar limit and every withdrawal you made in an earlier year, so this ledger adds nothing for the year's own limit and does not restore those earlier withdrawals a second time.",
+    "withdrawalsHelp": "Withdrawals made since that figure restore room in the following year, never in the year of the withdrawal. A direct transfer between your own TFSAs is not a withdrawal and is not recorded here.",
+    "withdrawalYear": "Year withdrawn",
+    "withdrawalAmount": "Amount withdrawn",
+    "withdrawalAdd": "Record a withdrawal",
+    "withdrawalRemove": "Remove",
+    "ledger": "Opening room {{opening}} + this year's addition {{addition}} + restored room {{restored}} − contributions {{applied}} = closing room {{closing}} CAD",
+    "savingsShare": "The plan contributes {{amount}} CAD to this person's TFSA this year, from the resolved savings split.",
+    "restoredNext": "Withdrawals recorded for {{year}} restore {{amount}} CAD of room in {{nextYear}}, not in {{year}}.",
+    "retained": "Retained and not contributed: {{retained}} CAD.",
+    "retainedHelp": "Contribution room is never exceeded and the money does not disappear: the remainder stays in the non-registered account instead.",
+    "unknownRoom": "TFSA contribution room is not confirmed, so no new contribution is executed and the money is retained: {{reason}}",
+    "limit": "The CRA states that contribution room is the annual TFSA dollar limit plus unused room from previous years plus withdrawals made in previous years (excluding direct transfers). That is the rule this ledger recomputes. The annual dollar limit itself is not encoded: it is indexed in $500 increments and no sourced limit pack is published, so a year after the statement year adds no room here and says so instead of guessing.",
+    "source": "CRA: contributing to a TFSA",
+    "scope": "Not implemented yet (BE-27 B), so no cash is routed by them here: the retirement surplus refill and cash-flow surplus policy, the RRIF-forced-surplus reinvestment interaction, the surplus-strategy comparison, and internal compliant transfer handling."
   }
 }

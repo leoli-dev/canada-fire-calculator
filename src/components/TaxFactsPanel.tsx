@@ -4,6 +4,7 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
+import { previewTfsaRoomYear, tfsaStatement, type TfsaWithdrawalLine } from '../engine/tfsaRoom'
 import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
 import { fhsaPlanRowId, fhsaScheduledContributions, legacyFhsaMirror, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
@@ -305,6 +306,105 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
       </>}
     <p className="hint">{t('be36.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/contributing-your-fhsa.html"
       target="_blank" rel="noopener noreferrer">{t('be36.source')}</a></p>
+  </div>
+}
+
+/**
+ * BE-27 A: one person's TFSA contribution-room row. TFSA room belongs to the
+ * person, so the editor is keyed by person and never by an account or a
+ * household total. Expert and guided entry both mount it, the unknown state is
+ * explicit, and the ledger is the same computation the kernel prices. The
+ * withdrawals recorded here are the only thing that restores room, and the row
+ * says when that happens instead of implying it happens immediately.
+ */
+function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
+  const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
+  const role = person.role
+  const ownerLabel = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
+  const statement = tfsaStatement(plan, person.id)
+  const withdrawals = statement?.withdrawals ?? []
+  const { ledger, savingsShare, restoredNextYear } = previewTfsaRoomYear(plan, person)
+  const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
+  const writeRoom = (raw: string) => {
+    const text = raw.trim()
+    const next = text === '' ? null : Number(text)
+    if (next !== null && (!Number.isFinite(next) || next < 0)) return
+    const current = person.tfsaAvailableRoom
+    if (current.status === 'known' && next === current.value || current.status === 'unknown' && next === null) return
+    onEdit(draft => {
+      draft.people.find(item => item.id === person.id)!.tfsaAvailableRoom = next === null
+        ? { status: 'unknown', reason: 'CRA TFSA room statement not supplied' } : { status: 'known', value: next }
+    })
+  }
+  // The withdrawal rows are a recorded fact set, not a derived value: an empty
+  // list is a confirmed "nothing was withdrawn" only once the user adds one,
+  // and clearing every row returns the history to its absent state.
+  const writeWithdrawals = (change: (rows: TfsaWithdrawalLine[]) => TfsaWithdrawalLine[]) =>
+    onEdit(draft => {
+      draft.tfsaStatement ??= {}
+      const entry = draft.tfsaStatement[person.id]
+      draft.tfsaStatement[person.id] = {
+        withdrawals: change(entry?.withdrawals ?? []),
+        provenance: entry?.provenance ?? { origin: 'user', sourceYear: draft.baseYear },
+      }
+    })
+  const addWithdrawal = () => writeWithdrawals(rows => {
+    let serial = 0
+    while (rows.some(row => row.id === `be27:withdrawal:${person.id}:${serial}`)) serial += 1
+    return [...rows, { id: `be27:withdrawal:${person.id}:${serial}`, calendarYear: plan.baseYear, amount: 0 }]
+  })
+  const setWithdrawal = (id: string, change: (row: TfsaWithdrawalLine) => void) =>
+    writeWithdrawals(rows => rows.map(row => { if (row.id !== id) return row; const next = { ...row }; change(next); return next }))
+  const removeWithdrawal = (id: string) => writeWithdrawals(rows => rows.filter(row => row.id !== id))
+  return <div role="group" aria-label={t('be27.person', { person: ownerLabel })} data-testid={`tfsa-statement-${role}`}>
+    <h5>{t('be27.person', { person: ownerLabel })}</h5>
+    <p className="hint">{t('be27.explanation')}</p>
+    <label>{t('be27.availableRoom')}
+      <input type="number" min="0" step="1" data-testid={`tfsa-available-room-${role}`}
+        key={`room:${person.id}:${person.tfsaAvailableRoom.status === 'known' ? person.tfsaAvailableRoom.value : 'unknown'}`}
+        defaultValue={person.tfsaAvailableRoom.status === 'known' ? person.tfsaAvailableRoom.value : ''}
+        placeholder={t('be12.unknown')}
+        onBlur={event => writeRoom(event.currentTarget.value)} />
+    </label>
+    <p className="hint">{t('be27.availableRoomNote')}</p>
+    <p className="hint">{t('be27.withdrawalsHelp')}</p>
+    {withdrawals.map(row => <div key={row.id} data-testid={`tfsa-withdrawal-${row.id}`}>
+      <label>{t('be27.withdrawalYear')}
+        <input type="number" min="1900" max="2200" step="1" data-testid={`tfsa-withdrawal-year-${row.id}`}
+          key={`wyear:${row.id}:${row.calendarYear}`} defaultValue={row.calendarYear}
+          onBlur={event => {
+            const year = Number(event.currentTarget.value)
+            if (!Number.isInteger(year) || year < 1900 || year > 2200 || year === row.calendarYear) return
+            setWithdrawal(row.id, item => { item.calendarYear = year })
+          }} />
+      </label>
+      <label>{t('be27.withdrawalAmount')}
+        <input type="number" min="0" step="1" data-testid={`tfsa-withdrawal-amount-${row.id}`}
+          key={`wamount:${row.id}:${row.amount}`} defaultValue={row.amount}
+          onBlur={event => {
+            const amount = Number(event.currentTarget.value)
+            if (!Number.isFinite(amount) || amount < 0 || amount === row.amount) return
+            setWithdrawal(row.id, item => { item.amount = amount })
+          }} />
+      </label>
+      <button type="button" data-testid={`tfsa-withdrawal-remove-${row.id}`}
+        onClick={() => removeWithdrawal(row.id)}>{t('be27.withdrawalRemove')}</button>
+    </div>)}
+    <button type="button" data-testid={`tfsa-withdrawal-add-${role}`} onClick={addWithdrawal}>{t('be27.withdrawalAdd')}</button>
+    {restoredNextYear.status === 'known' && restoredNextYear.value > 0 && <p className="hint" data-testid={`tfsa-restored-next-${role}`}>
+      {t('be27.restoredNext', { amount: money(restoredNextYear.value), year: plan.baseYear, nextYear: plan.baseYear + 1 })}</p>}
+    {savingsShare > 0 && <p className="hint" data-testid={`tfsa-savings-share-${role}`}>
+      {t('be27.savingsShare', { amount: money(savingsShare) })}</p>}
+    <p data-testid={`tfsa-ledger-${role}`}>{t('be27.ledger', {
+      opening: shown(ledger.openingRoom), addition: shown(ledger.annualAddition),
+      restored: shown(ledger.restored), applied: money(ledger.applied), closing: shown(ledger.closingRoom),
+    })}</p>
+    <p className="hint" data-testid={`tfsa-retained-${role}`}>{t('be27.retained', { retained: money(ledger.retained) })}
+      {ledger.retained > 0 ? ` ${t('be27.retainedHelp')}` : ''}</p>
+    {ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`tfsa-room-unknown-${role}`}>
+      {t('be27.unknownRoom', { reason: ledger.closingRoom.reason })}</p>}
   </div>
 }
 
@@ -737,6 +837,14 @@ export function TaxFactsPanel() {
     {activeFhsaAccounts(current, current.baseYear, id => current.accounts.find(item => item.id === id)?.balance ?? 0).length > 1 &&
       <p className="hint" role="status" data-testid="fhsa-multiple-active">{t('be36.multipleActive')}</p>}
     <p className="hint">{t('be36.scope')}</p>
+    {/* BE-27 A: TFSA room is per person too, and this row is the only place the
+        CRA room figure and the withdrawal history that restores it are recorded.
+        Both entry modes mount this panel, so the two never diverge. */}
+    <h4>{t('be27.title')}</h4>
+    {people.map(person => <TfsaRoomRow key={person.id} person={person} plan={current} onEdit={edit} />)}
+    <p className="hint">{t('be27.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/tax-free-savings-account/contributions.html"
+      target="_blank" rel="noopener noreferrer">{t('be27.source')}</a></p>
+    <p className="hint" data-testid="tfsa-scope">{t('be27.scope')}</p>
     {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
       const rowIds = [account.id, derivedAccountId(account.id)]
       const setRow = (change: (item: Account) => void) => edit(draft => {
