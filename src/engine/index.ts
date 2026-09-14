@@ -11,13 +11,18 @@ export {
   estimateOasAt65,
   allowanceAnnual,
   gisAnnual,
+  benefitIncomeBasis,
+  gisHouseholdCategory,
+  gisWorkExemption,
   ccbAnnual,
   CPP_MAX_AT_65,
   OAS_FULL_AT_65,
-  GIS_SINGLE,
-  GIS_COUPLE,
-  ALLOWANCE,
+  OAS_GIS_ALLOWANCE_2026_Q3,
+  GIS_HOUSEHOLD_CATEGORIES,
   CCB,
+  type BenefitBasis,
+  type BenefitIncomeBasis,
+  type GisHouseholdClassification,
 } from './benefits'
 export { rrifMinFactor } from './rrif'
 export { validateInputs, type ValidationIssue, type Severity } from './validate'

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { selectBenefitRules, selectTaxRules } from '../engine/rules'
+import { selectBenefitRules, selectGisRules, selectTaxRules } from '../engine/rules'
 import type { Province } from '../engine/types'
 
 /** Shared disclosure: both entry modes read the same pinned pack selection. */
@@ -7,9 +7,12 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   const { t } = useTranslation()
   const tax = selectTaxRules(province, 2026)
   const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
+  // BE-26 A: the GIS/Allowance pack is a quarterly published table, so its id
+  // and payment period are disclosed next to the tax and CCB ones.
+  const gis = selectGisRules()
   return <div className="rule-assumptions" data-testid="rule-assumptions">
     <strong>{t('ruleAssumptionsTitle')}</strong>
-    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id })}</p>
+    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
     <p>{t('ruleAssumptionsLimit')}</p>
     <div className="rule-sources">

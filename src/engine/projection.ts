@@ -13,7 +13,6 @@ import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
-  allowanceAnnual,
   ccbAnnual,
   cppAnnual,
   earlyClaimDilutionRelief,
@@ -192,12 +191,14 @@ function evaluate(
   // GIS: requires receiving OAS; income test is on combined household income
   // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
   // exemption) — a couple's GIS eligibility is assessed on family income
-  // regardless of which spouse earned what
+  // regardless of which spouse earned what. BE-26 A: the household category
+  // (single / both pensioners / one pensioner with an Allowance spouse / one
+  // pensioner whose spouse has neither) picks both the maximum and the
+  // cut-off, and the Allowance is computed inside that same category rather
+  // than added from a household-wide helper.
   const receivingOas = oasGrossPerPerson.map((o) => o > 0)
   const gisIncome = pooledTaxable + extraIncome
-  const gis =
-    gisAnnual(receivingOas, gisIncome, extraIncome) +
-    allowanceAnnual(receivingOas, agesPerPerson, gisIncome)
+  const gis = gisAnnual(receivingOas, gisIncome, extraIncome, { agesPerPerson })
   // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
@@ -226,8 +227,7 @@ function evaluate(
           oasGross: person.oasByPerson[row.personId]?.gross ?? 0,
           oasNet: person.oasByPerson[row.personId]?.net ?? 0 })
       }
-      const personGis = gisAnnual(receivingOas, person.taxableExOas, person.earnedWork) +
-        allowanceAnnual(receivingOas, agesPerPerson, person.taxableExOas)
+      const personGis = gisAnnual(receivingOas, person.taxableExOas, person.earnedWork, { agesPerPerson })
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, ccb: personCcb,
