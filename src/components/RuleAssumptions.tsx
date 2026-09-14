@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { selectBenefitRules, selectTaxRules } from '../engine/rules'
+import { selectBenefitRules, selectGisRules, selectTaxRules } from '../engine/rules'
 import type { Province } from '../engine/types'
 
 /** Shared disclosure: both entry modes read the same pinned pack selection. */
@@ -7,9 +7,15 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   const { t } = useTranslation()
   const tax = selectTaxRules(province, 2026)
   const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
+  // BE-26 A: the GIS/Allowance pack is a quarterly published table, so its id
+  // and payment period are disclosed next to the tax and CCB ones, together
+  // with the tables its fitted reduction is measured against and the paths it
+  // knowingly does not price. Those paths used to live only in the pack's own
+  // `limitation` string, which nothing rendered.
+  const gis = selectGisRules()
   return <div className="rule-assumptions" data-testid="rule-assumptions">
     <strong>{t('ruleAssumptionsTitle')}</strong>
-    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id })}</p>
+    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
     <p>{t('ruleAssumptionsLimit')}</p>
     <div className="rule-sources">
@@ -20,6 +26,9 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
         ['ruleProvincialBpaSource', tax.fieldSources.provincialBpa],
         ['ruleCcbAmountsSource', ccb.fieldSources.amounts],
         ['ruleCcbThresholdsSource', ccb.fieldSources.thresholds],
+        ['ruleGisQuarterSource', gis.sourceURL],
+        ['ruleGisTablesSource', gis.categories.single.fieldSources.reductionSegments],
+        ['ruleGisAllowanceSource', gis.allowance.fieldSources.maxMonthly],
       ] as const).map(([label, url]) => <span key={label}>
         <a href={url} target="_blank" rel="noreferrer">{t(label)}</a>{' · '}
       </span>)}
@@ -29,5 +38,11 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{t('ruleConflictingSource')}</a>{' · '}</span>)}
     </div>
     {tax.sourceConflict && <p>{t(province === 'PE' ? 'rulePeConflict' : 'ruleMbConflict')}</p>}
+    <p data-testid="rule-gis-not-modelled">
+      {t('ruleGisNotModelled')}{' '}
+      {gis.unsupportedPaths.map((path, index) => <span key={path.id}>
+        {index > 0 ? '; ' : ''}{t(`gisUnsupported.${path.id}`)}{' '}
+      </span>)}
+    </p>
   </div>
 }

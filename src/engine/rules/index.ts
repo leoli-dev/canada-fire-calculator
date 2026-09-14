@@ -15,6 +15,13 @@ export interface Provenance {
   coverage: Coverage
   limitation: string
 }
+/** The dates publication validation needs without narrowing a pack's shape. */
+interface RulePackMeta extends Provenance {
+  id: string
+  assumedFutureRule: boolean
+  assumedAnnualRate?: number
+  basedOnRuleId?: string
+}
 export interface TaxRulePack extends Provenance {
   id: string
   jurisdiction: Province
@@ -62,6 +69,87 @@ export interface FhsaRulePack extends Provenance {
    */
   participationRoomCarryForwardLimit: number
   fieldSources: { annualLimit: string; lifetimeLimit: string; participationRoomCarryForwardLimit: string }
+  assumedFutureRule: boolean
+  assumedAnnualRate?: number
+  basedOnRuleId?: string
+}
+
+/**
+ * BE-26 A: the OAS/GIS/Allowance parameter pack. GIS and the Allowance are not
+ * one table with one cut-off: the amount and the income cut-off both depend on
+ * the household shape, so this pack carries one entry per supported category
+ * and the values are never interchangeable across categories.
+ */
+export type GisHouseholdRuleCategory =
+  | 'single'
+  | 'couple-both-pensioners'
+  | 'couple-partner-allowance'
+  | 'couple-partner-no-oas-no-allowance'
+
+/** A path the pack knowingly does not price, with a reason a caller can show. */
+export interface GisUnsupportedPath {
+  id: string
+  reason: string
+}
+
+/**
+ * The reduction of the annual maximum, piecewise linear in annual joint
+ * income, in annual dollars removed per annual dollar of income. Each entry's
+ * `upTo` is the income at which the next rate takes over; the last one is
+ * `Infinity`.
+ *
+ * This is a *fit* to the published table of monthly amounts, not a published
+ * formula: the tables publish a rounded amount per income bracket, and no
+ * single line reproduces them. `maxMonthlyDeviation` records how far this fit
+ * can be from its table, and the tests fail if it exceeds the stated
+ * tolerance.
+ */
+export interface GisReductionSegment { rate: number; upTo: number }
+
+export interface GisCategoryRule {
+  /** Published maximum monthly payment for the whole household. */
+  maxMonthly: number
+  /** Published annual income cut-off for this category. */
+  annualCutoff: number
+  reductionSegments: GisReductionSegment[]
+  /**
+   * Largest monthly gap between this fitted reduction and the published table
+   * it was fitted to, across every published bracket boundary. Fitted, not
+   * published; pinned by `benefits.test.ts`.
+   */
+  maxMonthlyDeviation: number
+  fieldSources: { maxMonthly: string; annualCutoff: string; reductionSegments: string }
+}
+
+export interface GisAllowanceRule {
+  /** Published maximum monthly Allowance. */
+  maxMonthly: number
+  /** Published annual income cut-off for the Allowance. */
+  annualCutoff: number
+  /** Published income at which the Allowance starts to reduce. */
+  topUpIncome: number
+  reductionSegments: GisReductionSegment[]
+  /** Largest monthly gap against Table 4's Allowance column, as above. */
+  maxMonthlyDeviation: number
+  fieldSources: {
+    maxMonthly: string
+    annualCutoff: string
+    topUpIncome: string
+    reductionSegments: string
+  }
+}
+
+export interface GisRulePack extends Provenance {
+  id: string
+  program: 'GIS'
+  /** The payment quarter these amounts are published for. */
+  paymentPeriod: string
+  /** The base calendar year whose income these amounts test. */
+  basedOnIncomeYear: number
+  categories: Record<GisHouseholdRuleCategory, GisCategoryRule>
+  allowance: GisAllowanceRule
+  /** The paths this pack does not price, each with a reason to surface. */
+  unsupportedPaths: GisUnsupportedPath[]
   assumedFutureRule: boolean
   assumedAnnualRate?: number
   basedOnRuleId?: string
@@ -210,53 +298,332 @@ function validTable(value: unknown): value is TaxTable {
   }
   return true
 }
-export function publishRulePack<T extends TaxRulePack | BenefitRulePack | FhsaRulePack>(candidate: unknown): T {
-  const p = candidate as Partial<TaxRulePack & BenefitRulePack & FhsaRulePack>
-  if (!p || typeof p.id !== 'string' || !p.id.trim() || !validURL(p.sourceURL) ||
-      !validDate(p.effectiveDate) || !validDate(p.verifiedAt) ||
-      !['cpi-assumption', 'frozen'].includes(p.indexationRule ?? '') ||
-      p.rounding !== 'nearest-dollar' || !['modeled', 'estimated', 'unsupported'].includes(p.coverage ?? '') ||
-      typeof p.limitation !== 'string' || !p.limitation.trim() || typeof p.assumedFutureRule !== 'boolean' ||
-      (p.additionalSourceURLs !== undefined && (!Array.isArray(p.additionalSourceURLs) || p.additionalSourceURLs.some(url => !validURL(url)))) ||
-      (p.assumedFutureRule && (!amount(p.assumedAnnualRate) || p.assumedAnnualRate > 1 || !p.basedOnRuleId)) ||
-      Number('jurisdiction' in p) + Number('program' in p) + Number('annualLimit' in p) !== 1) throw new Error('Rule pack lacks publication metadata')
+const OAS_GIS_2026_Q3_URL = 'https://www.canada.ca/en/employment-social-development/programs/pensions/pension/statistics/2026-quarterly-july-september.html'
+const OAS_GIS_TABLES_URL = 'https://open.canada.ca/data/en/dataset/dfa4daf1-669e-4514-82cd-982f27707ed0'
+const ALLOWANCE_AMOUNT_URL = 'https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/guaranteed-income-supplement/allowance/benefit-amount.html'
+/**
+ * The four published tables of monthly amounts by income bracket that the
+ * reduction segments are fitted to. They are resources of the same
+ * open.canada.ca dataset; citing the dataset alone would not say which
+ * household shape a fit came from.
+ */
+const GIS_TABLE_1_SINGLE_URL = 'https://open.canada.ca/data/en/dataset/dfa4daf1-669e-4514-82cd-982f27707ed0/resource/0a7918f0-6e8a-433b-9ea2-60e2b8674cb5/download/table1_gis_for_single_who_receives_oas_pension_july2026.csv'
+const GIS_TABLE_2_SPOUSE_OAS_URL = 'https://open.canada.ca/data/en/dataset/dfa4daf1-669e-4514-82cd-982f27707ed0/resource/5efa3920-83f6-4108-bb51-db2456e7b37c/download/table2_gis_for_spouse_of_someone_receiving_oas_pension_july2026.csv'
+const GIS_TABLE_3_SPOUSE_NO_OAS_URL = 'https://open.canada.ca/data/en/dataset/dfa4daf1-669e-4514-82cd-982f27707ed0/resource/b4e1258c-2a72-4c64-b202-d0ab6aa2d21a/download/table3_gis_for_spouse_of_someone_who_does_not_receive_oas_pension_july2026.csv'
+const GIS_TABLE_4_ALLOWANCE_URL = 'https://open.canada.ca/data/en/dataset/dfa4daf1-669e-4514-82cd-982f27707ed0/resource/89b0fa2c-af49-4fb5-a74c-1cf2268fb521/download/table4_gis_and_allowance_for_couple_july2026.csv'
+
+/** Both pensioners' household maximum: the table publishes one pensioner's. */
+/** Published maximum monthly payments, whole household (ESDC Table 5). */
+const SINGLE_MONTHLY = 1123.17
+const ALLOWANCE_SPOUSE_MONTHLY = 676.09
+/**
+ * The both-pensioners row is published per pensioner; the household receives
+ * one each, so the category's own maximum is two of them.
+ */
+const BOTH_PENSIONERS_MONTHLY = 2 * ALLOWANCE_SPOUSE_MONTHLY
+const ALLOWANCE_MONTHLY = 1428.06
+/** Published annual income cut-offs, one per household shape (ESDC Table 5). */
+const SINGLE_CUTOFF = 22800
+const BOTH_PENSIONERS_CUTOFF = 30096
+const ALLOWANCE_CUTOFF = 42144
+const NO_OAS_CUTOFF = 54624
+/** Published annual income cut-offs for the GIS/Allowance top-ups (Table 5). */
+const SINGLE_TOP_UP = 10352
+const NO_OAS_TOP_UP = 20704
+const ALLOWANCE_TOP_UP = 8800
+
+/**
+ * BE-26 A (corrected): the reduction segments below are a *fit* to the
+ * published tables of monthly amounts, not a published formula. Table 5 of the
+ * quarterly page publishes each household shape's maximum, income cut-off and
+ * top-up income cut-off; the four companion tables publish the amount for
+ * every income bracket. Only those published figures are labelled published
+ * here.
+ *
+ * Every earlier version of this model drew one straight line from a flat
+ * "top-up band" to the cut-off. That was wrong twice over: the single row has
+ * no flat band at all (its table falls from the first $24 bracket), and the
+ * one-pensioner Allowance row is not flat either (its pensioner-side GIS falls
+ * with income, and the Allowance falls faster). Both rows are now fitted to
+ * the slope changes their own tables show.
+ *
+ * Breakpoints: 10,352 / 20,704 / 8,800 are the published top-up income
+ * cut-offs; 2,048 / 4,096 / 12,048 and the two fractional values are where the
+ * published table's slope changes, the fractional ones placed so the fit
+ * passes through the published amount at the table's top-up cut-off and on its
+ * final plateau.
+ */
+function gisCategoryRules(): Record<GisHouseholdRuleCategory, GisCategoryRule> {
+  return {
+    single: {
+      maxMonthly: SINGLE_MONTHLY, annualCutoff: SINGLE_CUTOFF,
+      reductionSegments: [
+        { rate: 0.5, upTo: 2048 },
+        { rate: 0.75, upTo: SINGLE_TOP_UP },
+        // The last rate is set so the fit reaches zero exactly at the
+        // published 22,800 cut-off rather than a few dollars past it.
+        { rate: 0.500164, upTo: Infinity },
+      ],
+      maxMonthlyDeviation: 1,
+      fieldSources: {
+        maxMonthly: OAS_GIS_2026_Q3_URL,
+        annualCutoff: OAS_GIS_2026_Q3_URL,
+        reductionSegments: GIS_TABLE_1_SINGLE_URL,
+      },
+    },
+    'couple-both-pensioners': {
+      maxMonthly: BOTH_PENSIONERS_MONTHLY, annualCutoff: BOTH_PENSIONERS_CUTOFF,
+      reductionSegments: [
+        { rate: 0.5, upTo: 4096 },
+        { rate: 0.75, upTo: ALLOWANCE_TOP_UP },
+        { rate: 0.5001026, upTo: Infinity },
+      ],
+      maxMonthlyDeviation: 2,
+      fieldSources: {
+        maxMonthly: OAS_GIS_2026_Q3_URL,
+        annualCutoff: OAS_GIS_2026_Q3_URL,
+        reductionSegments: GIS_TABLE_2_SPOUSE_OAS_URL,
+      },
+    },
+    'couple-partner-allowance': {
+      maxMonthly: ALLOWANCE_SPOUSE_MONTHLY, annualCutoff: ALLOWANCE_CUTOFF,
+      // The pensioner's own GIS on this row is not flat: Table 4 shows it
+      // falling with the Allowance until it levels off at its own $259.41
+      // plateau, which is what the spouse-with-neither row pays at the same
+      // income. That plateau is what makes the hand-off at 42,144 continuous.
+      reductionSegments: [
+        { rate: 0, upTo: 4096 },
+        { rate: 0.125, upTo: ALLOWANCE_TOP_UP },
+        { rate: 0, upTo: 12048 },
+        { rate: 0.25, upTo: 29696.64 },
+        { rate: 0, upTo: Infinity },
+      ],
+      maxMonthlyDeviation: 3,
+      fieldSources: {
+        maxMonthly: OAS_GIS_2026_Q3_URL,
+        annualCutoff: OAS_GIS_2026_Q3_URL,
+        reductionSegments: GIS_TABLE_4_ALLOWANCE_URL,
+      },
+    },
+    'couple-partner-no-oas-no-allowance': {
+      maxMonthly: SINGLE_MONTHLY, annualCutoff: NO_OAS_CUTOFF,
+      reductionSegments: [
+        { rate: 0, upTo: 4096 },
+        { rate: 0.125, upTo: 8977.44 },
+        { rate: 0.375, upTo: NO_OAS_TOP_UP },
+        // Two closing segments: the published amount is reproduced exactly at
+        // the 42,144 Allowance hand-off, and the fit still reaches zero at the
+        // published 54,624 cut-off rather than 38 dollars before it.
+        { rate: 0.25, upTo: ALLOWANCE_CUTOFF },
+        { rate: 0.249231, upTo: Infinity },
+      ],
+      maxMonthlyDeviation: 1.81,
+      fieldSources: {
+        maxMonthly: OAS_GIS_2026_Q3_URL,
+        annualCutoff: OAS_GIS_2026_Q3_URL,
+        reductionSegments: GIS_TABLE_3_SPOUSE_NO_OAS_URL,
+      },
+    },
+  }
+}
+
+/**
+ * The Allowance's own published maximum, top-up income cut-off and income
+ * cut-off (Table 5), with the reduction fitted to Table 4's Allowance column.
+ * It never borrows a GIS maximum: 1,428.06 is the Allowance's own figure.
+ */
+function allowanceRule(): GisAllowanceRule {
+  return {
+    maxMonthly: ALLOWANCE_MONTHLY, annualCutoff: ALLOWANCE_CUTOFF, topUpIncome: ALLOWANCE_TOP_UP,
+    reductionSegments: [
+      { rate: 0.75, upTo: 4096 },
+      { rate: 0.875, upTo: ALLOWANCE_TOP_UP },
+      { rate: 0.75, upTo: 12048 },
+      // Reaches zero exactly at the published 42,144 cut-off.
+      { rate: 0.2496258, upTo: Infinity },
+    ],
+    maxMonthlyDeviation: 3,
+    fieldSources: {
+      maxMonthly: ALLOWANCE_AMOUNT_URL,
+      annualCutoff: ALLOWANCE_AMOUNT_URL,
+      topUpIncome: OAS_GIS_2026_Q3_URL,
+      reductionSegments: GIS_TABLE_4_ALLOWANCE_URL,
+    },
+  }
+}
+
+/** Short names for the limitation text, so it never states a bound by hand. */
+const GIS_CATEGORY_LABEL: Record<GisHouseholdRuleCategory, string> = {
+  single: 'single',
+  'couple-both-pensioners': 'both pensioners',
+  'couple-partner-allowance': 'Allowance spouse',
+  'couple-partner-no-oas-no-allowance': 'spouse with neither',
+}
+
+/** The fitted bounds, read off the rules so the limitation cannot drift from them. */
+function deviationSummary(
+  categories: Record<GisHouseholdRuleCategory, GisCategoryRule>,
+  allowance: GisAllowanceRule,
+): string {
+  const perCategory = (Object.keys(categories) as GisHouseholdRuleCategory[])
+    .map(key => `${GIS_CATEGORY_LABEL[key]} $${categories[key].maxMonthlyDeviation.toFixed(2)}`)
+  return [...perCategory, `Allowance $${allowance.maxMonthlyDeviation.toFixed(2)}`].join(', ')
+}
+
+/**
+ * The paths this pack does not price. Each is an explicit reason a caller can
+ * surface, rather than free text inside a limitation a user never sees.
+ */
+const GIS_UNSUPPORTED_PATHS: GisUnsupportedPath[] = [
+  { id: 'prior-year-base-period',
+    reason: "GIS and the Allowance test the prior year's income (2025 for the 2026-07/2026-09 quarter); this calculator tests the same year's income." },
+  { id: 'retirement-year-income-estimate',
+    reason: 'The first payment year uses an estimated retirement-year income; this calculator does not estimate one.' },
+  { id: 'ccb-historical-income',
+    reason: "The Canada Child Benefit is paid on the prior year's adjusted family net income; this calculator uses the same year's income." },
+  { id: 'provincial-top-ups',
+    reason: 'Provincial GIS or Allowance top-ups (for example Quebec\'s) are not modelled.' },
+]
+
+/** The tolerance every fitted reduction in this pack is held to, in dollars a month. */
+export const DEVIATION_TOLERANCE = 3.25
+
+/**
+ * July-September 2026 amounts. The maximums, income cut-offs and top-up income
+ * cut-offs are transcribed from the published quarterly table (Table 5); the
+ * reduction shape is fitted to the four companion tables of monthly amounts by
+ * income bracket, and the fit's measured bound is recorded on each rule.
+ */
+const GIS_CATEGORIES_2026_Q3: Record<GisHouseholdRuleCategory, GisCategoryRule> = gisCategoryRules()
+const GIS_ALLOWANCE_2026_Q3: GisAllowanceRule = allowanceRule()
+
+const GIS_PACKS: GisRulePack[] = [
+  {
+    id: 'CA-OAS-GIS-2026-Q3-v1',
+    program: 'GIS',
+    paymentPeriod: '2026-07/2026-09',
+    basedOnIncomeYear: 2025,
+    categories: GIS_CATEGORIES_2026_Q3,
+    allowance: GIS_ALLOWANCE_2026_Q3,
+    unsupportedPaths: GIS_UNSUPPORTED_PATHS,
+    sourceURL: OAS_GIS_2026_Q3_URL,
+    additionalSourceURLs: [OAS_GIS_TABLES_URL, ALLOWANCE_AMOUNT_URL],
+    effectiveDate: '2026-07-01', verifiedAt: '2026-09-14',
+    indexationRule: 'cpi-assumption',
+    rounding: 'nearest-dollar', coverage: 'estimated',
+    limitation: 'Maximums, income cut-offs and top-up income cut-offs are the published July-September 2026 figures for each household shape (single; both pensioners; pensioner with an Allowance spouse; pensioner whose spouse has neither OAS nor the Allowance) and are reproduced exactly. The reduction is a piecewise-linear FIT to the published tables of monthly amounts by income bracket, not a published formula: at every published bracket boundary the modelled monthly amount is within the fitted bound recorded on each rule (' +
+      deviationSummary(GIS_CATEGORIES_2026_Q3, GIS_ALLOWANCE_2026_Q3) +
+      ') of its published table, and never more than $' + DEVIATION_TOLERANCE.toFixed(2) + '; the tests sweep the published range and fail if a fit drifts past its recorded bound. The tables publish $1 steps within brackets up to 48 dollars wide, so inside a bracket a continuous fit can differ from the rounded published amount by up to the step it is on. The Allowance is fitted from its own published maximum, 8,800 top-up income and 42,144 cut-off; the pensioner-side GIS follows its published Allowance-row table rather than staying flat, which is what keeps the household amount continuous when the Allowance ends at 42,144 and the household moves to the spouse-with-neither row. Not modelled: the Allowance for the Survivor, and the four paths listed in `unsupportedPaths`. Employment-income exemption: the first $5,000 of employment or self-employment income is excluded from the test, plus half of the next $10,000.',
+    assumedFutureRule: false,
+  },
+]
+
+/** A published shape's reduction segments must be ordered and end at Infinity. */
+function validReductionSegments(segments: GisReductionSegment[] | undefined): boolean {
+  if (!Array.isArray(segments) || segments.length === 0) return false
+  let previous = 0
+  return segments.every((segment, index) => {
+    const last = index === segments.length - 1
+    // A rate above 1 is legitimate: the reduction removes annual dollars from
+    // an annualized maximum. A negative or non-finite rate never is.
+    const ok = Number.isFinite(segment.rate) && segment.rate >= 0 && segment.rate < 12 &&
+      (last ? segment.upTo === Infinity : Number.isFinite(segment.upTo) && segment.upTo > previous)
+    previous = segment.upTo
+    return ok
+  })
+}
+
+/** A claimed fit bound must be a small, finite, positive number of dollars. */
+function validDeviation(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= DEVIATION_TOLERANCE
+}
+
+function validGisPack(p: Partial<GisRulePack>): boolean {
+  const categories: GisHouseholdRuleCategory[] = ['single', 'couple-both-pensioners',
+    'couple-partner-allowance', 'couple-partner-no-oas-no-allowance']
+  return !!p.categories && categories.every(key => {
+    const rule = p.categories?.[key]
+    if (!rule || !(rule.maxMonthly > 0) || !(rule.annualCutoff > 0)) return false
+    return validReductionSegments(rule.reductionSegments) && validDeviation(rule.maxMonthlyDeviation) &&
+      validURL(rule.fieldSources?.maxMonthly) && validURL(rule.fieldSources?.annualCutoff) &&
+      validURL(rule.fieldSources?.reductionSegments)
+  }) && !!p.allowance && p.allowance.maxMonthly > 0 && p.allowance.annualCutoff > 0 &&
+    p.allowance.topUpIncome >= 0 && p.allowance.topUpIncome < p.allowance.annualCutoff &&
+    validReductionSegments(p.allowance.reductionSegments) && validDeviation(p.allowance.maxMonthlyDeviation) &&
+    !!p.allowance.fieldSources && Object.values(p.allowance.fieldSources).every(validURL) &&
+    Array.isArray(p.unsupportedPaths) && p.unsupportedPaths.length > 0 &&
+    new Set(p.unsupportedPaths.map(path => path.id)).size === p.unsupportedPaths.length &&
+    p.unsupportedPaths.every(path => typeof path.id === 'string' && path.id.trim().length > 0 &&
+      typeof path.reason === 'string' && path.reason.trim().length > 0)
+}
+
+function validTaxPack(meta: RulePackMeta, p: Partial<TaxRulePack>): boolean {
+  return typeof p.jurisdiction === 'string' && Object.hasOwn(PROVINCIAL_2026_SNAPSHOT, p.jurisdiction) &&
+    Number.isInteger(p.taxYear) && (p.taxYear ?? 0) >= 1900 &&
+    meta.effectiveDate?.slice(0, 4) === String(p.taxYear) &&
+    validTable(p.federal) && validTable(p.provincial) &&
+    Array.isArray(p.frozenProvincialBracketIndexes) &&
+    new Set(p.frozenProvincialBracketIndexes).size === p.frozenProvincialBracketIndexes.length &&
+    p.frozenProvincialBracketIndexes.every(i => Number.isInteger(i) && i >= 0 && i < p.provincial!.brackets.length - 1) &&
+    !!p.fieldSources && Object.values(p.fieldSources).every(validURL) &&
+    (p.fieldAdditionalSources === undefined || (!!p.fieldAdditionalSources && typeof p.fieldAdditionalSources === 'object' &&
+      Object.entries(p.fieldAdditionalSources).every(([key, urls]) =>
+        ['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa'].includes(key) &&
+        Array.isArray(urls) && urls.length > 0 && urls.every(url => validURL(url))))) &&
+    ['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa']
+      .every(k => validURL(p.fieldSources?.[k as keyof typeof p.fieldSources]))
+}
+
+function validBenefitPack(meta: RulePackMeta, p: Partial<BenefitRulePack>): boolean {
+  const start = Number(p.paymentPeriod?.slice(0, 4))
+  return p.program === 'CCB' && Number.isInteger(start) && start >= 1900 &&
+    p.paymentPeriod === `${start}-07/${start + 1}-06` && p.incomeTaxYear === start - 1 &&
+    meta.effectiveDate === `${start}-07-01` && !!p.values &&
+    ['maxUnder6', 'max6to17', 'th1', 'th2'].every(k => amount(p.values?.[k as keyof typeof p.values])) &&
+    (p.values.th1 ?? 0) < (p.values.th2 ?? 0) &&
+    !!p.fieldSources && validURL(p.fieldSources.amounts) && validURL(p.fieldSources.thresholds)
+}
+
+function validFhsaPack(p: Partial<FhsaRulePack>): boolean {
+  return amount(p.annualLimit) && amount(p.lifetimeLimit) && amount(p.participationRoomCarryForwardLimit) &&
+    p.annualLimit > 0 && p.lifetimeLimit >= p.annualLimit &&
+    p.participationRoomCarryForwardLimit > 0 && !!p.fieldSources &&
+    validURL(p.fieldSources.annualLimit) && validURL(p.fieldSources.lifetimeLimit) &&
+    validURL(p.fieldSources.participationRoomCarryForwardLimit)
+}
+
+export function publishRulePack<T extends TaxRulePack | BenefitRulePack | FhsaRulePack | GisRulePack>(candidate: unknown): T {
+  const meta = candidate as RulePackMeta
+  if (!meta || typeof meta.id !== 'string' || !meta.id.trim() || !validURL(meta.sourceURL) ||
+      !validDate(meta.effectiveDate) || !validDate(meta.verifiedAt) ||
+      !['cpi-assumption', 'frozen'].includes(meta.indexationRule ?? '') ||
+      meta.rounding !== 'nearest-dollar' || !['modeled', 'estimated', 'unsupported'].includes(meta.coverage ?? '') ||
+      typeof meta.limitation !== 'string' || !meta.limitation.trim() || typeof meta.assumedFutureRule !== 'boolean' ||
+      (meta.additionalSourceURLs !== undefined && (!Array.isArray(meta.additionalSourceURLs) || meta.additionalSourceURLs.some(url => !validURL(url)))) ||
+      (meta.assumedFutureRule && (!amount(meta.assumedAnnualRate) || meta.assumedAnnualRate > 1 || !meta.basedOnRuleId)) ||
+      Number('jurisdiction' in meta) + Number('program' in meta) + Number('annualLimit' in meta) !== 1) throw new Error('Rule pack lacks publication metadata')
+  // A tax table, a CCB period, the FHSA limits and the GIS categories are
+  // published in different shapes; exactly one discriminator is present.
+  const p = candidate as Partial<TaxRulePack> & Partial<BenefitRulePack> & Partial<FhsaRulePack> & Partial<GisRulePack>
   if ('jurisdiction' in p) {
-    if (typeof p.jurisdiction !== 'string' || !Object.hasOwn(PROVINCIAL_2026_SNAPSHOT, p.jurisdiction) ||
-        !Number.isInteger(p.taxYear) || (p.taxYear ?? 0) < 1900 ||
-        p.effectiveDate?.slice(0, 4) !== String(p.taxYear) ||
-        !validTable(p.federal) || !validTable(p.provincial) ||
-        !Array.isArray(p.frozenProvincialBracketIndexes) ||
-        new Set(p.frozenProvincialBracketIndexes).size !== p.frozenProvincialBracketIndexes.length ||
-        p.frozenProvincialBracketIndexes.some(i => !Number.isInteger(i) || i < 0 || i >= p.provincial!.brackets.length - 1) ||
-        !p.fieldSources || !Object.values(p.fieldSources).every(validURL) ||
-        (p.fieldAdditionalSources !== undefined && (!p.fieldAdditionalSources || typeof p.fieldAdditionalSources !== 'object' ||
-          Object.entries(p.fieldAdditionalSources).some(([key, urls]) =>
-            !['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa'].includes(key) ||
-            !Array.isArray(urls) || urls.length === 0 || urls.some(url => !validURL(url))))) ||
-        !['federalBrackets', 'federalBpa', 'provincialBrackets', 'provincialBpa'].every(k => validURL(p.fieldSources?.[k as keyof typeof p.fieldSources])))
-      throw new Error('Tax pack lacks valid values, sources or scope')
-  } else if ('program' in p) {
-    const start = Number(p.paymentPeriod?.slice(0, 4))
-    if (p.program !== 'CCB' || !Number.isInteger(start) || start < 1900 ||
-        p.paymentPeriod !== `${start}-07/${start + 1}-06` || p.incomeTaxYear !== start - 1 ||
-        p.effectiveDate !== `${start}-07-01` || !p.values ||
-        !['maxUnder6', 'max6to17', 'th1', 'th2'].every(k => amount(p.values?.[k as keyof typeof p.values])) ||
-        (p.values.th1 ?? 0) >= (p.values.th2 ?? 0) ||
-        !p.fieldSources || !validURL(p.fieldSources.amounts) || !validURL(p.fieldSources.thresholds))
-      throw new Error('Benefit pack lacks valid values, sources or period')
+    if (!validTaxPack(meta, p)) throw new Error('Tax pack lacks valid values, sources or scope')
   } else if ('annualLimit' in p) {
-    if (!amount(p.annualLimit) || !amount(p.lifetimeLimit) || !amount(p.participationRoomCarryForwardLimit) ||
-        p.annualLimit <= 0 || p.lifetimeLimit < p.annualLimit ||
-        p.participationRoomCarryForwardLimit <= 0 || !p.fieldSources ||
-        !validURL(p.fieldSources.annualLimit) || !validURL(p.fieldSources.lifetimeLimit) ||
-        !validURL(p.fieldSources.participationRoomCarryForwardLimit))
-      throw new Error('FHSA pack lacks valid limits or sources')
+    if (!validFhsaPack(p)) throw new Error('FHSA pack lacks valid limits or sources')
+  } else if (p.program === 'GIS') {
+    if (typeof p.paymentPeriod !== 'string' || !/^\d{4}-07\/\d{4}-09$/.test(p.paymentPeriod) ||
+        p.paymentPeriod.slice(0, 4) !== (meta.effectiveDate ?? '').slice(0, 4) ||
+        !Number.isInteger(p.basedOnIncomeYear) || (p.basedOnIncomeYear ?? 0) < 1900 ||
+        p.basedOnIncomeYear !== Number(meta.effectiveDate?.slice(0, 4)) - 1 || !validGisPack(p))
+      throw new Error('GIS pack lacks valid category rules, cut-offs or sources')
+  } else if (!validBenefitPack(meta, p)) {
+    throw new Error('Benefit pack lacks valid values, sources or period')
   }
   return candidate as T
 }
 TAX_PACKS.forEach(pack => publishRulePack(pack))
 BENEFIT_PACKS.forEach(pack => publishRulePack(pack))
 FHSA_PACKS.forEach(pack => publishRulePack(pack))
+GIS_PACKS.forEach(pack => publishRulePack(pack))
 
 function indexed(value: number, years: number, rate: number): number {
   return Number.isFinite(value) ? Math.round(value * (1 + rate) ** years) : value
@@ -322,4 +689,15 @@ export const publishedTaxCoverage = TAX_PACKS.map(p => ({ jurisdiction: p.jurisd
  */
 export function selectFhsaRules(): FhsaRulePack {
   return structuredClone(FHSA_PACKS[0])
+}
+
+/**
+ * BE-26 A: the GIS/Allowance amounts are published per quarter with no
+ * projection mechanism (a future quarter needs a new pack, not an indexed
+ * number), so this selector takes the period and refuses anything else.
+ */
+export function selectGisRules(period = '2026-07/2026-09'): GisRulePack {
+  const exact = GIS_PACKS.find(pack => pack.paymentPeriod === period)
+  if (!exact) throw new Error('Unpublished GIS payment period')
+  return structuredClone(exact)
 }

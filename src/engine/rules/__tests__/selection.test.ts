@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectTaxRules, selectBenefitRules, publishRulePack } from '../index'
+import { selectTaxRules, selectBenefitRules, selectGisRules, publishRulePack } from '../index'
 
 // Independent published boundary fixture, not calculated from taxData.ts.
 // CRA 2025/2026 tax-rate pages and CCB payment-period pages are linked in the pack.
@@ -43,6 +43,57 @@ describe('dated rule selection', () => {
     expect(() => selectTaxRules('ON', 2042, { annualRate: 0.021 })).toThrow(/collision|overlap|ordered/i)
     expect(() => selectBenefitRules('CCB', '2024-07/2025-06')).toThrow()
     expect(selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: 0.02 }).values.maxUnder6).toBe(8320)
+  })
+
+  it('selects the published GIS quarter and refuses one that is not published', () => {
+    const gis = selectGisRules()
+    expect([gis.id, gis.paymentPeriod, gis.basedOnIncomeYear])
+      .toEqual(['CA-OAS-GIS-2026-Q3-v1', '2026-07/2026-09', 2025])
+    expect(gis.categories.single).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 22800 })
+    expect(gis.categories['couple-both-pensioners']).toMatchObject({ maxMonthly: 2 * 676.09, annualCutoff: 30096 })
+    expect(gis.categories['couple-partner-allowance']).toMatchObject({ maxMonthly: 676.09, annualCutoff: 42144 })
+    expect(gis.categories['couple-partner-no-oas-no-allowance']).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 54624 })
+    expect(gis.allowance).toMatchObject({ maxMonthly: 1428.06, annualCutoff: 42144, topUpIncome: 8800 })
+    expect(gis.unsupportedPaths.map(p => p.id)).toContain('prior-year-base-period')
+    // A quarter the pack does not publish has no amounts at all: there is no
+    // indexation mechanism for a quarterly table, so a new quarter needs a new
+    // pack rather than an interpolated number.
+    expect(() => selectGisRules('2026-10/2026-12')).toThrow()
+    // The selector hands back a copy, so a caller cannot mutate the pinned pack.
+    selectGisRules().categories.single.annualCutoff = 1
+    expect(selectGisRules().categories.single.annualCutoff).toBe(22800)
+  })
+
+  it('rejects a GIS pack whose categories, cut-offs or sources are incomplete', () => {
+    const gis = selectGisRules()
+    const withSingle = (single: object) => ({
+      ...gis, categories: { ...gis.categories, single: { ...gis.categories.single, ...single } },
+    })
+    expect(() => publishRulePack(gis)).not.toThrow()
+    expect(() => publishRulePack({ ...gis, categories: {} })).toThrow()
+    expect(() => publishRulePack(withSingle({ annualCutoff: 0 }))).toThrow()
+    expect(() => publishRulePack(withSingle({ reductionSegments: [] }))).toThrow()
+    expect(() => publishRulePack(withSingle({ reductionSegments: [{ rate: -1, upTo: Infinity }] }))).toThrow()
+    expect(() => publishRulePack(withSingle({
+      reductionSegments: [{ rate: 0, upTo: 100 }, { rate: 0.5, upTo: 50 }],
+    }))).toThrow()
+    expect(() => publishRulePack({ ...gis, allowance: { ...gis.allowance, topUpIncome: 99999 } })).toThrow()
+    expect(() => publishRulePack({ ...gis, allowance: { ...gis.allowance, reductionSegments: [] } })).toThrow()
+    // A fitted reduction must cite the table it was fitted to, and its
+    // recorded bound must be a small finite number.
+    expect(() => publishRulePack(withSingle({ fieldSources: { ...gis.categories.single.fieldSources, reductionSegments: '' } }))).toThrow()
+    expect(() => publishRulePack(withSingle({ maxMonthlyDeviation: 0 }))).toThrow()
+    expect(() => publishRulePack(withSingle({ maxMonthlyDeviation: 99 }))).toThrow()
+    // Every path the pack does not model needs a machine-readable reason.
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [] })).toThrow()
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: '' }] })).toThrow()
+    expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: 'y' }, { id: 'x', reason: 'z' }] })).toThrow()
+    expect(() => publishRulePack({ ...gis, basedOnIncomeYear: 2024 })).toThrow()
+    expect(() => publishRulePack({ ...gis, paymentPeriod: '2026-10/2026-12' })).toThrow()
+    // Exactly one shape discriminator per pack: a GIS pack is never accepted
+    // through the CCB or FHSA branch.
+    expect(() => publishRulePack({ ...gis, program: 'CCB' })).toThrow()
+    expect(() => publishRulePack({ ...gis, annualLimit: 8000 })).toThrow()
   })
 
   it('blocks publication without complete provenance and policy metadata', () => {

@@ -581,15 +581,19 @@ describe('runProjection', () => {
 
 describe('allowanceAnnual', () => {
   it('pays the 60-64 spouse of a GIS recipient, income-tested to zero at the cutoff', () => {
-    expect(allowanceAnnual([true, false], [67, 62], 0)).toBeGreaterThan(0)
-    expect(allowanceAnnual([true, false], [67, 62], 41616)).toBeCloseTo(0, 0)
+    // 42,144 is the published July-September 2026 Allowance cut-off; the old
+    // 41,616 was a superseded figure and its family linkage was wrong (BE-26 A,
+    // see benefits.test.ts for the per-category vectors).
+    expect(allowanceAnnual([true, false], [67, 62], 0)).toBeCloseTo(17136.72, 2)
+    expect(allowanceAnnual([true, false], [67, 62], 42143)).toBeGreaterThan(0)
+    expect(allowanceAnnual([true, false], [67, 62], 42144)).toBe(0)
     expect(allowanceAnnual([true, false], [67, 62], 100000)).toBe(0)
   })
 
   it('requires exactly one OAS recipient', () => {
     // neither receiving OAS: no Allowance
     expect(allowanceAnnual([false, false], [64, 62], 0)).toBe(0)
-    // both receiving OAS: this is GIS_COUPLE territory, not the Allowance
+    // both receiving OAS: the couple-both-pensioners GIS row, not the Allowance
     expect(allowanceAnnual([true, true], [67, 62], 0)).toBe(0)
   })
 

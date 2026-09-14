@@ -63,7 +63,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
                   <td className="num">{cad(r.withdrawals.tfsa)}</td>
                   <td className="num">{cad(r.cpp)}</td>
                   <td className="num">{cad(r.oas)}</td>
-                  {hasGis && <td className="num">{cad(r.gis)}</td>}
+                  {hasGis && <td className="num" data-testid={`year-gis-${r.age}`}>{cad(r.gis)}</td>}
                   {hasCcb && <td className="num">{cad(r.ccb)}</td>}
                   {hasRent && <td className="num">{cad(r.rent)}</td>}
                   {hasExtra && <td className="num">{cad(r.extraIncome)}</td>}

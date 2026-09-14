@@ -13,13 +13,14 @@ import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
-  allowanceAnnual,
+  basisAnnualAmount,
+  benefitIncomeBasis,
   ccbAnnual,
   cppAnnual,
   earlyClaimDilutionRelief,
-  gisAnnual,
   oasAnnual,
   oasAfterClawback,
+  type BenefitBasis,
 } from './benefits'
 import { minimumForRrif, rrifMinFactor } from './rrif'
 import type { InputsV2 } from './model'
@@ -91,6 +92,8 @@ interface WithdrawalOutcome {
   oasNet: number
   /** GIS received (tax-free, income-tested on taxable income excl. OAS) */
   gis: number
+  /** The basis the GIS/Allowance were priced from (BE-26 A). */
+  gisBasis?: Extract<BenefitBasis, { status: 'modeled' }>
   /** CCB received (tax-free, income-tested on taxable income incl. OAS) */
   ccb: number
   netCash: number
@@ -192,12 +195,21 @@ function evaluate(
   // GIS: requires receiving OAS; income test is on combined household income
   // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
   // exemption) — a couple's GIS eligibility is assessed on family income
-  // regardless of which spouse earned what
+  // regardless of which spouse earned what. BE-26 A: the household category
+  // (single / both pensioners / one pensioner with an Allowance spouse / one
+  // pensioner whose spouse has neither) picks both the maximum and the
+  // cut-off, and the Allowance is computed inside that same category rather
+  // than added from a household-wide helper.
   const receivingOas = oasGrossPerPerson.map((o) => o > 0)
   const gisIncome = pooledTaxable + extraIncome
-  const gis =
-    gisAnnual(receivingOas, gisIncome, extraIncome) +
-    allowanceAnnual(receivingOas, agesPerPerson, gisIncome)
+  // One classification decides the row, the amount and the Allowance in pay.
+  // The projection always has both spouses' ages and OAS flags, so the only
+  // non-modelled outcome here is `none` (nobody draws OAS, so neither the GIS
+  // nor the Allowance is payable) — a real zero, via `basisAnnualAmount`.
+  const legacyBasis = benefitIncomeBasis(receivingOas, agesPerPerson, gisIncome, {
+    workIncome: extraIncome,
+  })
+  const gis = basisAnnualAmount(legacyBasis)
   // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
@@ -226,18 +238,24 @@ function evaluate(
           oasGross: person.oasByPerson[row.personId]?.gross ?? 0,
           oasNet: person.oasByPerson[row.personId]?.net ?? 0 })
       }
-      const personGis = gisAnnual(receivingOas, person.taxableExOas, person.earnedWork) +
-        allowanceAnnual(receivingOas, agesPerPerson, person.taxableExOas)
+      // The same basis object the legacy path uses, so the year row's category
+      // and cut-off describe whichever income basis was actually priced.
+      const personBasis = benefitIncomeBasis(receivingOas, agesPerPerson, person.taxableExOas,
+        { workIncome: person.earnedWork })
+      const personGis = basisAnnualAmount(personBasis)
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
-      return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, ccb: personCcb,
+      return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, gisBasis: personBasis.status === 'modeled' ? personBasis : undefined, ccb: personCcb,
         netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson,
         spousalAttribution: person.spousalAttribution }
     }
-    return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson,
-      taxPeople, taxUnsupportedReason: person.reason }
+    return { withdrawals: w, tax, rrspTax, oasNet, gis,
+      gisBasis: legacyBasis.status === 'modeled' ? legacyBasis : undefined,
+      ccb, netCash, taxablePerPerson, taxPeople, taxUnsupportedReason: person.reason }
   }
-  return { withdrawals: w, tax, rrspTax, oasNet, gis, ccb, netCash, taxablePerPerson, taxPeople }
+  return { withdrawals: w, tax, rrspTax, oasNet, gis,
+    gisBasis: legacyBasis.status === 'modeled' ? legacyBasis : undefined,
+    ccb, netCash, taxablePerPerson, taxPeople }
 }
 
 /** Binary-search the gross withdrawal needed to hit the spending target. */
@@ -407,6 +425,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let cpp = 0
     let oas = 0
     let gis = 0
+    let gisBasisOut: Extract<BenefitBasis, { status: 'modeled' }> | undefined
     let ccb = 0
     let tax = 0
     let netCash = 0
@@ -932,6 +951,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       rrspTaxTotal += out.rrspTax
       oas = out.oasNet
       gis = out.gis
+      gisBasisOut = out.gisBasis
       ccb = out.ccb
       netCash = out.netCash
       taxablePerPerson = out.taxablePerPerson ?? 0
@@ -1036,6 +1056,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       age, phase, unfundedObligations: yearGaps, purchaseFunding, housingFunding,
       balances: { ...bal },
       withdrawals, cpp, oas, gis, ccb, rent,
+      gisCategory: gisBasisOut?.category ?? 'unsupported',
+      gisAnnualCutoff: gisBasisOut?.annualCutoff ?? 0,
+      allowance: gisBasisOut?.allowance ?? 0,
       extraIncome: phase === 'accumulation' ? 0 : extraIncome,
       pension,
       tax, netCash, shortfall,
