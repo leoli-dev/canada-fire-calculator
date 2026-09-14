@@ -10,17 +10,17 @@ const ROW1 = `be12:spousal:${ACCOUNT}:1`
 const SELF = 'legacy:person:self'
 const PARTNER = 'legacy:person:partner'
 
-async function seed(page: Page, options: { guided?: boolean } = {}) {
+async function seed(page: Page, options: { guided?: boolean; currentAge?: number; rrspBalance?: number; single?: boolean } = {}) {
   await page.goto('/')
-  await page.evaluate(async ({ guided }) => {
+  await page.evaluate(async ({ guided, currentAge, rrspBalance, single }) => {
     localStorage.clear()
     const { DEFAULT_INPUTS } = await import('/src/store.ts')
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
-    const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
+    const inputs = { ...DEFAULT_INPUTS, currentAge: currentAge ?? 40, fireAge: 60, lifeExpectancy: 90,
       annualSavings: 40_000, retirementSpending: 40_000,
-      balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
+      balances: { tfsa: 0, rrsp: rrspBalance ?? 0, nonReg: 0 }, nonRegBook: 0,
       cppAnnualAt65: 0, oasAnnualAt65: 0,
-      partner: { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } }
+      partner: single ? null : { currentAge: 38, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 } }
     const canonical = refreshCanonicalFromLegacy(null, inputs)
     localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
       inputs, canonical, entryMode: guided ? 'guided' : 'professional', guidedView: guided ? 'results' : 'questionnaire',
@@ -168,5 +168,58 @@ test('the spousal attribution block explains itself in EN, FR and ZH', async ({ 
   await page.getByRole('button', { name: '中文' }).click()
   await expect(editor).toContainText('配偶 RRSP 归属（T2205）')
   await expect(editor).toContainText('先进先出')
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('a recorded spousal history stays visible and attributed after the type switches to RRIF', async ({ page }) => {
+  // Review fix B1: switching the registered type used to leave the recorded
+  // premium history persisted, invisible and ignored, and the whole withdrawal
+  // was silently taxed to the annuitant. The recorded history is now the marker
+  // of a spousal plan, so the block survives the switch and the year's required
+  // minimum is taxed to the holder while only the excess is attributed.
+  await seed(page, { currentAge: 72, rrspBalance: 100_000 })
+  const year = await baseYear(page)
+  await makeSpousal(page)
+  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await addPremium(page, ROW0, { year: year - 1, contributor: PARTNER, amount: 40_000 })
+  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('rrif')
+  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
+  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40000')
+  // The seeded account reaches age 72 during the year, i.e. January 1 age 71,
+  // so the post-1986 factor category is required. `allOther` is 0.0528, and
+  // 100,000 * 0.0528 = a 5,280 minimum.
+  await page.getByTestId('rrif-opened-year').fill(String(year - 1))
+  await page.getByTestId('rrif-opened-year').blur()
+  await page.getByTestId(`rrif-factor-category-${ACCOUNT}`).selectOption('allOther')
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
+  expect(saved.accounts.find((account: { id: string }) => account.id === ACCOUNT).kind).toBe('rrif')
+  expect(saved.spousalHistory[ACCOUNT]).toEqual({ status: 'complete' })
+  expect(saved.contributions.map((contribution: { amount: number }) => contribution.amount)).toEqual([40_000])
+  // A 10,000 payment: 5,280 is the holder's minimum, only the 4,720 excess is
+  // attributed to the contributor.
+  await previewPayment(page, 10_000)
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,720')
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,280')
+  // Reload keeps the recorded fact, the RRIF note and the same split.
+  await page.reload()
+  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
+  await expect(page.getByTestId(`spousal-rrif-note-${ACCOUNT}`)).toBeVisible()
+  await previewPayment(page, 10_000)
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,720')
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,280')
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('a single-person plan explains why a spousal payment cannot be attributed', async ({ page }) => {
+  // Review fix N3: the payment field used to be shown with no way to ever
+  // produce an answer. The confirmed history now states the concrete reason.
+  await seed(page, { single: true })
+  // A single-person plan owns the account outright, so there is no owner picker.
+  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
+  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toBeVisible()
+  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText("needs the annuitant's spouse in the plan")
+  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toHaveCount(0)
   expect(await inViewport(page)).toBe(true)
 })
