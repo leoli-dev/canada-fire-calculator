@@ -1329,5 +1329,22 @@
   "gisUnsupported.prior-year-base-period": "la période de référence de l’année précédente : le vrai test utilise le revenu de l’année précédente, ce calculateur utilise celui de la même année",
   "gisUnsupported.retirement-year-income-estimate": "l’estimation du revenu de l’année de la retraite sur laquelle repose la première année de paiement",
   "gisUnsupported.ccb-historical-income": "l’utilisation, par l’Allocation canadienne pour enfants, du revenu familial net rajusté de l’année précédente",
-  "gisUnsupported.provincial-top-ups": "les compléments provinciaux au SRG ou à l’Allocation (par exemple ceux du Québec)"
+  "gisUnsupported.provincial-top-ups": "les compléments provinciaux au SRG ou à l’Allocation (par exemple ceux du Québec)",
+  "pensionAmountSource": "Provenance de ce montant",
+  "pensionSourceManual": "Saisi par moi",
+  "pensionSourceStatement": "Relevé de Service Canada / Retraite Québec",
+  "pensionSourceEstimator": "Estimé à partir de mon travail ou de ma résidence",
+  "pensionSourceUnknown": "Aucune source enregistrée",
+  "pensionAmountBasis": "Le relevé l'indique",
+  "pensionBasisAnnual": "par année",
+  "pensionBasisMonthly": "par mois",
+  "pensionAgeBasis": "Indiqué à l'âge",
+  "pensionReconfirm": "Vérifier et reconfirmer",
+  "pensionStatementNeedsReview": "L’âge de retraite saisi a changé depuis l’enregistrement de ce montant. Le montant n’a pas été modifié – vérifiez que l’hypothèse d’âge de début du relevé tient toujours, puis reconfirmez.",
+  "pensionEstimatorNeedsReview": "Cette estimation reposait sur les années de résidence que vous avez saisies. Un changement d’âge de retraite peut modifier le nombre d’années comptées – confirmez ce chiffre avant de vous y fier. Le montant n’a pas été modifié.",
+  "pensionSourceUnknownNote": "Cette valeur a été enregistrée avant que le calculateur ne note sa provenance. Elle est traitée comme non confirmée, et non comme une estimation.",
+  "pensionSourceManualNote": "Enregistré tel que saisi par vous. Un changement d’âge de retraite ne le modifie pas.",
+  "pensionSourceStatementNote": "Enregistré d’après un relevé ({{year}}). Le calculateur ne l’écrasera jamais ; un changement d’âge de retraite demande seulement une reconfirmation.",
+  "pensionSourceEstimatorNote": "Estimé par ce calculateur ({{year}}) à partir de vos hypothèses de travail ou de résidence. Un changement d’âge de retraite relance cette estimation.",
+  "oasEstUsesFireAge": "Enregistré avec l’âge de retraite saisi ci-dessus ({{age}}) comme hypothèse. La SV est fondée sur la résidence : le montant lui-même ne change pas avec l’âge de retraite."
 }

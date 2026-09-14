@@ -16,12 +16,10 @@ import {
   basisAnnualAmount,
   benefitIncomeBasis,
   ccbAnnual,
-  cppAnnual,
-  earlyClaimDilutionRelief,
-  oasAnnual,
   oasAfterClawback,
   type BenefitBasis,
 } from './benefits'
+import { inputsCppAnnual, inputsOasAnnual } from './pensionProvenance'
 import { minimumForRrif, rrifMinFactor } from './rrif'
 import type { InputsV2 } from './model'
 import { openingSpousalAttributionLedger, type SpousalAttributionLedger } from './spousalAttribution'
@@ -41,23 +39,43 @@ export type ReturnSampler = (age: number, account: AccountType) => number
  * loses real value every payment year: its nominal amount grows at only
  * indexation × CPI, so in this real-dollar frame it shrinks by the gap.
  */
+/**
+ * BE-39 A. The current retirement age of each person in the plan. The canonical
+ * model stores one `retirementAge` per person; when it is not available this
+ * falls back to the legacy `fireAge`, and to the age the partner has reached
+ * when the primary retires (the same relation the canonical migration records).
+ * This is the age the CPP/QPP early-claim dilution relief is computed from, so
+ * both the cash projection and the personal tax ledger use one answer.
+ */
+function retirementAgeFor(inputs: Inputs, canonical?: InputsV2): (role: 'self' | 'partner') => number {
+  return (role) => {
+    if (canonical) {
+      const person = canonical.people.find(item => item.role === role)
+      if (person) return person.retirementAge
+    }
+    return role === 'self'
+      ? inputs.fireAge
+      : (inputs.partner?.currentAge ?? inputs.currentAge) + (inputs.fireAge - inputs.currentAge)
+  }
+}
+
 /** Annual tax context for a withdrawal whose cash must exist at year start. */
-function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number): (taxable: number, rrspGross: number) => number {
+function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number, canonical?: InputsV2): (taxable: number, rrspGross: number) => number {
   const partnerAge = inputs.partner ? inputs.partner.currentAge + age - inputs.currentAge : null
   const ages = partnerAge === null ? [age] : [age, partnerAge]
-  const cppMax = inputs.province === 'QC' ? 72 : 70
-  const cppFor = (person: Inputs | NonNullable<Inputs['partner']>, personAge: number) =>
-    personAge >= person.cppStartAge
-      ? cppAnnual(person.cppAnnualAt65, person.cppStartAge, cppMax) *
-        (person.cppWork ? earlyClaimDilutionRelief(person.cppWork.startWorkAge, person.cppWork.retireAge, person.cppStartAge) : 1)
-      : 0
-  const cpp = cppFor(inputs, age) + (inputs.partner && partnerAge !== null ? cppFor(inputs.partner, partnerAge) : 0)
+  const retirementAge = retirementAgeFor(inputs, canonical)
+  // BE-39 A: one shared formula, and the current retirement age for the relief.
+  const cppFor = (person: Inputs | NonNullable<Inputs['partner']>, role: 'self' | 'partner') =>
+    inputsCppAnnual(person, person.cppStartAge, inputs.province, retirementAge(role))
+  const cpp = (age >= inputs.cppStartAge ? cppFor(inputs, 'self') : 0) +
+    (inputs.partner && partnerAge !== null && partnerAge >= inputs.partner.cppStartAge
+      ? cppFor(inputs.partner, 'partner') : 0)
   const pension = pensionPaid(inputs.pension, age, inputs.inflation ?? 0.021) +
     (inputs.partner && partnerAge !== null ? pensionPaid(inputs.partner.pension, partnerAge, inputs.inflation ?? 0.021) : 0)
   const oasGross = [age >= inputs.oasStartAge
-    ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1) : 0]
+    ? inputsOasAnnual(inputs, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1) : 0]
   if (inputs.partner && partnerAge !== null) oasGross.push(partnerAge >= inputs.partner.oasStartAge
-    ? oasAnnual(inputs.partner.oasAnnualAt65, inputs.partner.oasStartAge) * (partnerAge >= 75 ? 1.1 : 1) : 0)
+    ? inputsOasAnnual(inputs.partner, inputs.partner.oasStartAge) * (partnerAge >= 75 ? 1.1 : 1) : 0)
   const ei = inputs.extraIncome
   const extraIncome = ei && age >= Math.max(ei.fromAge, inputs.fireAge) && age <= ei.toAge ? ei.annual : 0
   const totalTax = (purchaseTaxable: number, rrspGross: number) => {
@@ -521,7 +539,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         const plan = planPurchaseFunding(plannedPurchase, age, {
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent),
+          taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent, canonical),
           annualSavings: 0, firstYearCost: 0,
         })
         if (plan.gap) yearGaps.push(plan.gap)
@@ -574,7 +592,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         const plan = planAnnualHousingFunding(age, sale.cashNeeded, {
           balances: bal, nonRegBook: nonRegBookReal(), annualSavings: 0,
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0),
+          taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0, canonical),
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
@@ -705,23 +723,23 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // not the household has FIRE'd yet (an older partner can be collecting
     // CPP/OAS during the primary's accumulation years)
     const partnerAge = partner ? partner.currentAge + (age - inputs.currentAge) : null
-    // QPP can be deferred to 72 (since 2024); CPP caps at 70
-    const cppMaxAge = inputs.province === 'QC' ? 72 : 70
+    // BE-39 A: the early-claim dilution relief runs off the person's *current*
+    // retirement age. The `cppWork.retireAge` the estimator captured at apply
+    // time is no longer read here — it never moved when the FIRE age did, so a
+    // stale snapshot silently drove the relief factor.
+    const reliefAge = retirementAgeFor(inputs, canonical)
+    // `age` is the calendar year's age; the *claim* age is the person's own
+    // start age, and `inputsCppAnnual` gates on it. Passing the calendar age
+    // as the claim age would have re-priced the benefit every year.
+    // The claim *age* is the person's own start age; the row's calendar age is
+    // only the gate. `inputsCppAnnual` takes the claim age, so the gate is
+    // explicit here — passing the calendar age as the claim age would re-price
+    // the benefit every year.
     if (age >= inputs.cppStartAge) {
-      const relief = inputs.cppWork
-        ? earlyClaimDilutionRelief(
-            inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
-          )
-        : 1
-      cpp += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
+      cpp += inputsCppAnnual(inputs, inputs.cppStartAge, inputs.province, reliefAge('self'))
     }
     if (partner && partnerAge! >= partner.cppStartAge) {
-      const relief = partner.cppWork
-        ? earlyClaimDilutionRelief(
-            partner.cppWork.startWorkAge, partner.cppWork.retireAge, partner.cppStartAge,
-          )
-        : 1
-      cpp += cppAnnual(partner.cppAnnualAt65, partner.cppStartAge, cppMaxAge) * relief
+      cpp += inputsCppAnnual(partner, partner.cppStartAge, inputs.province, reliefAge('partner'))
     }
 
     // employer pension runs on each person's own timeline, like CPP/OAS
@@ -730,18 +748,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       (partner ? pensionPaid(partner.pension, partnerAge!, inflation) : 0)
 
     // OAS rises 10% automatically at 75
-    const oasGrossPerPerson = [
-      age >= inputs.oasStartAge
-        ? oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
-        : 0,
-    ]
+    const oasGrossPerPerson = [age >= inputs.oasStartAge
+      ? inputsOasAnnual(inputs, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1) : 0]
     const agesPerPerson = [age]
     if (partner) {
-      oasGrossPerPerson.push(
-        partnerAge! >= partner.oasStartAge
-          ? oasAnnual(partner.oasAnnualAt65, partner.oasStartAge) * (partnerAge! >= 75 ? 1.1 : 1)
-          : 0,
-      )
+      oasGrossPerPerson.push(partnerAge! >= partner.oasStartAge
+        ? inputsOasAnnual(partner, partner.oasStartAge) * (partnerAge! >= 75 ? 1.1 : 1) : 0)
       agesPerPerson.push(partnerAge!)
     }
 

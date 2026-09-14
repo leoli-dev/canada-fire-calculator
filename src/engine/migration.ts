@@ -262,6 +262,11 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
     tfsaAvailableRoom: unknown('CRA statement not supplied'),
     cppAnnualAt65: finite(cpp), oasAnnualAt65: finite(oas), pensionAnnual: finite(pension?.annualAmount), pension,
     cppWork: role === 'self' ? input.cppWork ?? null : input.partner?.cppWork ?? null,
+    // BE-39 A: the amount provenance travels with the amount, so the canonical
+    // record can tell an estimator value from a recorded statement. A plan that
+    // never recorded a source leaves this undefined — unknown, not estimated.
+    cppAmountSource: role === 'self' ? input.cppAmountSource : input.partner?.cppAmountSource,
+    oasAmountSource: role === 'self' ? input.oasAmountSource : input.partner?.oasAmountSource,
     provenance: { ageInBaseYear: source, retirementAge: source, cppAnnualAt65: source, oasAnnualAt65: source, pensionAnnual: source },
   })
   const people = [person(selfId, 'self', input.currentAge, input.cppAnnualAt65, input.oasAnnualAt65, input.pension ?? null)]
@@ -366,6 +371,8 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     oasAnnualAt65: returningPartner.oasAnnualAt65,
     pension: returningPartner.pension,
     cppWork: returningPartner.cppWork,
+    cppAmountSource: returningPartner.cppAmountSource,
+    oasAmountSource: returningPartner.oasAmountSource,
     cppStartAge: previous?.incomeSources.find(source => source.id === `${returningPartner.id}:cpp`)?.startAge ?? inputs.partner.cppStartAge,
     oasStartAge: previous?.incomeSources.find(source => source.id === `${returningPartner.id}:oas`)?.startAge ?? inputs.partner.oasStartAge,
   } : inputs.partner
@@ -590,6 +597,10 @@ export function completeCanonicalFacts(plan: InputsV2, inputs: Inputs): InputsV2
     projectionAssumptions: plan.projectionAssumptions ?? facts.projectionAssumptions,
     taxProfile: plan.taxProfile ?? facts.taxProfile,
     people: plan.people.map(person => ({ ...person, cppWork: person.cppWork === undefined ? facts.people.find(item => item.id === person.id)?.cppWork ?? null : person.cppWork,
+      // BE-39 A: a plan persisted before amount provenance existed stays
+      // undefined (unknown) — it is never back-filled as estimated.
+      cppAmountSource: person.cppAmountSource ?? facts.people.find(item => item.id === person.id)?.cppAmountSource,
+      oasAmountSource: person.oasAmountSource ?? facts.people.find(item => item.id === person.id)?.oasAmountSource,
       rrspUnusedUndeducted: person.rrspUnusedUndeducted ?? unknown('CRA statement not supplied'),
       rrspPensionAdjustment: person.rrspPensionAdjustment ?? unknown('CRA statement not supplied'),
       rrspPspa: person.rrspPspa ?? unknown('CRA statement not supplied'),

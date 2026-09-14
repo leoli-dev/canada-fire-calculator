@@ -1,8 +1,10 @@
-import type { Inputs } from '../engine'
+import type { Inputs, PensionAmountProvenance } from '../engine'
 import type { InputsV2 } from '../engine/model'
 import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
 import type { PlanningIntent } from '../store'
+import type { PensionBenefitField, PensionBenefitRewrite } from '../engine'
+import { refreshPensionProvenanceReport } from '../engine'
 import { fieldRegistry, parseField, type SharedFieldId } from './fieldRegistry'
 
 export interface PlanFieldSnapshot {
@@ -13,6 +15,86 @@ export interface PlanFieldSnapshot {
   inputRevision: number
   resultRevision: number | null
   questionAnswers?: Record<string, string | boolean | string[]>
+}
+
+/** BE-39 A. The four recorded benefit amounts whose provenance the UI shows. */
+export type RewrittenBenefitField = PensionBenefitField
+
+/**
+ * The benefit amounts one edit wrote *directly* — either the amount box the
+ * user typed in, or a provenance record the patch carried (an estimator Apply,
+ * the source control, a re-confirm). It says which amount the edit touched, not
+ * who owns the number: the label comes from the amount's resolved provenance.
+ *
+ * A self amount arrives in a narrow patch (`{ cppAnnualAt65 }`), so naming the
+ * field is enough. A partner patch is a whole-record replacement — the UI
+ * spreads the current partner — so only a changed number or a *different*
+ * provenance object records a deliberate write there; a plain spread of an
+ * unrelated partner field must not relabel these amounts.
+ */
+export function writtenBenefitFields(previous: Inputs, patch: Partial<Inputs>): RewrittenBenefitField[] {
+  const fields: RewrittenBenefitField[] = []
+  const directive = (patched: Inputs['cppAmountSource'], recorded: Inputs['cppAmountSource']) =>
+    patched !== undefined && patched !== recorded
+  if (patch.cppAnnualAt65 !== undefined || directive(patch.cppAmountSource, previous.cppAmountSource))
+    fields.push('cppAnnualAt65')
+  if (patch.oasAnnualAt65 !== undefined || directive(patch.oasAmountSource, previous.oasAmountSource))
+    fields.push('oasAnnualAt65')
+  if (patch.partner && previous.partner) {
+    if (patch.partner.cppAnnualAt65 !== previous.partner.cppAnnualAt65 ||
+        directive(patch.partner.cppAmountSource, previous.partner.cppAmountSource))
+      fields.push('partner.cppAnnualAt65')
+    if (patch.partner.oasAnnualAt65 !== previous.partner.oasAnnualAt65 ||
+        directive(patch.partner.oasAmountSource, previous.partner.oasAmountSource))
+      fields.push('partner.oasAnnualAt65')
+  }
+  return fields
+}
+
+/**
+ * Overlay the benefit-amount marking onto a metadata map.
+ *
+ * `rewritten` is the dependency pass's own report of the amounts it re-derived
+ * because a retirement-age premise moved — never a before/after value diff,
+ * which also fires on a direct edit and used to persist a hand-typed figure as
+ * `estimated`/`default`. `written` are the amounts this edit wrote directly and
+ * `inputs` is the plan *after* the edit, because the label is a function of
+ * where the number came from, not of which control wrote it last: an applied
+ * estimator is this app's arithmetic (`estimated`/`default`, like every other
+ * applied preset), while a typed figure and a re-confirmed statement are facts
+ * the user asserts (`confirmed`/`user`). Deriving the label from the action
+ * instead recorded an estimator Apply as a user-confirmed fact.
+ */
+export function applyBenefitAnswerMeta(
+  meta: Record<string, AnswerMeta>,
+  rewritten: PensionBenefitRewrite[],
+  written: RewrittenBenefitField[],
+  inputs: Inputs,
+): Record<string, AnswerMeta> {
+  if (rewritten.length === 0 && written.length === 0) return meta
+  const updatedAt = new Date().toISOString()
+  const next = { ...meta }
+  for (const field of written) {
+    next[field] = benefitProvenance(inputs, field)?.source === 'estimator'
+      ? { status: 'estimated', origin: 'default', updatedAt }
+      : { status: 'confirmed', origin: 'user', updatedAt }
+  }
+  for (const { field, assumptionValue } of rewritten) {
+    if (written.includes(field)) continue
+    next[field] = { status: 'estimated', origin: 'default', updatedAt, assumptionValue }
+  }
+  return next
+}
+
+/** Read one recorded benefit amount's provenance out of a plan. */
+export function benefitProvenance(
+  inputs: Inputs,
+  field: RewrittenBenefitField,
+): PensionAmountProvenance | undefined {
+  if (field === 'cppAnnualAt65') return inputs.cppAmountSource
+  if (field === 'oasAnnualAt65') return inputs.oasAmountSource
+  if (field === 'partner.cppAnnualAt65') return inputs.partner?.cppAmountSource
+  return inputs.partner?.oasAmountSource
 }
 
 function revealAccount(answers: Record<string, string | boolean | string[]>, account: 'tfsa' | 'rrsp' | 'nonReg') {
@@ -32,15 +114,31 @@ export function editField(state: PlanFieldSnapshot, id: SharedFieldId, raw: stri
   }
   const draftByField = { ...state.draftByField }
   delete draftByField[id]
-  const inputs = fieldRegistry[id].write(state.inputs, parsed.value)
+  // BE-39 A: a registered-field edit that moves the retirement age (the FIRE
+  // age is the one that does) must invalidate the estimate-derived amounts.
+  // Without this the registry path bypasses the rule `store.set` applies.
+  const written = fieldRegistry[id].write(state.inputs, parsed.value)
+  const refreshed = refreshPensionProvenanceReport(written)
+  const inputs = refreshed.inputs
   const canonical = refreshCanonicalFromLegacy(state.canonical, inputs)
   if (id === 'nonRegBook') {
     const account = canonical.accounts.find(item => item.kind === 'nonReg')
     if (account) account.acb = { status: 'known', value: parsed.value }
   }
+  // The same bookkeeping `store.set` runs: when the dependency pass replaced the
+  // amount, its label follows the amount's provenance (an estimator record, so
+  // `estimated`/`default`). Both paths use the pass's own rewrite report so the
+  // metadata cannot drift between them. A registered field is never one of the
+  // four amounts, so nothing was written directly here.
+  const answerMeta = applyBenefitAnswerMeta(
+    { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
+    refreshed.rewritten,
+    [],
+    inputs,
+  )
   return {
     inputs: canonical.legacyProjection, canonical, draftByField,
-    answerMeta: { ...state.answerMeta, [id]: { status: 'confirmed', origin, updatedAt } },
+    answerMeta,
     ...(id.startsWith('balances.') && parsed.value > 0 && state.questionAnswers
       ? { questionAnswers: revealAccount(state.questionAnswers, id.slice('balances.'.length) as 'tfsa' | 'rrsp' | 'nonReg') }
       : {}),

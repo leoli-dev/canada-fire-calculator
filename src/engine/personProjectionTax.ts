@@ -3,7 +3,8 @@ import type { InputsV2 } from './model'
 import { calculateHouseholdTax, type HouseholdTaxResult } from './householdTax'
 import type { IncomeEvent, IncomeYearContext } from './personIncome'
 import type { SpousalAttributionLedger } from './spousalAttribution'
-import { cppAnnual, earlyClaimDilutionRelief, oasAfterClawback } from './benefits'
+import { oasAfterClawback } from './benefits'
+import { personCppAnnual } from './pensionProvenance'
 import { pensionPaid } from './pensionPaid'
 import { minimumForRrif } from './rrif'
 
@@ -57,9 +58,14 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
   let grossCpp = 0
   let grossPension = 0
   for (const [index, item] of legacyPeople.entries()) {
+    // BE-39 A: the same shared annual-benefit formula and the person's current
+    // canonical retirement age that the cash projection uses — never the
+    // `cppWork` snapshot captured when the estimator was applied.
+    // The stored amount is already annual; `basis` only records how it was
+    // entered, so it is not re-multiplied here.
     const cpp = item.age >= item.input.cppStartAge
-      ? cppAnnual(item.input.cppAnnualAt65, item.input.cppStartAge, inputs.province === 'QC' ? 72 : 70) *
-        (item.input.cppWork ? earlyClaimDilutionRelief(item.input.cppWork.startWorkAge, item.input.cppWork.retireAge, item.input.cppStartAge) : 1)
+      ? personCppAnnual(item.canonical, item.input.cppStartAge, inputs.province,
+          item.input.cppAnnualAt65, item.input.cppAmountSource?.ageBasis ?? null)
       : 0
     const pension = pensionPaid(item.input.pension, item.age, inputs.inflation ?? .021)
     grossCpp += cpp

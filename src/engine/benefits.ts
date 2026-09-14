@@ -14,6 +14,38 @@ export function cppAnnual(annualAt65: number, startAge: number, maxAge = 70): nu
 }
 
 /**
+ * The start-age adjustment itself, as a multiplier over the age-65 amount.
+ * `cppAnnual` is this factor times the amount, so a caller can state an amount
+ * on a different basis without ever applying the same adjustment twice.
+ */
+export function cppAgeFactor(startAge: number, maxAge = 70): number {
+  const months = (Math.min(maxAge, Math.max(60, startAge)) - 65) * 12
+  return months < 0 ? 1 + months * 0.006 : 1 + months * 0.007
+}
+
+/** OAS: no early start; +0.6%/month deferred past 65 (cap 70). */
+export function oasAgeFactor(startAge: number): number {
+  const months = (Math.min(70, Math.max(65, startAge)) - 65) * 12
+  return 1 + months * 0.006
+}
+
+/**
+ * BE-39 A: an amount recorded on a basis other than 65 carries the factor of
+ * its own basis, so the projection scales it by the ratio between the claim age
+ * and the basis age rather than by the full claim factor. An amount already
+ * stated at its claim age gets a ratio of 1, which stops a statement's
+ * early-claim amount from being reduced a second time. A `null` basis is the
+ * ordinary "amount at 65" contract and takes the full factor.
+ */
+export function cppAnnualAtBasis(amount: number, basisAge: number | null, startAge: number, maxAge = 70): number {
+  return amount * (cppAgeFactor(startAge, maxAge) / cppAgeFactor(basisAge ?? 65, maxAge))
+}
+
+export function oasAnnualAtBasis(amount: number, basisAge: number | null, startAge: number): number {
+  return amount * (oasAgeFactor(startAge) / oasAgeFactor(basisAge ?? 65))
+}
+
+/**
  * Claiming before 65 shortens the contributory period (18 → claim age), and
  * the 17% general dropout with it: at 60 the divisor is ~35 years, not 39,
  * so a FIRE retiree's zero-income years dilute less. Returns the multiplier
@@ -38,8 +70,7 @@ export function earlyClaimDilutionRelief(
 
 /** OAS: no early start; +0.6%/month deferred past 65 (cap 70). */
 export function oasAnnual(annualAt65: number, startAge: number): number {
-  const months = (Math.min(70, Math.max(65, startAge)) - 65) * 12
-  return annualAt65 * (1 + months * 0.006)
+  return annualAt65 * oasAgeFactor(startAge)
 }
 
 // 2026 figures — update annually. CPP max rises each year with the
@@ -432,6 +463,36 @@ export function ccbAnnual(nUnder6: number, n6to17: number, afni: number): number
   const reduction = CCB.rate1[idx] * band1 + CCB.rate2[idx] * band2
   return Math.max(0, max - reduction)
 }
+
+/**
+ * BE-39 A: CPP/QPP and OAS rules this slice deliberately does not model. Each
+ * names the concrete reason it is out of scope, so an unmodelled outcome is a
+ * declared gap rather than a silent default. Nothing reads them to compute an
+ * amount; a test asserts the boundary stays explicit.
+ */
+export interface BenefitUnsupportedPath {
+  id: string
+  reason: string
+}
+
+export const CPP_OAS_UNSUPPORTED_PATHS: BenefitUnsupportedPath[] = [
+  {
+    id: 'cpp-qpp-separate-dropout',
+    reason: 'CPP and QPP have different dropout provisions (QPP excludes low-income months at 15% rather than the CPP 17% general dropout, and their enhanced/phase-in rules differ); BE-28 B owns the per-plan estimator, so this slice keeps one shared general-dropout approximation and labels every estimator amount as estimated',
+  },
+  {
+    id: 'oas-residence-eligibility',
+    reason: 'OAS residence is modelled only as a prorated 0-40 year scale, so a count below 40 is priced in proportion to it (3 years is priced at 676.80) and no minimum is applied. The 10-year minimum for in-Canada benefits, the 20-year requirement for benefits outside Canada and social-security-agreement years are not modelled, so the eligibility step those rules decide is absent',
+  },
+  {
+    id: 'db-indexation-start',
+    reason: 'an employer DB pension is an amount stated at its start age with an indexation fraction; whether the amount is today\'s purchasing power or a future nominal entitlement, and when indexation begins, are not resolved, so the projection assumes the stated amount and discloses the assumption rather than deriving it',
+  },
+  {
+    id: 'provincial-benefit-interactions',
+    reason: 'provincial benefit top-ups and their interaction with federal CPP/OAS/GIS amounts are not modelled; only federal CPP/QPP, OAS, GIS/Allowance and CCB enter the projection',
+  },
+]
 
 export const OAS_CLAWBACK_THRESHOLD = 95323
 export const OAS_CLAWBACK_RATE = 0.15

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
+import { blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -15,6 +15,7 @@ import { guidanceForPage } from '../../guided/pageGuidance'
 import { NumberInput } from '../NumberInput'
 import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
+import { PensionSourceNote } from '../PensionSourceNote'
 import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
 import { TaxFactsPanel } from '../TaxFactsPanel'
@@ -153,6 +154,13 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   const applyIntent = (legacyPreference: typeof planningIntent.legacyPreference, spendingPreference: typeof planningIntent.spendingPreference) => {
     setPlanningIntent({ legacyPreference, spendingPreference, understandingAcknowledged: true, confirmedIntentRevision: Date.now() })
   }
+  // BE-39 A: amounts are stored in annual dollars, shown in the unit the source
+  // was recorded in. The partner retires when the primary does.
+  const cppSelfDisplay = pensionAmountDisplay(inputs.cppAnnualAt65, inputs.cppAmountSource)
+  const oasSelfDisplay = pensionAmountDisplay(inputs.oasAnnualAt65, inputs.oasAmountSource)
+  const partnerRetireAge = inputs.partner
+    ? inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge)
+    : inputs.fireAge
 
   let control: React.ReactNode
   switch (definition.id) {
@@ -435,8 +443,16 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'cpp.self':
       control = <>
-        <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ cppAnnualAt65 })} />
-        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ cppAnnualAt65, cppWork }); markAnswers(['cppAnnualAt65'], 'confirmed') }} />
+        <FactNumber field="cppAnnualAt65" label={t('cppAnnualAt65')} value={cppSelfDisplay}
+          onValue={(value) => set({ cppAnnualAt65: pensionAmountFromDisplay(value, inputs.cppAmountSource), cppAmountSource: typedAmountSource(inputs.cppAmountSource) })} />
+        <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
+          retirementAge={inputs.fireAge}
+          onProvenance={(cppAmountSource) => set({ cppAmountSource })}
+          onReconfirm={() => set(reconfirmStatementAmount(inputs.cppAnnualAt65, inputs.cppAmountSource, inputs.fireAge))} />
+        {/* BE-39 A / B3: the Apply is an explicit user action on this amount,
+            and `store.set` now records it as `confirmed`/`user` itself — the
+            same rule professional mode gets. No guided-only repair is needed. */}
+        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ cppAnnualAt65, cppAmountSource, cppWork }) }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="cppStartAge" label={t('cppStartAge')} value={inputs.cppStartAge} onValue={(cppStartAge) => set({ cppStartAge })} />
         <BenefitClaimAgeGuide field="cppStartAge" value={inputs.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ cppStartAge })} />
@@ -444,8 +460,16 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'oas.self':
       control = <>
-        <FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ oasAnnualAt65 })} />
-        <OasEstimator onApply={(oasAnnualAt65) => { set({ oasAnnualAt65 }); markAnswers(['oasAnnualAt65'], 'confirmed') }} />
+        <FactNumber field="oasAnnualAt65" label={t('oasAnnualAt65')} value={oasSelfDisplay}
+          onValue={(value) => set({ oasAnnualAt65: pensionAmountFromDisplay(value, inputs.oasAmountSource), oasAmountSource: typedAmountSource(inputs.oasAmountSource) })} />
+        <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
+          retirementAge={inputs.fireAge}
+          onProvenance={(oasAmountSource) => set({ oasAmountSource })}
+          onReconfirm={() => {
+            const next = reconfirmStatementAmount(inputs.oasAnnualAt65, inputs.oasAmountSource, inputs.fireAge)
+            set({ oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource })
+          }} />
+        <OasEstimator retireAge={inputs.fireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ oasAnnualAt65, oasAmountSource }) }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="oasStartAge" label={t('oasStartAge')} value={inputs.oasStartAge} onValue={(oasStartAge) => set({ oasStartAge })} />
         <BenefitClaimAgeGuide field="oasStartAge" value={inputs.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ oasStartAge })} />
@@ -453,8 +477,16 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'cpp.partner':
       control = <>
-        <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={inputs.partner!.cppAnnualAt65} onValue={(cppAnnualAt65) => set({ partner: { ...inputs.partner!, cppAnnualAt65 } })} />
-        <CppEstimator retireAge={inputs.fireAge} onApply={(cppAnnualAt65, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppWork } }); markAnswers(['partner.cppAnnualAt65'], 'confirmed') }} />
+        <FactNumber field="partner.cppAnnualAt65" label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource)}
+          onValue={(value) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.cppAmountSource), cppAmountSource: typedAmountSource(inputs.partner!.cppAmountSource) } })} />
+        <PensionSourceNote kind="cpp" provenance={inputs.partner!.cppAmountSource}
+          retirementAge={partnerRetireAge}
+          onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
+          onReconfirm={() => {
+            const next = reconfirmStatementAmount(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource, partnerRetireAge)
+            set({ partner: { ...inputs.partner!, cppAnnualAt65: next.cppAnnualAt65, cppAmountSource: next.cppAmountSource } })
+          }} />
+        <CppEstimator retireAge={partnerRetireAge} onApply={(cppAnnualAt65, cppAmountSource, cppWork) => { set({ partner: { ...inputs.partner!, cppAnnualAt65, cppAmountSource, cppWork } }) }} />
         <p className="benefit-estimate-note">{t('guidedCppEstimateNote')}</p>
         <FactNumber field="partner.cppStartAge" label={t('cppStartAge')} value={inputs.partner!.cppStartAge} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
         <BenefitClaimAgeGuide field="partner.cppStartAge" value={inputs.partner!.cppStartAge} kind={inputs.province === 'QC' ? 'qpp' : 'cpp'} onValue={(cppStartAge) => set({ partner: { ...inputs.partner!, cppStartAge } })} />
@@ -462,8 +494,16 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'oas.partner':
       control = <>
-        <FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={inputs.partner!.oasAnnualAt65} onValue={(oasAnnualAt65) => set({ partner: { ...inputs.partner!, oasAnnualAt65 } })} />
-        <OasEstimator onApply={(oasAnnualAt65) => { set({ partner: { ...inputs.partner!, oasAnnualAt65 } }); markAnswers(['partner.oasAnnualAt65'], 'confirmed') }} />
+        <FactNumber field="partner.oasAnnualAt65" label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource)}
+          onValue={(value) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(value, inputs.partner!.oasAmountSource), oasAmountSource: typedAmountSource(inputs.partner!.oasAmountSource) } })} />
+        <PensionSourceNote kind="oas" provenance={inputs.partner!.oasAmountSource}
+          retirementAge={partnerRetireAge}
+          onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}
+          onReconfirm={() => {
+            const next = reconfirmStatementAmount(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource, partnerRetireAge)
+            set({ partner: { ...inputs.partner!, oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource } })
+          }} />
+        <OasEstimator retireAge={partnerRetireAge} onApply={(oasAnnualAt65, oasAmountSource) => { set({ partner: { ...inputs.partner!, oasAnnualAt65, oasAmountSource } }) }} />
         <p className="benefit-estimate-note">{t('guidedOasEstimateNote')}</p>
         <FactNumber field="partner.oasStartAge" label={t('oasStartAge')} value={inputs.partner!.oasStartAge} onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />
         <BenefitClaimAgeGuide field="partner.oasStartAge" value={inputs.partner!.oasStartAge} kind="oas" onValue={(oasStartAge) => set({ partner: { ...inputs.partner!, oasStartAge } })} />

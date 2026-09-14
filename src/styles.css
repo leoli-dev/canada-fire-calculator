@@ -224,6 +224,20 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .benefit-age-guide .benefit-age-source { font-size: .85rem; }
 .benefit-age-source a { color: #174ea6; }
 .benefit-estimate-note { max-width: 620px; margin: 12px 0; font-size: .85rem; }
+/* BE-39 A: where a CPP/QPP or OAS amount came from, and what a retirement-age
+   change did to it. Kept as one compact block under the amount field. */
+.pension-source { max-width: 620px; margin: 6px 0 14px; }
+.pension-source-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
+.pension-source-field { margin: 0; min-width: 0; }
+.pension-source-field select { max-width: 100%; }
+.pension-source .pension-flag { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid #b45309;
+  background: #fffbeb; color: #7c2d12; font-size: .85rem; line-height: 1.5; }
+.pension-source .pension-reconfirm { margin-left: 8px; }
+.pension-source-hint { margin: 6px 0 0; }
+@media (max-width: 420px) {
+  .pension-source-controls { flex-direction: column; align-items: stretch; gap: 8px; }
+  .pension-source .pension-flag { font-size: .8rem; }
+}
 .allocation-instruction { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-return-explanation { max-width: 62ch; margin: 18px 0 8px; color: #526579; line-height: 1.6; }
 .mix-choice .choice-group { margin-top: 12px; }

@@ -323,7 +323,7 @@ test('tax assumptions explain both inputs and update the worked example', async 
   expect(overflow).toBe(false)
 })
 
-test('applying the CPP work-history estimate confirms the planning input and age choices explain the trade-off', async ({ page }) => {
+test('applying the CPP work-history estimate records an estimate, and age choices explain the trade-off', async ({ page }) => {
   await page.goto('/#/guided/income/cpp.self')
   await page.getByRole('button', { name: '中文' }).click()
 
@@ -338,7 +338,9 @@ test('applying the CPP work-history estimate confirms the planning input and age
 
   await page.locator('.estimator summary').click()
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
-  await expect(amount.locator('small')).toHaveText('已确认')
+  // round 3 / BL1: applying an estimator invokes a computation, so the amount
+  // reads 估算 (estimate), not 已确认 (confirmed)
+  await expect(amount.locator('small')).toHaveText('估算')
   await expect(amount.locator('input')).not.toHaveValue('10000')
   await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
   await expect(age.locator('small')).toHaveText('示例')
@@ -349,12 +351,12 @@ test('applying the CPP work-history estimate confirms the planning input and age
   await age.locator('input').fill('68')
   await expect(page.getByRole('radio', { name: /70 岁 · 延后领取/ })).not.toBeChecked()
   await page.reload()
-  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('small')).toHaveText('估算')
   await expect(age.locator('input')).toHaveValue('68')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
 })
 
-test('OAS estimate and claim-age options independently confirm the planning inputs', async ({ page }) => {
+test('the OAS estimate is recorded as an estimate while claim-age options confirm the planning inputs', async ({ page }) => {
   await page.goto('/#/guided/income/oas.self')
   await page.getByRole('button', { name: '中文' }).click()
 
@@ -366,7 +368,7 @@ test('OAS estimate and claim-age options independently confirm the planning inpu
   await page.locator('.estimator input').fill('32')
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
   await expect(amount.locator('input')).toHaveValue('7,219')
-  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('small')).toHaveText('估算')
   await expect(age.locator('small')).toHaveText('示例')
   await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
   await expect(page.getByRole('heading', { name: '不知道选几岁？先比较这三种情形' })).toBeVisible()
@@ -382,7 +384,7 @@ test('OAS estimate and claim-age options independently confirm the planning inpu
   await age.locator('input').fill('68')
   await expect(page.getByRole('radio', { name: /67 岁 · 延后两年/ })).not.toBeChecked()
   await page.reload()
-  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('small')).toHaveText('估算')
   await expect(amount.locator('input')).toHaveValue('7,219')
   await expect(age.locator('input')).toHaveValue('68')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
@@ -400,7 +402,7 @@ test('partner OAS estimate and claim-age options update partner fields', async (
   await page.locator('.estimator input').fill('32')
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
   await expect(amount.locator('input')).toHaveValue('7,219')
-  await expect(amount.locator('small')).toHaveText('已确认')
+  await expect(amount.locator('small')).toHaveText('估算')
   const age = page.locator('[data-field="partner.oasStartAge"]')
   await expect(age.locator('small')).toHaveText('示例')
   await expect(page.getByRole('radio', { name: /70 岁 · 延后五年/ })).toBeVisible()
@@ -429,7 +431,7 @@ test('Québec QPP offers age 72 guidance for both household members', async ({ p
   await expect(page.locator('[data-field="partner.cppStartAge"] small')).toHaveText('已确认')
   await page.locator('.estimator summary').click()
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
-  await expect(page.locator('[data-field="partner.cppAnnualAt65"] small')).toHaveText('已确认')
+  await expect(page.locator('[data-field="partner.cppAnnualAt65"] small')).toHaveText('估算')
 })
 
 test('final review replaces the redundant assumption page without overwriting confirmed answers', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { pensionPaid, runProjection } from './projection'
 import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSale } from './debts'
-import { cppAnnual, earlyClaimDilutionRelief, oasAnnual } from './benefits'
+import { inputsCppAnnual, inputsOasAnnual } from './pensionProvenance'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
 import type { InputsV2 } from './model'
@@ -615,30 +615,24 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     )
     bal.nonReg += rent - (rent - rentInterest) * marginal
     // ...and benefits already being collected while still working
-    const cppMaxAge = inputs.province === 'QC' ? 72 : 70
     let benefits = pensionPaid(inputs.pension, age, inflation)
-    if (age >= inputs.cppStartAge) {
-      const relief = inputs.cppWork
-        ? earlyClaimDilutionRelief(
-            inputs.cppWork.startWorkAge, inputs.cppWork.retireAge, inputs.cppStartAge,
-          )
-        : 1
-      benefits += cppAnnual(inputs.cppAnnualAt65, inputs.cppStartAge, cppMaxAge) * relief
-    }
+    // BE-39 A: the shared annual-benefit function, with the current retirement
+    // age, so a candidate scan can never price a benefit differently from the
+    // projection it is ranking.
+    const partnerRetirementAge = inputs.partner
+      ? inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge) : 0
+    if (age >= inputs.cppStartAge)
+      benefits += inputsCppAnnual(inputs, inputs.cppStartAge, inputs.province, inputs.fireAge)
     if (age >= inputs.oasStartAge)
-      benefits += oasAnnual(inputs.oasAnnualAt65, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
+      benefits += inputsOasAnnual(inputs, inputs.oasStartAge) * (age >= 75 ? 1.1 : 1)
     const p2 = inputs.partner
     if (p2) {
       const pAge = p2.currentAge + (age - inputs.currentAge)
       benefits += pensionPaid(p2.pension, pAge, inflation)
-      if (pAge >= p2.cppStartAge) {
-        const relief = p2.cppWork
-          ? earlyClaimDilutionRelief(p2.cppWork.startWorkAge, p2.cppWork.retireAge, p2.cppStartAge)
-          : 1
-        benefits += cppAnnual(p2.cppAnnualAt65, p2.cppStartAge, cppMaxAge) * relief
-      }
+      if (pAge >= p2.cppStartAge)
+        benefits += inputsCppAnnual(p2, p2.cppStartAge, inputs.province, partnerRetirementAge)
       if (pAge >= p2.oasStartAge)
-        benefits += oasAnnual(p2.oasAnnualAt65, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
+        benefits += inputsOasAnnual(p2, p2.oasStartAge) * (pAge >= 75 ? 1.1 : 1)
     }
     bal.nonReg += benefits * (1 - marginal)
     const releasedPayments = releasedMortgagePayment(prMortgage, prSold, yearIdx)

@@ -5,10 +5,15 @@ export { calculateQuebecTax, scheduleB2026, scheduleF2026, ramqPremium2026, ramq
   QC_DRUG_MONTHS_PER_YEAR, type QuebecTaxResult, type QuebecTaxRow } from './quebecTax'
 export {
   cppAnnual,
+  cppAgeFactor,
+  cppAnnualAtBasis,
   oasAnnual,
+  oasAgeFactor,
+  oasAnnualAtBasis,
   oasAfterClawback,
   estimateCppAt65,
   estimateOasAt65,
+  earlyClaimDilutionRelief,
   allowanceAnnual,
   gisAnnual,
   basisAnnualAmount,
@@ -17,6 +22,8 @@ export {
   gisWorkExemption,
   ccbAnnual,
   CPP_MAX_AT_65,
+  CPP_OAS_UNSUPPORTED_PATHS,
+  type BenefitUnsupportedPath,
   OAS_FULL_AT_65,
   OAS_GIS_ALLOWANCE_2026_Q3,
   GIS_HOUSEHOLD_CATEGORIES,
@@ -25,6 +32,36 @@ export {
   type BenefitIncomeBasis,
   type GisHouseholdClassification,
 } from './benefits'
+// BE-39 A: CPP/QPP and OAS amount provenance and retirement-age dependency
+// invalidation; `personCppAnnual` is the one shared annual-benefit formula.
+export {
+  normalizePensionAmount,
+  pensionAmountDisplay,
+  pensionAmountFromDisplay,
+  pensionAmountWarning,
+  syncPensionAmounts,
+  refreshPensionProvenance,
+  refreshPensionProvenanceReport,
+  deriveCppAmount,
+  deriveOasAmount,
+  cppEstimatorProvenance,
+  oasEstimatorProvenance,
+  manualProvenance,
+  provenanceForTypedAmount,
+  typedAmountSource,
+  statementProvenance,
+  reconfirmStatementAmount,
+  personCppAnnual,
+  personOasAnnual,
+  inputsCppAnnual,
+  inputsOasAnnual,
+  type PensionAmountReading,
+  type PensionAmountDerivation,
+  type PensionAmountWarning,
+  type PensionBenefitField,
+  type PensionBenefitRewrite,
+  type PensionProvenanceRefresh,
+} from './pensionProvenance'
 export { rrifMinFactor } from './rrif'
 export { validateInputs, type ValidationIssue, type Severity } from './validate'
 export { buildDebtStream, impliedRate, rollDebtsForward } from './debts'

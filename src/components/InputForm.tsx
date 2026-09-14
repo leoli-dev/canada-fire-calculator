@@ -13,6 +13,10 @@ import {
 } from '../store'
 import {
   DEBT_KINDS,
+  pensionAmountDisplay,
+  pensionAmountFromDisplay,
+  reconfirmStatementAmount,
+  typedAmountSource,
   validateInputs,
   type AccountType,
   type DebtKind,
@@ -23,6 +27,7 @@ import {
 import { useCad } from '../format'
 import { track } from '../analytics'
 import { CppEstimator, OasEstimator } from './BenefitEstimators'
+import { PensionSourceNote } from './PensionSourceNote'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 import { parseField, type SharedFieldId } from '../forms/fieldRegistry'
@@ -125,6 +130,15 @@ export function InputForm() {
   } = useStore()
 
   const worksheetTotal = WORKSHEET_KEYS.reduce((s, k) => s + (worksheet[k] || 0), 0)
+
+  // BE-39 A: amount fields are stored in annual dollars; a statement entered
+  // per month is shown per month. The partner retires when the primary does,
+  // which is the retirement age the canonical model records for them.
+  const cppSelfDisplay = pensionAmountDisplay(inputs.cppAnnualAt65, inputs.cppAmountSource)
+  const oasSelfDisplay = pensionAmountDisplay(inputs.oasAnnualAt65, inputs.oasAmountSource)
+  const partnerRetireAge = inputs.partner
+    ? inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge)
+    : inputs.fireAge
 
   const issues = useMemo(() => validateInputs(inputs), [inputs])
   // errors outrank warnings when a field has both
@@ -794,12 +808,25 @@ export function InputForm() {
         <legend>{t('benefits')}</legend>
         {inputs.partner && <p className="subhead">{t('benefitsSelf')}</p>}
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
-        <Num label={t('cppAnnualAt65')} value={inputs.cppAnnualAt65} step={500} onChange={(v) => set({ cppAnnualAt65: v })} />
+        <Num label={t('cppAnnualAt65')} value={cppSelfDisplay} step={500}
+          onChange={(v) => set({ cppAnnualAt65: pensionAmountFromDisplay(v, inputs.cppAmountSource), cppAmountSource: typedAmountSource(inputs.cppAmountSource) })} />
+        <PensionSourceNote kind="cpp" provenance={inputs.cppAmountSource}
+          retirementAge={inputs.fireAge}
+          onProvenance={(cppAmountSource) => set({ cppAmountSource })}
+          onReconfirm={() => set(reconfirmStatementAmount(inputs.cppAnnualAt65, inputs.cppAmountSource, inputs.fireAge))} />
         <CppEstimator retireAge={inputs.fireAge}
-          onApply={(v, work) => set({ cppAnnualAt65: v, cppWork: work })} />
+          onApply={(v, cppAmountSource, cppWork) => set({ cppAnnualAt65: v, cppAmountSource, cppWork })} />
         <Num label={t('oasStartAge')} value={inputs.oasStartAge} onChange={(v) => set({ oasStartAge: v })} />
-        <Num label={t('oasAnnualAt65')} value={inputs.oasAnnualAt65} step={100} onChange={(v) => set({ oasAnnualAt65: v })} />
-        <OasEstimator onApply={(v) => set({ oasAnnualAt65: v })} />
+        <Num label={t('oasAnnualAt65')} value={oasSelfDisplay} step={100}
+          onChange={(v) => set({ oasAnnualAt65: pensionAmountFromDisplay(v, inputs.oasAmountSource), oasAmountSource: typedAmountSource(inputs.oasAmountSource) })} />
+        <PensionSourceNote kind="oas" provenance={inputs.oasAmountSource}
+          retirementAge={inputs.fireAge}
+          onProvenance={(oasAmountSource) => set({ oasAmountSource })}
+          onReconfirm={() => {
+            const next = reconfirmStatementAmount(inputs.oasAnnualAt65, inputs.oasAmountSource, inputs.fireAge)
+            set({ oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource })
+          }} />
+        <OasEstimator retireAge={inputs.fireAge} onApply={(v, oasAmountSource) => set({ oasAnnualAt65: v, oasAmountSource })} />
 
         <label className="field">
           <span><Jargon text={t('pensionToggle')} /></span>
@@ -835,19 +862,34 @@ export function InputForm() {
             <p className="subhead">{t('partnerSection')}</p>
             <Num label={t('cppStartAge')} value={inputs.partner.cppStartAge}
               onChange={(v) => set({ partner: { ...inputs.partner!, cppStartAge: v } })} />
-            <Num label={t('cppAnnualAt65')} value={inputs.partner.cppAnnualAt65} step={500}
-              onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: v } })} />
+            <Num label={t('cppAnnualAt65')} value={pensionAmountDisplay(inputs.partner.cppAnnualAt65, inputs.partner.cppAmountSource)} step={500}
+              onChange={(v) => set({ partner: { ...inputs.partner!, cppAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.cppAmountSource), cppAmountSource: typedAmountSource(inputs.partner!.cppAmountSource) } })} />
+            <PensionSourceNote kind="cpp" provenance={inputs.partner.cppAmountSource}
+              retirementAge={partnerRetireAge}
+              onProvenance={(cppAmountSource) => set({ partner: { ...inputs.partner!, cppAmountSource } })}
+              onReconfirm={() => {
+                const next = reconfirmStatementAmount(inputs.partner!.cppAnnualAt65, inputs.partner!.cppAmountSource, partnerRetireAge)
+                set({ partner: { ...inputs.partner!, cppAnnualAt65: next.cppAnnualAt65, cppAmountSource: next.cppAmountSource } })
+              }} />
             <CppEstimator
-              retireAge={inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge)}
-              onApply={(v, work) =>
-                set({ partner: { ...inputs.partner!, cppAnnualAt65: v, cppWork: work } })}
+              retireAge={partnerRetireAge}
+              onApply={(v, cppAmountSource, cppWork) =>
+                set({ partner: { ...inputs.partner!, cppAnnualAt65: v, cppAmountSource, cppWork } })}
             />
             <Num label={t('oasStartAge')} value={inputs.partner.oasStartAge}
               onChange={(v) => set({ partner: { ...inputs.partner!, oasStartAge: v } })} />
-            <Num label={t('oasAnnualAt65')} value={inputs.partner.oasAnnualAt65} step={100}
-              onChange={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: v } })} />
+            <Num label={t('oasAnnualAt65')} value={pensionAmountDisplay(inputs.partner.oasAnnualAt65, inputs.partner.oasAmountSource)} step={100}
+              onChange={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: pensionAmountFromDisplay(v, inputs.partner!.oasAmountSource), oasAmountSource: typedAmountSource(inputs.partner!.oasAmountSource) } })} />
+            <PensionSourceNote kind="oas" provenance={inputs.partner.oasAmountSource}
+              retirementAge={partnerRetireAge}
+              onProvenance={(oasAmountSource) => set({ partner: { ...inputs.partner!, oasAmountSource } })}
+              onReconfirm={() => {
+                const next = reconfirmStatementAmount(inputs.partner!.oasAnnualAt65, inputs.partner!.oasAmountSource, partnerRetireAge)
+                set({ partner: { ...inputs.partner!, oasAnnualAt65: next.cppAnnualAt65, oasAmountSource: next.cppAmountSource } })
+              }} />
             <OasEstimator
-              onApply={(v) => set({ partner: { ...inputs.partner!, oasAnnualAt65: v } })}
+              retireAge={partnerRetireAge}
+              onApply={(v, oasAmountSource) => set({ partner: { ...inputs.partner!, oasAnnualAt65: v, oasAmountSource } })}
             />
             <label className="field">
               <span><Jargon text={t('pensionToggle')} /></span>
