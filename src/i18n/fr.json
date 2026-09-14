@@ -779,6 +779,7 @@
     "ledger": "Droit d'ouverture {{opening}} + ajouts {{additions}} + ajustements {{adjustments}} − cotisations {{applied}} = droit de clôture {{closing}} $ CA",
     "retained": "Conservé et non cotisé : {{retained}} $ CA.",
     "retainedHelp": "Le droit n'est jamais dépassé et l'argent ne disparaît pas : le solde reste dans le compte non enregistré.",
+    "savingsShare": "La répartition de l'épargne de cette année verse aussi {{amount}} $ CA au REER; ce montant est donc déjà compris dans la cotisation prévue et le solde conservé ci-dessus.",
     "unknownRoom": "Les droits de cotisation ne sont pas confirmés; aucune cotisation n'est chiffrée. Saisissez les lignes de l'état de l'ARC pour obtenir un montant exact.",
     "mismatch": "Les droits disponibles ne correspondent pas au maximum déductible moins les cotisations non déduites. Vérifiez les lignes de l'état de l'ARC; tant qu'elles ne concordent pas, aucune cotisation n'est chiffrée.",
     "overContribution": "Les cotisations non déduites dépassent le maximum déductible de {{amount}} $ CA. Les droits disponibles sont nuls; faites confirmer le surplus par l'ARC.",

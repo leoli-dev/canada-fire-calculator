@@ -35,7 +35,7 @@ async function enterStatement(page: import('@playwright/test').Page, values: { l
 const inViewport = (page: import('@playwright/test').Page) =>
   page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
 
-test('professional mode prices a stated 20k/5k statement and retains the clipped 1k', async ({ page }) => {
+test('professional mode prices a stated 20k/5k statement and retains the clipped 13k of the default split', async ({ page }) => {
   await seed(page)
   const panel = page.getByTestId('rrsp-statement-self')
   await expect(panel).toBeVisible()
@@ -44,7 +44,12 @@ test('professional mode prices a stated 20k/5k statement and retains the clipped
   await enterStatement(page, { limit: '20000', unused: '5000', planned: '16000' })
   // Available room is the statement's own arithmetic: 20,000 - 5,000 = 15,000.
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  // The default savings split {tfsa .3, rrsp .5, nonReg .2} of the remaining
+  // 24,000 sends another 12,000 to the RRSP, so the plan contributes 28,000
+  // against 15,000 of room and 13,000 is retained. The panel must show the
+  // kernel's figure, not a partial 1,000 from the recorded row alone.
+  await expect(page.getByTestId('rrsp-savings-share-self')).toContainText('12,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   const person = saved.canonical.people.find((item: { role: string }) => item.role === 'self')
@@ -57,13 +62,13 @@ test('professional mode prices a stated 20k/5k statement and retains the clipped
   await page.reload()
   await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20000')
   await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   // The same recorded facts show in guided mode; guided keeps explicit generate.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/income/income.taxFacts')
   await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20000')
   await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   const guidedState = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(guidedState.resultRevision).toBeNull()
   expect(await inViewport(page)).toBe(true)
@@ -75,17 +80,17 @@ test('guided mode records the statement and keeps it through reload and a mode s
   await expect(page.getByTestId('rrsp-statement-self')).toBeVisible()
   await enterStatement(page, { room: '15000', planned: '16000' })
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   // Guided does not auto-run: the recorded plan changes, results stay stale.
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   await page.reload()
   await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15000')
   await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15000')
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('1,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -97,12 +102,35 @@ test('unknown, zero and a contradictory statement stay distinguishable', async (
   await enterStatement(page, { room: '0', planned: '5000' })
   await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('0')
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('5,000')
+  // 5,000 recorded plus the default split's 12,000 cannot execute against zero room.
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('17,000')
   // Two statement lines that disagree are refused instead of guessing.
   await enterStatement(page, { limit: '20000', unused: '5000', room: '12000' })
   await expect(page.getByTestId('rrsp-mismatch-self')).toBeVisible()
   await expect(page.getByTestId('rrsp-room-unknown-self')).toBeVisible()
-  await expect(page.getByTestId('rrsp-retained-self')).toContainText('5,000')
+  await expect(page.getByTestId('rrsp-retained-self')).toContainText('17,000')
+  expect(await inViewport(page)).toBe(true)
+})
+
+test('an over-contributed statement keeps a real zero room and surfaces the excess', async ({ page }) => {
+  await seed(page)
+  // All three lines come from one CRA statement: deduction limit 20,000,
+  // unused undeducted 25,000, available room 0. The statement's own arithmetic
+  // floors at zero, so the 0 line agrees and the 5,000 excess is an
+  // over-contribution, not a contradictory statement.
+  await enterStatement(page, { limit: '20000', unused: '25000', room: '0' })
+  await expect(page.getByTestId('rrsp-mismatch-self')).toHaveCount(0)
+  await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
+  await expect(page.getByTestId('rrsp-over-contribution-self')).toBeVisible()
+  await expect(page.getByTestId('rrsp-over-contribution-self')).toContainText('5,000')
+  await expect(page.getByTestId('rrsp-ledger-self')).toContainText('Opening room 0')
+  // The same statement with the available-room line left blank gives the same
+  // answer: a known zero, not an unknown.
+  await enterStatement(page, { room: '' })
+  await expect(page.getByTestId('rrsp-mismatch-self')).toHaveCount(0)
+  await expect(page.getByTestId('rrsp-room-unknown-self')).toHaveCount(0)
+  await expect(page.getByTestId('rrsp-over-contribution-self')).toContainText('5,000')
+  await expect(page.getByTestId('rrsp-ledger-self')).toContainText('Opening room 0')
   expect(await inViewport(page)).toBe(true)
 })
 

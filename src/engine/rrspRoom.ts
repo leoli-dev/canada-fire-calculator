@@ -1,4 +1,5 @@
-import type { Contribution, InputsV2, Known } from './model'
+import type { Contribution, InputsV2, Known, Person } from './model'
+import { resolveYearAllocation } from './funding'
 
 /**
  * BE-12 A: a recomputable RRSP room ledger for one person and one calendar
@@ -129,10 +130,27 @@ const nonnegativeKnown = (value: Known<number>): Known<number> =>
     : value
 
 /**
+ * The one definition of the CRA statement's own arithmetic: deduction limit
+ * less contributions already made but not deducted, floored at zero, plus the
+ * over-contribution that a negative raw figure implies. A statement never shows
+ * negative available room — an over-contributor's room line reads zero — so
+ * every consistency check compares against the floored figure. `null` means a
+ * required line is unknown, which is not the same as a real zero.
+ */
+export function derivedStatementRoom(limitValue: number | null, unusedValue: number | null):
+  { room: number | null; overContribution: number } {
+  if (limitValue === null || unusedValue === null) return { room: null, overContribution: 0 }
+  const raw = roundCents(limitValue - unusedValue)
+  return { room: Math.max(0, raw), overContribution: raw < 0 ? roundCents(-raw) : 0 }
+}
+
+/**
  * The statement's "available contribution room" line when it is present,
  * otherwise its own arithmetic: deduction limit less contributions already made
- * but not deducted. Two known lines that disagree are refused rather than
- * silently preferring one.
+ * but not deducted, floored at zero. Two known lines that disagree are refused
+ * rather than silently preferring one; a statement that shows the floored zero
+ * while unused contributions exceed the deduction limit is a real
+ * over-contribution, reported as such instead of as a contradiction.
  */
 export function statementOpeningRoom(facts: RrspStatementFacts): { room: Known<number>; mismatch: RrspRoomLimitation | null; overContribution: number } {
   const limit = nonnegativeKnown(facts.rrspDeductionLimit)
@@ -140,7 +158,7 @@ export function statementOpeningRoom(facts: RrspStatementFacts): { room: Known<n
   const explicit = nonnegativeKnown(facts.rrspAvailableRoom)
   const limitValue = limit.status === 'known' ? limit.value : null
   const unusedValue = unused.status === 'known' ? unused.value : null
-  const derived = limitValue !== null && unusedValue !== null ? limitValue - unusedValue : null
+  const { room: derived, overContribution } = derivedStatementRoom(limitValue, unusedValue)
   if (explicit.status === 'known' && derived !== null && Math.abs(explicit.value - derived) > RRSP_MONEY_TOLERANCE) {
     return {
       room: { status: 'unknown', reason: 'CRA statement available room disagrees with deduction limit less unused contributions' },
@@ -151,14 +169,8 @@ export function statementOpeningRoom(facts: RrspStatementFacts): { room: Known<n
       overContribution: 0,
     }
   }
-  if (explicit.status === 'known') return { room: explicit, mismatch: null, overContribution: 0 }
-  if (derived !== null) {
-    return {
-      room: { status: 'known', value: Math.max(0, roundCents(derived)) },
-      mismatch: null,
-      overContribution: derived < 0 ? roundCents(-derived) : 0,
-    }
-  }
+  if (explicit.status === 'known') return { room: explicit, mismatch: null, overContribution }
+  if (derived !== null) return { room: { status: 'known', value: derived }, mismatch: null, overContribution }
   const reason = explicit.status === 'unknown' && limit.status === 'unknown' && unused.status === 'unknown'
     ? 'CRA statement room, deduction limit and unused contributions are all missing'
     : 'CRA statement available room is incomplete'
@@ -287,4 +299,64 @@ export function contributionLinesFor(contributions: Contribution[], personId: st
       deductionYear: contribution.deductionYear,
       amount: contribution.amount,
     })))
+}
+
+/**
+ * Every RRSP contribution line a plan makes for one person in one calendar
+ * year: the recorded rows plus the RRSP share of the resolved voluntary savings
+ * split. The kernel prices exactly these lines and the panel shows exactly this
+ * ledger, so the displayed "planned"/"retained" figures cannot drift from the
+ * kernel's (DM01 parity). `savingsShare` is
+ * `resolveYearAllocation(plan, year).voluntary.rrsp`, computed by the same
+ * function for both callers.
+ */
+export function plannedRrspLines(args: {
+  contributions: Contribution[]
+  personId: string
+  year: number
+  savingsShare: number
+}): RrspContributionLine[] {
+  const lines = contributionLinesFor(args.contributions, args.personId, args.year)
+  const share = roundCents(Math.max(0, args.savingsShare))
+  // Same synthetic id the kernel records, so the two ledgers are identical
+  // objects and the applied row is attributable in the contribution history.
+  if (share > 0) lines.push({ id: `annual:${args.year}:rrsp`, calendarYear: args.year, deductionYear: null, amount: share })
+  return lines
+}
+
+export interface RrspRoomPreview {
+  opening: ReturnType<typeof statementOpeningRoom>
+  ledger: RrspRoomYear
+  /** RRSP share of the year's voluntary savings split, a part of `ledger`. */
+  savingsShare: number
+}
+
+/**
+ * The panel-facing base-year ledger for one person. It reuses the same
+ * statement arithmetic, the same planned-line set and the same resolved
+ * allocation as `annualStep`, so the panel does not recompute a partial view of
+ * the plan (the B1 defect). Later years are not previewed because they would
+ * need the missing sourced room-addition rule.
+ */
+export function previewRrspRoomYear(plan: InputsV2, person: Person): RrspRoomPreview {
+  const year = plan.baseYear
+  const opening = statementOpeningRoom({
+    rrspDeductionLimit: person.rrspDeductionLimit, rrspAvailableRoom: person.rrspAvailableRoom,
+    rrspUnusedUndeducted: person.rrspUnusedUndeducted, rrspPensionAdjustment: person.rrspPensionAdjustment,
+    rrspPspa: person.rrspPspa, rrspPar: person.rrspPar,
+  })
+  // A couple's voluntary RRSP split is refused by the kernel (attribution not
+  // wired), so it is priced for neither ledger.
+  const savingsShare = plan.people.length === 1 ? resolveYearAllocation(plan, year).voluntary.rrsp : 0
+  const ledger = rrspRoomYear({
+    personId: person.id, year, openingRoom: opening.room, mismatch: opening.mismatch,
+    // The statement's available room already includes the statement year's own
+    // addition; a later year would need the sourced cap/18% rule.
+    additions: { status: 'known', value: 0 },
+    adjustments: { pensionAdjustment: person.rrspPensionAdjustment, pspa: person.rrspPspa, par: person.rrspPar },
+    adjustmentBasis: 'includedInStatement',
+    unusedUndeducted: person.rrspUnusedUndeducted, deductionLimit: person.rrspDeductionLimit,
+    lines: plannedRrspLines({ contributions: plan.contributions, personId: person.id, year, savingsShare }),
+  })
+  return { opening, ledger, savingsShare }
 }

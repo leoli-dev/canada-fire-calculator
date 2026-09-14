@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine/model'
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
-import { contributionLinesFor, ownRrspAccount, rrspRoomYear, statementOpeningRoom } from '../engine/rrspRoom'
+import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { useStore } from '../store'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked'] as const
@@ -97,22 +97,13 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
         calendarYear: draft.baseYear, amount, deductionYear, provenance: { origin: 'user', sourceYear: draft.baseYear } })
     })
   }
-  const opening = statementOpeningRoom({
-    rrspDeductionLimit: person.rrspDeductionLimit, rrspAvailableRoom: person.rrspAvailableRoom,
-    rrspUnusedUndeducted: person.rrspUnusedUndeducted, rrspPensionAdjustment: person.rrspPensionAdjustment,
-    rrspPspa: person.rrspPspa, rrspPar: person.rrspPar,
-  })
-  // The statement's available room already includes the statement year's own
-  // addition, so the panel adds nothing for that year. A later year would need
+  // One shared preview with the kernel: the statement arithmetic, the recorded
+  // rows and the resolved savings-split RRSP share are the same computation
+  // `annualStep` prices, so the panel cannot show a partial ledger (B1). The
+  // statement's available room already includes the statement year's own
+  // addition, so the panel adds nothing for that year; a later year would need
   // the sourced cap/18% rule, which is why the panel only prices the first year.
-  const ledger = rrspRoomYear({
-    personId: person.id, year: plan.baseYear, openingRoom: opening.room, mismatch: opening.mismatch,
-    additions: { status: 'known', value: 0 },
-    adjustments: { pensionAdjustment: person.rrspPensionAdjustment, pspa: person.rrspPspa, par: person.rrspPar },
-    adjustmentBasis: 'includedInStatement',
-    unusedUndeducted: person.rrspUnusedUndeducted, deductionLimit: person.rrspDeductionLimit,
-    lines: contributionLinesFor(plan.contributions, person.id, plan.baseYear),
-  })
+  const { opening, ledger, savingsShare } = previewRrspRoomYear(plan, person)
   const shown = (value: Known<number>) => value.status === 'known' ? money(value.value) : t('be12.unknown')
   const role = person.role
   return <div role="group" aria-label={t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}
@@ -162,6 +153,8 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
     })}</p>
     <p className="hint" data-testid={`rrsp-retained-${role}`}>{t('be12.retained', { retained: money(ledger.retained) })}
       {ledger.retained > 0 ? ` ${t('be12.retainedHelp')}` : ''}</p>
+    {savingsShare > 0 && <p className="hint" data-testid={`rrsp-savings-share-${role}`}>
+      {t('be12.savingsShare', { amount: money(savingsShare) })}</p>}
     {ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`rrsp-room-unknown-${role}`}>{t('be12.unknownRoom')}</p>}
     {ledger.deductedThisYear > 0 && <p className="hint">{t('be12.deductedThisYear', { amount: money(ledger.deductedThisYear), year: plan.baseYear })}</p>}
     {ledger.deferredDeduction > 0 && <p className="hint">{t('be12.deferred', { amount: money(ledger.deferredDeduction), year: plan.baseYear + 1 })}</p>}

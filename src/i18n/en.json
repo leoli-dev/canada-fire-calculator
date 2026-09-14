@@ -783,6 +783,7 @@
     "ledger": "Opening room {{opening}} + additions {{additions}} + adjustments {{adjustments}} − contributions {{applied}} = closing room {{closing}} CAD",
     "retained": "Retained and not contributed: {{retained}} CAD.",
     "retainedHelp": "Room is never exceeded and the money does not disappear: the remainder stays in the non-registered account instead.",
+    "savingsShare": "This year's savings split also sends {{amount}} CAD to the RRSP, so that amount is already included in the planned and retained figures above.",
     "unknownRoom": "Contribution room is not confirmed, so no contribution is priced. Enter the CRA statement lines to see an exact figure.",
     "mismatch": "Available room does not equal the deduction limit less unused contributions. Re-check the CRA statement lines; until they agree no contribution is priced.",
     "overContribution": "The statement's unused contributions exceed its deduction limit by {{amount}} CAD. Available room is zero; confirm the over-contribution with CRA.",

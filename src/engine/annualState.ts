@@ -1,11 +1,11 @@
 import type { InputsV2, Known, AccountKind } from './model'
 import { ageReachedInYear, precisionGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
-import { allocateContributions, type FundingGap } from './funding'
+import { resolveYearAllocation, type FundingGap } from './funding'
 import { impliedRate } from './debts'
 import {
-  RRSP_ADDITION_RULE_MISSING, rrspRoomYear, statementOpeningRoom,
-  type RrspContributionLine, type RrspRoomLimitation, type RrspRoomYear,
+  RRSP_ADDITION_RULE_MISSING, plannedRrspLines, rrspRoomYear, statementOpeningRoom,
+  type RrspRoomLimitation, type RrspRoomYear,
 } from './rrspRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
@@ -192,7 +192,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // BE-12 A: a scheduled contribution is priced by the person's own RRSP room
   // ledger. Spousal or attributed contributions stay explicitly unsupported.
   const scheduled = plan.contributions.filter(contribution => contribution.calendarYear === year && contribution.amount > 0)
-  const scheduledByPerson: Record<string, { accountId: string; lines: RrspContributionLine[]; planned: number }> = {}
+  const scheduledByPerson: Record<string, { accountId: string; planned: number }> = {}
   for (const contribution of scheduled) {
     if (!finiteNonnegative(contribution.amount) || (contribution.deductionYear !== null && !Number.isInteger(contribution.deductionYear))) return fail('invalid', `scheduled contribution facts: ${contribution.id}`)
     const account = state.byAccount[contribution.accountId]
@@ -201,10 +201,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (account.kind !== 'rrsp') return fail('unsupported', `scheduled ${account.kind} contribution rule not yet wired: ${contribution.id}`)
     if (contribution.contributorId === null) return fail('unsupported', `scheduled RRSP contributor not recorded: ${contribution.id}`)
     if (contribution.contributorId !== account.ownerId) return fail('unsupported', `RRSP contributor differs from the account owner; spousal attribution is not wired: ${contribution.id}`)
-    const bucket = scheduledByPerson[contribution.contributorId] ??= { accountId: contribution.accountId, lines: [], planned: 0 }
+    const bucket = scheduledByPerson[contribution.contributorId] ??= { accountId: contribution.accountId, planned: 0 }
     if (bucket.accountId !== contribution.accountId) return fail('unsupported', `one person has scheduled RRSP contributions to more than one account: ${contribution.contributorId}`)
     bucket.planned += contribution.amount
-    bucket.lines.push({ id: contribution.id, calendarYear: contribution.calendarYear, deductionYear: contribution.deductionYear, amount: contribution.amount })
   }
   const view = (): AnnualContext => ({ plan: clone(plan), state: clone(state) })
   let evaluation: AnnualEvaluation
@@ -251,17 +250,14 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
   const recurring = plan.recurringContributions.filter(c => state.byAccount[c.accountId])
   if (recurring.length !== plan.recurringContributions.length) return fail('invalid', 'recurring contribution account missing')
-  const fhsa = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'fhsa' && c.funding === 'fromSavings').map(c => c.annualAmount))
-  const employee = sum(recurring.filter(c => state.byAccount[c.accountId].kind === 'lira' && c.funding === 'fromSavings').map(c => c.annualAmount))
-  const employer = sum(recurring.filter(c => c.funding === 'employerAdditional').map(c => c.annualAmount))
   if (recurring.some(c => !finiteNonnegative(c.annualAmount) || !['fhsa', 'lira'].includes(state.byAccount[c.accountId].kind) || (state.byAccount[c.accountId].kind === 'fhsa' && c.funding !== 'fromSavings'))) return fail('unsupported', 'recurring contribution rule not yet wired')
   const scheduledPlanned = sum(Object.values(scheduledByPerson).map(bucket => bucket.planned))
   // A scheduled contribution is funded from the year's net savings, like the
   // configured voluntary split; it is never extra money the plan does not have.
-  // A scheduled contribution is funded from the year's net savings, like the
-  // configured voluntary split; it is never extra money the plan does not have.
   if (scheduledPlanned > cash + 1e-8) return fail('unsupported', 'scheduled RRSP contribution exceeds the year net savings')
-  const allocation = allocateContributions({ age: state.byPerson[self.id].age, budget: cash - scheduledPlanned, fhsa, employee, employer, split: plan.savingsAllocation.shares })
+  // One allocation resolver serves the kernel and the panel preview, so the
+  // voluntary RRSP share priced here is the same number the panel shows.
+  const allocation = resolveYearAllocation(plan, year)
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
   if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
   const rrspDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'rrsp')
@@ -286,9 +282,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   for (const person of plan.people) {
     const facts = state.byPerson[person.id]
     const bucket = scheduledByPerson[person.id]
-    const lines = bucket ? [...bucket.lines] : []
     const voluntary = plan.people.length === 1 ? allocation.voluntary.rrsp : 0
-    if (voluntary > 0) lines.push({ id: `annual:${year}:rrsp`, calendarYear: year, deductionYear: null, amount: voluntary })
+    // The same line set `previewRrspRoomYear` prices for the panel: recorded
+    // rows plus the resolved savings-split RRSP share.
+    const lines = plannedRrspLines({ contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
     const statementYear = year === plan.baseYear
     let openingRoom = facts.rrspRoom
     let mismatch: RrspRoomLimitation | null = null
@@ -346,7 +343,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (personRoom?.status === 'known') personRoom.value -= row.contribution
   }
   const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
-  if (Math.abs(totalContributions - cash - employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
+  if (Math.abs(totalContributions - cash - allocation.employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
   // Every provider evaluates the same settled, pre-growth portfolio. Neither
   // account order nor a provider mutating its own context may affect peers.
   for (const [id, account] of Object.entries(state.byAccount)) {
@@ -384,7 +381,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
   const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
-      employerContributions: employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
+      employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, issues: [] }
   return { status: 'ok', value: { state, row } }
 }

@@ -779,6 +779,7 @@
     "ledger": "期初额度 {{opening}} + 新增 {{additions}} + 调整 {{adjustments}} − 已供款 {{applied}} = 期末额度 {{closing}} 加元",
     "retained": "留存未供款：{{retained}} 加元。",
     "retainedHelp": "额度不会被超出，资金也不会消失：超出部分留在非注册账户中。",
+    "savingsShare": "今年的储蓄分配还会向 RRSP 供款 {{amount}} 加元，该金额已计入上方的计划供款与留存金额。",
     "unknownRoom": "供款额度尚未确认，因此不计算任何供款。填写 CRA 通知书各行即可得到确切数字。",
     "mismatch": "可用供款空间不等于扣除上限减去未扣除供款。请核对 CRA 通知书各行；在两者一致之前不会计算供款。",
     "overContribution": "通知书中的未扣除供款超出扣除上限 {{amount}} 加元。可用空间为零；请向 CRA 确认超额供款。",

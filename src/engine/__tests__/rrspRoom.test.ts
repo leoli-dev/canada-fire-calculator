@@ -62,6 +62,40 @@ describe('BE-12 A RRSP room ledger', () => {
     expect(row.limitations.map(item => item.code)).toContain('statementMismatch')
   })
 
+  it('reports an over-contributed statement as a real zero plus the excess, not as a contradiction', () => {
+    // Hand calculation: deduction limit 20,000 less unused undeducted 25,000 is
+    // -5,000. CRA prints available room as 0 for an over-contributor, so the
+    // statement's own 0 line agrees with the floored arithmetic and the 5,000
+    // excess is the over-contribution.
+    const overstated = statementOpeningRoom({ ...statement, rrspUnusedUndeducted: known(25000), rrspAvailableRoom: known(0) })
+    expect(overstated.room).toEqual(known(0))
+    expect(overstated.mismatch).toBeNull()
+    expect(overstated.overContribution).toBe(5000)
+    // The same statement with the room line left blank: the derived figure is a
+    // real zero, not unknown, and the excess is surfaced either way.
+    const blankLine = statementOpeningRoom({ ...statement, rrspUnusedUndeducted: known(25000) })
+    expect(blankLine.room).toEqual(known(0))
+    expect(blankLine.room.status).toBe('known')
+    expect(blankLine.mismatch).toBeNull()
+    expect(blankLine.overContribution).toBe(5000)
+    // A line that genuinely disagrees with the floored arithmetic is refused.
+    const contradictory = statementOpeningRoom({ ...statement, rrspUnusedUndeducted: known(25000), rrspAvailableRoom: known(3000) })
+    expect(contradictory.room.status).toBe('unknown')
+    expect(contradictory.mismatch?.code).toBe('statementMismatch')
+    expect(contradictory.overContribution).toBe(0)
+    // The same floored arithmetic also decides a consistent explicit line, so
+    // unknown and a known zero stay distinguishable.
+    expect(statementOpeningRoom({ ...statement, rrspAvailableRoom: known(15000) }).room).toEqual(known(15000))
+    expect(statementOpeningRoom({ ...statement, rrspAvailableRoom: known(0) }).room).toEqual(known(0))
+    // A known zero room prices no contribution and retains all of it, with no
+    // statement-mismatch limitation.
+    const row = rrspRoomYear(request({ openingRoom: overstated.room, mismatch: overstated.mismatch }))
+    expect(row.applied).toBe(0)
+    expect(row.retained).toBe(16000)
+    expect(row.closingRoom).toEqual(known(0))
+    expect(row.limitations).toEqual([])
+  })
+
   it('keeps the identity closing = opening + additions + adjustments - applied and never goes negative', () => {
     const row = rrspRoomYear(request({
       openingRoom: known(15000),
