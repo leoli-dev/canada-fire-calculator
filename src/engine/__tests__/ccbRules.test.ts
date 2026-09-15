@@ -19,7 +19,7 @@ import {
   ccbAnnual,
   selectPlanBenefitRules,
 } from '../benefits'
-import { publishRulePack, publishedBenefitPacks, selectBenefitRules, type BenefitRulePack } from '../rules'
+import { publishRulePack, publishedBenefitPacks, selectBenefitRules, selectFhsaRules, selectGisRules, selectTaxRules, type BenefitRulePack } from '../rules'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
 
@@ -202,6 +202,30 @@ describe('BE-38 B2: published CCB boundary amounts', () => {
 })
 
 describe('BE-38 B2: the pack governs the computation, the old literal does not', () => {
+  it('hands back no pack state a caller write can carry into a later selection', () => {
+    // The review's two priced routes, then every write route on every path.
+    // A write into the projected 2040 pack's rate row moved this to 0.
+    selectBenefitRules('CCB', '2040-07/2041-06', { annualRate: 0.02 }).values.rate1[3] = 0.99
+    expect(ccbAnnual(4, 0, 200000, selectPlanBenefitRules({ program: 'CCB', paymentPeriod: PLAN_BENEFIT_PERIOD }))).toBeCloseTo(11238.165, 3)
+    // A write into the projected 2028 pack emptied the published ON frozen list.
+    selectTaxRules('ON', 2028, { annualRate: 0.02 }).frozenProvincialBracketIndexes.length = 0
+    expect(selectTaxRules('ON', 2030, { annualRate: 0.02 }).provincial.brackets.map(b => b.upTo)).toEqual([58333, 116670, 150000, 220000, Infinity])
+    const poison = (v: any, seen = new Set<any>()): void => {
+      if (!v || typeof v !== 'object' || seen.has(v)) return
+      seen.add(v)
+      for (const w of [() => Object.assign(v, { poisoned: 1 }), () => { delete v.id; delete v[0] }, () => Reflect.set(v, '__proto__', { poisoned: 1 }), () => { v[0] = 1; v.push?.(1); v.length = 0 }]) { try { w() } catch { /* a frozen member refuses the write */ } }
+      Object.values(v).forEach(n => poison(n, seen))
+    }
+    for (const select of [
+      () => selectTaxRules('ON', 2026), () => selectTaxRules('ON', 2030, { annualRate: 0.02 }),
+      () => selectBenefitRules('CCB', '2026-07/2027-06'), () => selectBenefitRules('CCB', '2040-07/2041-06', { annualRate: 0.02 }),
+      () => selectFhsaRules(), () => selectGisRules(),
+    ]) {
+      const before = JSON.stringify(select()); poison(select())
+      expect(JSON.stringify(select())).toBe(before)
+    }
+  })
+
   it('computes from whatever pack it is handed, not from a literal', () => {
     // A distinct assumed future pack: if the computation read the old literal
     // (or ignored its argument) these would all equal the published figures.

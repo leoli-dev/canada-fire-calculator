@@ -335,7 +335,7 @@ const CCB_2026_AMOUNTS = 'https://www.canada.ca/en/employment-social-development
  * The July-to-June program year is statutory, not an inference from two agreeing
  * sources: ITA s.122.6 defines `base taxation year` so that months in the last
  * six of a calendar year use the preceding taxation year, which makes July
- * 2026-June 2027 exactly the 2025 tax year stored as both packs' `incomeTaxYear`.
+ * 2026-June 2027 exactly the 2025 tax year stored as the 2026-07 pack's `incomeTaxYear`.
  */
 const CCB_RATES = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-122.61.html'
 const CCB_PUBLISHED_THRESHOLDS = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/adjustment-personal-income-tax-benefit-amounts.html'
@@ -795,7 +795,7 @@ export function publishRulePack<T extends TaxRulePack | BenefitRulePack | FhsaRu
   } else if (!validBenefitPack(meta, p)) {
     throw new Error('Benefit pack lacks valid values, sources or period')
   }
-  return candidate as T
+  return structuredClone(candidate) as T // never hand back a reference into published rule state
 }
 TAX_PACKS.forEach(pack => publishRulePack(pack))
 BENEFIT_PACKS.forEach(pack => publishRulePack(pack))

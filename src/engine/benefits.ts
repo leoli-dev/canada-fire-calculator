@@ -609,8 +609,8 @@ export function ccbAnnual(nUnder6: number, n6to17: number, afni: number, rules?:
  * Nothing reads this any more — the annual amount is computed from the
  * selected `BenefitRulePack` (`CA-CCB-2026-07-v1` for the plan anchor period).
  * It is kept only so the previous slice's comparison and the mutation
- * diagnostic have a named subject: editing a number here must leave every test
- * green (it is dead), while editing the pack must not. Deleting it is a
+ * diagnostic have a named subject: nothing computes from it, but a test pins
+ * it to the published pack, so an edit fails that pin. Deleting it is a
  * follow-up, not part of this slice.
  *
  * @deprecated not computed with; use `selectPlanBenefitRules`/`ccbAnnual`'s pack.
