@@ -219,33 +219,51 @@ export const QC_FSS = { t1: 18500, t2: 64355, cap1: 150, cap2: 1000 }
  */
 export const QC_RAMQ = { threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 }
 
+/** One rung of a published probate step ladder: the fee that applies while the
+ * probatable value is at most `upTo` (and above the preceding rung's `upTo`). */
+export interface ProbateBand {
+  upTo: number
+  fee: number
+}
+/** A jurisdiction's published probate fee. `bands` is a step ladder (NT, NU);
+ * every other row is `flat + rate * max(0, value − threshold)`. */
+export interface ProbateRate {
+  flat: number
+  rate: number
+  threshold: number
+  /** The rungs at or below `threshold`, ascending, ending exactly on it. The
+   * tier above `threshold` is `flat`, so it is not repeated here. */
+  bands?: readonly ProbateBand[]
+}
+
 /**
  * Probate / estate administration fees: flat + rate * max(0, value − threshold),
- * applied to probatable assets (non-registered account, unsold real estate).
- * Registered accounts (RRSP/RRIF/TFSA) bypass probate via named beneficiary
- * designation — the norm in Canada — so they're excluded from the base.
- * 2026 figures (taxtips.ca, current as of 2026-01-25); small provinces with
- * multiple tiers below their main rate (AB, PE, NL, NS, NB) are simplified to
- * a single flat+rate matching the top tier — immaterial for the sizeable
- * estates this calculator projects.
+ * or a published step ladder (`bands`), applied to probatable assets
+ * (non-registered account, unsold real estate). Registered accounts
+ * (RRSP/RRIF/TFSA) bypass probate via named beneficiary designation — the norm
+ * in Canada — so they're excluded from the base. 2026 figures (taxtips.ca,
+ * current as of 2026-01-25); small provinces with multiple tiers below their
+ * main rate (AB, PE, NL, NS, NB) are simplified to a single flat+rate matching
+ * the top tier — immaterial for the sizeable estates this calculator projects.
  *
  * BE-38 B4: NT and NU are no longer priced from Yukon's $140 filing fee. Each
- * is set to the top tier its *own* regulation prints, and each row in
+ * is priced from the *full* ladder its own regulation prints, and each row in
  * `coverageMatrix.ts` cites that regulation:
- *   - NT: Court Services Fees Regulations, R-120-93, Part 2, item 1(e) — $435
- *     where the value exceeds $250,000
+ *   - NT: Court Services Fees Regulations, R-120-93, Part 2, item 1 — $30 ·
+ *     $110 · $215 · $325 · $435 (top tier where the value exceeds $250,000)
  *     (`https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf`).
- *   - NU: Court Fees Regulations, R.C.Nun. R-042-2021, Schedule C, item 5 — $425
- *     where the value exceeds $250,000
+ *   - NU: Court Fees Regulations, R.C.Nun. R-042-2021, Schedule C, item 5 — $30
+ *     · $110 · $215 · $325 · $425 (top tier where the value exceeds $250,000)
  *     (`https://www.nunavutlegislation.ca/en/file-download/download/public/7022`).
- * Unlike AB, whose flat fee is charged on any non-zero estate, both territories
- * charge nothing below the published $250,000 threshold, so `tax.ts` gates
- * their flat amount on `threshold`.
+ * The two instruments state identical boundaries; only the top tier differs.
+ * `bands` carries the four rungs up to and including $250,000 and `flat` is the
+ * tier above it, so every value the instrument covers is priced at the printed
+ * amount rather than charged nothing below the boundary.
  *
  * MB's zero is the published abolition of the fee, not a missing figure; YT's
  * $140 and every province remain as before.
  */
-export const PROBATE_RATES: Record<Province, { flat: number; rate: number; threshold: number }> = {
+export const PROBATE_RATES: Record<Province, ProbateRate> = {
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
   BC: { flat: 200, rate: 0.014, threshold: 50000 },
   AB: { flat: 525, rate: 0, threshold: 0 },
@@ -257,8 +275,22 @@ export const PROBATE_RATES: Record<Province, { flat: number; rate: number; thres
   PE: { flat: 400, rate: 0.004, threshold: 100000 },
   NL: { flat: 60, rate: 0.006, threshold: 1000 },
   YT: { flat: 140, rate: 0, threshold: 0 },
-  NT: { flat: 435, rate: 0, threshold: 250000 }, // top tier, over $250,000
-  NU: { flat: 425, rate: 0, threshold: 250000 }, // top tier, over $250,000
+  // R-120-93, Part 2, item 1(a)–(d) — the rungs up to $250,000 — then (e) $435.
+  NT: {
+    flat: 435, rate: 0, threshold: 250000,
+    bands: [
+      { upTo: 10_000, fee: 30 }, { upTo: 25_000, fee: 110 },
+      { upTo: 125_000, fee: 215 }, { upTo: 250_000, fee: 325 },
+    ],
+  },
+  // R.C.Nun. R-042-2021, Schedule C, item 5 table — same rungs, $425 top tier.
+  NU: {
+    flat: 425, rate: 0, threshold: 250000,
+    bands: [
+      { upTo: 10_000, fee: 30 }, { upTo: 25_000, fee: 110 },
+      { upTo: 125_000, fee: 215 }, { upTo: 250_000, fee: 325 },
+    ],
+  },
 }
 
 /** Federal age amount (65+): credit base, phased out at 15% above threshold. */

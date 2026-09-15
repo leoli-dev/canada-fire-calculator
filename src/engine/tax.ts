@@ -335,18 +335,18 @@ export function qcRamqPremium(income: number): number {
 /**
  * Probate / estate administration fee on probatable assets — see taxData.ts.
  *
- * `threshold` carries two published meanings and the fee's shape says which
- * one applies. A flat fee with no rate (AB, QC) is unconditional, so its
- * threshold is 0 and the `rate * max(0, value - threshold)` term is 0 — the
- * flat amount is charged on any non-zero estate. NT and NU publish a tier
- * table whose top tier begins above $250,000 and whose lower tiers the build
- * does not model, so their `flat` is that top-tier fee and their `threshold`
- * is the published gate: the `if` below charges nothing below it (BE-38 B4).
+ * Two published shapes and `bands` says which one a jurisdiction has. NT and NU
+ * print a step ladder: `bands` carries every rung up to the top tier's boundary
+ * and the first rung that reaches the value is the printed fee. Every other
+ * jurisdiction prints one flat amount plus a rate on the excess over its
+ * threshold — `rate` is 0 where the flat amount is unconditional (AB, QC), so
+ * the excess term vanishes. Because `bands` ends exactly on `threshold`, a
+ * laddered jurisdiction's top tier is the straight-line branch below.
  */
 export function probateTax(value: number, province: Province): number {
   if (value <= 0) return 0
-  const { flat, rate, threshold } = PROBATE_RATES[province]
-  if (rate === 0 && threshold > 0 && value <= threshold) return 0
+  const { flat, rate, threshold, bands } = PROBATE_RATES[province]
+  if (bands) for (const band of bands) if (value <= band.upTo) return band.fee
   return flat + rate * Math.max(0, value - threshold)
 }
 

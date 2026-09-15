@@ -313,18 +313,33 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
   // claims, pinned where the panel reads them.
   expect(EN['coverageLimitation.probateFees']).toMatch(/TaxTips\.ca/)
   // BE-38 B4: the territories are priced from their own regulations now, so the
-  // rendered text may no longer say the build charges Yukon's fee. It names the
-  // cited instrument, the priced top tier, and what the build still simplifies.
+  // rendered text may no longer say the build charges Yukon's fee. Review B2:
+  // it may also no longer say the fee is nil at or below $250,000 — both
+  // instruments charge $30/$110/$215/$325 there. The rendered claim must match
+  // what the build now models: the full published ladder.
+  const LADDER_TEXT = { NT: 435, NU: 425 } as const
+  for (const [province, top] of Object.entries(LADDER_TEXT)) {
+    const key = `coverageLimitation.probateFeesApprox${province}`
+    // Every published band is named, in every language, not just the top tier.
+    for (const [catalogue, fees] of [[EN, /\$30.*\$110.*\$215.*\$325/],
+      [FR, /30 \$.*110 \$.*215 \$.*325 \$/], [ZH, /30 加元.*110 加元.*215 加元.*325 加元/]] as const)
+      expect(catalogue[key], `${province} ${key}`).toMatch(fees)
+    expect(EN[key]).toContain(`$${top}`)
+    expect(EN[key]).not.toMatch(/Yukon/)
+    // The false claim the review found, in each language, must stay gone.
+    expect(EN[key], `${key} must not say the fee is nil below the boundary`)
+      .not.toMatch(/not charged|no band|is not charged/i)
+    expect(FR[key]).not.toMatch(/aucune somme n’est facturée|n’est facturée/i)
+    expect(ZH[key]).not.toMatch(/不收取费用|不收费用/)
+    // And it says plainly that the build approximates no band.
+    expect(EN[key]).toMatch(/none is approximated/)
+    expect(FR[key]).toMatch(/aucun n’est approximé/)
+    expect(ZH[key]).toMatch(/未作任何近似处理/)
+  }
   expect(EN['coverageLimitation.probateFeesApproxNT'])
-    .toMatch(/Court Services Fees Regulations \(R-120-93, Part 2, item 1\(e\)\)/)
-  expect(EN['coverageLimitation.probateFeesApproxNT']).toMatch(/\$435/)
-  expect(EN['coverageLimitation.probateFeesApproxNT']).not.toMatch(/Yukon/)
+    .toMatch(/Court Services Fees Regulations \(R-120-93, Part 2, item 1\)/)
   expect(EN['coverageLimitation.probateFeesApproxNU'])
-    .toMatch(/Court Fees Regulations \(R\.C\.Nun\. R-042-2021, Schedule C, item 5\)/)
-  expect(EN['coverageLimitation.probateFeesApproxNU']).toMatch(/\$425/)
-  expect(EN['coverageLimitation.probateFeesApproxNU']).not.toMatch(/Yukon/)
-  expect(EN['coverageLimitation.probateFeesApproxNT']).toMatch(/understated/)
-  expect(EN['coverageLimitation.probateFeesApproxNU']).toMatch(/understated/)
+    .toMatch(/Court Fees Regulations \(C\.R\.Nu\. R-042-2021, Schedule C, item 5\)/)
   expect(EN['coverageLimitation.probateFeesMB']).toMatch(/abolished its probate fee/)
   expect(EN['coverageLimitation.provincialAgeAmount']).toMatch(/Pinned 2026 figures/)
 })

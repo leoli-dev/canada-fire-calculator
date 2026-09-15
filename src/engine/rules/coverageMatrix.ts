@@ -275,13 +275,28 @@ export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthori
     checkedFigures: ['5 000 band at 7,84 % / 11,76 %', '755 maximum', '19 890 threshold',
       'age 3 986', 'retirement 3 541', 'reduction threshold 42 955', '18,75 %', '54 345 / 108 680 / 132 245', '14 / 19 / 24 / 25,75 %'],
   },
+  // BE-38 B4 review B1: the whole ladder each regulation prints, band by band
+  // with its own boundary wording, so a reader can see that the priced value is
+  // the document's and the suite can hold the two equal (see the ladder test).
   [NT_COURT_FEES]: {
     checkedOn: CHECKED_B4,
-    checkedFigures: ['$30', '$110', '$215', '$325', '$435', 'more than $250,000'],
+    checkedFigures: [
+      '$10,000 or under', '$30',
+      'more than $10,000 but not more than $25,000', '$110',
+      'more than $25,000 but not more than $125,000', '$215',
+      'more than $125,000 but not more than $250,000', '$325',
+      'more than $250,000', '$435',
+    ],
   },
   [NU_COURT_FEES]: {
     checkedOn: CHECKED_B4,
-    checkedFigures: ['$30', '$110', '$215', '$325', '$425', 'More than $250,000'],
+    checkedFigures: [
+      '$10,000 or under', '$30',
+      'More than $10,000 but not more than $25,000', '$110',
+      'More than $25,000 but not more than $125,000', '$215',
+      'More than $125,000 but not more than $250,000', '$325',
+      'More than $250,000', '$425',
+    ],
   },
   // The two TaxTips.ca territory tables the NT/NU probate rows carry as their
   // additional source. A row marked `contentChecked` may not contain an
@@ -345,11 +360,11 @@ const CHECKED = '2026-09-17'
 /**
  * BE-38 B4: each territory's own regulation, the document that carries the fee
  * `PROBATE_RATES` now prices. NT and NU are no longer charged Yukon's $140, so
- * the row cites the authority its figure is in rather than the table it was
- * approximated from. The tiered fees above the top tier that this build
- * simplifies away — one flat amount rather than the published ladder — stay
- * disclosed through `probateFeesApproxNT` / `probateFeesApproxNU`, which is why
- * the two rows still render a qualification.
+ * the row cites the authority its figures are in rather than the table it was
+ * approximated from. Review B1: the row also prices that document's full
+ * five-band ladder rather than its top tier alone, so the qualification the two
+ * rows render (`probateFeesApproxNT` / `probateFeesApproxNU`) states the
+ * modelled ladder instead of a gap.
  */
 const PROBATE_OWN: Partial<Record<CoverageJurisdiction, string>> = {
   NT: NT_COURT_FEES,

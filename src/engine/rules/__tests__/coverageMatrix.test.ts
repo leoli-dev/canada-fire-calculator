@@ -118,18 +118,52 @@ const PROBATE_HAND: Record<string, { flat: number; rate: number; threshold: numb
   NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, NB: { flat: 100, rate: 0.005, threshold: 20000 },
   PE: { flat: 400, rate: 0.004, threshold: 100000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
   YT: { flat: 140, rate: 0, threshold: 0 },
-  // BE-38 B4: the top tier each territory's own regulation prints, gated on the
-  // published $250,000 boundary rather than charged on any non-zero estate.
-  NT: { flat: 435, rate: 0, threshold: 250000 }, NU: { flat: 425, rate: 0, threshold: 250000 },
+}
+/**
+ * BE-38 B4 review N2: the full five-band ladder each territory's own regulation
+ * prints, hand-keyed from the documents themselves — including the boundary
+ * wording, so the expectation for the sub-boundary domain comes from the
+ * instrument rather than from the engine's own branch. The review found the
+ * previous `handProbate` re-encoded that branch (`rate === 0 && value <=
+ * threshold → 0`), which is how the missing bands passed review-grade tests.
+ * The rungs are exactly what the two instruments print:
+ *   - NT: Court Services Fees Regulations R-120-93, Part 2, item 1(a)–(e),
+ *     `judicature.r10.pdf` page 8:
+ *     "$10,000 or under $30" · "more than $10,000 but not more than $25,000
+ *     $110" · "more than $25,000 but not more than $125,000 $215" · "more than
+ *     $125,000 but not more than $250,000 $325" · "more than $250,000 $435".
+ *   - NU: Court Fees Regulations C.R.Nu. R-042-2021 (in force 2021-09-28),
+ *     Schedule C (s. 4) item 5 TABLE, `public/7022` page 11: the same four
+ *     lower rungs and "$425" above $250,000. The capitalization follows each
+ *     document; `Infinity` closes the top band.
+ */
+const PROBATE_LADDER: Partial<Record<string, readonly { upTo: number; fee: number; phrase: string }[]>> = {
+  NT: [
+    { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
+    { upTo: 25_000, fee: 110, phrase: 'more than $10,000 but not more than $25,000' },
+    { upTo: 125_000, fee: 215, phrase: 'more than $25,000 but not more than $125,000' },
+    { upTo: 250_000, fee: 325, phrase: 'more than $125,000 but not more than $250,000' },
+    { upTo: Infinity, fee: 435, phrase: 'more than $250,000' },
+  ],
+  NU: [
+    { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
+    { upTo: 25_000, fee: 110, phrase: 'More than $10,000 but not more than $25,000' },
+    { upTo: 125_000, fee: 215, phrase: 'More than $25,000 but not more than $125,000' },
+    { upTo: 250_000, fee: 325, phrase: 'More than $125,000 but not more than $250,000' },
+    { upTo: Infinity, fee: 425, phrase: 'More than $250,000' },
+  ],
 }
 /** The hand formula the probate pins are read against, kept separate from
  * `probateTax` so the expectation is the *published* rule rather than a
- * line-for-line copy of the implementation. A rate of zero whose threshold is a
- * published tier boundary charges nothing below it; every other row is the
+ * line-for-line copy of the implementation. A laddered jurisdiction is priced
+ * from `PROBATE_LADDER`, read off its own instrument; every other row is the
  * flat-plus-rate the province prints. */
 function handProbate(province: string, value: number): number {
+  const ladder = PROBATE_LADDER[province]
+  if (ladder) {
+    for (const rung of ladder) if (value <= rung.upTo) return rung.fee
+  }
   const hand = PROBATE_HAND[province]
-  if (hand.rate === 0 && hand.threshold > 0 && value <= hand.threshold) return 0
   return hand.flat + hand.rate * Math.max(0, value - hand.threshold)
 }
 /** The only provincial BPA phase-outs the pack carries, and the matrix row that
@@ -812,26 +846,22 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
     // BE-38 B3 review (NB5): the shared probate pin is vacuous for the one
     // jurisdiction priced at zero, so the zero is pinned to its reason and to
     // the disclosure instead of being left as an unprovable `0 ≈ 0`. Manitoba
-    // abolished the fee in 2020, so zero is the correct price, not a gap.
-    const zeroPriced = PROVINCES.filter(province => PROBATE_HAND[province].flat === 0
-      && PROBATE_HAND[province].rate === 0)
+    // abolished the fee in 2020, so zero is the correct price, not a gap. A
+    // laddered jurisdiction (NT, NU) has no `PROBATE_HAND` entry, so it is
+    // excluded from this filter rather than read as `undefined`.
+    const zeroPriced = PROVINCES.filter(province => !PROBATE_LADDER[province]
+      && PROBATE_HAND[province].flat === 0 && PROBATE_HAND[province].rate === 0)
     expect(zeroPriced).toEqual(['MB'])
     expect(PROBATE_RATES.MB).toEqual({ flat: 0, rate: 0, threshold: 0 })
     expect(probateTax(200_000, 'MB'), 'MB abolishes probate, so the pin is the disclosure').toBe(0)
     expect(coverageFor('MB').implemented['probate-and-estate-fees'].limitationId).toBe('probateFeesMB')
     // Every other jurisdiction's fee is non-zero at 200,000, so the shared row
-    // is demonstrably priced rather than zero everywhere. BE-38 B4: NT and NU
-    // are non-zero *above* their own published boundary rather than at 200,000,
-    // so the value they are charged at is pinned to that boundary.
+    // is demonstrably priced rather than zero everywhere. BE-38 B4 review B1:
+    // NT and NU used to be zero at 200,000; they are now priced at their own
+    // instrument's $325 middle band, so the value is pinned like every other
+    // province's rather than special-cased to the boundary.
     for (const province of PROVINCES) {
       if (province === 'MB') continue
-      if (province === 'NT' || province === 'NU') {
-        const from = PROBATE_HAND[province].threshold
-        expect(probateTax(from, province), `${province} is free at its boundary`).toBe(0)
-        expect(probateTax(from + 1, province), `${province} is priced above it`)
-          .toBeGreaterThan(0)
-        continue
-      }
       expect(Math.abs(probateTax(200_000, province)), `${province} is priced`).toBeGreaterThan(0)
     }
     // Quebec pays the federal ladder too, so that row is declared for it as
@@ -883,39 +913,78 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
 })
 
 describe('BE-38 B4: the territories are priced from their own published fees', () => {
-  /** The fee each territory's own regulation prints for an estate above
-   * $250,000, hand-keyed from the document itself — not read back from
-   * `PROBATE_RATES`, whose value is the thing under test:
+  const TERRITORIES = ['NT', 'NU'] as const
+  const BOUNDARY = 250_000
+  /** The top tier each territory's own regulation prints above $250,000,
+   * hand-keyed from the document itself — not read back from `PROBATE_RATES`,
+   * whose value is the thing under test:
    *   - NT: Court Services Fees Regulations R-120-93, Part 2 item 1(e) — $435
    *     (https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf)
-   *   - NU: Court Fees Regulations R.C.Nun. R-042-2021, Schedule C item 5 — $425
+   *   - NU: Court Fees Regulations C.R.Nu. R-042-2021, Schedule C item 5 — $425
    *     (https://www.nunavutlegislation.ca/en/file-download/download/public/7022)
    * The published boundary is "more than $250,000" in both documents, so
-   * $250,000 itself falls in the preceding tier and is not charged the top fee. */
+   * $250,000 itself falls in the preceding tier and is charged $325. */
   const TOP_TIER = { NT: 435, NU: 425 } as const
-  const BOUNDARY = 250_000
 
-  it('prices each territory at the top tier its own regulation prints, and not below it', () => {
-    for (const province of ['NT', 'NU'] as const) {
-      const fee = TOP_TIER[province]
-      // Before BE-38 B4 both were priced at Yukon's $140, so the change is
-      // +$295 (NT) and +$285 (NU) at every estate above $250,000.
-      expect(probateTax(1_000_000, province), `${province} at $1M`).toBe(fee)
-      expect(probateTax(BOUNDARY + 1, province), `${province} just above the boundary`).toBe(fee)
-      // The published value is a single flat top tier, not a rate: the fee does
-      // not grow with the estate size above the boundary.
-      expect(probateTax(50_000_000, province), `${province} far above the boundary`).toBe(fee)
-      // "More than $250,000": at the boundary the top tier does not apply.
-      expect(probateTax(BOUNDARY, province), `${province} at the boundary`).toBe(0)
-      expect(probateTax(200_000, province), `${province} below the boundary`).toBe(0)
-      expect(PROBATE_RATES[province], `${province} pinned rule`)
-        .toEqual({ flat: fee, rate: 0, threshold: BOUNDARY })
-      // The value the engine prices is exactly the one its row cites.
+  it('prices every band both instruments print, on both sides of every boundary', () => {
+    // BE-38 B4 review B1: the priced value is the instrument's own ladder, not
+    // its top tier alone. A missing or one-rung-shifted band fails here.
+    for (const province of TERRITORIES) {
+      const ladder = PROBATE_LADDER[province]!
+      expect(ladder.map(rung => [rung.upTo, rung.fee])).toEqual([
+        [10_000, 30], [25_000, 110], [125_000, 215], [250_000, 325], [Infinity, TOP_TIER[province]],
+      ])
+      // The implementation carries the same ladder, in the same shape: `bands`
+      // is the four rungs at or below the boundary and `flat` is the top tier.
+      expect(PROBATE_RATES[province], `${province} pinned rule`).toEqual({
+        flat: TOP_TIER[province], rate: 0, threshold: BOUNDARY,
+        bands: ladder.slice(0, -1).map(rung => ({ upTo: rung.upTo, fee: rung.fee })),
+      })
+      for (const [index, rung] of ladder.entries()) {
+        const previous = index === 0 ? 0 : ladder[index - 1].upTo
+        // Both ends of every band: just above the rung below, and at this
+        // band's own inclusive upper bound (the open top band has no finite
+        // upper bound, so only its lower end is a boundary).
+        expect(probateTax(previous + 1, province), `${province} ${rung.phrase} (lower end)`).toBe(rung.fee)
+        if (Number.isFinite(rung.upTo))
+          expect(probateTax(rung.upTo, province), `${province} ${rung.phrase} (upper end)`).toBe(rung.fee)
+      }
+      // ...and the hand expectation, read off the instrument, agrees band for
+      // band rather than reproducing the implementation's branch (review N2).
+      for (const value of [1, 10_000, 10_001, 25_000, 25_001, 125_000, 125_001, 200_000, 250_000, 250_001, 50_000_000])
+        expect(probateTax(value, province), `${province} at ${value}`)
+          .toBeCloseTo(handProbate(province, value), 6)
+      // Above the top band the fee is a flat amount, not a rate.
+      expect(probateTax(BOUNDARY + 1, province), `${province} just above the boundary`).toBe(TOP_TIER[province])
+      expect(probateTax(1_000_000, province), `${province} at $1M`).toBe(TOP_TIER[province])
+      expect(probateTax(50_000_000, province), `${province} far above the boundary`).toBe(TOP_TIER[province])
+      // An estate with nothing probatable is still free; a laddered row never
+      // prices an unknown as 0 and never a 0 as unknown.
+      expect(probateTax(0, province), `${province} zero estate`).toBe(0)
+    }
+  })
+
+  it('holds the cited authority\'s recorded figures equal to the priced ladder (review N1)', () => {
+    // BE-38 B3's pack-source equality check skips probate rows: their
+    // `ruleFields` is `taxData.ts:PROBATE_RATES`, which has no
+    // `PACK_FIELD_SOURCE` key, so the loop `continue`d. The review proved the
+    // gap by deleting `$30/$110/$215/$325` from the registry and watching every
+    // test pass. This is the equality the review asked for: the fee figures the
+    // registry records for each row's *cited authority* must be exactly the
+    // ladder the engine prices — no more, no fewer — and the boundary wording
+    // must be recorded too, so a future drift in either direction fails.
+    for (const province of TERRITORIES) {
       const row = coverageFor(province).implemented['probate-and-estate-fees']
-      expect(CONTENT_VERIFIED_AUTHORITIES[row.sourceURL].checkedFigures.join(' '),
-        `${province} citation must carry the priced figure`)
-        .toContain(String(fee))
       expect(row.sourceURL, `${province} source`).toBe(province === 'NT' ? NT_PROBATE : NU_PROBATE)
+      const record = CONTENT_VERIFIED_AUTHORITIES[row.sourceURL]
+      expect(record, `${province} cited authority must be content-checked`).toBeDefined()
+      expect(record.checkedOn, `${province} checked date`).toBe(row.verifiedAt)
+      const ladder = PROBATE_LADDER[province]!
+      const pricedFees = ladder.map(rung => `$${rung.fee}`)
+      expect(record.checkedFigures.filter(figure => /^\$[\d,]+$/.test(figure)),
+        `${province} citation must carry exactly the priced ladder`).toEqual(pricedFees)
+      for (const rung of ladder)
+        expect(record.checkedFigures, `${province} must record "${rung.phrase}"`).toContain(rung.phrase)
     }
   })
 
