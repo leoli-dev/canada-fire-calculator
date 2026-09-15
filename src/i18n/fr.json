@@ -109,7 +109,7 @@
   "ruleAssumptionsTitle": "Versions des règles fiscales et des prestations",
   "ruleAssumptionsVersion": "Impôt : {{tax}} · période de l’ACE : {{ccb}} · SRG/Allocation : {{gis}}",
   "ruleAssumptionsPolicy": "Les montants publiés prévalent. Les années futures non publiées exigent une hypothèse explicite : les seuils admissibles sont indexés une fois par an à {{rate}} d’inflation prévue; les seuils gelés restent fixes.",
-  "ruleAssumptionsLimit": "La projection actuelle utilise encore ses constantes 2026 pour toutes les années. La sélection datée est une base interne; le changement annuel des règles et la couverture complète des crédits ne sont pas encore raccordés.",
+  "ruleAssumptionsLimit": "Les échelles de taux fédérale et provinciale et les montants personnels de base proviennent désormais du paquet retenu. Chaque montant que le paquet ne change pas selon l’année est énuméré ci-dessus et conserve sa valeur épinglée; BE-38 B les remplacera par des règles datées. L’ajustement SRG/Allocation, l’approximation de l’ACE et l’absence de crédit TPS/TVH et de prestations provinciales restent inchangés.",
   "ruleTaxSource": "Source des tranches d’impôt",
   "ruleCcbSource": "Source de la période de l’ACE",
   "ruleFederalBracketsSource": "Tranches fédérales",
@@ -1379,5 +1379,18 @@
   "pensionSourceManualNote": "Enregistré tel que saisi par vous. Un changement d’âge de retraite ne le modifie pas.",
   "pensionSourceStatementNote": "Enregistré d’après un relevé ({{year}}). Le calculateur ne l’écrasera jamais ; un changement d’âge de retraite demande seulement une reconfirmation.",
   "pensionSourceEstimatorNote": "Estimé par ce calculateur ({{year}}) à partir de vos hypothèses de travail ou de résidence. Un changement d’âge de retraite relance cette estimation.",
-  "oasEstUsesFireAge": "Enregistré avec l’âge de retraite saisi ci-dessus ({{age}}) comme hypothèse. La SV est fondée sur la résidence : le montant lui-même ne change pas avec l’âge de retraite."
+  "oasEstUsesFireAge": "Enregistré avec l’âge de retraite saisi ci-dessus ({{age}}) comme hypothèse. La SV est fondée sur la résidence : le montant lui-même ne change pas avec l’âge de retraite.",
+  "ruleAssumptionsTaxPolicy": "Année de règles fiscales retenue : {{year}} — {{policy}}.",
+  "ruleAssumptionsTaxPolicyPublished": "montants publiés",
+  "ruleAssumptionsTaxPolicyAssumed": "hypothèse : les seuils nominaux admissibles du paquet indexés une fois par an à {{rate}} depuis l’année d’imposition {{from}}",
+  "ruleAssumptionsTaxNotModelled": "Ce paquet fiscal ne change pas selon l’année :",
+  "ruleAssumptionsRefused": "Règles fiscales indisponibles, aucun montant d’impôt n’est calculé : {{reason}}",
+  "taxUnsupported.federal-age-pension-amounts": "le montant fédéral pour personnes âgées et le montant pour revenu de pension (valeurs 2026 épinglées)",
+  "taxUnsupported.provincial-age-pension-amounts": "le montant pour personnes âgées, le montant pour revenu de pension et le supplément pour aînés de chaque province (valeurs 2026 épinglées)",
+  "taxUnsupported.spouse-credit": "les montants pour conjoint ou conjoint de fait et leurs tests de revenu (valeurs 2026 épinglées)",
+  "taxUnsupported.low-income-tax-reductions": "les réductions d’impôt provinciales pour faible revenu et les crédits remboursables (par exemple le crédit LIFT de l’Ontario), qui ne sont pas modélisés du tout",
+  "taxUnsupported.capital-gains-inclusion": "le taux d’inclusion des gains en capital (part statutaire épinglée de 50 %)",
+  "taxUnsupported.probate-fees": "les frais d’homologation et d’administration successorale (valeurs 2026 épinglées servant aux frais de succession)",
+  "taxUnsupported.gst-hst-and-cash-benefits": "le crédit pour la TPS/TVH et les prestations provinciales en espèces; aucun résultat n’est donc une situation complète après prestations",
+  "taxUnsupported.provincial-premiums-and-levies": "les primes et cotisations propres à la province (surtaxe et assurance-santé de l’Ontario, ou abattement, cotisation au FSS et prime de la RAMQ au Québec; valeurs épinglées)"
 }

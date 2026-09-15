@@ -1,5 +1,5 @@
 import type { InputsV2 } from './model'
-import { incomeTax } from './tax'
+import { incomeTax, PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules, type TaxRuleContext, type TaxRuleProvenance } from './tax'
 import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext, type PersonIncome } from './personIncome'
 import type { SpousalAttributionLedger } from './spousalAttribution'
 import { calculateQuebecTax } from './quebecTax'
@@ -15,19 +15,30 @@ export interface PersonTaxRow {
   qc?: import('./quebecTax').QuebecTaxRow
   bySource: PersonIncome['bySource']
 }
-export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record<string, PersonTaxRow>; ruleYear: 2026; coverage: 'estimated';
+export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record<string, PersonTaxRow>;
   /** The year's spousal attribution state, advanced for the next projected year. */
-  spousalAttribution?: SpousalAttributionLedger } |
+  spousalAttribution?: SpousalAttributionLedger } & TaxRuleProvenance |
   { status: 'unsupported' | 'invalid'; reason: string }
 
 /**
  * Tax attribution follows the event's actual recipient/account/property. The
  * elective split is applied only to an identified eligible pension event;
  * ordinary RRSP, CPP and OAS cannot be elected into a 50/50 household pool.
- * Current 2026 bracket/credit values are a real-dollar projection assumption
- * for future years until BE-38 supplies year-specific full return rules.
+ * The bracket ladder and basic personal amount come from the plan's selected,
+ * versioned rule pack — never from a literal — and every result carries that
+ * pack's id, year and whether the year was assumed. The projection is
+ * expressed in the anchor year's real dollars, so it is priced from the anchor
+ * year's published pack (`PLAN_TAX_YEAR`) whatever projected calendar year is
+ * being solved: a projected year is not a nominal-dollar year here, and
+ * re-indexing the ladder for it would inflate it a second time. Recomputing any
+ * projected year therefore gives the same tax as any other, and advancing the
+ * anchor constant is a deliberate, reviewed number change rather than drift.
  */
 export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): HouseholdTaxResult {
+  const selection = trySelectPlanTaxRules({ jurisdiction: plan.province, taxYear: PLAN_TAX_YEAR })
+  if (selection.status !== 'ok') return selection
+  const rules: TaxRuleContext = selection.context
+  const provenance = taxRuleProvenance(rules)
   const income = calculatePersonIncome(plan, year, events, context)
   if (income.status !== 'ok') return income
   const people = structuredClone(income.byPerson)
@@ -83,7 +94,7 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
         tax: row.federalTax + row.provincialIncomeTax + row.fss + row.ramq,
         bySource: person.bySource, qc: row }
     }
-    return { status: 'ok', total: qc.total, byPerson, ruleYear: 2026, coverage: 'estimated',
+    return { status: 'ok', total: qc.total, byPerson, ...provenance,
       spousalAttribution: income.spousalAttribution }
   }
   const byPerson: Record<string, PersonTaxRow> = {}
@@ -93,12 +104,12 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     const spouseNetIncome = claimant === id && other ? people[other].netIncome : undefined
     const tax = incomeTax(person.taxableIncome, plan.province, { age: person.age,
       pensionIncome: person.federalPensionEligible,
-      provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome })
+      provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome }, rules)
     byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
       taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
       provincialPensionEligible: person.provincialPensionEligible,
       tax, bySource: person.bySource }
   }
   return { status: 'ok', total: Object.values(byPerson).reduce((sum, row) => sum + row.tax, 0),
-    byPerson, ruleYear: 2026, coverage: 'estimated', spousalAttribution: income.spousalAttribution }
+    byPerson, ...provenance, spousalAttribution: income.spousalAttribution }
 }

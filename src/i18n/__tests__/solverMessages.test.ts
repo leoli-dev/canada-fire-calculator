@@ -37,3 +37,28 @@ it('gives every unmodelled GIS path a reason a caller can render in all three la
     expect(zh[key]).not.toBe(en[key])
   }
 })
+
+it('gives every tax figure the pack does not year-switch a native reason', () => {
+  // BE-38 B1: the tax pack names each participating figure it does not
+  // year-switch. Each one needs a native string, so the surface can show the
+  // scope instead of an English placeholder or nothing.
+  const ids = ['federal-age-pension-amounts', 'provincial-age-pension-amounts',
+    'spouse-credit', 'low-income-tax-reductions', 'capital-gains-inclusion',
+    'probate-fees', 'gst-hst-and-cash-benefits', 'provincial-premiums-and-levies']
+  for (const id of ids) {
+    const key = `taxUnsupported.${id}` as keyof typeof en
+    expect(en[key], key).toBeTruthy()
+    expect(fr[key], key).toBeTruthy()
+    expect(zh[key], key).toBeTruthy()
+    expect(fr[key]).not.toBe(en[key])
+    expect(zh[key]).not.toBe(en[key])
+  }
+  // The year/policy headline, the not-modelled heading and the refusal text.
+  for (const key of ['ruleAssumptionsTaxPolicy', 'ruleAssumptionsTaxPolicyPublished',
+    'ruleAssumptionsTaxPolicyAssumed', 'ruleAssumptionsTaxNotModelled',
+    'ruleAssumptionsRefused', 'ruleAssumptionsLimit'] as const) {
+    expect(en[key], key).toBeTruthy()
+    expect(fr[key], key).toBeTruthy()
+    expect(zh[key], key).toBeTruthy()
+  }
+})

@@ -1,11 +1,23 @@
 import { useTranslation } from 'react-i18next'
-import { selectBenefitRules, selectGisRules, selectTaxRules } from '../engine/rules'
+import { selectBenefitRules, selectGisRules } from '../engine/rules'
+import { PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules } from '../engine/tax'
 import type { Province } from '../engine/types'
 
-/** Shared disclosure: both entry modes read the same pinned pack selection. */
+/**
+ * Shared disclosure: both entry modes read the same pinned pack selection and
+ * are given the same plan anchor year, so a mode switch cannot change the rule
+ * pack, the rule year or the future-indexation policy. BE-38 B1: the tax pack
+ * is no longer display-only — the projection computes its bracket ladder and
+ * basic personal amount from it — so the panel now states which year priced the
+ * numbers, whether that year was published or assumed, and every participating
+ * figure the pack does not year-switch.
+ *
+ * The year shown is the engine's own anchor (`PLAN_TAX_YEAR`), never a prop:
+ * the panel must report the pack that actually priced the numbers, so a caller
+ * cannot make it display a year the computation did not use.
+ */
 export function RuleAssumptions({ province, inflation }: { province: Province; inflation: number }) {
   const { t } = useTranslation()
-  const tax = selectTaxRules(province, 2026)
   const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
   // BE-26 A: the GIS/Allowance pack is a quarterly published table, so its id
   // and payment period are disclosed next to the tax and CCB ones, together
@@ -13,10 +25,39 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   // knowingly does not price. Those paths used to live only in the pack's own
   // `limitation` string, which nothing rendered.
   const gis = selectGisRules()
+  const selection = trySelectPlanTaxRules({ jurisdiction: province, taxYear: PLAN_TAX_YEAR })
+  if (selection.status !== 'ok') {
+    // An unknown jurisdiction or an unpublished year refuses; it is never
+    // priced from another jurisdiction's table or shown as a number.
+    return <div className="rule-assumptions" data-testid="rule-assumptions">
+      <strong>{t('ruleAssumptionsTitle')}</strong>
+      <p data-testid="rule-assumptions-refusal">{t('ruleAssumptionsRefused', { reason: selection.reason })}</p>
+    </div>
+  }
+  const tax = selection.context.pack
+  const provenance = taxRuleProvenance(selection.context)
+  const policy = provenance.projectionPolicy
   return <div className="rule-assumptions" data-testid="rule-assumptions">
     <strong>{t('ruleAssumptionsTitle')}</strong>
     <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
+    <p data-testid="rule-tax-pack" data-rule-pack-id={tax.id} data-rule-year={provenance.ruleYear}
+      data-rule-assumed={String(provenance.assumedFutureRule)}>
+      {t('ruleAssumptionsTaxPolicy', {
+        year: provenance.ruleYear,
+        policy: policy.kind === 'published'
+          ? t('ruleAssumptionsTaxPolicyPublished')
+          : t('ruleAssumptionsTaxPolicyAssumed', {
+              rate: (policy.annualRate * 100).toFixed(1), from: policy.fromTaxYear,
+            }),
+      })}
+    </p>
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
+    <p data-testid="rule-tax-not-modelled">
+      {t('ruleAssumptionsTaxNotModelled')}{' '}
+      {tax.unsupportedPaths.map((path, index) => <span key={path.id}>
+        {index > 0 ? '; ' : ''}{t(`taxUnsupported.${path.id}`)}{' '}
+      </span>)}
+    </p>
     <p>{t('ruleAssumptionsLimit')}</p>
     <div className="rule-sources">
       {([

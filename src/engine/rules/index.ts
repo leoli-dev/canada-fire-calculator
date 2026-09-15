@@ -22,6 +22,18 @@ interface RulePackMeta extends Provenance {
   assumedAnnualRate?: number
   basedOnRuleId?: string
 }
+/**
+ * A parameter that participates in a tax result but that this pack does *not*
+ * year-switch, with a reason a caller can show. A bracket/BPA pack is not a
+ * complete return: every figure outside `federal`/`provincial` keeps its pinned
+ * value even in an assumed future year, and that has to be named in the pack
+ * rather than left inside a `limitation` string nothing renders. BE-38 B
+ * replaces these entries with real field-level packs.
+ */
+export interface TaxUnsupportedPath {
+  id: string
+  reason: string
+}
 export interface TaxRulePack extends Provenance {
   id: string
   jurisdiction: Province
@@ -35,9 +47,17 @@ export interface TaxRulePack extends Provenance {
   sourceConflict?: string
   /** Exact thresholds in this list never receive future indexation. */
   frozenProvincialBracketIndexes: number[]
+  /** The figures this pack does not year-switch, each with a reason. */
+  unsupportedPaths: TaxUnsupportedPath[]
   assumedFutureRule: boolean
   assumedAnnualRate?: number
   basedOnRuleId?: string
+  /**
+   * The published tax year an assumed pack was indexed from, so "indexed once
+   * per elapsed year" is auditable from the pack alone instead of inferred
+   * from its id string.
+   */
+  basedOnTaxYear?: number
 }
 export interface BenefitRulePack extends Provenance {
   id: string
@@ -180,6 +200,39 @@ const CRA_2026_RATES = 'https://www.canada.ca/en/revenue-agency/services/tax/ind
 const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
 const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
 const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
+/**
+ * The figures `tax.ts` reads straight from `taxData.ts` rather than from a
+ * pack, listed once so no pack can claim to govern a figure it does not carry.
+ * They are the same for every jurisdiction except the provincial premiums and
+ * levies, which only Ontario and Quebec charge.
+ */
+const TAX_UNCOVERED_COMMON: TaxUnsupportedPath[] = [
+  { id: 'federal-age-pension-amounts',
+    reason: 'The federal age amount and pension income amount are pinned 2026 figures in taxData.ts with no tax-year selection, so an assumed future year carries them forward unchanged.' },
+  { id: 'provincial-age-pension-amounts',
+    reason: 'Each jurisdiction\u2019s age amount, pension income amount and senior supplement are pinned 2026 figures in taxData.ts with no tax-year selection.' },
+  { id: 'spouse-credit',
+    reason: 'The spouse/common-law-partner amounts and their income tests (spouseCredit2026.ts) are pinned 2026 figures and are not selected by tax year.' },
+  { id: 'low-income-tax-reductions',
+    reason: 'Provincial low-income tax reductions and refundable credits (for example Ontario\u2019s LIFT credit) are not modelled at all, so no result priced by this pack is a complete provincial return.' },
+  { id: 'capital-gains-inclusion',
+    reason: 'The capital-gains inclusion rate (taxData.ts CAPITAL_GAINS_INCLUSION) is a pinned statutory share rather than a bracket, and is not selected by tax year.' },
+  { id: 'probate-fees',
+    reason: 'Probate and estate administration fees (taxData.ts PROBATE_RATES) are pinned 2026 figures outside this tax pack; the projection prices `probateFee` from them.' },
+  { id: 'gst-hst-and-cash-benefits',
+    reason: 'The GST/HST credit and provincial cash benefits are not modelled, so no result priced by this pack may be read as a complete after-tax or after-benefit position.' },
+]
+const TAX_UNCOVERED_BY_JURISDICTION: Partial<Record<Province, TaxUnsupportedPath>> = {
+  ON: { id: 'provincial-premiums-and-levies',
+    reason: 'Ontario surtax and the Ontario Health Premium (taxData.ts ON_SURTAX, ON_HEALTH_PREMIUM) are pinned figures with no tax-year selection.' },
+  QC: { id: 'provincial-premiums-and-levies',
+    reason: 'Quebec\u2019s federal abatement, the Fonds des services de sant\u00e9 contribution and the RAMQ premium (taxData.ts QC_ABATEMENT, QC_FSS, QC_RAMQ) are pinned figures with no tax-year selection.' },
+}
+function taxUnsupportedPaths(jurisdiction: Province): TaxUnsupportedPath[] {
+  const provincial = TAX_UNCOVERED_BY_JURISDICTION[jurisdiction]
+  return provincial ? [...TAX_UNCOVERED_COMMON, provincial] : [...TAX_UNCOVERED_COMMON]
+}
+
 const TAX_PACKS: TaxRulePack[] = [
   {
     id: 'CA-ON-tax-2025-v1', jurisdiction: 'ON', taxYear: 2025,
@@ -190,6 +243,7 @@ const TAX_PACKS: TaxRulePack[] = [
     fieldAdditionalSources: { federalBrackets: [TAX_2025_ON] },
     indexationRule: 'cpi-assumption', rounding: 'nearest-dollar', coverage: 'estimated',
     limitation: 'Bracket/BPA snapshot only; other Ontario credits, tax reduction and benefits are not year-switched.',
+    unsupportedPaths: taxUnsupportedPaths('ON'),
     assumedFutureRule: false,
   },
   ...Object.entries(PROVINCIAL_2026_SNAPSHOT).map(([jurisdiction, provincial]): TaxRulePack => ({
@@ -210,6 +264,7 @@ const TAX_PACKS: TaxRulePack[] = [
     indexationRule: jurisdiction === 'MB' ? 'frozen' : 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
     limitation: 'Existing engine constants are retained pending BE-38 B. Some provincial values/credits differ from current official tables; this is a versioned legacy snapshot, not a complete 2026 return.',
+    unsupportedPaths: taxUnsupportedPaths(jurisdiction as Province),
     assumedFutureRule: false,
   })),
 ]
@@ -538,6 +593,14 @@ function validDeviation(value: number | undefined): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= DEVIATION_TOLERANCE
 }
 
+/** Every path a pack knowingly does not price is named once, with a reason a caller can show. */
+function validUnsupportedPaths(paths: { id: string; reason: string }[] | undefined): boolean {
+  return Array.isArray(paths) &&
+    new Set(paths.map(path => path.id)).size === paths.length &&
+    paths.every(path => typeof path.id === 'string' && path.id.trim().length > 0 &&
+      typeof path.reason === 'string' && path.reason.trim().length > 0)
+}
+
 function validGisPack(p: Partial<GisRulePack>): boolean {
   const categories: GisHouseholdRuleCategory[] = ['single', 'couple-both-pensioners',
     'couple-partner-allowance', 'couple-partner-no-oas-no-allowance']
@@ -552,9 +615,7 @@ function validGisPack(p: Partial<GisRulePack>): boolean {
     validReductionSegments(p.allowance.reductionSegments) && validDeviation(p.allowance.maxMonthlyDeviation) &&
     !!p.allowance.fieldSources && Object.values(p.allowance.fieldSources).every(validURL) &&
     Array.isArray(p.unsupportedPaths) && p.unsupportedPaths.length > 0 &&
-    new Set(p.unsupportedPaths.map(path => path.id)).size === p.unsupportedPaths.length &&
-    p.unsupportedPaths.every(path => typeof path.id === 'string' && path.id.trim().length > 0 &&
-      typeof path.reason === 'string' && path.reason.trim().length > 0)
+    validUnsupportedPaths(p.unsupportedPaths)
 }
 
 function validTaxPack(meta: RulePackMeta, p: Partial<TaxRulePack>): boolean {
@@ -565,6 +626,11 @@ function validTaxPack(meta: RulePackMeta, p: Partial<TaxRulePack>): boolean {
     Array.isArray(p.frozenProvincialBracketIndexes) &&
     new Set(p.frozenProvincialBracketIndexes).size === p.frozenProvincialBracketIndexes.length &&
     p.frozenProvincialBracketIndexes.every(i => Number.isInteger(i) && i >= 0 && i < p.provincial!.brackets.length - 1) &&
+    // Every figure this pack does not year-switch must be named with a reason.
+    validUnsupportedPaths(p.unsupportedPaths) &&
+    // An assumed pack must say which published year it was indexed from, so the
+    // elapsed-year count is auditable rather than implied by its id.
+    (!p.assumedFutureRule || (Number.isInteger(p.basedOnTaxYear) && (p.basedOnTaxYear ?? 0) < (p.taxYear ?? 0))) &&
     !!p.fieldSources && Object.values(p.fieldSources).every(validURL) &&
     (p.fieldAdditionalSources === undefined || (!!p.fieldAdditionalSources && typeof p.fieldAdditionalSources === 'object' &&
       Object.entries(p.fieldAdditionalSources).every(([key, urls]) =>
@@ -641,21 +707,50 @@ function projectTable(table: TaxTable, years: number, rate: number, frozen: numb
     brackets: table.brackets.map((b, i) => ({ ...b, upTo: frozen.includes(i) ? b.upTo : indexed(b.upTo, years, rate) })),
   }
 }
+const PUBLISHED_JURISDICTIONS: string[] = Object.keys(PROVINCIAL_2026_SNAPSHOT).sort()
+/**
+ * Why a (jurisdiction, tax year) request cannot be priced, or null when it can.
+ * Each distinct failure gets its own concrete reason: a caller must never read
+ * "no pack for this year" as "unknown jurisdiction", and an unknown
+ * jurisdiction is never answered with another jurisdiction's table.
+ */
+function taxRefusalReason(jurisdiction: string, taxYear: number, future?: { annualRate: number }): string | null {
+  if (!Object.hasOwn(PROVINCIAL_2026_SNAPSHOT, jurisdiction))
+    return `unknown tax jurisdiction "${String(jurisdiction)}": published packs cover ${PUBLISHED_JURISDICTIONS.join(', ')}`
+  if (!Number.isInteger(taxYear))
+    return `tax year "${String(taxYear)}" for ${jurisdiction} is not a whole calendar year`
+  if (TAX_PACKS.some(pack => pack.jurisdiction === jurisdiction && pack.taxYear === taxYear)) return null
+  const base = TAX_PACKS.filter(pack => pack.jurisdiction === jurisdiction && pack.taxYear < taxYear).at(-1)
+  if (!base) {
+    const years = TAX_PACKS.filter(pack => pack.jurisdiction === jurisdiction)
+      .map(pack => pack.taxYear).sort((a, b) => a - b)
+    return years.length === 0
+      ? `no published tax rule pack covers ${jurisdiction}`
+      : `no published tax rule pack for ${jurisdiction} tax year ${taxYear}: published years are ${years.join(', ')}`
+  }
+  if (!future || !Number.isFinite(future.annualRate) || future.annualRate < 0 || future.annualRate > 1)
+    return `tax year ${taxYear} is not published for ${jurisdiction} (latest published year ${base.taxYear}); pass an explicit future indexation rate between 0 and 1`
+  return null
+}
 export function selectTaxRules(jurisdiction: string, taxYear: number, future?: { annualRate: number }): TaxRulePack {
-  if (!Object.hasOwn(PROVINCIAL_2026_SNAPSHOT, jurisdiction) || !Number.isInteger(taxYear)) throw new Error('Unknown tax jurisdiction or year')
+  const refusal = taxRefusalReason(jurisdiction, taxYear, future)
+  if (refusal) throw new Error(refusal)
   const exact = TAX_PACKS.find(p => p.jurisdiction === jurisdiction && p.taxYear === taxYear)
   if (exact) return structuredClone(exact)
-  const base = TAX_PACKS.filter(p => p.jurisdiction === jurisdiction && p.taxYear < taxYear).at(-1)
-  if (!base || !future || !Number.isFinite(future.annualRate) || future.annualRate < 0 || future.annualRate > 1)
-    throw new Error('Unpublished tax year requires an explicit future indexation assumption')
+  const base = TAX_PACKS.filter(p => p.jurisdiction === jurisdiction && p.taxYear < taxYear).at(-1)!
   const years = taxYear - base.taxYear
-  const rate = base.indexationRule === 'frozen' ? 0 : future.annualRate
+  // The pack's own indexation policy decides what freezes; the caller's rate is
+  // the once-a-year indexation applied to everything the pack does not freeze.
+  // Projecting always starts from the published pack, so a year is never
+  // re-indexed on top of an already-indexed value.
+  const rate = base.indexationRule === 'frozen' ? 0 : future!.annualRate
   const projected: TaxRulePack = {
     ...base, id: `${base.id}+assumed-${taxYear}-${rate}`, taxYear,
     effectiveDate: `${taxYear}-01-01`,
-    federal: projectTable(base.federal, years, future.annualRate, []),
+    federal: projectTable(base.federal, years, future!.annualRate, []),
     provincial: projectTable(base.provincial, years, rate, base.frozenProvincialBracketIndexes),
-    assumedFutureRule: true, assumedAnnualRate: future.annualRate, basedOnRuleId: base.id,
+    assumedFutureRule: true, assumedAnnualRate: future!.annualRate, basedOnRuleId: base.id,
+    basedOnTaxYear: base.taxYear,
     coverage: 'estimated',
   }
   // Frozen upper bounds can be overtaken by earlier indexed bounds. Never return an invalid pack.

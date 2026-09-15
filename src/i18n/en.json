@@ -109,7 +109,7 @@
   "ruleAssumptionsTitle": "Tax and benefit rule snapshots",
   "ruleAssumptionsVersion": "Tax: {{tax}} · CCB payment period: {{ccb}} · GIS/Allowance: {{gis}}",
   "ruleAssumptionsPolicy": "Published figures take priority. Unpublished future years require an explicit assumption: index eligible nominal thresholds once per year at {{rate}} planning inflation; frozen thresholds stay fixed.",
-  "ruleAssumptionsLimit": "The current projection still uses its pinned 2026 constants throughout. The dated selector is an internal foundation; year-by-year tax/benefit switching and full credit coverage are not yet connected.",
+  "ruleAssumptionsLimit": "The federal and provincial bracket ladders and basic personal amounts now come from the selected pack. Every figure the pack does not year-switch is listed above and keeps its pinned value; BE-38 B replaces them with dated rules. The GIS/Allowance fit, the CCB approximation and the absence of GST/HST and provincial cash benefits are unchanged.",
   "ruleTaxSource": "Tax bracket source",
   "ruleCcbSource": "CCB period source",
   "ruleFederalBracketsSource": "Federal brackets",
@@ -1370,5 +1370,18 @@
   "pensionSourceManualNote": "Recorded as entered by you. Changing your retirement age does not change it.",
   "pensionSourceStatementNote": "Recorded from a statement ({{year}}). The calculator will never overwrite it; a retirement-age change only asks you to re-confirm.",
   "pensionSourceEstimatorNote": "Estimated by this calculator ({{year}}) from the work or residence premises you gave. Changing your retirement age re-runs that estimate.",
-  "oasEstUsesFireAge": "Recorded with the FIRE age you entered above ({{age}}) as its premise. OAS is residence-based, so the amount itself does not change with retirement age."
+  "oasEstUsesFireAge": "Recorded with the FIRE age you entered above ({{age}}) as its premise. OAS is residence-based, so the amount itself does not change with retirement age.",
+  "ruleAssumptionsTaxPolicy": "Selected tax rule year: {{year}} — {{policy}}.",
+  "ruleAssumptionsTaxPolicyPublished": "published figures",
+  "ruleAssumptionsTaxPolicyAssumed": "assumed: the pack’s eligible nominal thresholds indexed once a year at {{rate}} from tax year {{from}}",
+  "ruleAssumptionsTaxNotModelled": "This tax pack does not year-switch:",
+  "ruleAssumptionsRefused": "Tax rules unavailable, so no tax figure is priced: {{reason}}",
+  "taxUnsupported.federal-age-pension-amounts": "the federal age amount and pension income amount (pinned 2026 figures)",
+  "taxUnsupported.provincial-age-pension-amounts": "each province’s age amount, pension income amount and senior supplement (pinned 2026 figures)",
+  "taxUnsupported.spouse-credit": "the spouse/common-law-partner amounts and their income tests (pinned 2026 figures)",
+  "taxUnsupported.low-income-tax-reductions": "provincial low-income tax reductions and refundable credits (for example Ontario’s LIFT credit), which are not modelled at all",
+  "taxUnsupported.capital-gains-inclusion": "the capital-gains inclusion rate (a pinned 50% statutory share)",
+  "taxUnsupported.probate-fees": "probate and estate administration fees (pinned 2026 figures used for the estate fee)",
+  "taxUnsupported.gst-hst-and-cash-benefits": "the GST/HST credit and provincial cash benefits, so no result is a complete after-benefit position",
+  "taxUnsupported.provincial-premiums-and-levies": "the jurisdiction’s own premiums and levies (Ontario surtax and health premium, or Quebec’s abatement, FSS contribution and RAMQ premium; pinned figures)"
 }

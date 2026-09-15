@@ -1,4 +1,4 @@
-import { incomeTax, type PersonCredits } from './tax'
+import { anchorTaxRules, incomeTax, PLAN_TAX_YEAR, type PersonCredits, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { OAS_CLAWBACK_RATE, OAS_CLAWBACK_THRESHOLD } from './benefits'
 import type { Province } from './types'
@@ -21,6 +21,14 @@ export interface TerminalTaxInput {
   /** Unrealized gains may be negative and offset other terminal capital gains. */
   nonRegisteredGain: number
   investmentPropertyGain: number
+  /** The plan's tax year; defaults to the real-dollar anchor year. */
+  taxYear?: number
+  /**
+   * The rule pack that prices the closing return. Supplied by the caller that
+   * selected it, so the terminal return cannot be priced from a different year
+   * or jurisdiction than the annual rows it extends.
+   */
+  rules?: TaxRuleContext
 }
 
 export interface TerminalTaxResult {
@@ -68,6 +76,7 @@ export function terminalTax(input: TerminalTaxInput): TerminalTaxResult {
       incrementalTax: 0, registeredTaxShare: 0 }
   }
   const dispositionPerPerson = taxableDisposition / input.people.length
+  const rules = input.rules ?? anchorTaxRules(input.province, input.taxYear ?? PLAN_TAX_YEAR)
   const increments = input.people.reduce((sum, person) => {
     const grossOas = person.oasGross ?? 0
     const netOas = person.oasNet ?? grossOas
@@ -79,8 +88,8 @@ export function terminalTax(input: TerminalTaxInput): TerminalTaxResult {
     const incomeBeforeRepayment = person.taxableIncome + alreadyRepaid + dispositionPerPerson
     const finalRepayment = Math.min(grossOas,
       Math.max(0, incomeBeforeRepayment - OAS_CLAWBACK_THRESHOLD) * OAS_CLAWBACK_RATE)
-    const before = incomeTax(person.taxableIncome, input.province, person.credits)
-    const after = incomeTax(incomeBeforeRepayment - finalRepayment, input.province, person.credits)
+    const before = incomeTax(person.taxableIncome, input.province, person.credits, rules)
+    const after = incomeTax(incomeBeforeRepayment - finalRepayment, input.province, person.credits, rules)
     return {
       incomeTaxIncrement: sum.incomeTaxIncrement + after - before,
       oasRecoveryIncrement: sum.oasRecoveryIncrement + finalRepayment - alreadyRepaid,

@@ -1,19 +1,151 @@
 import {
   FED_AGE_AMOUNT,
   FED_PENSION_AMOUNT,
-  FEDERAL,
   ON_HEALTH_PREMIUM,
   ON_SURTAX,
   PROV_AGE_PENSION,
   PROBATE_RATES,
-  PROVINCIAL,
   QC_ABATEMENT,
   QC_FSS,
   QC_RAMQ,
   type Bracket,
+  type TaxTable,
 } from './taxData'
+import { selectTaxRules, type TaxRulePack } from './rules'
 import type { Province } from './types'
 import { federalSpouseAmount2026, provincialSpouseAmount2026 } from './spouseCredit2026'
+
+/**
+ * The tax year whose published pack prices the projection. Every table input in
+ * this engine is a today's-dollar figure, so the projection is expressed in this
+ * year's real dollars whatever calendar year a row represents: an annually
+ * indexed ladder is already flat in real dollars, and indexing it a second time
+ * for a projected year would inflate it. Raising this constant to a newly
+ * published tax year is a deliberate, reviewed number change — it must land with
+ * an independent expected-value test and a recorded before/after, never as
+ * silent drift.
+ */
+export const PLAN_TAX_YEAR = 2026
+
+/** One selected, versioned rule pack plus the policy that produced it. */
+export interface TaxRuleContext {
+  jurisdiction: Province
+  /** The tax year whose pack prices this computation. */
+  taxYear: number
+  /** The pack itself. A pack is published data: callers never mutate it. */
+  pack: TaxRulePack
+  /**
+   * What happened beyond the pack's publication. `published` means every figure
+   * is a published value. `assumed` means the pack's eligible nominal
+   * thresholds were indexed exactly once per elapsed year from `fromTaxYear`,
+   * the ones the pack freezes were held fixed, and the result is therefore an
+   * assumption rather than a published figure.
+   */
+  projectionPolicy:
+    | { kind: 'published' }
+    | { kind: 'assumed'; annualRate: number; fromRuleId: string; fromTaxYear: number }
+}
+
+/** A request for the pack that should price one plan's tax. */
+export interface TaxRuleRequest {
+  jurisdiction: string
+  /** Defaults to the plan anchor year; a year beyond publication needs `futureIndexation`. */
+  taxYear?: number
+  /** The once-a-year indexation assumption required for a year beyond publication. */
+  futureIndexation?: { annualRate: number }
+}
+
+export type TaxRuleSelection =
+  | { status: 'ok'; context: TaxRuleContext }
+  /** No published or explicitly assumed pack can price this. Never a fallback. */
+  | { status: 'unsupported'; reason: string }
+
+/** The provenance every priced tax result must carry. */
+export interface TaxRuleProvenance {
+  rulePackId: string
+  ruleYear: number
+  assumedFutureRule: boolean
+  projectionPolicy: TaxRuleContext['projectionPolicy']
+  coverage: TaxRulePack['coverage']
+}
+
+function contextFor(pack: TaxRulePack, taxYear: number): TaxRuleContext {
+  return {
+    jurisdiction: pack.jurisdiction,
+    taxYear,
+    pack,
+    projectionPolicy: pack.assumedFutureRule
+      ? {
+          kind: 'assumed',
+          annualRate: pack.assumedAnnualRate ?? 0,
+          fromRuleId: pack.basedOnRuleId ?? pack.id,
+          fromTaxYear: pack.basedOnTaxYear ?? pack.taxYear,
+        }
+      : { kind: 'published' },
+  }
+}
+
+/**
+ * Select the pack for one plan, returning the refusal rather than throwing so a
+ * caller can surface it. An unknown jurisdiction is never answered with another
+ * jurisdiction's table, and an unpublished year is never answered with a
+ * published one.
+ */
+export function trySelectPlanTaxRules(request: TaxRuleRequest): TaxRuleSelection {
+  const taxYear = request.taxYear ?? PLAN_TAX_YEAR
+  try {
+    const pack = selectTaxRules(request.jurisdiction, taxYear, request.futureIndexation)
+    return { status: 'ok', context: contextFor(pack, taxYear) }
+  } catch (error) {
+    return {
+      status: 'unsupported',
+      reason: error instanceof Error ? error.message : 'tax rule selection failed',
+    }
+  }
+}
+
+/** Strict form of {@link trySelectPlanTaxRules}: throws the same concrete reason. */
+export function selectPlanTaxRules(request: TaxRuleRequest): TaxRuleContext {
+  const selection = trySelectPlanTaxRules(request)
+  if (selection.status !== 'ok') throw new Error(selection.reason)
+  return selection.context
+}
+
+/**
+ * Hot-path resolver for the plan anchor year. `incomeTax` runs inside every
+ * withdrawal bisection, so the anchor context is resolved once per
+ * (jurisdiction, year) and then read-only. Nothing outside this module ever
+ * receives this object — `selectPlanTaxRules` returns its own copy — so the
+ * shared pack cannot be mutated.
+ */
+const anchorContexts = new Map<string, TaxRuleContext>()
+export function anchorTaxRules(province: string, taxYear = PLAN_TAX_YEAR): TaxRuleContext {
+  const key = `${province}:${taxYear}`
+  const cached = anchorContexts.get(key)
+  if (cached) return cached
+  const context = selectPlanTaxRules({ jurisdiction: province, taxYear })
+  anchorContexts.set(key, context)
+  return context
+}
+
+export function taxRuleProvenance(context: TaxRuleContext): TaxRuleProvenance {
+  return {
+    rulePackId: context.pack.id,
+    ruleYear: context.taxYear,
+    assumedFutureRule: context.pack.assumedFutureRule,
+    projectionPolicy: context.projectionPolicy,
+    coverage: context.pack.coverage,
+  }
+}
+
+/** A context must price the jurisdiction it is used for, or it is a bug. */
+function tablesFor(context: TaxRuleContext, province: Province): { federal: TaxTable; provincial: TaxTable } {
+  if (context.pack.jurisdiction !== province)
+    throw new Error(
+      `tax rule pack ${context.pack.id} prices ${context.pack.jurisdiction}, not ${province}`,
+    )
+  return { federal: context.pack.federal, provincial: context.pack.provincial }
+}
 
 export interface PersonCredits {
   /** the taxpayer's age — 65+ unlocks the age amount */
@@ -43,40 +175,50 @@ function bracketTax(income: number, brackets: Bracket[]): number {
 }
 
 /** Enhanced federal BPA phases down to the floor across the 4th bracket. */
-function federalBpa(taxable: number): number {
-  const { bpa, bpaMin, brackets } = FEDERAL
-  if (bpaMin === undefined) return bpa
-  const from = brackets[2].upTo
-  const to = brackets[3].upTo
+function enhancedBpa(table: TaxTable, taxable: number): number {
+  if (table.bpaMin === undefined) return table.bpa
+  const from = table.brackets[2].upTo
+  const to = table.brackets[3].upTo
   const phase = Math.min(1, Math.max(0, (taxable - from) / (to - from)))
-  return bpa - (bpa - bpaMin) * phase
+  return table.bpa - (table.bpa - table.bpaMin) * phase
 }
 
 /** Components for the person-owned Québec return. Ordinary Québec tax omits
  * Schedule B, Schedule F and Schedule K; the household calculator adds each
- * from its actual family/source/coverage facts. */
-export function federalIncomeTax(taxable: number, credits?: PersonCredits, quebecAbatement = false): number {
+ * from its actual family/source/coverage facts. The rule context is required:
+ * the federal ladder is read from the pack, never from a literal. */
+export function federalIncomeTax(taxable: number, rules: TaxRuleContext, credits?: PersonCredits, quebecAbatement = false): number {
   if (taxable <= 0) return 0
-  let credit = federalBpa(taxable) * FEDERAL.brackets[0].rate
-  credit += Math.min(FED_PENSION_AMOUNT, credits?.pensionIncome ?? 0) * FEDERAL.brackets[0].rate
+  const federal = rules.pack.federal
+  let credit = enhancedBpa(federal, taxable) * federal.brackets[0].rate
+  credit += Math.min(FED_PENSION_AMOUNT, credits?.pensionIncome ?? 0) * federal.brackets[0].rate
   if (credits?.spouseNetIncome !== undefined)
-    credit += federalSpouseAmount2026(credits.spouseNetIncome, federalBpa(taxable)) * FEDERAL.brackets[0].rate
+    credit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if ((credits?.age ?? 0) >= 65)
-    credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold)) * FEDERAL.brackets[0].rate
-  const amount = Math.max(0, bracketTax(taxable, FEDERAL.brackets) - credit)
+    credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold)) * federal.brackets[0].rate
+  const amount = Math.max(0, bracketTax(taxable, federal.brackets) - credit)
   return quebecAbatement ? amount * (1 - QC_ABATEMENT) : amount
 }
 
-export function ordinaryQuebecIncomeTax(taxable: number): number {
+export function ordinaryQuebecIncomeTax(taxable: number, rules: TaxRuleContext): number {
   if (taxable <= 0) return 0
-  const qc = PROVINCIAL.QC
+  if (rules.pack.jurisdiction !== 'QC')
+    throw new Error(`ordinary Quebec tax needs a QC rule pack, got ${rules.pack.id}`)
+  const qc = rules.pack.provincial
   return Math.max(0, bracketTax(taxable, qc.brackets) - qc.bpa * qc.brackets[0].rate)
 }
 
 /**
  * Legacy combined federal + provincial income-tax preview on taxable income.
- * For Quebec it cannot identify Schedule F source income or Schedule K
- * coverage. Verified person-owned Quebec results use quebecTax.ts instead.
+ * The federal and provincial bracket ladders and basic personal amounts come
+ * from the selected, versioned rule pack — never from a literal in this file.
+ * The credits and levies the pack does not carry (age/pension amounts, the
+ * spouse amount, Ontario surtax and health premium, Quebec's abatement/FSS/RAMQ)
+ * still come from `taxData.ts` and are enumerated in the pack's
+ * `unsupportedPaths`; BE-38 B replaces them with field-level packs.
+ *
+ * For Quebec this preview cannot identify Schedule F source income or Schedule
+ * K coverage. Verified person-owned Quebec results use quebecTax.ts instead.
  * Optional retiree credits: the age amount (65+, income-tested) and the
  * pension income amount, both federal and provincial. Taxable income stands
  * in for net income in the phase-outs.
@@ -85,29 +227,31 @@ export function incomeTax(
   taxable: number,
   province: Province,
   credits?: PersonCredits,
+  rules?: TaxRuleContext,
 ): number {
   if (taxable <= 0) return 0
+  const context = rules ?? anchorTaxRules(province)
+  const { federal, provincial: p } = tablesFor(context, province)
   const senior = (credits?.age ?? 0) >= 65
   const pensionInc = credits?.pensionIncome ?? 0
   const provincialPensionInc = credits?.provincialPensionIncome ?? pensionInc
 
-  let fedCredit = federalBpa(taxable) * FEDERAL.brackets[0].rate
+  let fedCredit = enhancedBpa(federal, taxable) * federal.brackets[0].rate
   // the pension income amount has no age test of its own — eligibility by
   // income type is the caller's job (see PersonCredits.pensionIncome)
-  fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * FEDERAL.brackets[0].rate
+  fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * federal.brackets[0].rate
   if (credits?.spouseNetIncome !== undefined)
-    fedCredit += federalSpouseAmount2026(credits.spouseNetIncome, federalBpa(taxable)) * FEDERAL.brackets[0].rate
+    fedCredit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if (senior) {
     const ageAmt = Math.max(
       0,
       FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold),
     )
-    fedCredit += ageAmt * FEDERAL.brackets[0].rate
+    fedCredit += ageAmt * federal.brackets[0].rate
   }
-  let fed = Math.max(0, bracketTax(taxable, FEDERAL.brackets) - fedCredit)
+  let fed = Math.max(0, bracketTax(taxable, federal.brackets) - fedCredit)
   if (province === 'QC') fed *= 1 - QC_ABATEMENT
 
-  const p = PROVINCIAL[province]
   const lowRate = p.brackets[0].rate
   let provBpa = p.bpa
   if (p.bpaPhaseOut) {
@@ -191,8 +335,10 @@ export function probateTax(value: number, province: Province): number {
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */
-export function marginalRate(taxable: number, province: Province): number {
+export function marginalRate(taxable: number, province: Province, rules?: TaxRuleContext): number {
   if (taxable <= 0) return 0
+  const context = rules ?? anchorTaxRules(province)
+  const { federal, provincial } = tablesFor(context, province)
   const at = (brackets: Bracket[]) => {
     let prev = 0
     for (const b of brackets) {
@@ -201,7 +347,7 @@ export function marginalRate(taxable: number, province: Province): number {
     }
     return brackets[brackets.length - 1].rate
   }
-  let fed = at(FEDERAL.brackets)
+  let fed = at(federal.brackets)
   if (province === 'QC') fed *= 1 - QC_ABATEMENT
-  return fed + at(PROVINCIAL[province].brackets)
+  return fed + at(provincial.brackets)
 }
