@@ -234,7 +234,7 @@ export interface ContentVerifiedAuthority {
  * Justice office consolidation of the Court Services Fees Regulations (R-120-93
  * as amended to R-071-2017), whose Part 2 item 1(e) prints $435 where the value
  * exceeds $250,000. NU's is the official consolidation of the Court Fees
- * Regulations (R.C.Nun. R-042-2021), whose Schedule C item 5 prints $425 on the
+ * Regulations (C.R.Nu. R-042-2021), whose Schedule C item 5 prints $425 on the
  * same boundary. Both are served by the government that made them, so a reader
  * can reproduce the figure; the TaxTips.ca territory table each row also lists
  * prints the same top tier and is recorded too, because a `contentChecked` row

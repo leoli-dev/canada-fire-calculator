@@ -224,7 +224,7 @@ const PROBATE_TABLE = (province: string) =>
  * exceeds $250,000. */
 const NT_PROBATE = 'https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf'
 /** Nunavut's official consolidation of the Court Fees Regulations,
- * R.C.Nun. R-042-2021, Schedule C item 5: $425 where the value exceeds
+ * C.R.Nu. R-042-2021, Schedule C item 5: $425 where the value exceeds
  * $250,000. */
 const NU_PROBATE = 'https://www.nunavutlegislation.ca/en/file-download/download/public/7022'
 /** Ontario's probate rate and threshold, hand-keyed from `98e34` s. 2(6.1):

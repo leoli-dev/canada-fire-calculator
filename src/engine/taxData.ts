@@ -252,7 +252,7 @@ export interface ProbateRate {
  *   - NT: Court Services Fees Regulations, R-120-93, Part 2, item 1 — $30 ·
  *     $110 · $215 · $325 · $435 (top tier where the value exceeds $250,000)
  *     (`https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf`).
- *   - NU: Court Fees Regulations, R.C.Nun. R-042-2021, Schedule C, item 5 — $30
+ *   - NU: Court Fees Regulations, C.R.Nu. R-042-2021, Schedule C, item 5 — $30
  *     · $110 · $215 · $325 · $425 (top tier where the value exceeds $250,000)
  *     (`https://www.nunavutlegislation.ca/en/file-download/download/public/7022`).
  * The two instruments state identical boundaries; only the top tier differs.
@@ -283,7 +283,7 @@ export const PROBATE_RATES: Record<Province, ProbateRate> = {
       { upTo: 125_000, fee: 215 }, { upTo: 250_000, fee: 325 },
     ],
   },
-  // R.C.Nun. R-042-2021, Schedule C, item 5 table — same rungs, $425 top tier.
+  // C.R.Nu. R-042-2021, Schedule C, item 5 table — same rungs, $425 top tier.
   NU: {
     flat: 425, rate: 0, threshold: 250000,
     bands: [
