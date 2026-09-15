@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { incomeTax, qcFssContribution, qcRamqPremium } from '../tax'
+import { anchorTaxRules, incomeTax, qcFssContribution, qcRamqPremium, selectPlanTaxRules } from '../tax'
 import {
   CPP_MAX_AT_65,
   OAS_FULL_AT_65,
@@ -220,5 +220,26 @@ describe('rrifMinFactor', () => {
     expect(rrifMinFactor(72)).toBeCloseTo(0.0528)
     expect(rrifMinFactor(95)).toBeCloseTo(0.1879)
     expect(rrifMinFactor(100)).toBe(0.2)
+  })
+})
+
+describe('anchorTaxRules caching', () => {
+  it('does not let a caller mutate the cached anchor tax pack', () => {
+    // The same hot-path hazard as the CCB anchor: `anchorTaxRules` hands its
+    // cached context straight back to callers (`incomeTax` runs inside every
+    // withdrawal bisection), so a stray write must not re-price later
+    // computations while `rulePackId` still names the published pack. The
+    // reference is a fresh copy of the same published pack.
+    const reference = selectPlanTaxRules({ jurisdiction: 'ON' }).pack.federal.bpa
+    const before = incomeTax(60000, 'ON')
+    try {
+      anchorTaxRules('ON').pack.federal.bpa = 999999
+    } catch {
+      // A frozen cache refuses the write; a copy would absorb it. Either way
+      // the cache and the next computation must be untouched.
+    }
+    expect(anchorTaxRules('ON').pack.federal.bpa).toBe(reference)
+    expect(anchorTaxRules('ON').pack.id).toBe('CA-ON-tax-2026-legacy-v1')
+    expect(incomeTax(60000, 'ON')).toBe(before)
   })
 })

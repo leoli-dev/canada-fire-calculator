@@ -1,6 +1,7 @@
 // CPP/QPP and OAS start-age adjustments and OAS clawback. 2025 figures.
 
 import {
+  freezeRuleContext,
   selectBenefitRules,
   selectGisRules,
   type BenefitRulePack,
@@ -510,16 +511,16 @@ function benefitContextFor(pack: BenefitRulePack, paymentPeriod: string): Benefi
  * Select the pack for one CCB payment period, returning the refusal rather than
  * throwing so a caller can surface it. An unknown program is never answered
  * with the CCB pack, and an unpublished period is never answered with a
- * published one.
+ * published one. `packs` defaults to the published packs (a test seam).
  */
 export function trySelectBenefitRules(request: {
   program: string
   paymentPeriod?: string
   futureIndexation?: { annualRate: number }
-}): BenefitRuleSelection {
+}, packs?: BenefitRulePack[]): BenefitRuleSelection {
   const paymentPeriod = request.paymentPeriod ?? PLAN_BENEFIT_PERIOD
   try {
-    const pack = selectBenefitRules(request.program, paymentPeriod, request.futureIndexation)
+    const pack = selectBenefitRules(request.program, paymentPeriod, request.futureIndexation, packs)
     return { status: 'ok', context: benefitContextFor(pack, paymentPeriod) }
   } catch (error) {
     return {
@@ -534,8 +535,8 @@ export function selectPlanBenefitRules(request: {
   program: string
   paymentPeriod?: string
   futureIndexation?: { annualRate: number }
-}): BenefitRuleContext {
-  const selection = trySelectBenefitRules(request)
+}, packs?: BenefitRulePack[]): BenefitRuleContext {
+  const selection = trySelectBenefitRules(request, packs)
   if (selection.status === 'ok') return selection.context
   throw new Error(selection.reason)
 }
@@ -554,14 +555,16 @@ export function benefitRuleProvenance(context: BenefitRuleContext): BenefitRuleP
 
 /**
  * The plan-anchored CCB context, resolved once per payment period and then read
- * only. `ccbAnnual` runs inside every withdrawal bisection, and the returned
- * pack is a copy the caller may read but is never handed back into the cache.
+ * only. `ccbAnnual` runs inside every withdrawal bisection, so the context is
+ * deep-frozen before it is cached and handed back: a stray write throws instead
+ * of silently re-pricing every later amount while `rulePackId` still names the
+ * published pack.
  */
 const anchorBenefitContexts = new Map<string, BenefitRuleContext>()
 export function anchorBenefitRules(period = PLAN_BENEFIT_PERIOD): BenefitRuleContext {
   const cached = anchorBenefitContexts.get(period)
   if (cached) return cached
-  const context = selectPlanBenefitRules({ program: 'CCB', paymentPeriod: period })
+  const context = freezeRuleContext(selectPlanBenefitRules({ program: 'CCB', paymentPeriod: period }))
   anchorBenefitContexts.set(period, context)
   return context
 }

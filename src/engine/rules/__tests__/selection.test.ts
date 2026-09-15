@@ -29,16 +29,24 @@ describe('dated rule selection', () => {
     // BE-38 B2: the pack is now what the computation reads, so `rate1`/`rate2`
     // and the published phase-out amounts must be sourced like the amounts and
     // thresholds rather than implied by a limitation string.
-    for (const pack of [selectBenefitRules('CCB', '2025-07/2026-06'), selectBenefitRules('CCB', '2026-07/2027-06')]) {
+    const packs = [selectBenefitRules('CCB', '2025-07/2026-06'), selectBenefitRules('CCB', '2026-07/2027-06')]
+    for (const pack of packs) {
       expect(pack.values.rate1).toHaveLength(4)
       expect(pack.values.rate2).toHaveLength(4)
       expect(pack.values.basePhaseOutAmounts).toHaveLength(4)
-      expect(pack.fieldSources.amounts).toContain('/news/')
+      // The retired 2025 ESDC news release now returns HTTP 404, so neither
+      // pack cites it: the 2025 amounts come from the live CRA indexation page
+      // and the 2026 ones from the live ESDC 2026 release.
+      expect(pack.fieldSources.amounts).toMatch(/adjustment-personal-income-tax-benefit-amounts|\/news\/2026\/07\//)
       expect(pack.fieldSources.thresholds).toContain('adjustment-personal-income-tax-benefit-amounts')
       expect(pack.fieldSources.rates).toContain('laws-lois.justice.gc.ca')
       expect(pack.unsupportedPaths.map(path => path.id)).toContain('ccb-prior-year-afni')
       expect(pack.unsupportedPaths.map(path => path.id)).toContain('ccb-provincial-top-ups')
     }
+    // The 2025-26 calculation sheet corroborates the 2025 amounts.
+    expect(packs[0].additionalSourceURLs).toContain(
+      'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html')
+    expect(packs[1].fieldSources.amounts).toContain('/news/2026/07/')
   })
 
   it('refuses an unknown benefit program and an unpublished period with distinct reasons', () => {
@@ -217,7 +225,8 @@ describe('dated rule selection', () => {
     expect(on25.fieldSources.provincialBpa).toContain('/2025/')
     expect(on26.fieldSources.federalBrackets).toContain('/2026/')
     expect(on26.fieldSources.provincialBpa).toContain('/2026/')
-    expect(selectBenefitRules('CCB', '2025-07/2026-06').fieldSources.amounts).toContain('2025')
+    expect(selectBenefitRules('CCB', '2025-07/2026-06').fieldSources.amounts)
+      .toContain('adjustment-personal-income-tax-benefit-amounts')
     expect(selectBenefitRules('CCB', '2026-07/2027-06').fieldSources.amounts).toContain('/2026/')
     expect(selectTaxRules('MB', 2026).sourceConflict).toContain('$47,564')
     const bc = selectTaxRules('BC', 2026)

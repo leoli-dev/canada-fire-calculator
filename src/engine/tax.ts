@@ -11,7 +11,7 @@ import {
   type Bracket,
   type TaxTable,
 } from './taxData'
-import { selectTaxRules, type TaxRulePack } from './rules'
+import { freezeRuleContext, selectTaxRules, type TaxRulePack } from './rules'
 import type { Province } from './types'
 import { federalSpouseAmount2026, provincialSpouseAmount2026 } from './spouseCredit2026'
 
@@ -114,16 +114,17 @@ export function selectPlanTaxRules(request: TaxRuleRequest): TaxRuleContext {
 /**
  * Hot-path resolver for the plan anchor year. `incomeTax` runs inside every
  * withdrawal bisection, so the anchor context is resolved once per
- * (jurisdiction, year) and then read-only. Nothing outside this module ever
- * receives this object — `selectPlanTaxRules` returns its own copy — so the
- * shared pack cannot be mutated.
+ * (jurisdiction, year) and then read-only. The context is deep-frozen before it
+ * is cached and handed back: `selectPlanTaxRules` returns its own copy, and this
+ * resolver's cached copy cannot be mutated by a caller either, so the shared
+ * pack can never be re-priced behind `rulePackId`.
  */
 const anchorContexts = new Map<string, TaxRuleContext>()
 export function anchorTaxRules(province: string, taxYear = PLAN_TAX_YEAR): TaxRuleContext {
   const key = `${province}:${taxYear}`
   const cached = anchorContexts.get(key)
   if (cached) return cached
-  const context = selectPlanTaxRules({ jurisdiction: province, taxYear })
+  const context = freezeRuleContext(selectPlanTaxRules({ jurisdiction: province, taxYear }))
   anchorContexts.set(key, context)
   return context
 }

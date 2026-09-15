@@ -14,11 +14,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_BENEFIT_PERIOD,
+  CCB,
   anchorBenefitRules,
   ccbAnnual,
   selectPlanBenefitRules,
 } from '../benefits'
-import { publishedBenefitPacks, selectBenefitRules } from '../rules'
+import { publishRulePack, publishedBenefitPacks, selectBenefitRules, type BenefitRulePack } from '../rules'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
 
@@ -220,23 +221,37 @@ describe('BE-38 B2: the pack governs the computation, the old literal does not',
     })
   })
 
-  it('reads the published pack through the anchor, so a pack edit moves the anchor', () => {
-    // This is the half of the mutation diagnostic a test can assert: the
-    // anchor's figures are the published pack's figures, by identity of value.
-    // Editing `maxUnder6` in BENEFIT_PACKS breaks this assertion; editing the
-    // retired `CCB` literal does not touch it.
+  it('pins the retired literal to the published pack, so the two cannot drift', () => {
+    // The `CCB` literal is dead — nothing computes from it — but it is still
+    // exported, so a reader could mistake it for the source of truth. This is
+    // the one test that names it: every field must equal the pack's, so a drift
+    // in *either* direction fails.
     const published = publishedBenefitPacks().find(pack => pack.id === 'CA-CCB-2026-07-v1')!
-    expect(anchor.values).toEqual(published.values)
-    expect(anchor.values.maxUnder6).toBe(8157)
+    expect(published.values.maxUnder6).toBe(8157)
+    for (const key of ['maxUnder6', 'max6to17', 'th1', 'th2'] as const)
+      expect(CCB[key], `CCB.${key}`).toBe(published.values[key])
+    expect(CCB.rate1).toEqual(published.values.rate1)
+    expect(CCB.rate2).toEqual(published.values.rate2)
   })
 
-  it('separates the pack from the retired literal only by identity, never by value', () => {
-    // The retired `CCB` literal (benefits.ts) is intentionally unreferenced by
-    // the engine; this test names the published pack set the anchor draws from.
-    // The mutation evidence that the literal is dead is run out-of-band and
-    // reported in the PR, because a test cannot edit a module under test.
+  it('publishes exactly the two CCB packs the anchor can select from', () => {
     expect(publishedBenefitPacks().map(pack => pack.id))
       .toEqual(['CA-CCB-2025-07-v1', 'CA-CCB-2026-07-v1'])
+  })
+
+  it('does not let a caller mutate the cached anchor pack', () => {
+    // `anchorBenefitRules` hands its cached context straight back on the
+    // `ccbAnnual` hot path, so a stray write must not silently re-price later
+    // amounts while `rulePackId` still names the published pack.
+    const before = ccbAnnual(1, 0, 0)
+    try {
+      anchorBenefitRules().pack.values.maxUnder6 = 424242
+    } catch {
+      // A frozen cache refuses the write; a copy would absorb it.
+    }
+    expect(anchorBenefitRules().pack.values.maxUnder6).toBe(8157)
+    expect(anchorBenefitRules().pack.id).toBe('CA-CCB-2026-07-v1')
+    expect(ccbAnnual(1, 0, 0)).toBe(before)
   })
 })
 
@@ -335,25 +350,32 @@ describe('BE-38 B2: an assumed period is indexed exactly once and marked assumed
     expect(anchorBenefitRules().projectionPolicy.kind).toBe('published')
   })
 
-  it('keeps a frozen pack frozen: a frozen value does not inflate', () => {
-    // The CCB packs are published with `cpi-assumption`, so the pack's own
-    // policy and the caller's rate both apply. A pack published `frozen` must
-    // carry its values across an assumed period unchanged: the selector reads
-    // the policy off the pack, so the caller's rate cannot inflate a frozen
-    // figure. This mirrors the tax selector's frozen-bracket behaviour through
-    // the same code path shape.
-    const frozen: typeof anchor = { ...anchor, id: `${anchor.id}-frozen-fixture`, indexationRule: 'frozen' }
-    const base = frozen.values
-    const applied = frozen.indexationRule === 'frozen' ? 0 : 1.02
-    const years = 4
-    for (const key of ['maxUnder6', 'max6to17', 'th1', 'th2'] as const)
-      expect(Math.round(base[key] * (1 + applied) ** years), key).toBe(base[key])
-    // And with a 0% assumption even the indexed path is a no-op, so the only
-    // way a frozen value moves is a new publication.
+  it('reports the rate it actually applied for a frozen pack, and never inflates it', () => {
+    // No frozen CCB pack is published, so drive the real selector with a frozen
+    // fixture: four years on the values must not move, and the policy must
+    // report the applied rate (none), never the requested 2.0% the panel would
+    // otherwise render as indexation that never happened.
+    const frozen = publishRulePack<BenefitRulePack>({
+      ...selectBenefitRules('CCB', '2026-07/2027-06'),
+      id: 'CA-CCB-2026-07-v1+frozen-fixture',
+      indexationRule: 'frozen',
+    })
+    const context = selectPlanBenefitRules(
+      { program: 'CCB', paymentPeriod: '2030-07/2031-06', futureIndexation: { annualRate: 0.02 } },
+      [frozen],
+    )
+    expect(context.pack.values).toEqual(frozen.values)
+    expect(context.pack.assumedAnnualRate).toBe(0)
+    expect(context.projectionPolicy).toEqual({
+      kind: 'assumed', annualRate: 0,
+      fromRuleId: frozen.id, fromPaymentPeriod: '2026-07/2027-06',
+    })
+    expect(context.pack.assumedFutureRule).toBe(true)
+    // A 0% caller assumption on an indexed pack is a no-op too, so only a new
+    // publication can move a frozen value.
     const noIncrease = selectBenefitRules('CCB', '2028-07/2029-06', { annualRate: 0 })
     expect(noIncrease.assumedFutureRule).toBe(true)
-    expect(noIncrease.values.maxUnder6).toBe(base.maxUnder6)
-    expect(noIncrease.values.th1).toBe(base.th1)
-    expect(noIncrease.values.th2).toBe(base.th2)
+    expect(noIncrease.assumedAnnualRate).toBe(0)
+    expect(noIncrease.values.maxUnder6).toBe(8157)
   })
 })

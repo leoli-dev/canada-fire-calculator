@@ -312,7 +312,10 @@ const TAX_PACKS: TaxRulePack[] = [
   })),
 ]
 
-const CCB_2025_AMOUNTS = 'https://www.canada.ca/en/employment-social-development/news/2025/07/canada-child-benefit-payments-increasing-in-2025-2026.html'
+// The 2025 ESDC news release this pack used to cite returns HTTP 404, so the
+// 2025 amounts are sourced to the live CRA indexation page (which publishes
+// 7,997 / 6,748 for 2025 and also 8,157 / 6,883 for 2026); the 2026 pack keeps
+// its live ESDC release. The 2025-26 calculation sheet below corroborates.
 const CCB_2025_SHEET = 'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html'
 const CCB_2026_AMOUNTS = 'https://www.canada.ca/en/employment-social-development/news/2026/07/canada-child-benefit-payments-increasing-in-2026-2027.html'
 /**
@@ -328,6 +331,11 @@ const CCB_2026_AMOUNTS = 'https://www.canada.ca/en/employment-social-development
  * stored as rates and the published amounts as a cross-check). The rates are
  * fixed percentages in the statute and are not themselves indexed, so an
  * assumed future period indexes only the amounts.
+ *
+ * The July-to-June program year is statutory, not an inference from two agreeing
+ * sources: ITA s.122.6 defines `base taxation year` so that months in the last
+ * six of a calendar year use the preceding taxation year, which makes July
+ * 2026-June 2027 exactly the 2025 tax year stored as both packs' `incomeTaxYear`.
  */
 const CCB_RATES = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-122.61.html'
 const CCB_PUBLISHED_THRESHOLDS = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/adjustment-personal-income-tax-benefit-amounts.html'
@@ -350,8 +358,8 @@ const BENEFIT_PACKS: BenefitRulePack[] = [
     values: { maxUnder6: 7997, max6to17: 6748, th1: 37487, th2: 81222,
       rate1: [0.07, 0.135, 0.19, 0.23], rate2: [0.032, 0.057, 0.08, 0.095],
       basePhaseOutAmounts: [3061, 5904, 8310, 10059] },
-    sourceURL: CCB_2025_AMOUNTS,
-    fieldSources: { amounts: CCB_2025_AMOUNTS, thresholds: CCB_PUBLISHED_THRESHOLDS, rates: CCB_RATES },
+    sourceURL: CCB_PUBLISHED_THRESHOLDS,
+    fieldSources: { amounts: CCB_PUBLISHED_THRESHOLDS, thresholds: CCB_PUBLISHED_THRESHOLDS, rates: CCB_RATES },
     additionalSourceURLs: [CCB_2025_SHEET],
     effectiveDate: '2025-07-01', verifiedAt: '2026-09-13', indexationRule: 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
@@ -797,6 +805,15 @@ GIS_PACKS.forEach(pack => publishRulePack(pack))
 function indexed(value: number, years: number, rate: number): number {
   return Number.isFinite(value) ? Math.round(value * (1 + rate) ** years) : value
 }
+/** Deep-freeze a cached rule context so a caller's stray write cannot re-price a
+ * later computation behind the cache. */
+export function freezeRuleContext<T>(context: T): T {
+  if (context && typeof context === 'object' && !Object.isFrozen(context)) {
+    Object.freeze(context)
+    for (const nested of Object.values(context as Record<string, unknown>)) freezeRuleContext(nested)
+  }
+  return context
+}
 function projectTable(table: TaxTable, years: number, rate: number, frozen: number[]): TaxTable {
   return {
     ...table,
@@ -864,8 +881,8 @@ export function selectTaxRules(jurisdiction: string, taxYear: number, future?: {
 /** The programs a published pack exists for; a caller can be told what is covered. */
 export const PUBLISHED_BENEFIT_PROGRAMS: string[] = [...new Set(BENEFIT_PACKS.map(p => p.program))].sort()
 /** The payment periods the packs publish, oldest first, for a concrete refusal message. */
-function publishedBenefitPeriods(program: string): string[] {
-  return BENEFIT_PACKS.filter(p => p.program === program).map(p => p.paymentPeriod).sort()
+function publishedBenefitPeriods(program: string, packs: BenefitRulePack[] = BENEFIT_PACKS): string[] {
+  return packs.filter(p => p.program === program).map(p => p.paymentPeriod).sort()
 }
 /**
  * Why a (program, payment period) request cannot be priced, or null when it can.
@@ -876,16 +893,16 @@ function publishedBenefitPeriods(program: string): string[] {
  * published one, and a period before the published ones is never priced at the
  * first published period's amounts.
  */
-function benefitRefusalReason(program: string, period: string, future?: { annualRate: number }): string | null {
+function benefitRefusalReason(program: string, period: string, future?: { annualRate: number }, packs: BenefitRulePack[] = BENEFIT_PACKS): string | null {
   if (!PUBLISHED_BENEFIT_PROGRAMS.includes(program))
     return `unknown benefit program "${String(program)}": published packs cover ${PUBLISHED_BENEFIT_PROGRAMS.join(', ')}`
   const match = /^(\d{4})-07\/(\d{4})-06$/.exec(period ?? '')
   if (!match || period !== `${match[1]}-07/${Number(match[1]) + 1}-06`)
     return `benefit payment period "${String(period)}" for ${program} is not a whole July-to-June program year (expected e.g. "2026-07/2027-06")`
   const start = Number(match[1])
-  if (BENEFIT_PACKS.some(p => p.program === program && p.paymentPeriod === period)) return null
-  const published = publishedBenefitPeriods(program)
-  const base = BENEFIT_PACKS
+  if (packs.some(p => p.program === program && p.paymentPeriod === period)) return null
+  const published = publishedBenefitPeriods(program, packs)
+  const base = packs
     .filter(p => p.program === program && Number(p.paymentPeriod.slice(0, 4)) < start)
     .sort((a, b) => a.paymentPeriod.localeCompare(b.paymentPeriod)).at(-1)
   if (!base)
@@ -900,15 +917,18 @@ function benefitRefusalReason(program: string, period: string, future?: { annual
  * published pack under that pack's own indexation policy, applied exactly once
  * per elapsed program year, and is flagged `assumedFutureRule` with the pack it
  * came from. A frozen pack does not inflate: its values are carried across
- * unchanged. Nothing here consults the clock.
+ * unchanged, and `assumedAnnualRate` records the rate that was *actually*
+ * applied (zero for a frozen pack), never the caller's requested one. `packs`
+ * defaults to the published packs and lets a test drive this selector with an
+ * explicit fixture. Nothing here consults the clock.
  */
-export function selectBenefitRules(program: string, period: string, future?: { annualRate: number }): BenefitRulePack {
-  const refusal = benefitRefusalReason(program, period, future)
+export function selectBenefitRules(program: string, period: string, future?: { annualRate: number }, packs: BenefitRulePack[] = BENEFIT_PACKS): BenefitRulePack {
+  const refusal = benefitRefusalReason(program, period, future, packs)
   if (refusal) throw new Error(refusal)
-  const exact = BENEFIT_PACKS.find(p => p.program === program && p.paymentPeriod === period)
+  const exact = packs.find(p => p.program === program && p.paymentPeriod === period)
   if (exact) return structuredClone(exact)
   const start = Number(period.slice(0, 4))
-  const base = BENEFIT_PACKS
+  const base = packs
     .filter(p => p.program === program && Number(p.paymentPeriod.slice(0, 4)) < start)
     .sort((a, b) => a.paymentPeriod.localeCompare(b.paymentPeriod)).at(-1)!
   const years = start - Number(base.paymentPeriod.slice(0, 4))
@@ -927,7 +947,9 @@ export function selectBenefitRules(program: string, period: string, future?: { a
       th1: indexed(base.values.th1, years, rate),
       th2: indexed(base.values.th2, years, rate),
     },
-    assumedFutureRule: true, assumedAnnualRate: future!.annualRate, basedOnRuleId: base.id,
+    // The *applied* rate, not the requested one: a frozen pack reports no
+    // indexation, never a rate that did not move a figure.
+    assumedFutureRule: true, assumedAnnualRate: rate, basedOnRuleId: base.id,
     basedOnPaymentPeriod: base.paymentPeriod,
     coverage: 'estimated',
   }
