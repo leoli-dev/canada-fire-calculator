@@ -252,8 +252,15 @@ const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-ar
 /**
  * The two source conflicts the pack recorded that BE-38 B3 had to resolve,
  * with the authority that governs and whether the resolution moved a priced
- * number. Exported so the coverage matrix, a test and the UI read the same
- * record rather than three paraphrases of it.
+ * number.
+ *
+ * BE-38 B3 review (round 4, N1): the previous sentence claimed the coverage
+ * matrix and the UI read this record too. They do not — `coverageMatrix.ts` does
+ * not import it, and the panel renders the catalogue's `rulePeConflict` /
+ * `ruleMbConflict` copy while each pack carries its own `sourceConflict` string.
+ * Only `coverageMatrix.test.ts` reads this record, as the evidence trail behind
+ * the two pack strings; the three texts are paraphrases that currently agree,
+ * and a test pins the pack copies to their resolution.
  */
 export const sourceResolutions = [
   {
@@ -1014,8 +1021,12 @@ export function publishedBenefitPacks(): BenefitRulePack[] {
  * the matrix module itself imports nothing from here except the 2026 snapshot,
  * so the re-export adds no cycle.
  */
-export { coverageFor, coverageMatrix, coverageSummary, COVERAGE_JURISDICTIONS } from './coverageMatrix'
+export {
+  coverageFor, coverageMatrix, coverageSummary, COVERAGE_JURISDICTIONS, BLOCKED_SOURCES,
+  CONTENT_VERIFIED_AUTHORITIES, rowAuthorities,
+} from './coverageMatrix'
 export type {
+  BlockedSource, ContentVerifiedAuthority,
   CreditCoverage, CoverageJurisdiction, CoverageMatrixArtifact, JurisdictionCoverageMatrix,
 } from './coverageMatrix'
 

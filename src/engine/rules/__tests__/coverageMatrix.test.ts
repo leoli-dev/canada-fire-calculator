@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCKED_SOURCES, COVERAGE_JURISDICTIONS, coverageFor, coverageLimitationIds, coverageMatrix,
-  coverageSummary, evidenceFixtureIds, matrixJurisdictions,
+  BLOCKED_SOURCES, CONTENT_VERIFIED_AUTHORITIES, COVERAGE_JURISDICTIONS, coverageFor,
+  coverageLimitationIds, coverageMatrix, coverageSummary, evidenceFixtureIds, matrixJurisdictions,
+  rowAuthorities,
 } from '../coverageMatrix'
+import type { ImplementedCreditCoverage } from '../coverageMatrix'
 import { PLAN_TAX_YEAR, incomeTax, probateTax, qcFssContribution, qcRamqPremium } from '../../tax'
 import {
   CAPITAL_GAINS_INCLUSION, FED_AGE_AMOUNT, FED_PENSION_AMOUNT, ON_HEALTH_PREMIUM, ON_SURTAX,
@@ -18,6 +20,24 @@ const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1'
 // The Ministry of Finance's 2026 parameters PDF at the URL the QC pack records
 // in `fieldSources` (the byte-identical cdn-contenu mirror is not the pack's).
 const RQ = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
+/** The July editions this slice's rows cite, repeated here so an assertion reads
+ * against the URL rather than against a row field. */
+const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-pe-7-26e.pdf'
+const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
+const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
+const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
+const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
+
+/** The two states the panel can render an authority in. `unverified` is what a
+ * `contentChecked` row is forbidden to contain. */
+function authorityStates(credit: ImplementedCreditCoverage): { unverified: string[] } {
+  return {
+    unverified: rowAuthorities(credit)
+      .filter(authority => !authority.checkedFigures
+        || CONTENT_VERIFIED_AUTHORITIES[authority.url]?.checkedOn !== credit.verifiedAt)
+      .map(authority => authority.url),
+  }
+}
 
 /**
  * BE-38 B3 review (BL1): the pack field each `ruleFields` entry prices, for the
@@ -140,15 +160,22 @@ const FIXTURE_SOURCES: Record<string, string> = {
   'qc-provincial-age-amount-2026': RQ,
   'qc-provincial-pension-amount-2026': RQ,
 }
-/** The authority each probate figure was read from. Ontario has a statute that
- * carries its 1.5%; every other jurisdiction is pinned from the TaxTips.ca table
- * named in `taxData.ts`, and NT/NU price Yukon's $140 fee, so that is what their
- * row must evidence. */
+/** The authority each probate figure was read from. Ontario's Estate
+ * Administration Tax Act (98e34) is the statute that carries its $15-per-$1,000
+ * tax over $50,000 — the Estates Administration Act (90e22) this fixture used
+ * to name carries none of the row's figures. Every other jurisdiction is pinned
+ * from the TaxTips.ca table named in `taxData.ts`, and NT/NU price Yukon's $140
+ * fee, so that is what their row must evidence. */
 const PROBATE_TABLE = (province: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
+/** Ontario's probate rate and threshold, hand-keyed from `98e34` s. 2(6.1):
+ * "$15 for each $1,000 or part thereof by which the value of the estate exceeds
+ * $50,000", with an estate of $50,000 or less exempt. The old `90e22` citation
+ * prints neither figure. */
+const ON_PROBATE_STATUTE = 'https://www.ontario.ca/laws/statute/98e34'
 for (const province of PROVINCES) {
   FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`] =
-    province === 'ON' ? 'https://www.ontario.ca/laws/statute/90e22'
+    province === 'ON' ? ON_PROBATE_STATUTE
       : province === 'NT' || province === 'NU' ? PROBATE_TABLE('YT') : PROBATE_TABLE(province)
 }
 for (const province of PROVINCES) {
@@ -788,9 +815,13 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
       expect(row, province).toBeDefined()
       const urls = [row.sourceURL, ...(row.additionalSourceURLs ?? [])]
       if (province === 'ON') {
-        // Ontario's statute is the authority carrying its 1.5% rate.
-        expect(row.sourceURL).toBe('https://www.ontario.ca/laws/statute/90e22')
+        // Ontario's Estate Administration Tax Act is the authority carrying its
+        // 1.5% rate ($15 per $1,000 above $50,000). BE-38 B3 review (round 4,
+        // B1): this assertion used to pin `90e22`, the Estates Administration
+        // Act, which prints none of the row's figures.
+        expect(row.sourceURL).toBe(ON_PROBATE_STATUTE)
         expect(urls).toContain(table('ON'))
+        expect(row.contentChecked, 'ON probate must be content-checked, not merely listed').toBe(true)
       } else if (province === 'NT' || province === 'NU') {
         // The declared exception: these price Yukon's $140 flat filing fee, so
         // that is the figure the row evidences, and the row names the published
@@ -812,14 +843,20 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
 describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualified', () => {
   const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
   const QC_PARAMS = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
-  const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
 
   it('never renders a bot-gated authority, and qualifies every row that cites one', () => {
-    // B2: the rendered authority must be one a reader can reach. The only
-    // authority the suite knows to be unreachable is recorded, dated, in
+    // B2: the rendered authority must be one a reader can reach. The authorities
+    // the suite knows to be unreachable are recorded, dated, in
     // `BLOCKED_SOURCES`; a row may list one as an additional source only if its
     // rendered limitation says so. This is the assertion that would have failed
     // the QC bracket rows while `RQ_RATES` was their `sourceURL`.
+    //
+    // BE-38 B3 review (round 4, B2): the registry now also carries a source that
+    // answers **200** to curl and to an API request context (PE's own page). A
+    // status-code sweep cannot see that gate, so the guard keys off this
+    // registry — populated from real Chromium navigations — and not off HTTP
+    // status. `RuleAssumptions.tsx` marks each such link with its gate, and the
+    // e2e suite pins the rendered marker.
     for (const jurisdiction of COVERAGE_JURISDICTIONS)
       for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented)) {
         expect(BLOCKED_SOURCES[credit.sourceURL],
@@ -831,7 +868,33 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
       }
     // The record cannot be emptied to make the assertion vacuous.
     expect(Object.keys(BLOCKED_SOURCES)).toContain(RQ_RATES)
-    expect(BLOCKED_SOURCES[RQ_RATES]).toMatch(/403/)
+    expect(BLOCKED_SOURCES[RQ_RATES].gateMarker).toBe('403')
+    // The round-4 entry: recorded with the reason that makes it invisible to a
+    // status-code check, so a future reader cannot "simplify" the guard back to
+    // an HTTP sweep without deleting this assertion.
+    expect(Object.keys(BLOCKED_SOURCES)).toContain(PE_2026_GOV)
+    expect(BLOCKED_SOURCES[PE_2026_GOV].reason).toMatch(/200/)
+    expect(BLOCKED_SOURCES[PE_2026_GOV].reason).toMatch(/CAPTCHA/)
+    expect(BLOCKED_SOURCES[PE_2026_GOV].observedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    for (const [url, blocked] of Object.entries(BLOCKED_SOURCES)) {
+      expect(blocked.reason.length, url).toBeGreaterThan(40)
+      expect(blocked.observedAt, url).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(blocked.gateMarker.length, url).toBeGreaterThan(0)
+    }
+  })
+
+  it('derives the registered gate marker for every blocked URL a row renders', () => {
+    // The generic shape of round 4's B2: for *every* recorded block, a row that
+    // cites it as `additionalSourceURLs` must name that block's own marker in a
+    // rendered limitation. Dropping the marker from the catalogue, or citing a
+    // newly recorded URL without naming its gate, fails here rather than
+    // shipping an unqualified dead link for the next jurisdiction.
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented))
+        for (const authority of rowAuthorities(credit))
+          if (authority.blocked)
+            expect(credit.limitationId,
+              `${jurisdiction}/${id} renders a blocked authority with no limitation`).toBeDefined()
   })
 
   it('names a rendered limitation for every row whose cited source does not carry its figures', () => {
@@ -846,11 +909,101 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
       for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented))
         if (credit.qualifiedSource) gaps.push(`${jurisdiction}/${id}`)
     // The exact set this round declared, so the flag cannot be dropped silently.
+    // BE-38 B3 review (round 4, B1): ON probate is *not* in this set — its
+    // citation now carries the priced figures (98e34) and the row is
+    // content-checked instead. PE's bracket row is deliberately *not* here
+    // either: its primary source carries the priced ladder, and the blocked PE
+    // government page is a separate condition (`BLOCKED_SOURCES` + a rendered
+    // limitation), asserted in the tests below.
     expect(gaps.sort()).toEqual([
-      'MB/manitoba-bpa-phase-out', 'QC/provincial-age-amount', 'QC/quebec-basic-personal-amount',
-      'QC/quebec-fss-contribution', 'QC/quebec-income-tax-brackets', 'QC/quebec-ramq-premium',
-      'YT/yukon-bpa-phase-out',
+      'MB/manitoba-bpa-phase-out', 'QC/provincial-age-amount',
+      'QC/quebec-basic-personal-amount', 'QC/quebec-fss-contribution', 'QC/quebec-income-tax-brackets',
+      'QC/quebec-ramq-premium', 'YT/yukon-bpa-phase-out',
     ])
+  })
+
+  it('content-verifies the ON probate citation and records the figures that were read', () => {
+    // BE-38 B3 review (round 4, B1): the row cited `90e22` (Estates
+    // Administration Act), which prints none of the priced figures, and the
+    // suite pinned it. The citation is now the Estate Administration Tax Act,
+    // and the row's claim is recorded in the registry with the figures a person
+    // read on the page, so the artifact no longer asserts a read that did not
+    // happen.
+    const row = coverageFor('ON').implemented['probate-and-estate-fees']
+    expect(row.sourceURL).toBe(ON_PROBATE_STATUTE)
+    expect(row.sourceURL).not.toContain('90e22')
+    expect(row.contentChecked).toBe(true)
+    const record = CONTENT_VERIFIED_AUTHORITIES[ON_PROBATE_STATUTE]
+    expect(record, 'the cited statute must be in the content-verified registry').toBeDefined()
+    expect(record.checkedOn).toBe(row.verifiedAt)
+    expect(record.checkedFigures.join(' ')).toMatch(/\$15/)
+    expect(record.checkedFigures.join(' ')).toMatch(/\$50,000/)
+    // The hand-keyed figures in the suite are the ones the statute prints:
+    // $15 per $1,000 over $50,000 is exactly the 1.5% the engine charges.
+    expect(PROBATE_HAND.ON).toEqual({ flat: 0, rate: 0.015, threshold: 50_000 })
+    expect(PROBATE_RATES.ON).toEqual(PROBATE_HAND.ON)
+    // And the wrong statute is the one the review found carries none of them.
+    expect(Object.keys(CONTENT_VERIFIED_AUTHORITIES)).not.toContain('https://www.ontario.ca/laws/statute/90e22')
+  })
+
+  it('renders the content-verified / merely-listed distinction from the registry', () => {
+    // BE-38 B3 review (round 4): the whole point of the round. A row may only be
+    // called content-checked when *every* authority it lists is recorded in
+    // `CONTENT_VERIFIED_AUTHORITIES` on the row's own `verifiedAt` date, and no
+    // authority may render the "checked figures" claim unless it is recorded
+    // there. The counts are pinned so the surface cannot silently start claiming
+    // more than the registry holds.
+    const verified = new Set<string>()
+    const merelyListed = new Set<string>()
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented)) {
+        const authorities = rowAuthorities(credit)
+        expect(authorities.length, `${jurisdiction}/${id} renders at least its primary`).toBeGreaterThan(0)
+        expect(authorities.map(a => a.url)).toEqual([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])])
+        for (const authority of authorities) {
+          if (authority.checkedFigures) {
+            const record = CONTENT_VERIFIED_AUTHORITIES[authority.url]
+            expect(record, `${jurisdiction}/${id} ${authority.url}`).toBeDefined()
+            expect(record.checkedOn, `${jurisdiction}/${id} ${authority.url}`).toBe(credit.verifiedAt)
+            expect(authority.checkedFigures).toEqual(record.checkedFigures)
+            verified.add(authority.url)
+          } else {
+            expect(CONTENT_VERIFIED_AUTHORITIES[authority.url],
+              `${jurisdiction}/${id} may not render an unrecorded authority as checked`).toBeUndefined()
+            merelyListed.add(authority.url)
+          }
+        }
+        // A `contentChecked` row means every one of its authorities is verified:
+        // the flag can never cover for an unchecked link inside the same row.
+        if (credit.contentChecked)
+          expect(authorityStates(credit).unverified, `${jurisdiction}/${id} claims contentChecked`).toEqual([])
+      }
+    // Every registry entry is cited by at least one row, so the registry cannot
+    // accumulate authorities the artifact does not show.
+    const cited = new Set<string>()
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const credit of Object.values(coverageFor(jurisdiction).implemented))
+        for (const authority of rowAuthorities(credit)) cited.add(authority.url)
+    for (const url of Object.keys(CONTENT_VERIFIED_AUTHORITIES))
+      expect(cited.has(url), `registry entry cited by no row: ${url}`).toBe(true)
+    for (const url of Object.keys(BLOCKED_SOURCES))
+      expect(cited.has(url), `blocked entry cited by no row: ${url}`).toBe(true)
+    // The two rendered categories, counted over unique authorities: the surface
+    // says "content-checked" for 6 of the 51 distinct URLs it links and "listed
+    // only" for the other 45. A reader can therefore tell which citations this
+    // artifact actually claims a document↔figure correspondence for.
+    expect([...verified].sort()).toEqual([
+      BC_2026_JULY, CFFP_GUIDE, NL_2026_JULY, PE_2026_JULY, ON_PROBATE_STATUTE,
+      'https://www.taxtips.ca/willsandestates/probatefees/on.htm',
+    ].sort())
+    expect(cited.size).toBe(51)
+    expect(verified.size).toBe(6)
+    expect(merelyListed.size).toBe(45)
+    expect(verified.size + merelyListed.size).toBe(cited.size)
+    expect(CONTENT_VERIFIED_AUTHORITIES[PE_2026_JULY].checkedFigures).toContain('142,520')
+    expect(CONTENT_VERIFIED_AUTHORITIES[BC_2026_JULY].checkedFigures.join(' ')).toMatch(/5\.60/)
+    expect(CONTENT_VERIFIED_AUTHORITIES[NL_2026_JULY].checkedFigures.join(' ')).toMatch(/13,094/)
+    expect(CONTENT_VERIFIED_AUTHORITIES[CFFP_GUIDE].checkedFigures.join(' ')).toMatch(/19 890/)
   })
 
   it('cites the authority the QC RAMQ approximation was derived from, not the parameters PDF', () => {

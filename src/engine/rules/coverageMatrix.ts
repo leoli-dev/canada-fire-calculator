@@ -26,6 +26,20 @@
  * reader with a bot gate. The suite never fetches a URL: reachability and
  * content are checked by hand and dated in `verifiedAt`, and
  * {@link BLOCKED_SOURCES} records the citations the suite refuses to render.
+ *
+ * BE-38 B3 review (round 4, B1/B2): four rounds each found an artifact
+ * asserting a citation↔figure correspondence the cited document did not
+ * support, because nothing here separates "a human opened this and checked the
+ * figures" from "this URL was reached". The matrix now states which case each
+ * authority is in. {@link CONTENT_VERIFIED_AUTHORITIES} is the registry of
+ * authorities a person read and checked against named figures on a named date;
+ * every row's authorities are rendered as either content-checked (with that
+ * date and those figures) or *listed only — content not checked*. Nothing that
+ * a reader can see claims a document carries a priced figure unless the
+ * authority is in that registry, so the claim text now says only what the suite
+ * enforces. {@link BLOCKED_SOURCES} is likewise the registry of authorities a
+ * scripted reader cannot reach, and a row may cite one only with a rendered
+ * qualification that names the gate in every language.
  * Nothing here claims a complete return — the standing negative statement lives
  * in {@link coverageCaveat} and travels with the matrix so no summary can drop it.
  */
@@ -52,11 +66,14 @@ export interface ImplementedCreditCoverage {
   /** The published rule this row prices, stated as values where the row can. */
   implementedRule?: string
   /**
-   * The authority the figures were read from, and the document the panel shows
-   * a reader. Where `qualifiedSource` is set, at least one priced figure is not
-   * printed here — it is an approximation derived from another table, or a rate
-   * carried by a page linked as an additional source — and the row's rendered
-   * `limitation` says which figure and where it is printed.
+   * The URL a reader is sent to first, and the document the row's figures are
+   * *claimed* to come from. Whether that claim has been checked is stated by
+   * {@link CONTENT_VERIFIED_AUTHORITIES}, never assumed: unless the authority is
+   * in that registry, the panel renders it as *listed only — content not
+   * checked*, and where `qualifiedSource` is set at least one priced figure is
+   * known not to be printed here — it is an approximation derived from another
+   * table, or a rate carried by a page linked as an additional source — and the
+   * row's rendered `limitation` says which figure and where it is printed.
    */
   sourceURL: string
   additionalSourceURLs?: string[]
@@ -64,6 +81,15 @@ export interface ImplementedCreditCoverage {
   verifiedAt: string
   /** Id of the registry entry that pins this row's figures. */
   evidenceFixture: string
+  /**
+   * True when *every* authority this row lists — `sourceURL` and each
+   * `additionalSourceURLs` entry — is in {@link CONTENT_VERIFIED_AUTHORITIES}
+   * with a `verifiedAt` matching that registry's `checkedOn`. Such a row is the
+   * only one the panel describes as content-checked; every other row is
+   * rendered as merely cited. Set only when the whole set is verified, so the
+   * flag itself cannot overstate one link in the row.
+   */
+  contentChecked?: boolean
   /**
    * Id of the catalogue string (`coverageLimitation.<id>`) stating what this row
    * specifically does not do. The panel renders it next to the row's link, so a
@@ -119,8 +145,9 @@ export const coverageCaveat =
   'This calculator models the federal and provincial income tax brackets, the basic personal amount ' +
   'and the named credits in this list only. It does not model the GST/HST credit, any provincial or ' +
   'territorial cash benefit, any low-income or refundable tax reduction, dividend tax credits, the ' +
-  'Canada employment amount or the province-specific spouse worksheets, so no figure it produces is ' +
-  'a complete tax return, a complete after-tax position, or a complete after-benefit position. Where a ' +
+  'Canada employment amount or the net-income base the province-specific spouse-credit worksheets use ' +
+  '(the spouse rows price the published maxima and thresholds, not that base), so no figure it produces ' +
+  'is a complete tax return, a complete after-tax position, or a complete after-benefit position. Where a ' +
   'credit it does apply is a pinned rather than year-switched figure (the age and pension amounts, the ' +
   'spouse maxima, the Ontario surtax and health premium, probate fees, the capital-gains inclusion ' +
   'rate, the Quebec levies), an assumed future year carries that 2026 figure forward unchanged, and ' +
@@ -132,16 +159,101 @@ const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1/td1-26e
 const TD1_PROV = (code: string) =>
   `https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1${code}/td1${code}-26e.pdf`
 const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
+/** The editions whose ladders the pack actually prices where they differ from
+ * the January chart. Each row must cite the edition carrying its figure; the
+ * superseded edition travels as an additional source, not as the authority. */
+const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-pe-7-26e.pdf'
+const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
+const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
+const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
+const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
 /**
- * The authorities the suite refuses to render. Revenu Québec answers a scripted
- * client — and, per the B3 review, a real Chromium navigation from the review
- * network — with HTTP 403 and a CAPTCHA, so a row that cites this page for its
- * only rendered authority hands the reader a dead link. A row may still list it
- * as an *additional* source, but only if the row's rendered `limitation` says so.
+ * One authority a scripted reader cannot reach, with the gate that stops it and
+ * the token every language's rendered qualification must contain. The marker is
+ * not necessarily a status code: it is whatever the gate actually is, so a gate
+ * that answers 200 can be recorded too.
  */
-export const BLOCKED_SOURCES: Record<string, string> = {
-  [RQ_RATES]:
-    'HTTP 403 with a CAPTCHA to curl, to an API request context and to a real Chromium navigation (checked 2026-09-16).',
+export interface BlockedSource {
+  /** What stops a real reader, as observed. */
+  reason: string
+  /** `YYYY-MM-DD` the gate was last observed. */
+  observedAt: string
+  /**
+   * The literal that must appear in `coverageLimitation.<id>` in **every**
+   * language for a row that cites this URL. It is the same in all three
+   * catalogues, so the suite can assert the disclosure is really rendered
+   * rather than trusting a translator to have kept it.
+   */
+  gateMarker: string
+}
+/**
+ * The authorities the suite refuses to render unqualified. Revenu Québec
+ * answers a scripted client — and, per the B3 review, a real Chromium
+ * navigation from the review network — with HTTP 403 and a CAPTCHA, so a row
+ * that cites this page for its only rendered authority hands the reader a dead
+ * link. A row may still list one as an *additional* source, but only if the
+ * row's rendered `limitation` names the gate in every language and the link
+ * itself carries a rendered gate marker.
+ *
+ * BE-38 B3 review (round 4, B2): Prince Edward Island's own page is the second
+ * entry. It answers **200** to `curl` and to an `APIRequestContext` — a
+ * status-code check cannot see it — and only a real Chromium navigation reveals
+ * the Radware CAPTCHA. That is why this registry, and not an HTTP status sweep,
+ * is what the guard keys off; the entry is recorded from a real navigation.
+ */
+export const BLOCKED_SOURCES: Record<string, BlockedSource> = {
+  [RQ_RATES]: {
+    reason: 'HTTP 403 with a CAPTCHA to curl, to an API request context and to a real Chromium navigation.',
+    observedAt: '2026-09-16',
+    gateMarker: '403',
+  },
+  [PE_2026_GOV]: {
+    reason: 'HTTP 200 to curl and to an API request context, but a real Chromium navigation is redirected to '
+      + 'validate.perfdrive.com and served the Radware CAPTCHA page, so a reader cannot see the page from this link.',
+    observedAt: '2026-09-17',
+    gateMarker: 'CAPTCHA',
+  },
+}
+/**
+ * BE-38 B3 review (round 4, B1/B2): the authorities a person has actually
+ * opened and read against the named figures — the only citations about which
+ * this artifact claims correspondence between a document and a figure. The set
+ * is deliberately small: adding a URL here is a claim a reader can reproduce,
+ * and the suite refuses a `contentChecked` row whose authority is not recorded
+ * here with the same date.
+ */
+export interface ContentVerifiedAuthority {
+  /** `YYYY-MM-DD` the figures were last read on the page itself. */
+  checkedOn: string
+  /** The figures found on that page, as printed. */
+  checkedFigures: string[]
+}
+export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthority> = {
+  'https://www.ontario.ca/laws/statute/98e34': {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['$15 for each $1,000', '$50,000', 'exempt below $50,000'],
+  },
+  'https://www.taxtips.ca/willsandestates/probatefees/on.htm': {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['1.5% of the estate value over $50,000', '$50,000'],
+  },
+  [PE_2026_JULY]: {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['106,890', '142,520', '200,000', '17.62%', '19.00%', '20%'],
+  },
+  [BC_2026_JULY]: {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['5.60% (up from 5.06%)', '50,363', '100,728'],
+  },
+  [NL_2026_JULY]: {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['13,094 (up from 11,188)'],
+  },
+  [CFFP_GUIDE]: {
+    checkedOn: '2026-09-17',
+    checkedFigures: ['5 000 band at 7,84 % / 11,76 %', '755 maximum', '19 890 threshold',
+      'age 3 986', 'retirement 3 541', 'reduction threshold 42 955', '18,75 %', '54 345 / 108 680 / 132 245', '14 / 19 / 24 / 25,75 %'],
+  },
 }
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
  * pack records in `fieldSources`, so a row that prices those fields must cite
@@ -158,17 +270,10 @@ const QC_PARAMS = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/doc
  * retirement amount 3,541, reduction threshold 42,955, reduction rate 18.75% and
  * 14% conversion — so it is the authority for the 18.75% `ageRate` the
  * parameters PDF does not carry. Reachable (HTTP 200) where Revenu Québec's own
- * pages are not.
+ * pages are not. Recorded in {@link CONTENT_VERIFIED_AUTHORITIES} for the
+ * figures above, read on the page itself.
  */
-const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
 const ITA_38 = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html'
-/** The editions whose ladders the pack actually prices where they differ from
- * the January chart. Each row must cite the edition carrying its figure; the
- * superseded edition travels as an additional source, not as the authority. */
-const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
-const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
-const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-pe-7-26e.pdf'
-const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
 /** The Quebec abatement's 16.5%: the Department of Finance's 2026 Report on
  * Federal Tax Expenditures prints the rate, its 0.165 factor and its statutory
  * home (Federal-Provincial Fiscal Arrangements Act, Part VI). The dead
@@ -176,11 +281,26 @@ const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-an
 const QC_ABATEMENT_2026 = 'https://www.canada.ca/content/dam/fin/publications/taxexp-depfisc/2026/taxexp-depfisc-26-eng.pdf'
 const QC_ABATEMENT_ACT = 'https://laws-lois.justice.gc.ca/eng/acts/F-8/'
 const QC_ABATEMENT_FORM = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/t2203/t2203-25e.pdf'
-/** Ontario's Estate Administration Tax Act, the statute carrying the 1.5%. */
-const PROBATE = 'https://www.ontario.ca/laws/statute/90e22'
+/**
+ * BE-38 B3 review (round 4, B1): Ontario's citation used to be `90e22`, which
+ * resolves to the **Estates Administration Act, R.S.O. 1990, c. E.22** and
+ * carries none of the priced figures. The authority the 1.5%-above-$50,000 fee
+ * is actually in is the Estate Administration Tax Act, 1998, S.O. 1998, c. 34,
+ * Sched. (`98e34`), whose s. 2(6.1) prints "$15 for each $1,000 or part thereof
+ * by which the value of the estate exceeds $50,000" — read on the page, and
+ * recorded in {@link CONTENT_VERIFIED_AUTHORITIES}.
+ */
+const PROBATE = 'https://www.ontario.ca/laws/statute/98e34'
 const TAXTIPS_PROBATE = (code: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${code}.htm`
+/** The date the reachability sweep and the hand content checks behind most rows
+ * were made. */
 const AT = '2026-09-15'
+/** BE-38 B3 review (round 4): the date the authorities in
+ * {@link CONTENT_VERIFIED_AUTHORITIES} were last opened and read against their
+ * figures. A row is only `contentChecked` when its `verifiedAt` is this date, so
+ * a `verifiedAt` that never had its content read cannot inherit the claim. */
+const CHECKED = '2026-09-17'
 /** The two territories this build charges Yukon's flat $140 filing fee, mapped to
  * the catalogue entry that names the published tier the build does not model. */
 const PROBATE_APPROXIMATED: Partial<Record<CoverageJurisdiction, string>> = {
@@ -238,6 +358,12 @@ const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCo
  * all thirteen jurisdictions. `taxData.ts` reads the pinned figures from the
  * cited TaxTips.ca per-jurisdiction table, so each row now names its own; the
  * two territories whose priced fee is Yukon's say so in the row's limitation.
+ *
+ * BE-38 B3 review (round 4, B1): Ontario's own row now cites the Estate
+ * Administration Tax Act (`98e34`, the statute that prints the $15-per-$1,000
+ * tax over $50,000) rather than the Estates Administration Act the citation used
+ * to name, and the row is marked `contentChecked` because that authority is in
+ * {@link CONTENT_VERIFIED_AUTHORITIES} with the figures read on the page.
  */
 const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const table = TAXTIPS_PROBATE(code.toLowerCase())
@@ -251,7 +377,8 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
     sourceURL: code === 'ON' ? PROBATE : pricedFrom,
     additionalSourceURLs: [...new Set([...(code === 'ON' ? [table] : []), ...(approximation ? [table] : [])])],
-    verifiedAt: AT, evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
+    verifiedAt: code === 'ON' ? CHECKED : AT, evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
+    contentChecked: code === 'ON' ? true : undefined,
     limitationId: code === 'MB' ? 'probateFeesMB' : approximation ?? 'probateFees',
   }
 }
@@ -271,17 +398,25 @@ const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCredi
   // this round fixed: PE's link showed the $142,250 this slice declares
   // superseded, BC's showed 5.06% against the priced 5.60%, and NL's $11,188.
   const bracketSource = code === 'BC' ? BC_2026_JULY : code === 'PE' ? PE_2026_JULY : january
+  // BE-38 B3 review (round 4, B2): PE's `PE_2026_GOV` entry in this list used to
+  // render with no qualification. It is recorded in `BLOCKED_SOURCES` (a real
+  // Chromium navigation is redirected to a Radware CAPTCHA even though the URL
+  // answers 200 to curl), so the row must carry a rendered limitation naming the
+  // gate — `peProvincialIncomeTaxBrackets` — and the panel marks the link itself.
   const bracketExtra = code === 'PE' ? [january, PE_2026_GOV] : bracketSource === january ? [] : [january]
   const bpaSource = code === 'NL' ? NL_2026_JULY : january
   return {
   'provincial-income-tax-brackets': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'], implementedRule: `The published 2026 ${code} ladder.`,
-    sourceURL: bracketSource, additionalSourceURLs: [...new Set(bracketExtra)], verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-brackets-2026`,
+    sourceURL: bracketSource, additionalSourceURLs: [...new Set(bracketExtra)],
+    verifiedAt: code === 'PE' || code === 'BC' ? CHECKED : AT,
+    evidenceFixture: `${code.toLowerCase()}-provincial-brackets-2026`,
+    limitationId: code === 'PE' ? 'peProvincialIncomeTaxBrackets' : undefined,
   },
   'provincial-basic-personal-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
     sourceURL: bpaSource, additionalSourceURLs: bpaSource === january ? [] : [january],
-    verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
+    verifiedAt: code === 'NL' ? CHECKED : AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
     limitationId: 'provincialBasicPersonalAmount',
   },
   'provincial-pension-income-amount': {
@@ -382,13 +517,13 @@ const extras: Partial<Record<CoverageJurisdiction, {
       // handed an unqualified dead link.
       'quebec-income-tax-brackets': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'],
-        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: AT,
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: CHECKED,
         evidenceFixture: 'quebec-brackets-2026', limitationId: 'quebecIncomeTaxBrackets',
         qualifiedSource: true,
       },
       'quebec-basic-personal-amount': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
-        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: AT,
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: CHECKED,
         evidenceFixture: 'quebec-bpa-2026', limitationId: 'quebecBasicPersonalAmount',
         qualifiedSource: true,
       },
@@ -409,7 +544,7 @@ const extras: Partial<Record<CoverageJurisdiction, {
         coverage: 'implemented', scope: 'provincial', kind: 'credit',
         ruleFields: ['taxData.ts:PROV_AGE_PENSION.ageMax', 'taxData.ts:PROV_AGE_PENSION.ageThreshold',
           'taxData.ts:PROV_AGE_PENSION.ageRate'],
-        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE], verifiedAt: AT,
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE], verifiedAt: CHECKED,
         evidenceFixture: 'qc-provincial-age-amount-2026', limitationId: 'quebecProvincialAgeAmount',
         qualifiedSource: true,
       },
@@ -431,7 +566,7 @@ const extras: Partial<Record<CoverageJurisdiction, {
       // happen.
       'quebec-ramq-premium': {
         coverage: 'implemented', scope: 'provincial', kind: 'levy', ruleFields: ['taxData.ts:QC_RAMQ'],
-        sourceURL: CFFP_GUIDE, verifiedAt: AT, evidenceFixture: 'quebec-ramq-2026',
+        sourceURL: CFFP_GUIDE, verifiedAt: CHECKED, evidenceFixture: 'quebec-ramq-2026',
         limitationId: 'quebecRamqPremium', qualifiedSource: true,
       },
     },
@@ -589,4 +724,27 @@ export function coverageLimitationIds(): string[] {
 /** The jurisdictions the matrix covers. */
 export function matrixJurisdictions(): string[] {
   return coverageMatrix.jurisdictions.map(row => row.jurisdiction)
+}
+
+/**
+ * One row's authorities in render order, each carrying the exact claim the
+ * artifact makes about it. BE-38 B3 review (round 4): `contentChecked` is true
+ * only for a URL in {@link CONTENT_VERIFIED_AUTHORITIES} on the row's own
+ * `verifiedAt` date — a person opened it and read the recorded figures — and
+ * `blocked` carries the recorded gate for a URL a scripted reader cannot reach.
+ * The panel renders these three states verbatim, so no authority is shown as
+ * carrying a figure unless the registry says it was checked.
+ */
+export function rowAuthorities(credit: ImplementedCreditCoverage): {
+  url: string; primary: boolean; checkedFigures?: string[]; blocked?: BlockedSource
+}[] {
+  return [credit.sourceURL, ...(credit.additionalSourceURLs ?? [])].map((url) => {
+    const verified = CONTENT_VERIFIED_AUTHORITIES[url]
+    return {
+      url,
+      primary: url === credit.sourceURL,
+      checkedFigures: verified && verified.checkedOn === credit.verifiedAt ? verified.checkedFigures : undefined,
+      blocked: BLOCKED_SOURCES[url],
+    }
+  })
 }

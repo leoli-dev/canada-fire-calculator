@@ -1,8 +1,13 @@
 import { useTranslation } from 'react-i18next'
-import { coverageFor, selectBenefitRules, selectGisRules } from '../engine/rules'
+import { BLOCKED_SOURCES, coverageFor, rowAuthorities, selectBenefitRules, selectGisRules } from '../engine/rules'
 import { PLAN_BENEFIT_PERIOD, benefitRuleProvenance, trySelectBenefitRules } from '../engine/benefits'
 import { PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules } from '../engine/tax'
 import type { Province } from '../engine/types'
+
+/** The catalogue key for a row's rendered qualification. Kept as a plain
+ *  `coverageLimitation.<id>` builder so the i18n guard can read it out of this
+ *  component's source, exactly like the other dynamic prefixes. */
+const coverageLimitationKey = (id: string) => `coverageLimitation.${id}`
 
 /**
  * Shared disclosure: both entry modes read the same pinned pack selection and
@@ -95,26 +100,43 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
         {Object.entries(coverage.implemented).map(([id, credit]) => <li key={id}
           data-testid={`rule-coverage-implemented-${id}`} data-evidence={credit.evidenceFixture}
           data-additional-sources={(credit.additionalSourceURLs ?? []).length}
-          data-limited={String(credit.limitationId !== undefined)}>
-          <a href={credit.sourceURL} target="_blank" rel="noreferrer">{t(`coverageImplemented.${id}`)}</a>
+          data-limited={String(credit.limitationId !== undefined)}
+          data-content-checked={String(credit.contentChecked === true)}>
           {/*
-            BE-38 B3 review (B2): `additionalSourceURLs` was modelled and never
-            rendered, so the pack's own authority (and every superseded edition)
-            was invisible while a bot-gated page was the only link. Every cited
-            URL is now shown; a blocked one can only be shown because the row's
-            own rendered limitation says it is blocked.
+            BE-38 B3 review (round 4): every authority on the row is rendered,
+            each carrying the exact claim the artifact makes about it — the
+            figures a person content-checked against it and the date, or the
+            plain statement that it is listed only and its content was not
+            checked. A URL the artifact records as blocked to automated readers
+            is marked as such next to the link itself. No authority is described
+            as carrying a figure unless `CONTENT_VERIFIED_AUTHORITIES` says so.
           */}
-          {credit.additionalSourceURLs?.length ? <span className="rule-coverage-additional">
-            {credit.additionalSourceURLs.map(url => <a key={url} href={url} target="_blank" rel="noreferrer"
-              data-testid={`rule-coverage-additional-source-${id}`}>{t('ruleCoverageAdditionalSource')}</a>)}
-          </span> : null}
-          {/*
-            BE-38 B3 review (B1): a declared limit that is never rendered is what
-            let the panel tell a reader something the cited document did not
-            support. Every `limitationId` is now rendered with its row.
-          */}
-          {credit.limitationId ? <span className="rule-coverage-limit"
-            data-testid={`rule-coverage-limitation-${id}`}>{t(`coverageLimitation.${credit.limitationId}`)}</span> : null}
+          {rowAuthorities(credit).map((authority, index) => <span key={authority.url}
+            className="rule-coverage-authority"
+            data-testid={`rule-coverage-authority-${id}-${authority.primary ? 'primary' : `additional-${index - 1}`}`}>
+            {index === 0
+              ? <a href={authority.url} target="_blank" rel="noreferrer">{t(`coverageImplemented.${id}`)}</a>
+              : <a href={authority.url} target="_blank" rel="noreferrer">{t('ruleCoverageAdditionalSource')}</a>}
+            {' '}
+            <span className="rule-coverage-authority-status">
+              {authority.checkedFigures
+                ? `${t('ruleCoverageAuthorityChecked', { date: credit.verifiedAt, figures: authority.checkedFigures.join(' · ') })}.`
+                : `${t('ruleCoverageAuthorityListed')}.`}
+              {authority.blocked
+                ? ` ${t('ruleCoverageAuthorityBlocked', { gate: authority.blocked.gateMarker })}.`
+                : null}
+            </span>
+            {/*
+              BE-38 B3 review (round 4, B2): the row's rendered limitation for
+              this authority is the qualification the guard requires. It is
+              rendered against the authority it qualifies, so a reader cannot
+              follow the link without the disclosure being inline.
+            */}
+            {authority.primary && credit.limitationId
+              ? <span className="rule-coverage-limit"
+                data-testid={`rule-coverage-limitation-${id}`}>{t(coverageLimitationKey(credit.limitationId))}</span>
+              : null}
+          </span>)}
         </li>)}
       </ul>
       <p data-testid="rule-coverage-unsupported">
@@ -140,6 +162,12 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       </span>)}
     </p>
     <p>{t('ruleAssumptionsLimit')}</p>
+    {/*
+      BE-38 B3 review (round 4, B2): a URL this artifact records as blocked to
+      automated readers is marked here too. `PE_2026_GOV` is listed by the PE
+      pack and used to render unqualified under the "PE 2026 updated brackets"
+      label even though a real browser is sent to a CAPTCHA.
+    */}
     <div className="rule-sources" data-testid="rule-sources">
       {([
         ['ruleFederalBracketsSource', tax.fieldSources.federalBrackets],
@@ -153,10 +181,17 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
         ['ruleGisTablesSource', gis.categories.single.fieldSources.reductionSegments],
         ['ruleGisAllowanceSource', gis.allowance.fieldSources.maxMonthly],
       ] as const).map(([label, url]) => <span key={label}>
-        <a href={url} target="_blank" rel="noreferrer">{t(label)}</a>{' · '}
+        <a href={url} target="_blank" rel="noreferrer">{t(label)}</a>
+        {BLOCKED_SOURCES[url]
+          ? ` ${t('ruleCoverageAuthorityBlocked', { gate: BLOCKED_SOURCES[url].gateMarker })}`
+          : null}{' · '}
       </span>)}
       {tax.fieldAdditionalSources?.provincialBrackets?.map(url => <span key={url}>
-        <a href={url} target="_blank" rel="noreferrer">{t('rulePeUpdatedBracketSource')}</a>{' · '}
+        <a href={url} target="_blank" rel="noreferrer"
+          data-testid="rule-pe-updated-bracket-source">{t('rulePeUpdatedBracketSource')}</a>
+        {BLOCKED_SOURCES[url]
+          ? ` ${t('ruleCoverageAuthorityBlocked', { gate: BLOCKED_SOURCES[url].gateMarker })}`
+          : null}{' · '}
       </span>)}
       {tax.additionalSourceURLs?.map(url => <span key={url}><a href={url} target="_blank" rel="noreferrer">{t('ruleConflictingSource')}</a>{' · '}</span>)}
     </div>

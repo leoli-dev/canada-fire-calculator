@@ -1,5 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { coverageFor } from '../../src/engine/rules/coverageMatrix'
+import { BLOCKED_SOURCES, coverageFor, rowAuthorities } from '../../src/engine/rules/coverageMatrix'
+
+/** Every authority the panel should render for one jurisdiction: the rows'
+ *  primary and additional URLs, and the additional sources the sources block
+ *  lists for that pack. A blocked URL rendered as a row's *primary* is a guard
+ *  failure, so it is recorded here rather than skipped. */
+function renderedAuthorities(province: string): { url: string; rowId?: string; primary?: boolean }[] {
+  const out: { url: string; rowId?: string; primary?: boolean }[] = []
+  for (const [id, credit] of Object.entries(coverageFor(province).implemented))
+    for (const authority of rowAuthorities(credit))
+      out.push({ url: authority.url, rowId: id, primary: authority.primary })
+  return out
+}
 
 test('guided and professional expose the same pinned rule versions, policy and sources', async ({ page }) => {
   await page.goto('/')
@@ -126,6 +138,23 @@ test('the credit coverage matrix is visible in both modes and claims no complete
       await expect(professional.getByTestId(`rule-coverage-limitation-${id}`), id).toBeVisible()
       await expect(row, id).toHaveAttribute('data-limited', 'true')
     }
+    // BE-38 B3 review (round 4): every authority states which case it is in —
+    // the figures a person content-checked against it and the date, or the plain
+    // statement that it is listed only. The two are read from the registry, so
+    // the DOM claim cannot outrun `CONTENT_VERIFIED_AUTHORITIES`.
+    const statuses = await row.locator('.rule-coverage-authority-status')
+      .evaluateAll(nodes => nodes.map(node => node.textContent ?? ''))
+    expect(statuses.length, id).toBe(hrefs.length)
+    const checked = rowAuthorities(credit).filter(authority => authority.checkedFigures)
+    statuses.forEach((status, index) => {
+      if (checked.some(authority => authority.url === hrefs[index])) {
+        expect(status, `${id} ${hrefs[index]}`).toContain('content-checked')
+        expect(status, `${id} ${hrefs[index]}`).toContain(credit.verifiedAt)
+      } else {
+        expect(status, `${id} ${hrefs[index]}`).toContain('listed only — content not checked')
+      }
+    })
+    await expect(row, id).toHaveAttribute('data-content-checked', String(credit.contentChecked === true))
   }
 
   // BE-38 B3 review (round 3, B1/B2): the two blocking rows' qualifications are
@@ -152,6 +181,28 @@ test('the credit coverage matrix is visible in both modes and claims no complete
     expect(Number(await coverage.getAttribute('data-coverage-unsupported')), `${province} unsupported`).toBeGreaterThan(3)
     await expect(professional.getByTestId('rule-coverage-unsupported-provincial-refundable-benefits'), province).toBeVisible()
   }
+
+  // BE-38 B3 review (round 4, B2): no recorded-blocked URL may render
+  // unqualified, in any province, in either the coverage list or the sources
+  // block. This is generic over `BLOCKED_SOURCES`, so the next gate recorded for
+  // any jurisdiction is covered without editing this test.
+  for (const province of ['ON', 'QC', 'PE', 'BC', 'NL', 'MB']) {
+    await page.getByLabel('Province').selectOption(province)
+    for (const authority of renderedAuthorities(province)) {
+      if (!BLOCKED_SOURCES[authority.url]) continue
+      const link = professional.locator(`a[href="${authority.url}"]`)
+      expect(await link.count(), `${province} ${authority.url} is rendered`).toBeGreaterThan(0)
+      const marker = BLOCKED_SOURCES[authority.url].gateMarker
+      const rowText = authority.rowId
+        ? await professional.getByTestId(`rule-coverage-implemented-${authority.rowId}`).innerText()
+        : await professional.getByTestId('rule-sources').innerText()
+      expect(rowText, `${province} ${authority.url} must name its gate ${marker}`).toContain(marker)
+      if (authority.rowId)
+        await expect(professional.getByTestId(`rule-coverage-limitation-${authority.rowId}`),
+          `${province} ${authority.rowId} must render its qualification`).toBeVisible()
+    }
+  }
+  await page.getByLabel('Province').selectOption('ON')
 
   // Same matrix, same caveat, in guided mode.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
@@ -202,4 +253,68 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
     await expect(brackets, lang).toContainText('403')
     await expect(brackets, `${lang} bracket qualification is an English placeholder`).not.toHaveText(bracketsEn)
   }
+})
+
+test('the two authority states and the gate label render natively in all three languages', async ({ page }) => {
+  // BE-38 B3 review (round 4): the panel now says which authorities a person
+  // content-checked and which are merely listed, and names the gate on a blocked
+  // link. Those labels are the disclosure this round added, so they may not be
+  // English placeholders in fr/zh — the round-3 defect shape exactly.
+  await page.goto('/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.locator('.entry-mode button').nth(1).click()
+  // Ontario's probate row is the content-checked one; its statute is the URL
+  // recorded in `CONTENT_VERIFIED_AUTHORITIES`.
+  await page.locator('select:has(option[value="ON"])').selectOption('ON')
+  const probateRow = page.getByTestId('rule-coverage-implemented-probate-and-estate-fees')
+  const en = await probateRow.innerText()
+  expect(en, 'ON probate must render its checked citation').toContain('content-checked 2026-09-17')
+  expect(en).toContain('listed only — content not checked')
+  // PE's own page is the round-4 blocked authority; a real navigation is the
+  // only way to see its gate, and the panel must name it there.
+  await page.locator('select:has(option[value="PE"])').selectOption('PE')
+  const peRow = page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets')
+  const peEn = await peRow.innerText()
+  expect(peEn).toContain('CAPTCHA')
+  expect(peEn).toContain('listed only — content not checked')
+  expect(peEn).toContain('142,520')
+  const peSources = await page.getByTestId('rule-sources').innerText()
+  expect(peSources, 'the sources block must name the gate on the PE government link').toContain('CAPTCHA')
+  for (const [lang, checked, listed, gate] of [
+    ['fr', 'contenu vérifié', 'seulement citée', 'CAPTCHA'],
+    ['zh', '逐项核对内容', '仅列出', 'CAPTCHA'],
+  ] as const) {
+    await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
+    await page.reload()
+    await page.locator('.entry-mode button').nth(1).click()
+    await page.locator('select:has(option[value="ON"])').selectOption('ON')
+    const frText = await page.getByTestId('rule-coverage-implemented-probate-and-estate-fees').innerText()
+    expect(frText, `${lang} checked label`).toContain(checked)
+    expect(frText, `${lang} listed label`).toContain(listed)
+    expect(frText, `${lang} probate row is not an English placeholder`).not.toBe(en)
+    await page.locator('select:has(option[value="PE"])').selectOption('PE')
+    const peText = await page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets').innerText()
+    expect(peText, `${lang} gate label`).toContain(gate)
+    expect(peText, `${lang} PE row is not an English placeholder`).not.toBe(peEn)
+  }
+})
+
+test('a navigation, not a status code, is what reveals the PE gate', async ({ page }) => {
+  // BE-38 B3 review (round 4, B2): the recorded PE authority answers 200 to
+  // `curl` and to an API request context; only a real Chromium navigation is
+  // redirected to the Radware CAPTCHA. The registry entry is recorded from this
+  // observation, which is why the guard keys off `BLOCKED_SOURCES` rather than
+  // an HTTP status sweep. If the gate ever goes away this test fails and the
+  // entry is re-checked rather than silently kept.
+  const gated = Object.entries(BLOCKED_SOURCES).find(([url]) => url.includes('princeedwardisland'))
+  expect(gated, 'the PE entry must still be recorded').toBeDefined()
+  const [url, blocked] = gated!
+  expect(blocked.reason, 'the recorded reason is the 200-vs-navigation discrepancy').toMatch(/200/)
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await page.waitForTimeout(4_000)
+  expect(page.url(), 'a real navigation must be redirected away from the page').not.toBe(url)
+  const body = await page.evaluate(() => document.body.innerText)
+  expect(body.length).toBeLessThan(5_000)
+  expect(body).toMatch(/apologize|bot/i)
 })

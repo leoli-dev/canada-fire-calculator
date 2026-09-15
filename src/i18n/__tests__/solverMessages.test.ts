@@ -14,6 +14,9 @@ import { selectBenefitRules, selectGisRules, selectTaxRules } from '../../engine
 const EN = en as unknown as Record<string, string>
 const FR = fr as unknown as Record<string, string>
 const ZH = zh as unknown as Record<string, string>
+/** The round-4 blocked entry: PE's own page, whose gate only appears under a
+ * real navigation. Repeated here so the assertion reads against the URL. */
+const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
 
 it('has native failure, bound and assumption messages in all three languages', () => {
   const keys = [
@@ -206,6 +209,17 @@ it('renders the coverage caveat natively, with the English copy tied to the arti
   expect(ZH.ruleCoverageCaveat, 'zh caveat is an English placeholder').not.toBe(EN.ruleCoverageCaveat)
   expect(FR.ruleCoverageCaveat).toMatch(/TPS\/TVH/)
   expect(ZH.ruleCoverageCaveat).toMatch(/GST\/HST/)
+  // BE-38 B3 review (round 4, H1): the caveat listed "the province-specific
+  // spouse worksheets" as not modelled while the matrix renders an implemented
+  // spouse row. It now names the one thing that is genuinely absent — the
+  // net-income base those worksheets use — so the caveat and the row agree.
+  expect(coverageMatrix.caveat).not.toMatch(/spouse worksheets,/)
+  expect(coverageMatrix.caveat).toMatch(/net-income base/)
+  expect(FR.ruleCoverageCaveat).toMatch(/base de revenu net/)
+  expect(ZH.ruleCoverageCaveat).toMatch(/净收入基数/)
+  // The rendered spouse limitation says the same thing, so the two surfaces the
+  // review put side by side no longer read as a contradiction.
+  expect(EN['coverageLimitation.provincialSpouseAmount']).toMatch(/net-income base/)
 })
 
 it('renders every declared coverage limitation natively, with no orphan key', () => {
@@ -239,19 +253,58 @@ it('renders every declared coverage limitation natively, with no orphan key', ()
 })
 
 it('states the bot gate in every language for a row that cites a blocked authority', () => {
-  // BE-38 B3 review (round 3, B2): rendering an `additionalSourceURLs` entry
-  // that blocks automated readers is only honest if the row's own rendered
-  // qualification says so. Deriving the ids from the matrix keeps this honest
-  // when the blocked-source record changes.
-  const qualified = new Set<string>()
+  // BE-38 B3 review (round 3, B2; round 4, B2): rendering an
+  // `additionalSourceURLs` entry that blocks automated readers is only honest if
+  // the row's own rendered qualification says so. The marker comes from the
+  // registry entry rather than a hard-coded `/403/`, because round 4 added a
+  // gate that answers **200** to curl and to an API request context and only
+  // reveals itself as a Radware CAPTCHA to a real navigation — a status code
+  // cannot name it. Deriving the ids from the matrix keeps this honest when the
+  // blocked-source record changes.
+  const qualified = new Map<string, string>()
   for (const row of coverageMatrix.jurisdictions)
     for (const credit of Object.values(row.implemented))
       for (const url of credit.additionalSourceURLs ?? [])
-        if (BLOCKED_SOURCES[url] && credit.limitationId) qualified.add(credit.limitationId)
-  expect([...qualified].sort()).toEqual(['quebecBasicPersonalAmount', 'quebecIncomeTaxBrackets'])
-  for (const id of qualified)
+        if (BLOCKED_SOURCES[url] && credit.limitationId)
+          qualified.set(credit.limitationId, BLOCKED_SOURCES[url].gateMarker)
+  expect([...qualified.keys()].sort()).toEqual([
+    'peProvincialIncomeTaxBrackets', 'quebecBasicPersonalAmount', 'quebecIncomeTaxBrackets',
+  ])
+  for (const [id, marker] of qualified)
     for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const)
-      expect(catalogue[`coverageLimitation.${id}`], `${lang} ${id} must name the block`).toMatch(/403/)
+      expect(catalogue[`coverageLimitation.${id}`], `${lang} ${id} must name the gate "${marker}"`)
+        .toContain(marker)
+  // The gate marker for the round-4 entry is a CAPTCHA, not a status code —
+  // pinning that keeps a future editor from "fixing" it to a 403 that the page
+  // never returns.
+  expect(BLOCKED_SOURCES[PE_2026_GOV]?.gateMarker).toBe('CAPTCHA')
+  expect(BLOCKED_SOURCES[PE_2026_GOV]?.reason).toMatch(/200/)
+})
+
+it('renders the content-checked and merely-listed states natively in every language', () => {
+  // BE-38 B3 review (round 4): the panel now states what each authority is —
+  // content-checked (with the date and the figures a person read) or listed only
+  // with its content unchecked — so the two labels and the gate label must exist
+  // natively, or the disclosure would regress to an English placeholder or a raw
+  // key exactly where the round-4 claim lives.
+  for (const key of ['ruleCoverageAuthorityChecked', 'ruleCoverageAuthorityListed',
+    'ruleCoverageAuthorityBlocked'] as const) {
+    expect(EN[key], key).toBeTruthy()
+    expect(FR[key], key).toBeTruthy()
+    expect(ZH[key], key).toBeTruthy()
+    expect(FR[key], `fr ${key} is an English placeholder`).not.toBe(EN[key])
+    expect(ZH[key], `zh ${key} is an English placeholder`).not.toBe(EN[key])
+  }
+  expect(EN.ruleCoverageAuthorityChecked).toContain('{{date}}')
+  expect(EN.ruleCoverageAuthorityChecked).toContain('{{figures}}')
+  expect(FR.ruleCoverageAuthorityBlocked).toContain('{{gate}}')
+  expect(ZH.ruleCoverageAuthorityBlocked).toContain('{{gate}}')
+  // The claim text may only promise what the suite enforces: the checked/listed
+  // distinction and the rendered limit. It must not resurrect the round-3
+  // sentence promising a read that did not happen.
+  expect(EN.ruleAssumptionsLimit).toMatch(/content-checked/)
+  expect(EN.ruleAssumptionsLimit).toMatch(/listed only/)
+  expect(EN.ruleAssumptionsLimit).toMatch(/stated next to the link/)
 })
 
 it('pins the moved limitation prose to the catalogue rather than to the engine strings', () => {
