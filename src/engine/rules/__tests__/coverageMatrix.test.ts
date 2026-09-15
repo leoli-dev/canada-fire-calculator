@@ -871,6 +871,11 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     for (const id of ['quebec-income-tax-brackets', 'quebec-basic-personal-amount']) {
       const row = coverageFor('QC').implemented[id]
       expect(row.sourceURL, id).toBe(QC_PARAMS)
+      // The CFFP guide is the reachable source that prints the 2026 ladder
+      // *including* the 14/19/24/25.75 rates the parameters PDF omits; the
+      // Revenu Québec page is cited and is bot-gated, and the rendered
+      // qualification says so.
+      expect(row.additionalSourceURLs, id).toContain(CFFP_GUIDE)
       expect(row.additionalSourceURLs, id).toContain(RQ_RATES)
       expect(row.limitationId, id).toBeTruthy()
       expect(row.qualifiedSource, id).toBe(true)

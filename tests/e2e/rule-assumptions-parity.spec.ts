@@ -174,7 +174,10 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
   await page.evaluate(() => localStorage.clear())
   await page.reload()
   await page.locator('.entry-mode button').nth(1).click()
-  await page.getByLabel('Province').selectOption('QC')
+  // The Province field's label is translated, so select by the option value,
+  // which is the jurisdiction code in every language.
+  const provinceSelect = page.locator('select:has(option[value="QC"])')
+  await provinceSelect.selectOption('QC')
   const caveatEn = await page.getByTestId('rule-coverage-caveat').innerText()
   const ramqEn = await page.getByTestId('rule-coverage-limitation-quebec-ramq-premium').innerText()
   const bracketsEn = await page.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets').innerText()
@@ -187,7 +190,7 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
     await page.locator('.entry-mode button').nth(1).click()
-    await page.getByLabel('Province').selectOption('QC')
+    await page.locator('select:has(option[value="QC"])').selectOption('QC')
     const caveat = page.getByTestId('rule-coverage-caveat')
     await expect(caveat, lang).toContainText(marker)
     await expect(caveat, lang).not.toHaveText(caveatEn)

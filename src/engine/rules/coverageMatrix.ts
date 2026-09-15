@@ -373,19 +373,20 @@ const extras: Partial<Record<CoverageJurisdiction, {
       // BE-38 B3 review (B2): the rendered authority is the Ministry of Finance
       // parameters PDF the pack itself records as the source of these fields and
       // which returns 200 and prints the priced 2026 thresholds and BPA. The
-      // bracket *rates* are published only on Revenu Québec's rates page, which
-      // answers a scripted reader with a bot gate; it is listed as an additional
-      // source and the row's rendered limitation says so, so the reader is never
+      // bracket *rates* are published on Revenu Québec's rates page, which
+      // answers a scripted reader with a bot gate, and the full 2026 ladder is
+      // also printed in the reachable CFFP guide; both are additional sources and
+      // the row's rendered limitation says which is which, so the reader is never
       // handed an unqualified dead link.
       'quebec-income-tax-brackets': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'],
-        sourceURL: QC_PARAMS, additionalSourceURLs: [RQ_RATES], verifiedAt: AT,
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: AT,
         evidenceFixture: 'quebec-brackets-2026', limitationId: 'quebecIncomeTaxBrackets',
         qualifiedSource: true,
       },
       'quebec-basic-personal-amount': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
-        sourceURL: QC_PARAMS, additionalSourceURLs: [RQ_RATES], verifiedAt: AT,
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE, RQ_RATES], verifiedAt: AT,
         evidenceFixture: 'quebec-bpa-2026', limitationId: 'quebecBasicPersonalAmount',
         qualifiedSource: true,
       },
