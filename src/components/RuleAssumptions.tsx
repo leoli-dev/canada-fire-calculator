@@ -114,7 +114,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
           {rowAuthorities(credit).map((authority, index) => <span key={authority.url}
             className="rule-coverage-authority"
             data-testid={`rule-coverage-authority-${id}-${authority.primary ? 'primary' : `additional-${index - 1}`}`}>
-            {index === 0
+            {authority.primary
               ? <a href={authority.url} target="_blank" rel="noreferrer">{t(`coverageImplemented.${id}`)}</a>
               : <a href={authority.url} target="_blank" rel="noreferrer">{t('ruleCoverageAdditionalSource')}</a>}
             {' '}
@@ -126,17 +126,18 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
                 ? ` ${t('ruleCoverageAuthorityBlocked', { gate: authority.blocked.gateMarker })}.`
                 : null}
             </span>
-            {/*
-              BE-38 B3 review (round 4, B2): the row's rendered limitation for
-              this authority is the qualification the guard requires. It is
-              rendered against the authority it qualifies, so a reader cannot
-              follow the link without the disclosure being inline.
-            */}
-            {authority.primary && credit.limitationId
-              ? <span className="rule-coverage-limit"
-                data-testid={`rule-coverage-limitation-${id}`}>{t(coverageLimitationKey(credit.limitationId))}</span>
-              : null}
           </span>)}
+          {/*
+            BE-38 B3 review (round 4, B2): the row's rendered limitation is the
+            qualification the guard requires for a citation that does not settle
+            a figure or that is recorded as blocked. It is rendered inside the
+            row, immediately after the authorities (and before the additional
+            sources below), so the disclosure travels with the links.
+          */}
+          {credit.limitationId
+            ? <span className="rule-coverage-limit"
+              data-testid={`rule-coverage-limitation-${id}`}>{t(coverageLimitationKey(credit.limitationId))}</span>
+            : null}
         </li>)}
       </ul>
       <p data-testid="rule-coverage-unsupported">

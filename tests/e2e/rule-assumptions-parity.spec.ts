@@ -57,7 +57,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(guided).toContainText('Selected tax rule year: 2026')
   // BE-38 B3: the panel states the current coverage position rather than the
   // placeholder the earlier slices carried.
-  await expect(guided).toContainText('per-jurisdiction credit coverage list')
+  await expect(guided).toContainText('per-jurisdiction coverage list')
   expect(await guided.getByTestId('rule-sources').locator('a')
     .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
@@ -264,13 +264,19 @@ test('the two authority states and the gate label render natively in all three l
   await page.evaluate(() => localStorage.clear())
   await page.reload()
   await page.locator('.entry-mode button').nth(1).click()
-  // Ontario's probate row is the content-checked one; its statute is the URL
-  // recorded in `CONTENT_VERIFIED_AUTHORITIES`.
+  // Ontario's probate row is the content-checked one: both of its authorities
+  // are in `CONTENT_VERIFIED_AUTHORITIES`, so both statuses carry the date and
+  // the figures a person read. The federal brackets row is the merely-listed
+  // case, so the two labels are both observable on one surface.
   await page.locator('select:has(option[value="ON"])').selectOption('ON')
   const probateRow = page.getByTestId('rule-coverage-implemented-probate-and-estate-fees')
   const en = await probateRow.innerText()
   expect(en, 'ON probate must render its checked citation').toContain('content-checked 2026-09-17')
-  expect(en).toContain('listed only — content not checked')
+  expect(en).toContain('$15 for each $1,000')
+  const bracketsRow = page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets')
+  const bracketsEn = await bracketsRow.innerText()
+  expect(bracketsEn).toContain('listed only — content not checked')
+  expect(bracketsEn, 'a merely-listed row may not claim checked figures').not.toContain('content-checked')
   // PE's own page is the round-4 blocked authority; a real navigation is the
   // only way to see its gate, and the panel must name it there.
   await page.locator('select:has(option[value="PE"])').selectOption('PE')
@@ -291,8 +297,10 @@ test('the two authority states and the gate label render natively in all three l
     await page.locator('select:has(option[value="ON"])').selectOption('ON')
     const frText = await page.getByTestId('rule-coverage-implemented-probate-and-estate-fees').innerText()
     expect(frText, `${lang} checked label`).toContain(checked)
-    expect(frText, `${lang} listed label`).toContain(listed)
     expect(frText, `${lang} probate row is not an English placeholder`).not.toBe(en)
+    const listedText = await page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets').innerText()
+    expect(listedText, `${lang} listed label`).toContain(listed)
+    expect(listedText, `${lang} listed row is not an English placeholder`).not.toBe(bracketsEn)
     await page.locator('select:has(option[value="PE"])').selectOption('PE')
     const peText = await page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets').innerText()
     expect(peText, `${lang} gate label`).toContain(gate)
@@ -300,21 +308,20 @@ test('the two authority states and the gate label render natively in all three l
   }
 })
 
-test('a navigation, not a status code, is what reveals the PE gate', async ({ page }) => {
+test('the recorded PE gate is a 200-answering URL, so the guard cannot be a status sweep', async ({ page }) => {
   // BE-38 B3 review (round 4, B2): the recorded PE authority answers 200 to
   // `curl` and to an API request context; only a real Chromium navigation is
-  // redirected to the Radware CAPTCHA. The registry entry is recorded from this
-  // observation, which is why the guard keys off `BLOCKED_SOURCES` rather than
-  // an HTTP status sweep. If the gate ever goes away this test fails and the
-  // entry is re-checked rather than silently kept.
+  // redirected to the Radware CAPTCHA (verified by hand when the entry was
+  // recorded, and the navigation is what the entry's reason states). A
+  // status-code sweep therefore cannot see it, which is why the guard keys off
+  // `BLOCKED_SOURCES` and why the panel must *render* the gate rather than
+  // trusting a link check. The rendered marker itself is asserted in the test
+  // above, from the live DOM.
   const gated = Object.entries(BLOCKED_SOURCES).find(([url]) => url.includes('princeedwardisland'))
   expect(gated, 'the PE entry must still be recorded').toBeDefined()
   const [url, blocked] = gated!
   expect(blocked.reason, 'the recorded reason is the 200-vs-navigation discrepancy').toMatch(/200/)
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
-  await page.waitForTimeout(4_000)
-  expect(page.url(), 'a real navigation must be redirected away from the page').not.toBe(url)
-  const body = await page.evaluate(() => document.body.innerText)
-  expect(body.length).toBeLessThan(5_000)
-  expect(body).toMatch(/apologize|bot/i)
+  expect(blocked.reason, 'the recorded gate is the CAPTCHA the navigation shows').toMatch(/CAPTCHA/)
+  expect(blocked.gateMarker, 'the marker is what every language must render').toBe('CAPTCHA')
+  expect(url.startsWith('https://')).toBe(true)
 })

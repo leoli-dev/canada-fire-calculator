@@ -314,10 +314,14 @@ const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCo
   // ladder from. The MB and ON editions travel as additional sources because
   // the pinned fixture is keyed to the MB chart.
   const own = T4032(code.toLowerCase())
+  // BE-38 B3 review (round 4): ON's own edition *is* the pinned ON chart, so the
+  // hard-coded pair used to list Ontario's PDF twice (as `sourceURL` and again as
+  // an additional source). The row's own edition is excluded from its extras.
+  const pinnedCharts = [T4032('mb'), T4032('on')].filter(url => url !== own)
   return {
   'federal-income-tax-brackets': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['federal.brackets'],
-    sourceURL: own, additionalSourceURLs: [...new Set([T4032('mb'), T4032('on')])], verifiedAt: AT,
+    sourceURL: own, additionalSourceURLs: [...new Set(pinnedCharts)], verifiedAt: AT,
     evidenceFixture: 'federal-brackets-2026',
     limitationId: 'federalIncomeTaxBrackets',
   },

@@ -960,6 +960,13 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
         const authorities = rowAuthorities(credit)
         expect(authorities.length, `${jurisdiction}/${id} renders at least its primary`).toBeGreaterThan(0)
         expect(authorities.map(a => a.url)).toEqual([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])])
+        // Round 4 found ON's federal row listing its own T4032 twice (as the
+        // source *and* as a hard-coded additional source), and React warned
+        // about the duplicate key. A URL may appear at most once per row, and a
+        // row renders exactly one primary.
+        expect(new Set(authorities.map(a => a.url)).size, `${jurisdiction}/${id} lists a URL twice`).toBe(authorities.length)
+        expect(authorities.filter(a => a.primary).length, `${jurisdiction}/${id} renders more than one primary`).toBe(1)
+        expect(authorities.filter(a => a.url === credit.sourceURL).length, `${jurisdiction}/${id} primary`).toBe(1)
         for (const authority of authorities) {
           if (authority.checkedFigures) {
             const record = CONTENT_VERIFIED_AUTHORITIES[authority.url]
