@@ -275,7 +275,7 @@ export const sourceResolutions = [
     resolution:
       'The dedicated CRA T4032-PE July 2026 guide governs. Its Chart 2 lists the fourth threshold at $142,520 rather than January\u2019s $142,250, and its "what\u2019s new" states that PE\u2019s new over-$200,000 bracket is 20% for 2026 and subsequent years. The 21% that chart prints is a six-month prorated withholding rate, not the annual statutory rate, so this pack keeps 17.62% and 19% and carries the 20% top rate. The retained ladder is therefore the January five-bracket table in its fourth and fifth brackets, with the fifth threshold split at $200,000 so the sixth bracket can apply the statutory 20%: it differs from a straight January ladder only by the 19% charged on the $142,250-$142,520 band.',
     pricedChange:
-      'PE provincial tax falls by $3.726 at every taxable income above $142,520 (no effect at or below it): the $270 band between the January and July fourth thresholds is the only income the retained January ladder charged at 19% and this pack now charges at 17.62%.',
+      'PE provincial tax falls by $3.726 once taxable income reaches $142,520: the $270 band between the January and July fourth thresholds is the only income the retained January ladder charged at 19% and this pack now charges at 17.62%. The effect is nil at or below $142,250, rises across the $270 band as income enters it, and is the full $3.726 at $142,520 and above.',
   },
 ] as const
 /**
@@ -342,7 +342,7 @@ const TAX_PACKS: TaxRulePack[] = [
     sourceConflict: jurisdiction === 'MB'
       ? 'Resolved 2026-09-15: the dedicated CRA T4032-MB (January 2026) guide governs. Its Chart 2 lists $47,000/$100,000 at 10.8%/12.75%/17.4% and its basic personal amount is $15,780, matching this pack. CRA\u2019s general "current year" rates page lists $47,564/$101,200, which the dedicated provincial guide and Manitoba\u2019s 2026 budget (which paused bracket indexation for 2026) both contradict; the general page is the same page that is stale for PE. Retained values, no number changed.'
       : jurisdiction === 'PE'
-      ? 'Resolved 2026-09-15: the dedicated CRA T4032-PE July 2026 guide governs. Its Chart 2 lists the fourth threshold at $142,520 (as does CRA\u2019s general rates page), and states that PE\u2019s new over-$200,000 bracket is 20% for 2026 and subsequent years (the 21% in that chart is a six-month prorated withholding rate). This pack therefore keeps the January 17.62% and 19% rates and the 20% top rate, and moves the fourth threshold from $142,250 to $142,520. Priced change: PE provincial tax falls by $3.726 at every taxable income above $142,520, the $270 band the January ladder charged at 19%.'
+      ? 'Resolved 2026-09-15: the dedicated CRA T4032-PE July 2026 guide governs. Its Chart 2 lists the fourth threshold at $142,520 (as does CRA\u2019s general rates page), and states that PE\u2019s new over-$200,000 bracket is 20% for 2026 and subsequent years (the 21% in that chart is a six-month prorated withholding rate). This pack therefore keeps the January 17.62% and 19% rates and the 20% top rate, and moves the fourth threshold from $142,250 to $142,520. Priced change: PE provincial tax falls by $3.726 at $142,520 and above, the $270 band the January ladder charged at 19%; the effect starts at nil at $142,250 and phases in across that band.'
       : undefined,
     indexationRule: jurisdiction === 'MB' ? 'frozen' : 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',

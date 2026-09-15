@@ -3,7 +3,7 @@ import {
   COVERAGE_JURISDICTIONS, coverageFor, coverageMatrix, coverageSummary, evidenceFixtureIds,
   matrixJurisdictions,
 } from '../coverageMatrix'
-import { PLAN_TAX_YEAR, incomeTax, qcFssContribution, qcRamqPremium } from '../../tax'
+import { PLAN_TAX_YEAR, incomeTax, probateTax, qcFssContribution, qcRamqPremium } from '../../tax'
 import {
   CAPITAL_GAINS_INCLUSION, FED_AGE_AMOUNT, FED_PENSION_AMOUNT, ON_HEALTH_PREMIUM, ON_SURTAX,
   PROBATE_RATES, PROV_AGE_PENSION, QC_ABATEMENT, QC_FSS, QC_RAMQ, type TaxTable,
@@ -37,17 +37,19 @@ const BPA: Record<string, number> = { ON: 12989, AB: 22769, BC: 13216, SK: 20381
   NB: 13664, NL: 13094, YT: 16452, NT: 18198, NU: 19659, MB: 15780, PE: 15000 }
 const PENSION: Record<string, number> = { ON: 1796, AB: 1753, BC: 1000, SK: 1000, NS: 1173,
   NB: 1000, NL: 1000, YT: 2000, NT: 1000, NU: 2000, MB: 1000, PE: 1000 }
-/** Each 2026 TD1's "Age amount ... between $Y and $Z" line. NL is absent: its
- * 2026 TD1 publishes no age amount, so the retained figure is a follow-up. */
+/** Each 2026 TD1's "Age amount ... between $Y and $Z" line. Every figure here
+ * was read from that jurisdiction's own TD1; NL was previously held out on the
+ * false premise that its form publishes no age amount. */
 const AGE: Record<string, { max: number; threshold: number; end: number; supplement?: number }> = {
   ON: { max: 6342, threshold: 47210, end: 89490 }, AB: { max: 6345, threshold: 47234, end: 89534 },
   BC: { max: 5927, threshold: 44119, end: 83633 }, SK: { max: 5901, threshold: 43927, end: 83267, supplement: 2569 },
   NS: { max: 5826, threshold: 30828, end: 69668 }, NB: { max: 6158, threshold: 45844, end: 86898 },
   YT: { max: 9208, threshold: 46432, end: 107819 }, NT: { max: 8902, threshold: 46432, end: 105779 },
   NU: { max: 12550, threshold: 46432, end: 130099 }, MB: { max: 3728, threshold: 27749, end: 52602 },
-  PE: { max: 6510, threshold: 36600, end: 80000 } }
+  PE: { max: 6510, threshold: 36600, end: 80000 }, NL: { max: 7142, threshold: 39138, end: 86752 } }
 /** The TD1 spouse line: `max` is the published amount, `threshold` where it
- * reaches zero, `low` the TD1's own start-of-reduction bound this build skips. */
+ * reaches zero, `low` the TD1's own start-of-reduction bound (`max + low =
+ * threshold`; YT's 2,740 is an infirm-spouse top-up, not a bound). */
 const SPOUSE: Record<string, { max: number; threshold: number; low?: number }> = {
   ON: { max: 11029, threshold: 12132, low: 1103 }, AB: { max: 22769, threshold: 22769 },
   BC: { max: 11317, threshold: 12449, low: 1132 }, SK: { max: 20381, threshold: 22419, low: 2038 },
@@ -59,12 +61,44 @@ const FEDERAL = { t: [58523, 117045, 181440, 258482, Infinity], r: [0.14, 0.205,
 const FEDERAL_BPA = { bpa: 16452, bpaMin: 14829, from: 181440, to: 258482 }
 const FEDERAL_AGE = { max: 9208, threshold: 46432, rate: 0.15, end: 107819 }
 const FEDERAL_PENSION = 2000
-const QUEBEC = { t: [54345, 108680, 132245, Infinity], r: [0.14, 0.19, 0.24, 0.2575] }
+const QUEBEC = { t: [54345, 108680, 132245, Infinity], r: [0.14, 0.19, 0.24, 0.2575], bpa: 18952 }
+const QC_ABATEMENT_HAND = 0.165
+/** Revenu Québec's own Line 361 figures (Quebec 2026 fiscal parameters, Table
+ * 3): age 3,986, retirement income 3,541, reduction threshold 42,955, reduced
+ * at the statutory 18.75% of income above it. */
+const QC_AGE = { max: 3986, threshold: 42955, pension: 3541, rate: 0.1875 }
+const ON_SURTAX_HAND = { t1: 5818, r1: 0.2, t2: 7446, r2: 0.36 }
+const ON_HEALTH_HAND = [
+  { from: 20000, base: 0, rate: 0.06, cap: 300 }, { from: 36000, base: 300, rate: 0.06, cap: 450 },
+  { from: 48000, base: 450, rate: 0.25, cap: 600 }, { from: 72000, base: 600, rate: 0.25, cap: 750 },
+  { from: 200000, base: 750, rate: 0.25, cap: 900 },
+]
+const QC_FSS_HAND = { t1: 18500, t2: 64355, cap1: 150, cap2: 1000 }
+const QC_RAMQ_HAND = { threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 }
+const PROBATE_HAND: Record<string, { flat: number; rate: number; threshold: number }> = {
+  ON: { flat: 0, rate: 0.015, threshold: 50000 }, BC: { flat: 200, rate: 0.014, threshold: 50000 },
+  AB: { flat: 525, rate: 0, threshold: 0 }, QC: { flat: 243, rate: 0, threshold: 0 },
+  MB: { flat: 0, rate: 0, threshold: 0 }, SK: { flat: 200, rate: 0.007, threshold: 0 },
+  NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, NB: { flat: 100, rate: 0.005, threshold: 20000 },
+  PE: { flat: 400, rate: 0.004, threshold: 100000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
+  YT: { flat: 140, rate: 0, threshold: 0 }, NT: { flat: 140, rate: 0, threshold: 0 },
+  NU: { flat: 140, rate: 0, threshold: 0 },
+}
+/** The only provincial BPA phase-outs the pack carries, and the matrix row that
+ * must declare each one. A new phase-out in the snapshot fails the assertion in
+ * the review suite rather than going undeclared. */
+const PHASE_OUT: Partial<Record<Province, { row: string; from: number; to: number; min: number }>> = {
+  MB: { row: 'manitoba-bpa-phase-out', from: 200000, to: 400000, min: 0 },
+  YT: { row: 'yukon-bpa-phase-out', from: 181440, to: 258482, min: 14829 },
+}
 
 /**
  * The registry every `implemented` matrix row must name, each pointing at the
  * authority its row was keyed from. A row cannot be added without a fixture,
- * and a fixture cannot be dropped without its row noticing.
+ * and a fixture cannot be dropped without its row noticing. The provincial ids
+ * carry their jurisdiction because their authority does: the age, pension and
+ * spouse figures come from that province's own TD1 (and Quebec's from its own
+ * fiscal-parameters PDF), never from a shared stand-in.
  */
 const FIXTURE_SOURCES: Record<string, string> = {
   'federal-brackets-2026': `${CRA}mb-1-26e.pdf`,
@@ -74,19 +108,26 @@ const FIXTURE_SOURCES: Record<string, string> = {
   'federal-spouse-amount-2026': `${TD1}/td1-26e.pdf`,
   'capital-gains-inclusion-2026': 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html',
   'probate-fees-2026': 'https://www.ontario.ca/laws/statute/90e22',
-  'provincial-brackets-2026': `${CRA}mb-1-26e.pdf`,
-  'provincial-bpa-2026': `${CRA}mb-1-26e.pdf`,
-  'provincial-pension-amount-2026': `${TD1}on/td1on-26e.pdf`,
-  'provincial-age-amount-2026': `${TD1}on/td1on-26e.pdf`,
-  'provincial-spouse-amount-2026': `${TD1}on/td1on-26e.pdf`,
   'ontario-surtax-2026': `${CRA}on-1-26e.pdf`,
   'ontario-health-premium-2026': `${CRA}on-1-26e.pdf`,
   'manitoba-bpa-phase-out-2026': `${CRA}mb-1-26e.pdf`,
+  'yukon-bpa-phase-out-2026': `${CRA}yt-1-26e.pdf`,
   'quebec-brackets-2026': RQ,
   'quebec-bpa-2026': RQ,
   'quebec-abatement-2026': 'https://laws-lois.justice.gc.ca/eng/acts/f-1.3/section-4.html',
   'quebec-fss-2026': RQ,
   'quebec-ramq-2026': RQ,
+  'qc-provincial-age-amount-2026': RQ,
+  'qc-provincial-pension-amount-2026': RQ,
+}
+for (const province of PROVINCES) {
+  if (province === 'QC') continue
+  const code = province.toLowerCase()
+  FIXTURE_SOURCES[`${code}-provincial-brackets-2026`] = `${CRA}${code}-1-26e.pdf`
+  FIXTURE_SOURCES[`${code}-provincial-bpa-2026`] = `${CRA}${code}-1-26e.pdf`
+  FIXTURE_SOURCES[`${code}-provincial-pension-amount-2026`] = `${TD1}${code}/td1${code}-26e.pdf`
+  FIXTURE_SOURCES[`${code}-provincial-age-amount-2026`] = `${TD1}${code}/td1${code}-26e.pdf`
+  FIXTURE_SOURCES[`${code}-provincial-spouse-amount-2026`] = `${TD1}${code}/td1${code}-26e.pdf`
 }
 
 const packTable = (p: Province): TaxTable => selectTaxRules(p, PLAN_TAX_YEAR).provincial
@@ -189,6 +230,11 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
         expect(credit.sourceURL, `${jurisdiction}/${id} source`).toMatch(/^https:\/\//)
         expect(credit.verifiedAt, `${jurisdiction}/${id} date`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
         expect(FIXTURE_SOURCES[credit.evidenceFixture], `${jurisdiction}/${id}`).toBeDefined()
+        // The fixture must resolve to an authority the row itself names. This
+        // is the check that catches a jurisdiction pointed at another
+        // jurisdiction's form: NL's age row named Ontario's TD1.
+        expect([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])],
+          `${jurisdiction}/${id} fixture authority`).toContain(FIXTURE_SOURCES[credit.evidenceFixture])
         for (const field of credit.ruleFields) {
           if (field.startsWith('provincial.')) expect(id).toMatch(/bracket|basic-personal|phase-out/)
           if (field.startsWith('federal.')) expect(credit.scope).toBe('federal')
@@ -258,7 +304,7 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
     const quebec = packTable('QC')
     expect(thresholds(quebec)).toEqual(QUEBEC.t)
     expect(rates(quebec)).toEqual(QUEBEC.r)
-    expect(quebec.bpa).toBe(18952)
+    expect(quebec.bpa).toBe(QUEBEC.bpa)
     for (const province of PROVINCES) {
       if (province === 'QC') continue
       expect(packTable(province).bpa, province).toBe(BPA[province])
@@ -268,9 +314,10 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
       .toEqual([FEDERAL_AGE.max, FEDERAL_AGE.threshold, FEDERAL_AGE.rate])
     expect(FEDERAL_AGE.threshold + FEDERAL_AGE.max / FEDERAL_AGE.rate).toBeCloseTo(FEDERAL_AGE.end, 0)
     for (const province of PROVINCES) {
-      // QC's senior credit is its own family-tested framework; NL's 2026 TD1
-      // publishes no age amount, so neither is in the fixture.
-      if (province === 'QC' || province === 'NL') continue
+      // Quebec's senior amount is one combined, family-tested credit with its
+      // own published figures, checked in its own block below; every other
+      // jurisdiction including NL is checked against its own TD1 here.
+      if (province === 'QC') continue
       const lowest = packTable(province).brackets[0].rate
       const rule = PROV_AGE_PENSION[province]
       expect(rule.pension, `${province} pension`).toBe(PENSION[province])
@@ -290,6 +337,20 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
         `${province} spouse credit`).toBeCloseTo(amount * lowest + (16_452 - 4_000) * 0.14, 6)
       expect(SPOUSE[province].threshold).toBeGreaterThanOrEqual(SPOUSE[province].max)
     }
+    // Quebec's Line 361 amount, against the Ministry of Finance's own 2026
+    // parameters: 3,986 of age amount and 3,541 of retirement-income amount,
+    // reduced at 18.75% of income above 42,955. Both are priced below the
+    // threshold, where the reduction is nil, so the expected credit is exact.
+    const qc = PROV_AGE_PENSION.QC
+    expect([qc.ageMax, qc.ageThreshold, qc.ageRate, qc.pension])
+      .toEqual([QC_AGE.max, QC_AGE.threshold, QC_AGE.rate, QC_AGE.pension])
+    expect(coverageFor('QC').implemented['provincial-age-amount'], 'QC age row').toBeDefined()
+    expect(coverageFor('QC').implemented['provincial-pension-income-amount'], 'QC pension row').toBeDefined()
+    expect(creditWorth(qc, 'ageMax', 40_000, 'QC', { age: 65 }), 'QC age credit')
+      .toBeCloseTo(QC_AGE.max * QUEBEC.r[0], 6)
+    expect(creditWorth(qc, 'pension', 40_000, 'QC',
+      { age: 65, pensionIncome: 5_000, provincialPensionIncome: 5_000 }),
+      'QC retirement-income credit').toBeCloseTo(Math.min(QC_AGE.pension, 5_000) * QUEBEC.r[0], 6)
     expect(ON_SURTAX).toEqual({ t1: 5818, r1: 0.2, t2: 7446, r2: 0.36 })
     expect(ON_HEALTH_PREMIUM[4]).toEqual({ from: 200000, base: 750, rate: 0.25, cap: 900 })
     expect(incomeTax(30_000, 'ON')).toBeCloseTo(
@@ -299,7 +360,7 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
       .toBeGreaterThan(expectedFederalTax(250_000) + bracketOnlyProvincial('ON', 250_000))
     expect(CAPITAL_GAINS_INCLUSION).toBe(0.5)
     expect([PROBATE_RATES.ON.rate, PROBATE_RATES.MB.rate, PROBATE_RATES.NS.rate]).toEqual([0.015, 0, 0.01695])
-    expect(QC_ABATEMENT).toBe(0.165)
+    expect(QC_ABATEMENT).toBe(QC_ABATEMENT_HAND)
     expect(QC_FSS).toEqual({ t1: 18500, t2: 64355, cap1: 150, cap2: 1000 })
     expect(QC_RAMQ).toEqual({ threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 })
     expect(qcFssContribution(20_000)).toBeCloseTo(15, 6)
@@ -427,5 +488,211 @@ describe('BE-38 B3: the declared-unimplemented items are really absent from the 
     // rate change the same budget made, so the reason is not generic.
     expect(coverageFor('BC').unsupported['british-columbia-tax-reduction'].scopeStatement)
       .toMatch(/\$690|prorated|withdrawn/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Review fix (B2): a declared status is only worth publishing if the pricing
+// code agrees with it. The review found Quebec's age/retirement amount declared
+// `unsupported` while `tax.ts` subtracted it, and the drift test could not see
+// it because both QC loops skipped the province. This block reconciles every
+// jurisdiction against the matrix's own declarations in both directions.
+// ---------------------------------------------------------------------------
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+
+/** Bracket tax from a hand-keyed ladder — never from the pack under test. */
+function handBracketTax(brackets: number[], rates: number[], income: number): number {
+  let tax = 0
+  let previous = 0
+  for (let index = 0; index < brackets.length; index += 1) {
+    const slice = Math.min(income, brackets[index]) - previous
+    if (slice > 0) tax += slice * rates[index]
+    previous = brackets[index]
+    if (income <= brackets[index]) break
+  }
+  return tax
+}
+
+function handEnhancedBpa(taxable: number): number {
+  return FEDERAL_BPA.bpa - (FEDERAL_BPA.bpa - FEDERAL_BPA.bpaMin)
+    * clamp01((taxable - FEDERAL_BPA.from) / (FEDERAL_BPA.to - FEDERAL_BPA.from))
+}
+
+function handHealthPremium(income: number): number {
+  let premium = 0
+  for (const segment of ON_HEALTH_HAND)
+    if (income > segment.from)
+      premium = Math.min(segment.cap, segment.base + segment.rate * (income - segment.from))
+  return premium
+}
+
+function handFss(income: number): number {
+  const { t1, t2, cap1, cap2 } = QC_FSS_HAND
+  if (income <= t1) return 0
+  if (income <= t2) return Math.min(cap1, (income - t1) * 0.01)
+  return Math.min(cap2, cap1 + (income - t2) * 0.01)
+}
+
+function handRamq(income: number): number {
+  const { threshold, band1, rate1, rate2, max } = QC_RAMQ_HAND
+  const excess = Math.max(0, income - threshold)
+  return excess <= band1 ? excess * rate1 : Math.min(max, band1 * rate1 + (excess - band1) * rate2)
+}
+
+/**
+ * What the matrix's own declarations imply the tax should be, hand-keyed from
+ * the authorities the rows cite. A row declared `unsupported` contributes
+ * nothing; a row declared `implemented` must be present. `incomeTax` is then
+ * required to agree, which turns a mis-declared status into a failure in either
+ * direction: a credit the matrix hides but the engine applies leaves the engine
+ * cheaper than declared, and a credit the matrix claims but the engine ignores
+ * leaves it dearer.
+ */
+function declaredOnlyTax(province: Province, taxable: number,
+  credits: Parameters<typeof incomeTax>[2]): number {
+  const has = (id: string) => coverageFor(province).implemented[id] !== undefined
+  const senior = (credits?.age ?? 0) >= 65
+  const pensionIncome = credits?.pensionIncome ?? 0
+  const provincialPension = credits?.provincialPensionIncome ?? pensionIncome
+  let expected = 0
+
+  if (has('federal-income-tax-brackets')) {
+    let credit = 0
+    if (has('federal-basic-personal-amount')) credit += handEnhancedBpa(taxable) * 0.14
+    if (has('federal-pension-income-amount')) credit += Math.min(FEDERAL_PENSION, pensionIncome) * 0.14
+    if (has('federal-spouse-amount') && credits?.spouseNetIncome !== undefined)
+      credit += Math.max(0, handEnhancedBpa(taxable) - Math.max(0, credits.spouseNetIncome)) * 0.14
+    if (has('federal-age-amount') && senior)
+      credit += Math.max(0, FEDERAL_AGE.max
+        - FEDERAL_AGE.rate * Math.max(0, taxable - FEDERAL_AGE.threshold)) * 0.14
+    let federal = Math.max(0, handBracketTax(FEDERAL.t, FEDERAL.r, taxable) - credit)
+    if (province === 'QC' && has('quebec-federal-abatement')) federal *= 1 - QC_ABATEMENT_HAND
+    expected += federal
+  }
+
+  const lowest = province === 'QC' ? QUEBEC.r[0] : BRACKETS[province].r[0]
+  let credit = 0
+  if (province === 'QC') {
+    if (has('quebec-basic-personal-amount')) credit += QUEBEC.bpa * lowest
+    if (senior && has('provincial-age-amount')) {
+      const combined = QC_AGE.max
+        + (has('provincial-pension-income-amount') ? Math.min(QC_AGE.pension, pensionIncome) : 0)
+      credit += Math.max(0, combined - QC_AGE.rate * Math.max(0, taxable - QC_AGE.threshold)) * lowest
+    }
+  } else {
+    if (has('provincial-basic-personal-amount')) {
+      const phase = PHASE_OUT[province]
+      credit += (phase && has(phase.row)
+        ? BPA[province] - (BPA[province] - phase.min) * clamp01((taxable - phase.from) / (phase.to - phase.from))
+        : BPA[province]) * lowest
+    }
+    if (has('provincial-pension-income-amount'))
+      credit += Math.min(PENSION[province], provincialPension) * lowest
+    if (has('provincial-spouse-amount') && credits?.spouseNetIncome !== undefined)
+      credit += Math.min(SPOUSE[province].max,
+        Math.max(0, SPOUSE[province].threshold - credits.spouseNetIncome)) * lowest
+    if (has('provincial-age-amount') && senior) {
+      credit += (AGE[province].supplement ?? 0) * lowest
+      credit += Math.max(0, AGE[province].max - 0.15 * Math.max(0, taxable - AGE[province].threshold)) * lowest
+    }
+  }
+  const brackets = province === 'QC' ? QUEBEC : BRACKETS[province]
+  let provincial = Math.max(0, handBracketTax(brackets.t, brackets.r, taxable) - credit)
+  if (province === 'ON') {
+    if (has('ontario-surtax'))
+      provincial += Math.max(0, provincial - ON_SURTAX_HAND.t1) * ON_SURTAX_HAND.r1
+        + Math.max(0, provincial - ON_SURTAX_HAND.t2) * ON_SURTAX_HAND.r2
+    if (has('ontario-health-premium')) provincial += handHealthPremium(taxable)
+  }
+  if (province === 'QC') {
+    if (has('quebec-fss-contribution')) provincial += handFss(taxable)
+    if (has('quebec-ramq-premium')) provincial += handRamq(taxable)
+  }
+  return expected + provincial
+}
+
+/** Incomes that exercise the low-income floor, both phase-outs, the surtax,
+ *  the health premium and the Quebec levies, with and without each credit. */
+const PROBES: { income: number; credits: Parameters<typeof incomeTax>[2] }[] = [
+  { income: 15_000, credits: undefined },
+  { income: 25_000, credits: { age: 65 } },
+  { income: 30_000, credits: undefined },
+  { income: 60_000, credits: { age: 70, pensionIncome: 5_000, provincialPensionIncome: 5_000 } },
+  { income: 90_000, credits: { pensionIncome: 5_000, provincialPensionIncome: 5_000 } },
+  { income: 90_000, credits: { spouseNetIncome: 4_000 } },
+  { income: 130_000, credits: { age: 65, pensionIncome: 2_000, provincialPensionIncome: 2_000, spouseNetIncome: 3_000 } },
+  { income: 250_000, credits: { age: 70 } },
+  { income: 300_000, credits: undefined },
+]
+
+describe('BE-38 B3 review: every declared status is verified against the pricing code', () => {
+  it('prices exactly the credits the matrix declares implemented, in all 13 jurisdictions', () => {
+    for (const province of PROVINCES) {
+      const carries = packTable(province).bpaPhaseOut !== undefined
+      // Every phase-out the pack carries is a declared row the hand model
+      // applies, and no other province may claim one: a new phase-out fails
+      // here rather than going undeclared (the review's YT finding).
+      expect(carries, `${province} carries a phase-out`).toBe(PHASE_OUT[province] !== undefined)
+      if (PHASE_OUT[province])
+        expect(coverageFor(province).implemented[PHASE_OUT[province]!.row], `${province} phase-out row`).toBeDefined()
+    }
+    for (const province of PROVINCES) {
+      for (const probe of PROBES) {
+        expect(incomeTax(probe.income, province, probe.credits), `${province}@${probe.income}`)
+          .toBeCloseTo(declaredOnlyTax(province, probe.income, probe.credits), 6)
+      }
+    }
+  })
+
+  it('declares Quebec\u2019s senior credit implemented, at the price the code charges', () => {
+    // The exact B2 regression. The engine subtracts a combined age +
+    // retirement-income credit for Quebec; the expected delta below is
+    // hand-keyed from the Ministry of Finance figures, not read from `tax.ts`.
+    const federalSenior = (Math.max(0, FEDERAL_AGE.max
+      - FEDERAL_AGE.rate * (60_000 - FEDERAL_AGE.threshold)) + Math.min(FEDERAL_PENSION, 5_000))
+      * 0.14 * (1 - QC_ABATEMENT_HAND)
+    const quebecSenior = Math.max(0, QC_AGE.max + Math.min(QC_AGE.pension, 5_000)
+      - QC_AGE.rate * (60_000 - QC_AGE.threshold)) * QUEBEC.r[0]
+    const credits = { age: 70, pensionIncome: 5_000, provincialPensionIncome: 5_000 }
+    expect(incomeTax(60_000, 'QC') - incomeTax(60_000, 'QC', credits))
+      .toBeCloseTo(federalSenior + quebecSenior, 6)
+    // The panel may no longer tell a Quebec senior that this credit is excluded.
+    const row = coverageFor('QC')
+    expect(Object.keys(row.unsupported)).not.toContain('quebec-senior-amount')
+    expect(row.unsupported['provincial-age-pension-amounts'].scopeStatement).not.toMatch(/not applied per person/)
+    expect(row.implemented['provincial-age-amount']).toBeDefined()
+    expect(row.implemented['provincial-pension-income-amount']).toBeDefined()
+    // Quebec's own spouse amount stays unsupported and really is not applied,
+    // even though the federal spouse amount on top of it is.
+    expect(row.unsupported['provincial-spouse-amount']).toBeDefined()
+    expect(incomeTax(90_000, 'QC', { spouseNetIncome: 4_000 }))
+      .toBeCloseTo(incomeTax(90_000, 'QC') - (FEDERAL_BPA.bpa - 4_000) * 0.14 * (1 - QC_ABATEMENT_HAND), 6)
+  })
+
+  it('gives every declared id a reconciliation or its own pin, so no status is unproven', () => {
+    const reconciled = new Set([
+      'federal-income-tax-brackets', 'federal-basic-personal-amount', 'federal-pension-income-amount',
+      'federal-age-amount', 'federal-spouse-amount', 'quebec-federal-abatement',
+      'quebec-income-tax-brackets', 'quebec-basic-personal-amount',
+      'provincial-income-tax-brackets', 'provincial-basic-personal-amount',
+      'provincial-pension-income-amount', 'provincial-age-amount', 'provincial-spouse-amount',
+      'manitoba-bpa-phase-out', 'yukon-bpa-phase-out', 'ontario-surtax', 'ontario-health-premium',
+      'quebec-fss-contribution', 'quebec-ramq-premium',
+    ])
+    const pinnedSeparately = new Set(['capital-gains-inclusion-rate', 'probate-and-estate-fees'])
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const id of Object.keys(coverageFor(jurisdiction).implemented))
+        expect(reconciled.has(id) || pinnedSeparately.has(id), `${jurisdiction}/${id} has no status proof`).toBe(true)
+    expect(CAPITAL_GAINS_INCLUSION).toBe(0.5)
+    for (const province of PROVINCES) {
+      const hand = PROBATE_HAND[province]
+      expect(probateTax(200_000, province), `${province} probate`)
+        .toBeCloseTo(hand.flat + hand.rate * Math.max(0, 200_000 - hand.threshold), 6)
+    }
+    // Quebec pays the federal ladder too, so that row is declared for it as
+    // well; dropping it was the one other declared-status drift the audit found.
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      expect(coverageFor(jurisdiction).implemented['federal-income-tax-brackets'], jurisdiction).toBeDefined()
   })
 })

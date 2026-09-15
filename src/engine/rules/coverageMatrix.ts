@@ -7,13 +7,17 @@
  * answer to "which credits and reductions are inside these numbers and which
  * are outside them", for every jurisdiction the app can price.
  *
- * `coverageMatrix.test.ts` enforces three properties: every supported
+ * `coverageMatrix.test.ts` enforces four properties: every supported
  * jurisdiction has an entry that lists the federal rows too; every
  * `implemented` row names a fixture that resolves to a pinned,
- * independently-sourced expectation; and every `unsupported` row carries a
- * concrete reason whose absence is asserted against the engine. Nothing here
- * claims a complete return — the standing negative statement lives in
- * {@link coverageCaveat} and travels with the matrix so no summary can drop it.
+ * independently-sourced expectation and to the authority the row's own
+ * `sourceURL` names; every `unsupported` row carries a concrete reason whose
+ * absence is asserted against the engine; and every declaration — implemented
+ * or unsupported, for every jurisdiction — is reconciled against what the
+ * pricing code actually does, so a row cannot claim a credit is excluded while
+ * `tax.ts` prices it (or the reverse). Nothing here claims a complete return —
+ * the standing negative statement lives in {@link coverageCaveat} and travels
+ * with the matrix so no summary can drop it.
  */
 
 import { PLAN_TAX_YEAR } from '../planYear'
@@ -101,6 +105,7 @@ const TD1_PROV = (code: string) =>
 const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
 const QC_PARAMS = 'https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/finances/publications-adm/parametres/AUTFR_RegimeImpot2026.pdf'
 const ITA_38 = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html'
+const QC_ABATEMENT_ACT = 'https://laws-lois.justice.gc.ca/eng/acts/f-1.3/section-4.html'
 const PROBATE = 'https://www.ontario.ca/laws/statute/90e22'
 const AT = '2026-09-15'
 const federal = (): Record<string, ImplementedCreditCoverage> => ({
@@ -142,40 +147,46 @@ const federal = (): Record<string, ImplementedCreditCoverage> => ({
   'probate-and-estate-fees': {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
     sourceURL: PROBATE, verifiedAt: AT, evidenceFixture: 'probate-fees-2026',
-    limitation: 'Pinned 2026 figures; provinces with tiered rates are simplified to one flat amount plus rate.',
+    limitation: 'Pinned 2026 figures; provinces with tiered rates are simplified to one flat amount plus rate. The cited statute is Ontario\u2019s; each other jurisdiction\u2019s rate is pinned from its own administration-of-estates statute, not from this URL.',
   },
 })
 
-/** The rows every non-Quebec jurisdiction prices from its own T4032 chart and TD1. */
+/**
+ * The rows every non-Quebec jurisdiction prices from its own T4032 chart and TD1.
+ * The fixture id carries the jurisdiction because the authority does: every
+ * province's age, pension and spouse line comes from its own TD1, so a shared
+ * fixture id could (and did) point a province at another province's form.
+ */
 const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => ({
   'provincial-income-tax-brackets': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'], implementedRule: `The published 2026 ${code} ladder.`,
-    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: 'provincial-brackets-2026',
+    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-brackets-2026`,
   },
   'provincial-basic-personal-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
-    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: 'provincial-bpa-2026',
+    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
     limitation: 'An assumed future year indexes it from the pack\u2019s own policy; the 2026 value is the published one.',
   },
   'provincial-pension-income-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['taxData.ts:PROV_AGE_PENSION.pension'],
-    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: 'provincial-pension-amount-2026',
+    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-pension-amount-2026`,
     limitation: 'Not year-switched, and applied with no income test in this model.',
   },
   'provincial-age-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit',
     ruleFields: ['taxData.ts:PROV_AGE_PENSION.ageMax', 'taxData.ts:PROV_AGE_PENSION.ageThreshold',
       'taxData.ts:PROV_AGE_PENSION.ageRate', 'taxData.ts:PROV_AGE_PENSION.seniorSupplement'],
-    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: 'provincial-age-amount-2026',
+    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-age-amount-2026`,
     limitation: 'Pinned 2026 figures, and the income test uses taxable income rather than the net income the TD1 worksheet uses.',
   },
   'provincial-spouse-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit',
     ruleFields: ['spouseCredit2026.ts:provincialSpouseAmount2026'],
-    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: 'provincial-spouse-amount-2026',
+    sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-spouse-amount-2026`,
     limitation:
-      'The reduction starts from the maximum rather than the lower bound the TD1 worksheet uses, and the maxima ' +
-      'and thresholds are pinned 2026 figures.',
+      'The amount is `min(max, threshold \u2212 spouse net income)`, which is algebraically identical to the TD1 ' +
+      'worksheet because every such form publishes `max + low = threshold`; the real gap is the spouse net-income ' +
+      'base, and the maxima and thresholds are pinned 2026 figures.',
   },
 })
 
@@ -205,6 +216,11 @@ const commonUnsupported = (): Record<string, UnsupportedCreditCoverage> => ({
     coverage: 'unsupported', scope: 'provincial', kind: 'credit',
     scopeStatement: 'The provincial age amount, pension income amount and any senior supplement are not applied beyond the flat provincial rows this matrix names.',
     reason: 'taxData.ts pins 2026 provincial age and pension amounts with no tax-year selection, and their income tests use taxable income rather than net income. Scope for BE-38 B4.',
+  },
+  'canada-employment-amount': {
+    coverage: 'unsupported', scope: 'federal', kind: 'credit',
+    scopeStatement: 'The Canada employment amount is not applied, so a result that includes employment income omits that credit.',
+    reason: 'The engine prices interest, pension and capital-gain income and models no employment-income credit; the caveat names the same gap. Scope for BE-38 B4.',
   },
 })
 
@@ -251,8 +267,26 @@ const extras: Partial<Record<CoverageJurisdiction, {
       },
       'quebec-federal-abatement': {
         coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['taxData.ts:QC_ABATEMENT'],
-        sourceURL: RQ_RATES, verifiedAt: AT, evidenceFixture: 'quebec-abatement-2026',
+        sourceURL: RQ_RATES, additionalSourceURLs: [QC_ABATEMENT_ACT], verifiedAt: AT, evidenceFixture: 'quebec-abatement-2026',
         limitation: 'A pinned statutory share, not selected by tax year.',
+      },
+      // `tax.ts` prices both of these for Quebec: the combined age +
+      // retirement-income amount, applied per person on an assumed 50/50
+      // income split. The review found the matrix declaring them unsupported
+      // while the engine subtracted them, so the UI told Quebec seniors that a
+      // credit they receive was excluded. The family test is the real gap and
+      // is named as the rows' limitation.
+      'provincial-age-amount': {
+        coverage: 'implemented', scope: 'provincial', kind: 'credit',
+        ruleFields: ['taxData.ts:PROV_AGE_PENSION.ageMax', 'taxData.ts:PROV_AGE_PENSION.ageThreshold',
+          'taxData.ts:PROV_AGE_PENSION.ageRate'],
+        sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'qc-provincial-age-amount-2026',
+        limitation: 'Pinned 2026 figures; applied on taxable income per person rather than through Schedule B\u2019s family-income test, which this build does not compute.',
+      },
+      'provincial-pension-income-amount': {
+        coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['taxData.ts:PROV_AGE_PENSION.pension'],
+        sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'qc-provincial-pension-amount-2026',
+        limitation: 'Pinned 2026 figures; the retirement-income amount is priced only inside the 65+ combined credit and shares the same per-person Schedule B approximation as the age amount.',
       },
       'quebec-fss-contribution': {
         coverage: 'implemented', scope: 'provincial', kind: 'levy', ruleFields: ['taxData.ts:QC_FSS'],
@@ -266,11 +300,6 @@ const extras: Partial<Record<CoverageJurisdiction, {
       },
     },
     unsupported: {
-      'quebec-senior-amount': {
-        coverage: 'unsupported', scope: 'provincial', kind: 'credit',
-        scopeStatement: 'Quebec\u2019s combined age and retirement-income amount is not applied on its family-income-tested basis.',
-        reason: 'The engine applies a per-person approximation from taxData.ts with a pinned 2026 threshold rather than the Schedule B family test. Scope for BE-38 B4.',
-      },
       'quebec-work-premium-and-refundable-credits': {
         coverage: 'unsupported', scope: 'provincial', kind: 'credit',
         scopeStatement: 'The Quebec work premium, the solidarity tax credit and the refundable medical-expense credit are not applied.',
@@ -285,11 +314,6 @@ const extras: Partial<Record<CoverageJurisdiction, {
         coverage: 'unsupported', scope: 'provincial', kind: 'credit',
         scopeStatement: 'Quebec\u2019s spouse or common-law-partner amount is not applied.',
         reason: 'Quebec prices a spouse through its own family framework rather than a per-person amount, and this build does not compute that framework.',
-      },
-      'provincial-age-pension-amounts': {
-        coverage: 'unsupported', scope: 'provincial', kind: 'credit',
-        scopeStatement: 'Quebec\u2019s own age and retirement-income amounts are not applied per person.',
-        reason: 'Quebec tests them at the family level in Schedule B, which this build does not compute.',
       },
     },
   },
@@ -321,6 +345,17 @@ const extras: Partial<Record<CoverageJurisdiction, {
     },
   },
   YT: {
+    implemented: {
+      // `tax.ts` phases Yukon's basic personal amount down with the federal
+      // enhanced-BPA bounds for every jurisdiction that carries
+      // `provincial.bpaPhaseOut`; until this row existed only Manitoba's
+      // phase-out was declared, so the matrix under-reported what Yukon prices.
+      'yukon-bpa-phase-out': {
+        coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpaPhaseOut'],
+        sourceURL: T4032('yt'), verifiedAt: AT, evidenceFixture: 'yukon-bpa-phase-out-2026',
+        limitation: 'Mirrors the federal enhanced-BPA phase-down and is a pinned figure rather than a chart line.',
+      },
+    },
     unsupported: {
       'yukon-cost-of-living-credits': {
         coverage: 'unsupported', scope: 'provincial', kind: 'credit',
@@ -355,8 +390,10 @@ function build(): CoverageMatrixArtifact {
   const jurisdictions = COVERAGE_JURISDICTIONS.map((jurisdiction) => {
     const implemented: Record<string, ImplementedCreditCoverage> = { ...fed }
     const unsupported: Record<string, UnsupportedCreditCoverage> = { ...common }
-    if (jurisdiction === 'QC') delete implemented['federal-income-tax-brackets']
-    else Object.assign(implemented, provincial(jurisdiction))
+    // Quebec pays the federal ladder too (with its own abatement row on top),
+    // so the federal bracket row is no longer dropped for QC: dropping it hid
+    // a priced row from the province that most needs the disclosure.
+    if (jurisdiction !== 'QC') Object.assign(implemented, provincial(jurisdiction))
     Object.assign(implemented, extras[jurisdiction]?.implemented ?? {})
     Object.assign(unsupported, extras[jurisdiction]?.unsupported ?? {})
     return {
