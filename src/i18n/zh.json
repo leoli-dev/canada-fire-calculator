@@ -109,7 +109,7 @@
   "ruleAssumptionsTitle": "税务与福利规则版本",
   "ruleAssumptionsVersion": "税务：{{tax}} · CCB支付期：{{ccb}} · GIS/Allowance：{{gis}}",
   "ruleAssumptionsPolicy": "优先使用已公布数值。未公布的未来年度须明确假设：可指数化的名义门槛按{{rate}}规划通胀每年调整一次；冻结门槛不变。",
-  "ruleAssumptionsLimit": "当前投影仍在所有年份使用固定的2026常数。按日期选规则目前是内部基础；逐年税务／福利切换和完整抵免覆盖尚未接入。",
+  "ruleAssumptionsLimit": "联邦与省级税率级距及基本个人免税额现已来自所选规则包。该规则包不按年度切换的每一项数值均列于上方并保持其固定值；BE-38 B 将把它们替换为带日期的规则。GIS／Allowance 拟合、CCB 近似，以及未建模 GST/HST 与省级现金福利这几点保持不变。",
   "ruleTaxSource": "税阶来源",
   "ruleCcbSource": "CCB支付期来源",
   "ruleFederalBracketsSource": "联邦税阶",
@@ -1379,5 +1379,18 @@
   "pensionSourceManualNote": "按你的输入记录。改变退休年龄不会改动它。",
   "pensionSourceStatementNote": "根据对账单记录（{{year}}）。本计算器绝不会覆盖它；退休年龄变化只会请求你重新确认。",
   "pensionSourceEstimatorNote": "由本计算器根据你提供的工作或居住前提估算（{{year}}）。改变退休年龄会重新运行该估算。",
-  "oasEstUsesFireAge": "记录的假设是你上面填写的退休年龄（{{age}}）。OAS 基于居住年限，金额本身不随退休年龄变化。"
+  "oasEstUsesFireAge": "记录的假设是你上面填写的退休年龄（{{age}}）。OAS 基于居住年限，金额本身不随退休年龄变化。",
+  "ruleAssumptionsTaxPolicy": "所选税务规则年度：{{year}} — {{policy}}。",
+  "ruleAssumptionsTaxPolicyPublished": "已公布数值",
+  "ruleAssumptionsTaxPolicyAssumed": "假设：该规则包中可指数化的名义门槛自 {{from}} 税务年度起，每年按 {{rate}} 调整一次",
+  "ruleAssumptionsTaxNotModelled": "该税务规则包不按年度切换：",
+  "ruleAssumptionsRefused": "税务规则不可用，因此不计算任何税额：{{reason}}",
+  "taxUnsupported.federal-age-pension-amounts": "联邦年龄免税额与养老金收入免税额（固定的 2026 年数值）",
+  "taxUnsupported.provincial-age-pension-amounts": "各省的年龄免税额、养老金收入免税额及老年人补充额（固定的 2026 年数值）",
+  "taxUnsupported.spouse-credit": "配偶／同居伴侣免税额及其收入测试（固定的 2026 年数值）",
+  "taxUnsupported.low-income-tax-reductions": "省级低收入减税与可退还抵免（例如安大略省的 LIFT 抵免），完全未建模",
+  "taxUnsupported.capital-gains-inclusion": "资本利得计入率（固定的 50% 法定比例）",
+  "taxUnsupported.probate-fees": "遗嘱认证与遗产管理费用（用于遗产费用的固定 2026 年数值）",
+  "taxUnsupported.gst-hst-and-cash-benefits": "GST/HST 抵免与省级现金福利，因此任何结果都不是完整的税后福利状况",
+  "taxUnsupported.provincial-premiums-and-levies": "该省自身的附加税与征费（安大略省的附加税与健康保险费，或魁北克的减征额、FSS 缴款与 RAMQ 保险费；固定数值）"
 }

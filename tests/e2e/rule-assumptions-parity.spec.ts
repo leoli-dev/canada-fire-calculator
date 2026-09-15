@@ -27,13 +27,18 @@ test('guided and professional expose the same pinned rule versions, policy and s
   // string nothing rendered.
   await expect(professional.getByTestId('rule-gis-not-modelled')).toContainText('prior-year base period')
   await expect(professional.getByTestId('rule-gis-not-modelled')).toContainText('provincial GIS or Allowance top-ups')
+  // BE-38 B1: the tax figures the pack does not year-switch are named too.
+  await expect(professional.getByTestId('rule-tax-not-modelled')).toContainText('GST/HST credit')
+  await expect(professional.getByTestId('rule-tax-not-modelled')).toContainText('low-income tax reductions')
 
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
   const guided = page.getByTestId('rule-assumptions')
   await expect(guided).toContainText('CA-BC-tax-2026-legacy-v1')
   await expect(guided).toContainText('CA-CCB-2026-07-v1')
-  await expect(guided).toContainText('not yet connected')
+  // The pack that priced the numbers, stated in both modes.
+  await expect(guided).toContainText('Selected tax rule year: 2026')
+  await expect(guided).toContainText('BE-38 B')
   expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
 
