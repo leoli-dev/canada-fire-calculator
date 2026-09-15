@@ -88,13 +88,41 @@ test('a migrated v10 plan presents its legacy figure for review instead of reint
   expect(await canonicalBudget(page)).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' } })
 
   // Keeping the legacy approximation records the old meaning explicitly and
-  // leaves the figure untouched.
+  // leaves the figure untouched. Review fix B1: the click must record what its
+  // own sentence says, so assert the copy and the recorded flags together.
+  await expect(page.getByTestId('budget-method')).toContainText('already net of the listed loan payments')
+  await expect(page.getByTestId('budget-method')).toContainText('without the tax difference')
   await page.getByTestId('budget-basis-legacy').check()
-  await expect(page.getByTestId('budget-debt-no')).toBeChecked()
-  await expect(page.getByTestId('budget-state')).toContainText('Recorded as not included')
-  expect(await canonicalBudget(page)).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false } })
+  await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
+  await expect(page.getByTestId('budget-tax-no')).toBeChecked()
+  await expect(page.getByTestId('budget-state')).toContainText('cannot yet add it as refund cash')
+  expect(await canonicalBudget(page)).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: false } })
   await page.reload()
-  await expect(page.getByTestId('budget-debt-no')).toBeChecked()
+  await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
+  await expect(page.getByTestId('budget-tax-no')).toBeChecked()
   await expect(savingsField).toHaveValue('24,000')
+  expect(await insideViewport(page)).toBe(true)
+})
+
+test('an answered-excluded budget basis labels the headline result as an estimate', async ({ page }) => {
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  // Review fix B2. Unknown facts are an unanswered question, not a
+  // contradiction: the default plan keeps its precise summary.
+  await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)
+  await page.getByTestId('budget-debt-no').check()
+  await page.getByTestId('budget-tax-no').check()
+  await expect(page.getByTestId('budget-state')).toContainText('cannot yet add them back to a cash budget')
+  // Once a fact is recorded as excluded, the caveat sits where the number does.
+  const estimate = page.getByTestId('legacy-estimate')
+  await expect(estimate).toHaveCount(1)
+  await expect(estimate).toContainText('estimate rather than a precise number')
+  await expect(estimate).toContainText('Final net worth:')
+  // Only the shape the projection actually prices loses the label: answering the
+  // same two facts "Yes" is the basis the projection already assumes.
+  await page.getByTestId('budget-debt-yes').check()
+  await page.getByTestId('budget-tax-yes').check()
+  await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)
+  expect(await canonicalBudget(page)).toMatchObject({ debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } })
+  await expect(page.locator('.results-column')).not.toContainText('estimate rather than a precise number')
   expect(await insideViewport(page)).toBe(true)
 })

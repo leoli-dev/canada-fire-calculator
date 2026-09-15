@@ -1,4 +1,4 @@
-import { precisionGate, type InputsV2 } from './model'
+import { pricingGate, type InputsV2 } from './model'
 
 export interface MigrationReview {
   ownershipPending: boolean
@@ -9,10 +9,19 @@ export interface MigrationReview {
   orphanedPeople: NonNullable<InputsV2['orphanedPeople']>
 }
 
-/** Read-only view of one canonical plan. A legacy total is never an owner assignment. */
+/**
+ * Read-only view of one canonical plan. A legacy total is never an owner
+ * assignment.
+ *
+ * Uses the pricing gate, not `precisionGate`: every string this view drives is
+ * about *migration* facts (legacy age basis, savings basis, ownership), so the
+ * presentation-only `budgetBasisExcluded` reason must not make a plan that was
+ * entered in this UI look like an unconfirmed legacy import. The headline
+ * estimate label for that reason is chosen in `ResultsPanel` instead.
+ */
 export function migrationReview(plan: InputsV2 | null): MigrationReview | null {
   if (!plan) return null
-  const gate = precisionGate(plan)
+  const gate = pricingGate(plan)
   return {
     ownershipPending: gate.reasons.includes('ownershipUnknown') || gate.reasons.includes('recipientUnknown'),
     precisionAllowed: gate.allowed,
@@ -24,5 +33,5 @@ export function migrationReview(plan: InputsV2 | null): MigrationReview | null {
 }
 
 export function canComparePrecisely(current: InputsV2 | null, scenarioA: InputsV2 | null): boolean {
-  return current !== null && scenarioA !== null && precisionGate(current).allowed && precisionGate(scenarioA).allowed
+  return current !== null && scenarioA !== null && pricingGate(current).allowed && pricingGate(scenarioA).allowed
 }

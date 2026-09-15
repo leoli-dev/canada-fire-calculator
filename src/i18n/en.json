@@ -26,6 +26,7 @@
     "stateUnknown": "Still to answer: {{fields}}. The plan keeps these unknown rather than assuming an answer.",
     "stateKnownFalse": "Recorded as not included: {{detail}}",
     "stateIncome": "Recorded as an income budget. {{detail}}",
+    "estimateExcluded": "The saving basis you recorded leaves out a component this projection still treats as included, so the result below is an estimate rather than a precise number until BE-14 B prices the recorded basis.",
     "fieldDebt": "whether the listed loan payments are already subtracted",
     "fieldTax": "whether the RRSP/RRIF tax difference is already reflected"
   },

@@ -26,6 +26,7 @@
     "stateUnknown": "仍待回答：{{fields}}。计划保持未知，不会替你假设答案。",
     "stateKnownFalse": "已记录为未包含：{{detail}}",
     "stateIncome": "已记录为收入预算。{{detail}}",
+    "estimateExcluded": "你记录的储蓄口径不含某一项，而本次推演仍把它视为已包含；在 BE-14 B 按所记录口径计价之前，下面只是估算，不是精确数字。",
     "fieldDebt": "是否已扣掉单列贷款还款",
     "fieldTax": "是否已反映RRSP/RRIF抵税差额"
   },

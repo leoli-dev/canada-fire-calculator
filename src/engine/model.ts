@@ -228,11 +228,42 @@ export interface InputsV2 {
   }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
-export function precisionGate(plan: InputsV2): PrecisionGate {
+
+/**
+ * The facts the canonical kernel needs before it may price a plan. Every reason
+ * here refuses a price, so it must stay free of presentation-only concerns.
+ */
+export function pricingGate(plan: InputsV2): PrecisionGate {
   const reasons: string[] = []
   if (plan.migration.ownershipNeedsConfirmation || plan.accounts.some(a => a.kind !== 'nonReg' && a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || plan.properties.some(p => p.taxableOwnerShares.status === 'unknown')) reasons.push('ownershipUnknown')
   if (plan.orphanedPeople?.length || plan.incomeSources.some(source => source.recipientId === null && source.annualAmount.status === 'known' && source.annualAmount.value !== 0)) reasons.push('recipientUnknown')
   if (plan.migration.ageBasisNeedsConfirmation) reasons.push('ageBasisUnknown')
   if (plan.migration.savingsBasisNeedsConfirmation || (plan.migration.sourcePersistVersion <= 10 && plan.budget.kind === 'savingsBudget' && (plan.budget.debtIncluded.status === 'unknown' || plan.budget.taxBenefitIncluded.status === 'unknown'))) reasons.push('savingsBasisUnknown')
   return { allowed: reasons.length === 0, reasons }
+}
+
+/**
+ * BE-13 A review fix B2. `pricingGate` plus the one reason that is about how a
+ * result must be *presented*: a savings budget whose user explicitly recorded
+ * that the figure is **not** net of a component the projection still prices as
+ * net of it (`runProjection` adds the whole `annualSavings` and never charges
+ * the listed debt during accumulation; `resolveYearAllocation` reads
+ * `annualNetSavings`). The headline number must then be the labelled estimate,
+ * not a precise figure.
+ *
+ * Only an explicit `known: false` counts. `unknown` is an unanswered fact, and
+ * both `known: true` agrees with what is priced, so neither is affected.
+ *
+ * Deliberately kept out of `pricingGate`: that gate also decides whether the
+ * person-level tax capability is used (`calculatePersonIncome`). Refusing there
+ * would flip `taxCapability` to `legacyEstimate` and move priced numbers, and it
+ * would shadow the kernel's own flag-specific budget refusal, which this fix
+ * must not change.
+ */
+export function precisionGate(plan: InputsV2): PrecisionGate {
+  const gate = pricingGate(plan)
+  const basisExcluded = plan.budget.kind === 'savingsBudget' &&
+    ((plan.budget.debtIncluded.status === 'known' && !plan.budget.debtIncluded.value) ||
+      (plan.budget.taxBenefitIncluded.status === 'known' && !plan.budget.taxBenefitIncluded.value))
+  return basisExcluded ? { allowed: false, reasons: [...gate.reasons, 'budgetBasisExcluded'] } : gate
 }

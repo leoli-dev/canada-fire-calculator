@@ -1,5 +1,5 @@
 import type { InputsV2, Known, AccountKind } from './model'
-import { ageReachedInYear, precisionGate } from './model'
+import { ageReachedInYear, pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
 import { resolveYearAllocation, type FundingGap } from './funding'
 import { impliedRate } from './debts'
@@ -89,8 +89,8 @@ const roundCents = (value: number) => Math.round(value * 100) / 100
 
 export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
-  const gate = precisionGate(plan)
-  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const gate = pricingGate(plan)
+  if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   if (plan.accounts.some(account => account.ownerId === null)) return fail('unsupported', 'account ownership unknown')
   if (plan.accounts.some(account => !finiteNonnegative(account.balance)) || plan.debts.some(debt => !finiteNonnegative(debt.principal))) return fail('invalid', 'negative or nonfinite opening balance')
   const byPerson = Object.fromEntries(plan.people.map(person => [person.id, {
@@ -173,8 +173,8 @@ function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
 
 function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders): KernelResult<AnnualStepValue> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
-  const gate = precisionGate(plan)
-  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const gate = pricingGate(plan)
+  if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   const self = plan.people.find(person => person.role === 'self')!
   const problem = snapshotProblem(plan, opening)
   if (problem) return fail('invalid', problem)
@@ -549,8 +549,8 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
 export function projectFromState(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<{ state: AnnualState; rows: YearRow[] }> {
   if (!Number.isInteger(years) || years < 0 || years > 120) return fail('invalid', 'projection years')
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
-  const gate = precisionGate(plan)
-  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const gate = pricingGate(plan)
+  if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   const problem = snapshotProblem(plan, opening)
   if (problem) return fail('invalid', problem)
   let state: AnnualState

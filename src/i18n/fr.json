@@ -26,6 +26,7 @@
     "stateUnknown": "À répondre: {{fields}}. Le plan les garde inconnues plutôt que de supposer une réponse.",
     "stateKnownFalse": "Enregistré comme non inclus: {{detail}}",
     "stateIncome": "Enregistré comme budget de revenu. {{detail}}",
+    "estimateExcluded": "La base d’épargne que vous avez enregistrée omet un élément que cette projection traite encore comme inclus; le résultat ci-dessous est donc une estimation, et non un chiffre précis, jusqu’à ce que BE-14 B chiffre la base enregistrée.",
     "fieldDebt": "si les remboursements de prêts inscrits sont déjà déduits",
     "fieldTax": "si l’économie d’impôt REER/FERR est déjà prise en compte"
   },

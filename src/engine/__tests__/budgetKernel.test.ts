@@ -3,6 +3,8 @@ import type { Inputs } from '../types'
 import { migratePersistedPlan } from '../migration'
 import type { BudgetMode, InputsV2 } from '../model'
 import { annualStep, initializeState, type AnnualProviders } from '../annualState'
+import { reconciledBudget } from '../budgetSemantics'
+import { runProjection } from '../projection'
 
 /**
  * BE-13 A. The kernel used to answer one generic "budget treatment not yet
@@ -83,5 +85,24 @@ describe('BE-13 A differentiated budget refusal', () => {
     const result = annualStep(canonical, opening.value, providers())
     if (result.status !== 'ok') throw new Error(`supported shape was refused: ${result.issues[0].detail}`)
     expect(result.value.row.cashLedger).toMatchObject({ income: 120, tax: 20, spending: 50, debtPayments: 10, voluntaryContributions: 40, unallocated: 0 })
+  })
+
+  it('keeps the flag-specific refusal and the priced result when the presentation gate fires', () => {
+    // Review fix B2: `precisionGate` is presentation-only. The kernel still
+    // opens and refuses these shapes with the budget's own reason, and the
+    // projection still prices the same number and the same tax capability.
+    const excluded = plan(savings({ debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false } }))
+    const opening = initializeState(excluded)
+    expect(opening.status).toBe('ok')
+    const refused = failure(excluded)
+    expect(refused.status).toBe('unsupported')
+    expect(refused.detail).toContain('cannot yet add them back to a cash budget')
+    expect(refused.detail).not.toContain('budgetBasisExcluded')
+
+    const priced = (canonical: InputsV2) => runProjection(input(), undefined, canonical)
+    const legacyKept = priced(plan(reconciledBudget({ annualSavings: 40, retirementSpending: 50 }, { keepLegacy: true })))
+    const adopted = priced(plan(reconciledBudget({ annualSavings: 40, retirementSpending: 50 }, { keepLegacy: false })))
+    expect(legacyKept.finalNetWorth).toBe(adopted.finalNetWorth)
+    expect(legacyKept.taxCapability?.status).toBe(adopted.taxCapability?.status)
   })
 })

@@ -18,7 +18,7 @@ import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 
-export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
+export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
@@ -96,7 +96,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
 
   if (props.legacyEstimate) return (
     <div className="summary uncertain" data-testid="legacy-estimate">
-      <p className="hint">{t(props.legacyOwnershipPending ? 'migrationLegacySummary' : 'migrationApproximate')}</p>
+      <p className="hint">{t(props.legacyOwnershipPending ? 'migrationLegacySummary'
+        : props.budgetBasisExcluded ? 'budget.estimateExcluded' : 'migrationApproximate')}</p>
       <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     </div>
   )

@@ -125,18 +125,20 @@ describe('BE-13 A store budget facts', () => {
     expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: false, legacyAnnualDebtPayments: 6_000 })
     expect(savings().debtIncluded.status).toBe('unknown')
     useStore.getState().setBudgetChoice({ kind: 'migratedBasis', basis: 'legacy' })
+    // Review fix B1: the click records the sentence it is shown — the v10
+    // figure is net of the listed debt, and excludes the tax difference.
     expect(useStore.getState().canonical?.budget).toMatchObject({
       kind: 'savingsBudget', annualNetSavings: 24_000,
-      debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false },
+      debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: false },
     })
     // Scenario A keeps the same recorded facts and restores them unchanged.
     useStore.getState().saveScenarioA()
-    expect(useStore.getState().scenarioACanonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false } })
+    expect(useStore.getState().scenarioACanonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: true } })
     useStore.getState().setBudgetChoice({ kind: 'taxBenefitIncluded', value: true })
     useStore.getState().restoreScenarioA()
-    expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false } })
+    expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: false } })
     reload()
-    expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false } })
+    expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: true } })
     expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: true, legacyAnnualDebtPayments: 6_000 })
   })
 })

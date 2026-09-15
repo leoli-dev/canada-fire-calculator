@@ -102,11 +102,17 @@ export function canonicalBudgetForChoice(
 }
 
 /**
- * The canonical budget a recorded migration answer produces. `keepLegacy`
- * states on the plan that the v10 figure is *net of* the listed debt payments
- * and excludes the tax benefit — the old meaning, so the kernel reports exactly
- * that shape as unsupported rather than reinterpreting the number. The
- * alternative asserts both facts, so the same amount now means the new basis.
+ * The canonical budget a recorded migration answer produces, in the exact words
+ * of the copy the user clicks.
+ *
+ * `keepLegacy` keeps the v10 meaning: the figure is *already net of* the listed
+ * debt payments (that is how the legacy projection priced it — see
+ * `projection.ts` and `debtsSection.debtNote`) and *without* the tax difference.
+ * The alternative asserts both facts, so the same amount now means the new
+ * basis. The number itself is never rewritten either way.
+ *
+ * A recorded fact may never contradict the sentence that produced it: this is
+ * pinned by the copy/record test in `budgetSemantics.test.ts`.
  */
 export function reconciledBudget(
   legacy: Pick<Inputs, 'annualSavings' | 'retirementSpending'>,
@@ -114,7 +120,7 @@ export function reconciledBudget(
 ): BudgetMode {
   return canonicalBudgetForChoice(legacy, {
     mode: 'savingsBudget',
-    debtIncluded: !choice.keepLegacy,
+    debtIncluded: true,
     taxBenefitIncluded: !choice.keepLegacy,
   })
 }
