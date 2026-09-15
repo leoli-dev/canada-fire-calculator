@@ -12,6 +12,7 @@ import {
   type TaxTable,
 } from './taxData'
 import { freezeRuleContext, selectTaxRules, type TaxRulePack } from './rules'
+import { PLAN_TAX_YEAR } from './planYear'
 import type { Province } from './types'
 import { federalSpouseAmount2026, provincialSpouseAmount2026 } from './spouseCredit2026'
 
@@ -24,8 +25,11 @@ import { federalSpouseAmount2026, provincialSpouseAmount2026 } from './spouseCre
  * published tax year is a deliberate, reviewed number change — it must land with
  * an independent expected-value test and a recorded before/after, never as
  * silent drift.
+ *
+ * BE-38 B3 moved the literal to `./planYear` and re-exports it here so the
+ * coverage matrix can state the same year without importing the tax engine.
  */
-export const PLAN_TAX_YEAR = 2026
+export { PLAN_TAX_YEAR } from './planYear'
 
 /** One selected, versioned rule pack plus the policy that produced it. */
 export interface TaxRuleContext {

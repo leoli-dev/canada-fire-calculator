@@ -223,6 +223,11 @@ export const PROVINCIAL_2026_SNAPSHOT: Record<Province, TaxTable> = {
     ]
   },
   "PE": {
+    // BE-38 B3: the fourth threshold is the July 2026 T4032-PE figure
+    // ($142,520), which replaced January's $142,250 when PE added its sixth
+    // bracket over $200,000. The top rate stays at the 20% statutory rate PE
+    // enacted; the 21% in the July withholding tables is a six-month prorated
+    // withholding rate, not the annual statutory rate.
     "bpa": 15000,
     "brackets": [
       {
@@ -238,7 +243,7 @@ export const PROVINCIAL_2026_SNAPSHOT: Record<Province, TaxTable> = {
         "rate": 0.166
       },
       {
-        "upTo": 142250,
+        "upTo": 142520,
         "rate": 0.1762
       },
       {

@@ -119,13 +119,16 @@ export const PROVINCIAL: Record<Province, TaxTable> = {
     ],
   },
   PE: {
-    // surtax abolished 2024; the 20% bracket over $200k took effect Jan 2026
+    // surtax abolished 2024; the 20% bracket over $200k took effect Jan 2026.
+    // This table is a dead export (no module imports it; `rules/` owns the
+    // priced ladders), kept in step with the July 2026 T4032-PE so a future
+    // import cannot silently reintroduce January's superseded $142,250.
     bpa: 15000,
     brackets: [
       { upTo: 33928, rate: 0.095 },
       { upTo: 65820, rate: 0.1347 },
       { upTo: 106890, rate: 0.166 },
-      { upTo: 142250, rate: 0.1762 },
+      { upTo: 142520, rate: 0.1762 },
       { upTo: 200000, rate: 0.19 },
       { upTo: Infinity, rate: 0.2 },
     ],
