@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { selectBenefitRules, selectGisRules } from '../engine/rules'
+import { PLAN_BENEFIT_PERIOD, benefitRuleProvenance, trySelectBenefitRules } from '../engine/benefits'
 import { PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules } from '../engine/tax'
 import type { Province } from '../engine/types'
 
@@ -18,7 +19,7 @@ import type { Province } from '../engine/types'
  */
 export function RuleAssumptions({ province, inflation }: { province: Province; inflation: number }) {
   const { t } = useTranslation()
-  const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
+  const ccb = selectBenefitRules('CCB', PLAN_BENEFIT_PERIOD)
   // BE-26 A: the GIS/Allowance pack is a quarterly published table, so its id
   // and payment period are disclosed next to the tax and CCB ones, together
   // with the tables its fitted reduction is measured against and the paths it
@@ -37,9 +38,17 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   const tax = selection.context.pack
   const provenance = taxRuleProvenance(selection.context)
   const policy = provenance.projectionPolicy
+  // BE-38 B2: the CCB pack is no longer display-only either — `ccbAnnual`
+  // computes from it — so the panel states which payment period priced the CCB,
+  // whether that period was published or assumed, and the gap it refuses. The
+  // period shown is the engine's own anchor, never a prop: the panel must report
+  // the pack that actually priced the numbers.
+  const ccbSelection = trySelectBenefitRules({ program: 'CCB', paymentPeriod: PLAN_BENEFIT_PERIOD })
+  const ccbProvenance = ccbSelection.status === 'ok' ? benefitRuleProvenance(ccbSelection.context) : null
+  const ccbPolicy = ccbProvenance?.projectionPolicy
   return <div className="rule-assumptions" data-testid="rule-assumptions">
     <strong>{t('ruleAssumptionsTitle')}</strong>
-    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: ccb.id, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
+    <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: `${ccb.id} (${ccb.paymentPeriod})`, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
     <p data-testid="rule-tax-pack" data-rule-pack-id={tax.id} data-rule-year={provenance.ruleYear}
       data-rule-assumed={String(provenance.assumedFutureRule)}>
       {t('ruleAssumptionsTaxPolicy', {
@@ -51,7 +60,29 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
             }),
       })}
     </p>
+    {ccbProvenance
+      ? <p data-testid="rule-ccb-pack" data-rule-pack-id={ccbProvenance.rulePackId}
+          data-rule-period={ccbProvenance.paymentPeriod} data-rule-assumed={String(ccbProvenance.assumedFutureRule)}>
+          {t('ruleAssumptionsCcbPolicy', {
+            period: ccbProvenance.paymentPeriod,
+            policy: ccbPolicy && ccbPolicy.kind === 'published'
+              ? t('ruleAssumptionsCcbPolicyPublished')
+              : t('ruleAssumptionsCcbPolicyAssumed', {
+                  rate: ((ccbPolicy?.annualRate ?? 0) * 100).toFixed(1),
+                  from: ccbPolicy?.kind === 'assumed' ? ccbPolicy.fromPaymentPeriod : '',
+                }),
+          })}
+        </p>
+      : <p data-testid="rule-ccb-refusal">
+          {t('ruleAssumptionsBenefitRefused', { reason: ccbSelection.status === 'unsupported' ? ccbSelection.reason : '' })}
+        </p>}
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
+    <p data-testid="rule-ccb-not-modelled">
+      {t('ruleAssumptionsCcbNotModelled')}{' '}
+      {ccb.unsupportedPaths.map((path, index) => <span key={path.id}>
+        {index > 0 ? '; ' : ''}{t(`ccbUnsupported.${path.id}`)}{' '}
+      </span>)}
+    </p>
     <p data-testid="rule-tax-not-modelled">
       {t('ruleAssumptionsTaxNotModelled')}{' '}
       {tax.unsupportedPaths.map((path, index) => <span key={path.id}>
