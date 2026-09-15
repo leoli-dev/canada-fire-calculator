@@ -87,7 +87,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       being priced, and it carries the standing negative statement rather than
       letting "tax complete" stand in for it.
     */}
-    <div data-testid="rule-coverage" data-coverage-jurisdiction={coverage.jurisdiction}
+    <div className="rule-coverage" data-testid="rule-coverage" data-coverage-jurisdiction={coverage.jurisdiction}
       data-coverage-implemented={Object.keys(coverage.implemented).length}
       data-coverage-unsupported={Object.keys(coverage.unsupported).length}>
       <p>{t('ruleCoverageImplemented', { jurisdiction: coverage.jurisdiction, year: coverage.taxYear })}</p>

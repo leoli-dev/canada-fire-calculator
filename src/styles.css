@@ -687,3 +687,10 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .qc-month-grid label { min-width: 0; }
 .qc-month-grid select { width: 100%; min-width: 0; }
 .qc-change-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+
+/* BE-38 B3: the coverage matrix wraps its credit ids at any character, so a
+   long identifier cannot widen the 320px layout. */
+.rule-coverage { margin: 8px 0; }
+.rule-coverage ul { margin: 4px 0; padding-left: 18px; }
+.rule-coverage li { overflow-wrap: anywhere; }
+.rule-coverage p { margin: 4px 0; }
