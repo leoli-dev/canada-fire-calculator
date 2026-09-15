@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { coverageFor } from '../../src/engine/rules/coverageMatrix'
 
 test('guided and professional expose the same pinned rule versions, policy and sources', async ({ page }) => {
   await page.goto('/')
@@ -12,11 +13,13 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await page.getByLabel('Province').selectOption('BC')
   await expect(professional).toContainText('CA-BC-tax-2026-legacy-v1')
   const text = await professional.innerText()
-  const links = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+  const links = await professional.getByTestId('rule-sources').locator('a')
+    .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   // Four tax sources, three CCB sources (amounts, thresholds and, since BE-38
   // B2, the statutory rates the computation applies), and the three
   // GIS/Allowance ones the panel discloses: the quarterly page and the two
-  // tables its fitted reduction is measured against.
+  // tables its fitted reduction is measured against. The per-entry coverage
+  // links are a separate list and are asserted in the coverage test below.
   expect(links).toHaveLength(10)
   expect(links[0]).toContain('/2026/')
   expect(links[2]).toContain('t4032bc-july')
@@ -43,7 +46,8 @@ test('guided and professional expose the same pinned rule versions, policy and s
   // BE-38 B3: the panel states the current coverage position rather than the
   // placeholder the earlier slices carried.
   await expect(guided).toContainText('per-jurisdiction credit coverage list')
-  expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
+  expect(await guided.getByTestId('rule-sources').locator('a')
+    .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
@@ -52,7 +56,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
   await expect(guided).toContainText('Manitoba\'s dedicated 2026 CRA guide')
-  await expect(guided.locator('a')).toHaveCount(11)
+  await expect(guided.getByTestId('rule-sources').locator('a')).toHaveCount(11)
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByLabel('Province').selectOption('NL')
@@ -102,6 +106,24 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   await expect(professional.getByTestId('rule-coverage-caveat'))
     .toContainText('does not model the GST/HST credit')
 
+  // BE-38 B3 review (BL2): the panel tells the reader that each implemented
+  // entry links to the authority its figures were read from. Tie that claim to
+  // the DOM: every implemented row must carry exactly one real anchor, and it
+  // must point at the authority the matrix row names — the same URL the BL1
+  // assertion forces to be the one the pack prices from.
+  const implementedOn = coverageFor('ON').implemented
+  expect(Object.keys(implementedOn).length).toBeGreaterThan(5)
+  const implementedAnchors = await coverage.locator('ul').first().locator('li a')
+    .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+  expect(implementedAnchors).toHaveLength(Object.keys(implementedOn).length)
+  expect(implementedAnchors.every(href => href?.startsWith('https://'))).toBe(true)
+  for (const [id, credit] of Object.entries(implementedOn))
+    await expect(professional.getByTestId(`rule-coverage-implemented-${id}`).locator('a'), id)
+      .toHaveAttribute('href', credit.sourceURL)
+  // No implemented row may render as bare text: an unlinked row would make the
+  // claim false for that row even if the others were linked.
+  expect(await coverage.locator('ul').first().locator('li').count()).toBe(implementedAnchors.length)
+
   // Every province must render the matrix with both directions populated.
   for (const province of ['BC', 'MB', 'PE', 'QC', 'NL', 'NU']) {
     await page.getByLabel('Province').selectOption(province)
@@ -121,4 +143,24 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   await expect(guided.getByTestId('rule-coverage-unsupported-provincial-low-income-reduction')).toBeVisible()
   expect(await guidedCoverage.getAttribute('data-coverage-implemented'))
     .toBe(await coverage.getAttribute('data-coverage-implemented'))
+})
+
+test('the coverage caveat is native in French and Chinese, not English copy', async ({ page }) => {
+  // BE-38 B3 review (NB4): the panel rendered the English artifact string in
+  // every language. It now reads the catalogue, so each language must render
+  // its own copy of the same caveat.
+  await page.goto('/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.locator('.entry-mode button').nth(1).click()
+  const caveatEn = await page.getByTestId('rule-coverage-caveat').innerText()
+  expect(caveatEn).toContain('does not model the GST/HST credit')
+  for (const [lang, marker] of [['fr', 'TPS/TVH'], ['zh', 'GST/HST']] as const) {
+    await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
+    await page.reload()
+    await page.locator('.entry-mode button').nth(1).click()
+    const caveat = await page.getByTestId('rule-coverage-caveat')
+    await expect(caveat, lang).toContainText(marker)
+    await expect(caveat, lang).not.toHaveText(caveatEn)
+  }
 })

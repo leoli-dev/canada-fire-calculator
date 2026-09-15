@@ -113,6 +113,7 @@
   "ruleCoverageImplemented": "{{year}} 年 {{jurisdiction}} 数字中包含的抵免：",
   "ruleCoverageUnsupported": "{{jurisdiction}} 数字中未包含的抵免：",
   "ruleCoverageNotModelled": "“未建模”意味着“未做近似替代”：引擎中没有任何逻辑代替上述项目，因此任何结果都不是完整的税表。",
+  "ruleCoverageCaveat": "本计算器仅建模联邦与省级所得税税阶、基本个人免税额以及本清单中列明的抵免。它不建模 GST/HST 抵免、任何省或地区的现金福利、任何低收入或可退还税额减免、股息税收抵免、加拿大就业抵免额或各省配偶抵免工作表，因此它产生的任何数字都不是完整的税表、完整的税后状况或完整的福利后状况。对于它所适用的按固定值而非按年度切换的抵免（年龄与养老金抵免额、配偶最高额、安省附加税与健康保险费、遗嘱认证费、资本利得计入率、魁省各项缴费），假定的未来年度会沿用 2026 年的固定金额，相关行会说明这一点。",
   "ruleTaxSource": "税阶来源",
   "ruleCcbSource": "CCB支付期来源",
   "ruleFederalBracketsSource": "联邦税阶",

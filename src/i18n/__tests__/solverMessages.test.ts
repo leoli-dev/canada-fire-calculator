@@ -193,3 +193,16 @@ it('gives every CCB gap the pack names a native reason in all three languages', 
     expect(zh[key]).not.toBe(en[key])
   }
 })
+
+it('renders the coverage caveat natively, with the English copy tied to the artifact', () => {
+  // BE-38 B3 review (NB4): the panel used to render `coverageMatrix.caveat`
+  // verbatim, so a French or Chinese user got an English paragraph. It now goes
+  // through the catalogue, and the English string is pinned to the artifact's
+  // own copy so the two cannot drift.
+  expect(EN.ruleCoverageCaveat).toBeTruthy()
+  expect(EN.ruleCoverageCaveat).toBe(coverageMatrix.caveat)
+  expect(FR.ruleCoverageCaveat, 'fr caveat is an English placeholder').not.toBe(EN.ruleCoverageCaveat)
+  expect(ZH.ruleCoverageCaveat, 'zh caveat is an English placeholder').not.toBe(EN.ruleCoverageCaveat)
+  expect(FR.ruleCoverageCaveat).toMatch(/TPS\/TVH/)
+  expect(ZH.ruleCoverageCaveat).toMatch(/GST\/HST/)
+})

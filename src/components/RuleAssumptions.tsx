@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { coverageFor, coverageMatrix, selectBenefitRules, selectGisRules } from '../engine/rules'
+import { coverageFor, selectBenefitRules, selectGisRules } from '../engine/rules'
 import { PLAN_BENEFIT_PERIOD, benefitRuleProvenance, trySelectBenefitRules } from '../engine/benefits'
 import { PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules } from '../engine/tax'
 import type { Province } from '../engine/types'
@@ -94,7 +94,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       <ul>
         {Object.entries(coverage.implemented).map(([id, credit]) => <li key={id}
           data-testid={`rule-coverage-implemented-${id}`} data-evidence={credit.evidenceFixture}>
-          {t(`coverageImplemented.${id}`)}
+          <a href={credit.sourceURL} target="_blank" rel="noreferrer">{t(`coverageImplemented.${id}`)}</a>
         </li>)}
       </ul>
       <p data-testid="rule-coverage-unsupported">
@@ -105,7 +105,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
           data-testid={`rule-coverage-unsupported-${id}`}>{t(`coverageUnsupported.${id}`)}</li>)}
       </ul>
       <p data-testid="rule-coverage-not-modelled">{t('ruleCoverageNotModelled')}</p>
-      <p data-testid="rule-coverage-caveat">{coverageMatrix.caveat}</p>
+      <p data-testid="rule-coverage-caveat">{t('ruleCoverageCaveat')}</p>
     </div>
     <p data-testid="rule-ccb-not-modelled">
       {t('ruleAssumptionsCcbNotModelled')}{' '}
@@ -120,7 +120,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       </span>)}
     </p>
     <p>{t('ruleAssumptionsLimit')}</p>
-    <div className="rule-sources">
+    <div className="rule-sources" data-testid="rule-sources">
       {([
         ['ruleFederalBracketsSource', tax.fieldSources.federalBrackets],
         ['ruleFederalBpaSource', tax.fieldSources.federalBpa],

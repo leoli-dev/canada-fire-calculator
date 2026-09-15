@@ -9,15 +9,19 @@
  *
  * `coverageMatrix.test.ts` enforces four properties: every supported
  * jurisdiction has an entry that lists the federal rows too; every
- * `implemented` row names a fixture that resolves to a pinned,
- * independently-sourced expectation and to the authority the row's own
- * `sourceURL` names; every `unsupported` row carries a concrete reason whose
- * absence is asserted against the engine; and every declaration — implemented
- * or unsupported, for every jurisdiction — is reconciled against what the
- * pricing code actually does, so a row cannot claim a credit is excluded while
- * `tax.ts` prices it (or the reverse). Nothing here claims a complete return —
- * the standing negative statement lives in {@link coverageCaveat} and travels
- * with the matrix so no summary can drop it.
+ * `implemented` row names a registered fixture whose URL is one of the row's
+ * own URLs **and** cites the pack's own `fieldSources` entry for every pack
+ * field the row prices, so the authority the pack says it read a figure from
+ * and the authority the row shows a reader cannot disagree; every
+ * `unsupported` row carries a concrete reason whose absence is asserted
+ * against the engine; and every declaration — implemented or unsupported, for
+ * every jurisdiction — is reconciled against what the pricing code actually
+ * does, so a row cannot claim a credit is excluded while `tax.ts` prices it
+ * (or the reverse). The suite never fetches a URL: reachability and content are
+ * checked by hand and dated in `verifiedAt`, and the review round that added
+ * the pack-source assertion fetched every URL the matrix cites. Nothing here
+ * claims a complete return — the standing negative statement lives in
+ * {@link coverageCaveat} and travels with the matrix so no summary can drop it.
  */
 
 import { PLAN_TAX_YEAR } from '../planYear'
@@ -103,21 +107,52 @@ const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1/td1-26e
 const TD1_PROV = (code: string) =>
   `https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1${code}/td1${code}-26e.pdf`
 const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
-const QC_PARAMS = 'https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/finances/publications-adm/parametres/AUTFR_RegimeImpot2026.pdf'
+/** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
+ * pack records in `fieldSources`, so a row that prices those fields must cite
+ * exactly it rather than the byte-identical `cdn-contenu.quebec.ca` mirror the
+ * matrix used to carry. */
+const QC_PARAMS = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
 const ITA_38 = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html'
-const QC_ABATEMENT_ACT = 'https://laws-lois.justice.gc.ca/eng/acts/f-1.3/section-4.html'
+/** The editions whose ladders the pack actually prices where they differ from
+ * the January chart. Each row must cite the edition carrying its figure; the
+ * superseded edition travels as an additional source, not as the authority. */
+const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4032-payroll-deductions-tables/t4032bc-july/t4032bc-july-general-information.html'
+const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
+const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-pe-7-26e.pdf'
+const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
+/** The Quebec abatement's 16.5%: the Department of Finance's 2026 Report on
+ * Federal Tax Expenditures prints the rate, its 0.165 factor and its statutory
+ * home (Federal-Provincial Fiscal Arrangements Act, Part VI). The dead
+ * `f-1.3` Act the matrix used to cite does not exist on Justice Laws. */
+const QC_ABATEMENT_2026 = 'https://www.canada.ca/content/dam/fin/publications/taxexp-depfisc/2026/taxexp-depfisc-26-eng.pdf'
+const QC_ABATEMENT_ACT = 'https://laws-lois.justice.gc.ca/eng/acts/F-8/'
+const QC_ABATEMENT_FORM = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/t2203/t2203-25e.pdf'
+/** Ontario's Estate Administration Tax Act, the statute carrying the 1.5%. */
 const PROBATE = 'https://www.ontario.ca/laws/statute/90e22'
+const TAXTIPS_PROBATE = (code: string) =>
+  `https://www.taxtips.ca/willsandestates/probatefees/${code}.htm`
 const AT = '2026-09-15'
-const federal = (): Record<string, ImplementedCreditCoverage> => ({
+/** The two territories this build charges Yukon's flat $140 filing fee, with
+ * the published tier it does not model. */
+const PROBATE_APPROXIMATED: Partial<Record<CoverageJurisdiction, string>> = {
+  NT: 'the Northwest Territories publishes a tiered fee rising to $435',
+  NU: 'Nunavut publishes a tiered fee rising to $425',
+}
+const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
+  // The pack records each jurisdiction's own T4032 edition as its federal
+  // source; the row carries that edition too, so the pack's `fieldSources` and
+  // the row can never point at different editions.
+  const own = T4032(code.toLowerCase())
+  return {
   'federal-income-tax-brackets': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['federal.brackets'],
-    sourceURL: T4032('mb'), additionalSourceURLs: [T4032('on')], verifiedAt: AT,
+    sourceURL: T4032('mb'), additionalSourceURLs: [...new Set([T4032('on'), own])], verifiedAt: AT,
     evidenceFixture: 'federal-brackets-2026',
     limitation: 'Quebec applies its 16.5% abatement on top, which is its own row.',
   },
   'federal-basic-personal-amount': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['federal.bpa', 'federal.bpaMin'],
-    sourceURL: TD1, additionalSourceURLs: [T4032('mb')], verifiedAt: AT,
+    sourceURL: TD1, additionalSourceURLs: [...new Set([T4032('mb'), own])], verifiedAt: AT,
     evidenceFixture: 'federal-bpa-and-phase-out-2026',
     limitation: 'The phase-out uses taxable income, not the net income the CRA worksheet uses.',
   },
@@ -144,12 +179,38 @@ const federal = (): Record<string, ImplementedCreditCoverage> => ({
     sourceURL: ITA_38, verifiedAt: AT, evidenceFixture: 'capital-gains-inclusion-2026',
     limitation: 'The 66.67% rate proposed in 2024 was cancelled and never took effect; the rate is statutory and not year-switched.',
   },
-  'probate-and-estate-fees': {
+  }
+}
+
+/**
+ * BE-38 B3 review (NB6): probate used to be one row citing Ontario's statute for
+ * all thirteen jurisdictions. `taxData.ts` reads the pinned figures from the
+ * cited TaxTips.ca per-jurisdiction table, so each row now names its own; the
+ * two territories whose priced fee is Yukon's say so in the row's limitation.
+ */
+const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
+  const table = TAXTIPS_PROBATE(code.toLowerCase())
+  const approximation = PROBATE_APPROXIMATED[code]
+  // NT and NU price Yukon's flat $140 filing fee, so that is the figure the
+  // row must evidence; their own published tiers travel as additional sources
+  // and are named in the limitation rather than silently swapped for the price.
+  const pricedFrom = approximation ? TAXTIPS_PROBATE('yt') : table
+  return {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
-    sourceURL: PROBATE, verifiedAt: AT, evidenceFixture: 'probate-fees-2026',
-    limitation: 'Pinned 2026 figures; provinces with tiered rates are simplified to one flat amount plus rate. The cited statute is Ontario\u2019s; each other jurisdiction\u2019s rate is pinned from its own administration-of-estates statute, not from this URL.',
-  },
-})
+    sourceURL: code === 'ON' ? PROBATE : pricedFrom,
+    additionalSourceURLs: [...new Set([...(code === 'ON' ? [table] : []), ...(approximation ? [table] : [])])],
+    verifiedAt: AT, evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
+    limitation:
+      'Pinned 2026 figures read from the cited TaxTips.ca table; provinces whose fee is tiered ' +
+      '(BC, AB, PE, NL, NS, NB) are simplified to one flat amount plus rate matching the top tier. ' +
+      (code === 'MB'
+        ? 'Manitoba abolished its probate fee on 2020-11-06, so the correct priced fee is exactly zero and the cited table documents the elimination. '
+        : '') +
+      (approximation
+        ? `This build charges Yukon\u2019s $140 flat filing fee rather than the territory\u2019s own published tiers (${approximation}), so the priced fee is an explicit approximation that is understated above the first tier. `
+        : ''),
+  }
+}
 
 /**
  * The rows every non-Quebec jurisdiction prices from its own T4032 chart and TD1.
@@ -157,14 +218,26 @@ const federal = (): Record<string, ImplementedCreditCoverage> => ({
  * province's age, pension and spouse line comes from its own TD1, so a shared
  * fixture id could (and did) point a province at another province's form.
  */
-const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => ({
+const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
+  const january = T4032(code.toLowerCase())
+  // BC raised its bottom rate and PE moved its fourth threshold after the
+  // January chart was printed; the pack prices the later editions, so the row
+  // cites them and carries the superseded chart as an additional source. NL's
+  // pack prices its July BPA. Citing January for any of the three is the defect
+  // this round fixed: PE's link showed the $142,250 this slice declares
+  // superseded, BC's showed 5.06% against the priced 5.60%, and NL's $11,188.
+  const bracketSource = code === 'BC' ? BC_2026_JULY : code === 'PE' ? PE_2026_JULY : january
+  const bracketExtra = code === 'PE' ? [january, PE_2026_GOV] : bracketSource === january ? [] : [january]
+  const bpaSource = code === 'NL' ? NL_2026_JULY : january
+  return {
   'provincial-income-tax-brackets': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'], implementedRule: `The published 2026 ${code} ladder.`,
-    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-brackets-2026`,
+    sourceURL: bracketSource, additionalSourceURLs: [...new Set(bracketExtra)], verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-brackets-2026`,
   },
   'provincial-basic-personal-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
-    sourceURL: T4032(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
+    sourceURL: bpaSource, additionalSourceURLs: bpaSource === january ? [] : [january],
+    verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
     limitation: 'An assumed future year indexes it from the pack\u2019s own policy; the 2026 value is the published one.',
   },
   'provincial-pension-income-amount': {
@@ -188,7 +261,8 @@ const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCredi
       'worksheet because every such form publishes `max + low = threshold`; the real gap is the spouse net-income ' +
       'base, and the maxima and thresholds are pinned 2026 figures.',
   },
-})
+  }
+}
 
 /** Rows true in every province except Quebec, whose return is its own. */
 const commonUnsupported = (): Record<string, UnsupportedCreditCoverage> => ({
@@ -267,8 +341,10 @@ const extras: Partial<Record<CoverageJurisdiction, {
       },
       'quebec-federal-abatement': {
         coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['taxData.ts:QC_ABATEMENT'],
-        sourceURL: RQ_RATES, additionalSourceURLs: [QC_ABATEMENT_ACT], verifiedAt: AT, evidenceFixture: 'quebec-abatement-2026',
-        limitation: 'A pinned statutory share, not selected by tax year.',
+        sourceURL: QC_ABATEMENT_2026,
+        additionalSourceURLs: [QC_ABATEMENT_ACT, QC_ABATEMENT_FORM, RQ_RATES], verifiedAt: AT,
+        evidenceFixture: 'quebec-abatement-2026',
+        limitation: 'A pinned statutory share, not selected by tax year. No 2026 CRA form is published yet, so the cited form is the most recent edition that prints the 16.5% rate; the Department of Finance report carries it for 2026.',
       },
       // `tax.ts` prices both of these for Quebec: the combined age +
       // retirement-income amount, applied per person on an assumed 50/50
@@ -385,10 +461,12 @@ const extras: Partial<Record<CoverageJurisdiction, {
 }
 
 function build(): CoverageMatrixArtifact {
-  const fed = federal()
   const common = commonUnsupported()
   const jurisdictions = COVERAGE_JURISDICTIONS.map((jurisdiction) => {
-    const implemented: Record<string, ImplementedCreditCoverage> = { ...fed }
+    const implemented: Record<string, ImplementedCreditCoverage> = {
+      ...federal(jurisdiction),
+      'probate-and-estate-fees': probate(jurisdiction),
+    }
     const unsupported: Record<string, UnsupportedCreditCoverage> = { ...common }
     // Quebec pays the federal ladder too (with its own abatement row on top),
     // so the federal bracket row is no longer dropped for QC: dropping it hid

@@ -15,7 +15,23 @@ import type { Province } from '../../types'
 const PROVINCES: Province[] = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']
 const CRA = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-'
 const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1'
-const RQ = 'https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/finances/publications-adm/parametres/AUTFR_RegimeImpot2026.pdf'
+// The Ministry of Finance's 2026 parameters PDF at the URL the QC pack records
+// in `fieldSources` (the byte-identical cdn-contenu mirror is not the pack's).
+const RQ = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
+
+/**
+ * BE-38 B3 review (BL1): the pack field each `ruleFields` entry prices, for the
+ * fields the pack itself declares a `fieldSources` entry for. A row that prices
+ * one of these must cite that URL, which is the assertion that would have caught
+ * all four rows the review found pointing at an authority that does not carry
+ * the priced figure.
+ */
+const PACK_FIELD_SOURCE: Record<string, 'federalBrackets' | 'federalBpa' | 'provincialBrackets' | 'provincialBpa'> = {
+  'federal.brackets': 'federalBrackets',
+  'federal.bpa': 'federalBpa',
+  'provincial.brackets': 'provincialBrackets',
+  'provincial.bpa': 'provincialBpa',
+}
 
 /** Chart 2 of each jurisdiction's own 2026 T4032: thresholds, rates, and the tax
  * the printed rates accumulate at every finite threshold. Hand-keyed. */
@@ -107,18 +123,30 @@ const FIXTURE_SOURCES: Record<string, string> = {
   'federal-age-amount-2026': `${TD1}/td1-26e.pdf`,
   'federal-spouse-amount-2026': `${TD1}/td1-26e.pdf`,
   'capital-gains-inclusion-2026': 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html',
-  'probate-fees-2026': 'https://www.ontario.ca/laws/statute/90e22',
   'ontario-surtax-2026': `${CRA}on-1-26e.pdf`,
   'ontario-health-premium-2026': `${CRA}on-1-26e.pdf`,
   'manitoba-bpa-phase-out-2026': `${CRA}mb-1-26e.pdf`,
   'yukon-bpa-phase-out-2026': `${CRA}yt-1-26e.pdf`,
   'quebec-brackets-2026': RQ,
   'quebec-bpa-2026': RQ,
-  'quebec-abatement-2026': 'https://laws-lois.justice.gc.ca/eng/acts/f-1.3/section-4.html',
+  // The abatement's 16.5% is printed by the Department of Finance's 2026 report;
+  // the `f-1.3` Act this fixture used to name does not exist on Justice Laws.
+  'quebec-abatement-2026': 'https://www.canada.ca/content/dam/fin/publications/taxexp-depfisc/2026/taxexp-depfisc-26-eng.pdf',
   'quebec-fss-2026': RQ,
   'quebec-ramq-2026': RQ,
   'qc-provincial-age-amount-2026': RQ,
   'qc-provincial-pension-amount-2026': RQ,
+}
+/** The authority each probate figure was read from. Ontario has a statute that
+ * carries its 1.5%; every other jurisdiction is pinned from the TaxTips.ca table
+ * named in `taxData.ts`, and NT/NU price Yukon's $140 fee, so that is what their
+ * row must evidence. */
+const PROBATE_TABLE = (province: string) =>
+  `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
+for (const province of PROVINCES) {
+  FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`] =
+    province === 'ON' ? 'https://www.ontario.ca/laws/statute/90e22'
+      : province === 'NT' || province === 'NU' ? PROBATE_TABLE('YT') : PROBATE_TABLE(province)
 }
 for (const province of PROVINCES) {
   if (province === 'QC') continue
@@ -163,6 +191,16 @@ function bracketOnlyProvincial(province: Province, taxable: number): number {
     if (taxable <= bracket.upTo) break
   }
   return Math.max(0, tax - table.bpa * table.brackets[0].rate)
+}
+
+/**
+ * BE-38 B3 review (NB8): the same bracket-only line, taken from the hand-keyed
+ * published charts rather than from the pack under test. A bound that reads the
+ * pack can never fail, so it proves nothing; this one can.
+ */
+function publishedBracketOnly(province: Province, taxable: number): number {
+  const table = BRACKETS[province]
+  return Math.max(0, handBracketTax(table.t, table.r, taxable) - BPA[province] * table.r[0])
 }
 
 /** What one credit column is worth, measured by turning it off. */
@@ -235,6 +273,20 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
         // jurisdiction's form: NL's age row named Ontario's TD1.
         expect([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])],
           `${jurisdiction}/${id} fixture authority`).toContain(FIXTURE_SOURCES[credit.evidenceFixture])
+        // BE-38 B3 review (BL1): the row must cite the authority the pack itself
+        // records for every pack field the row prices. The fixture check above
+        // is only self-consistency; this is the one that catches a row pointing
+        // at the *superseded edition* of a figure the pack actually prices —
+        // PE's January chart ($142,250), BC's January 5.06%, NL's January BPA.
+        const urls = [credit.sourceURL, ...(credit.additionalSourceURLs ?? [])]
+        for (const field of credit.ruleFields) {
+          const key = PACK_FIELD_SOURCE[field]
+          if (!key) continue
+          expect(urls, `${jurisdiction}/${id} must cite the pack's own ${key} source`)
+            .toContain(pack.fieldSources[key])
+          for (const extra of pack.fieldAdditionalSources?.[key] ?? [])
+            expect(urls, `${jurisdiction}/${id} must cite the pack's additional ${key} source`).toContain(extra)
+        }
         for (const field of credit.ruleFields) {
           if (field.startsWith('provincial.')) expect(id).toMatch(/bracket|basic-personal|phase-out/)
           if (field.startsWith('federal.')) expect(credit.scope).toBe('federal')
@@ -445,16 +497,24 @@ describe('BE-38 B3: the two promised source conflicts are resolved', () => {
 
 describe('BE-38 B3: the declared-unimplemented items are really absent from the code path', () => {
   it('never prices a result below the published bracket arithmetic', () => {
-    // A low-income or refundable reduction would push the result below the
-    // bracket-only line. Sweeping several incomes catches a phase-out a single
-    // point could miss; the Ontario surtax only ever raises the result.
+    // BE-38 B3 review (NB8): the bound used to be built from the pack under
+    // test, so it could not fail. It now comes from the hand-keyed published
+    // charts above. A low-income or refundable reduction would push the result
+    // below the bracket-only line; sweeping several incomes catches a phase-out
+    // a single point could miss, and the phase-outs, surtax and health premium
+    // only ever raise the result above this bound.
     for (const province of PROVINCES) {
       if (province === 'QC') continue
       for (const income of [15_000, 25_000, 40_000, 60_000, 120_000]) {
-        const lowerBound = expectedFederalTax(income) + bracketOnlyProvincial(province, income)
-        expect(incomeTax(income, province), `${province}@${income}`).toBeGreaterThanOrEqual(lowerBound - 1e-6)
+        expect(incomeTax(income, province), `${province}@${income}`)
+          .toBeGreaterThanOrEqual(expectedFederalTax(income) + publishedBracketOnly(province, income) - 1e-6)
       }
     }
+    // The bound is not vacuous: at 25,000 Ontario's own bracket arithmetic is
+    // strictly below the result the engine returns, by the health premium alone.
+    expect(publishedBracketOnly('ON', 15_000)).toBeCloseTo((15_000 - 12_989) * 0.0505, 6)
+    expect(incomeTax(25_000, 'ON') - expectedFederalTax(25_000))
+      .toBeGreaterThan(publishedBracketOnly('ON', 25_000) + 1e-6)
   })
 
   it('does not apply Ontario\u2019s tax reduction or Alberta\u2019s supplemental credit', () => {
@@ -690,9 +750,52 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
       expect(probateTax(200_000, province), `${province} probate`)
         .toBeCloseTo(hand.flat + hand.rate * Math.max(0, 200_000 - hand.threshold), 6)
     }
+    // BE-38 B3 review (NB5): the shared probate pin is vacuous for the one
+    // jurisdiction priced at zero, so the zero is pinned to its reason and to
+    // the disclosure instead of being left as an unprovable `0 ≈ 0`. Manitoba
+    // abolished the fee in 2020, so zero is the correct price, not a gap.
+    const zeroPriced = PROVINCES.filter(province => PROBATE_HAND[province].flat === 0
+      && PROBATE_HAND[province].rate === 0)
+    expect(zeroPriced).toEqual(['MB'])
+    expect(PROBATE_RATES.MB).toEqual({ flat: 0, rate: 0, threshold: 0 })
+    expect(probateTax(200_000, 'MB'), 'MB abolishes probate, so the pin is the disclosure').toBe(0)
+    expect(coverageFor('MB').implemented['probate-and-estate-fees'].limitation).toMatch(/abolished its probate fee/)
+    // Every other jurisdiction's fee is non-zero at 200,000, so the shared row
+    // is demonstrably priced rather than zero everywhere.
+    for (const province of PROVINCES) if (province !== 'MB')
+      expect(Math.abs(probateTax(200_000, province)), `${province} is priced`).toBeGreaterThan(0)
     // Quebec pays the federal ladder too, so that row is declared for it as
     // well; dropping it was the one other declared-status drift the audit found.
     for (const jurisdiction of COVERAGE_JURISDICTIONS)
       expect(coverageFor(jurisdiction).implemented['federal-income-tax-brackets'], jurisdiction).toBeDefined()
+  })
+
+  it('cites the probate authority each jurisdiction\u2019s pinned figure was read from', () => {
+    // BE-38 B3 review (NB6): one Ontario fixture used to cover all thirteen
+    // jurisdictions. `taxData.ts` reads the figures from the TaxTips.ca table
+    // named per jurisdiction, so each row now cites its own.
+    const table = (province: string) =>
+      `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
+    for (const province of PROVINCES) {
+      const row = coverageFor(province).implemented['probate-and-estate-fees']
+      expect(row, province).toBeDefined()
+      const urls = [row.sourceURL, ...(row.additionalSourceURLs ?? [])]
+      if (province === 'ON') {
+        // Ontario's statute is the authority carrying its 1.5% rate.
+        expect(row.sourceURL).toBe('https://www.ontario.ca/laws/statute/90e22')
+        expect(urls).toContain(table('ON'))
+      } else if (province === 'NT' || province === 'NU') {
+        // The declared exception: these price Yukon's $140 flat filing fee, so
+        // that is the figure the row evidences, and the row names the published
+        // tier it does not model instead of quietly swapping the authority.
+        expect(row.sourceURL, `${province} prices Yukon's fee`).toBe(table('YT'))
+        expect(urls, `${province} names its own published table`).toContain(table(province))
+        expect(row.limitation, province).toMatch(/Yukon\u2019s \$140 flat filing fee/)
+        expect(row.limitation, province).toMatch(/understated/)
+      } else {
+        expect(row.sourceURL, province).toBe(table(province))
+      }
+      expect(row.limitation, `${province} names the table`).toMatch(/TaxTips\.ca/)
+    }
   })
 })

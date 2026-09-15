@@ -113,6 +113,7 @@
   "ruleCoverageImplemented": "Credits these {{year}} {{jurisdiction}} numbers include:",
   "ruleCoverageUnsupported": "Credits these {{jurisdiction}} numbers do not include:",
   "ruleCoverageNotModelled": "Not modelled means not approximated: nothing in the engine stands in for the entries above, so a result is never a complete tax return.",
+  "ruleCoverageCaveat": "This calculator models the federal and provincial income tax brackets, the basic personal amount and the named credits in this list only. It does not model the GST/HST credit, any provincial or territorial cash benefit, any low-income or refundable tax reduction, dividend tax credits, the Canada employment amount or the province-specific spouse worksheets, so no figure it produces is a complete tax return, a complete after-tax position, or a complete after-benefit position. Where a credit it does apply is a pinned rather than year-switched figure (the age and pension amounts, the spouse maxima, the Ontario surtax and health premium, probate fees, the capital-gains inclusion rate, the Quebec levies), an assumed future year carries that 2026 figure forward unchanged, and the row says so.",
   "ruleTaxSource": "Tax bracket source",
   "ruleCcbSource": "CCB period source",
   "ruleFederalBracketsSource": "Federal brackets",
