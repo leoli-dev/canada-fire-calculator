@@ -5,6 +5,7 @@ import type { AnswerMeta } from '../store'
 import type { PlanningIntent } from '../store'
 import type { PensionBenefitField, PensionBenefitRewrite } from '../engine'
 import { refreshPensionProvenanceReport } from '../engine'
+import { canonicalBudgetForChoice, listedAnnualDebtPayments, recordedBasis, reconciledBudget } from '../engine/budgetSemantics'
 import { fieldRegistry, parseField, type SharedFieldId } from './fieldRegistry'
 
 export interface PlanFieldSnapshot {
@@ -228,5 +229,111 @@ export function changeIntent(state: PlanFieldSnapshot & { planningIntent: Planni
     questionAnswers: { ...state.questionAnswers, 'intent.spending': planningIntent.spendingPreference, 'intent.legacy': planningIntent.legacyPreference },
     answerMeta: { ...state.answerMeta, goal: { status: 'confirmed', origin: 'user', updatedAt: new Date().toISOString() } },
     inputRevision: state.inputRevision + 1, resultRevision: null,
+  }
+}
+
+/**
+ * BE-13 A. One answer about what the recorded saving amount means.
+ *
+ * Budget mode and the two `savingsBudget` inclusion facts are real financial
+ * facts the user asserts, so each answer is recorded exactly as given and is
+ * never widened: an unanswered flag stays `unknown`, and only an explicit
+ * answer writes `known true`/`known false`. This is the only path that creates
+ * a budget fact; no derivation from a form value ever does.
+ */
+export type BudgetChoice =
+  | { kind: 'mode'; mode: 'savingsBudget' | 'incomeBudget' }
+  | { kind: 'debtIncluded'; value: boolean }
+  | { kind: 'taxBenefitIncluded'; value: boolean }
+  /** The answer to what a migrated v10 figure means under the new definition. */
+  | { kind: 'migratedBasis'; basis: 'legacy' | 'newDefinition' }
+
+/** Guided answer-page IDs that report the recorded basis, one per answer. */
+export const BUDGET_REVIEW_FIELD: Record<BudgetChoice['kind'], string> = {
+  mode: 'budget.method',
+  debtIncluded: 'budget.debtIncluded',
+  taxBenefitIncluded: 'budget.taxBenefitIncluded',
+  migratedBasis: 'budget.migratedBasis',
+}
+
+/** The value the guided page shows as the recorded answer for each field. */
+export function budgetReviewAnswer(choice: BudgetChoice): string | boolean {
+  if (choice.kind === 'mode') return choice.mode
+  if (choice.kind === 'migratedBasis') return choice.basis
+  return choice.value
+}
+
+export function setBudgetChoice(state: PlanFieldSnapshot, choice: BudgetChoice): Partial<PlanFieldSnapshot> {
+  // A budget answer is often the first thing a user records, so the canonical
+  // plan is created on demand rather than refusing the answer. That first
+  // derivation states nothing the user has not said.
+  const previous = state.canonical ?? refreshCanonicalFromLegacy(null, state.inputs)
+  const budget = previous.budget
+  const updatedAt = new Date().toISOString()
+  const label = BUDGET_REVIEW_FIELD[choice.kind]
+  const legacyAnnualDebtPayments = previous.migration.budgetReconciliation?.legacyAnnualDebtPayments ?? listedAnnualDebtPayments(previous)
+  let migration = previous.migration
+  let nextBudget = budget
+
+  if (choice.kind === 'mode') {
+    if (budget.kind === choice.mode) return { answerMeta: { ...state.answerMeta, [label]: { status: 'confirmed', origin: 'user', updatedAt } } }
+    if (choice.mode === 'incomeBudget') {
+      // An explicit switch to the income budget is its own decision. The
+      // recorded savings answers are archived on the plan for the way back, so
+      // switching modes can neither lose nor rewrite what the user answered.
+      nextBudget = canonicalBudgetForChoice(state.inputs, { mode: 'incomeBudget' })
+      // Only a settled savings answer is archived: an unanswered one must come
+      // back as unanswered, never as a restored default.
+      if (budget.kind === 'savingsBudget' && migration.budgetReconciliation?.answered) migration = {
+        ...migration,
+        budgetReconciliation: { ...migration.budgetReconciliation, savingsBasis: { debtIncluded: budget.debtIncluded, taxBenefitIncluded: budget.taxBenefitIncluded } },
+      }
+    } else {
+      // Returning to the savings budget restores the archived answers exactly,
+      // or states nothing at all when there are none to restore.
+      nextBudget = {
+        kind: 'savingsBudget', annualNetSavings: state.inputs.annualSavings, retirementSpending: state.inputs.retirementSpending,
+        ...recordedBasis(migration.budgetReconciliation),
+      }
+    }
+  } else if (choice.kind === 'migratedBasis') {
+    // The migrated answer IS the two flags: keeping the legacy approximation
+    // states on the plan that the figure is still net of the debt and excludes
+    // the tax benefit. The number itself is never rewritten.
+    nextBudget = reconciledBudget(state.inputs, { keepLegacy: choice.basis === 'legacy' })
+    migration = { ...migration, budgetReconciliation: { ...migration.budgetReconciliation, answered: true, legacyAnnualDebtPayments } }
+  } else if (budget.kind !== 'savingsBudget') {
+    // A debt/tax answer is only meaningful for a savings budget. Switching mode
+    // is the explicit act that changes the mode, never an inclusion answer.
+    return { answerMeta: { ...state.answerMeta, [label]: { status: 'unknown', origin: 'user', updatedAt } } }
+  } else {
+    // Only the flag the user actually answered changes; the other keeps its
+    // recorded status, including `unknown`. The archives mirror the live
+    // answers so the mode switch stays lossless.
+    nextBudget = choice.kind === 'debtIncluded'
+      ? { ...budget, debtIncluded: { status: 'known', value: choice.value } }
+      : { ...budget, taxBenefitIncluded: { status: 'known', value: choice.value } }
+    const bothTrue = nextBudget.debtIncluded.status === 'known' && nextBudget.debtIncluded.value &&
+      nextBudget.taxBenefitIncluded.status === 'known' && nextBudget.taxBenefitIncluded.value
+    migration = { ...migration, budgetReconciliation: {
+      // Answering somewhere other than "both are included" is the answer to
+      // what the figure means, so a plan the user has answered does not keep
+      // asking. A plan still describing the v10 approximation keeps its
+      // separate, explicit review.
+      answered: bothTrue || (migration.budgetReconciliation?.answered ?? false),
+      legacyAnnualDebtPayments,
+      savingsBasis: { debtIncluded: nextBudget.debtIncluded, taxBenefitIncluded: nextBudget.taxBenefitIncluded },
+    } }
+  }
+
+  const decision = nextBudget === budget && migration === previous.migration ? previous : { ...previous, budget: nextBudget, migration }
+  const canonical = refreshCanonicalFromLegacy(decision, state.inputs)
+  return {
+    inputs: canonical.legacyProjection,
+    canonical,
+    answerMeta: { ...state.answerMeta, [label]: { status: 'confirmed', origin: 'user', updatedAt } },
+    questionAnswers: { ...(state.questionAnswers ?? {}), [label]: budgetReviewAnswer(choice) },
+    inputRevision: state.inputRevision + 1,
+    resultRevision: null,
   }
 }

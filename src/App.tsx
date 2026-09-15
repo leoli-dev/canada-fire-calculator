@@ -123,6 +123,7 @@ export default function App() {
         </aside>
         {result && !hasBlockingIssues && <section className="results-column">
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
+            budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
           {precisionBlocked ? <ScenarioCard /> : <>
           {taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}

@@ -220,13 +220,17 @@ describe('BE-14 A nominal annual state kernel', () => {
     expect(exact.row.cashLedger.debtPayments).toBe(10)
     expect(exact.row.cashLedger.voluntaryContributions).toBe(40)
     expect(annualStep(withDebt, debtOpening, providers(110)).status).toBe('unsupported')
+    // BE-13 A: an answered-false flag has its own reason, and the unanswered
+    // flag has a different one. Neither is the removed generic message.
     if (withDebt.budget.kind === 'savingsBudget') withDebt.budget.debtIncluded = { status: 'known', value: false }
-    expect(annualStep(withDebt, debtOpening, providers(120)).status).toBe('unsupported')
+    expect(annualStep(withDebt, debtOpening, providers(120))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('cannot yet add them back to a cash budget') }] })
     if (withDebt.budget.kind === 'savingsBudget') {
       withDebt.budget.debtIncluded = { status: 'known', value: true }
-      withDebt.budget.taxBenefitIncluded = { status: 'unknown', reason: 'not confirmed' }
+      withDebt.budget.taxBenefitIncluded = { status: 'known', value: false }
     }
-    expect(annualStep(withDebt, debtOpening, providers(120)).status).toBe('unsupported')
+    expect(annualStep(withDebt, debtOpening, providers(120))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('cannot yet add it as refund cash') }] })
+    if (withDebt.budget.kind === 'savingsBudget') withDebt.budget.taxBenefitIncluded = { status: 'unknown', reason: 'not confirmed' }
+    expect(annualStep(withDebt, debtOpening, providers(120))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('the user must answer budget.taxBenefitIncluded') }] })
     const deficit = plan({ ...input(), debts: [], annualSavings: -40, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 } })
     expect(annualStep(deficit, ok(initializeState(deficit)), providers(110))).toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringContaining('negative net savings') }] })
   })

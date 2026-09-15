@@ -18,6 +18,7 @@ import { CppEstimator, OasEstimator } from '../BenefitEstimators'
 import { PensionSourceNote } from '../PensionSourceNote'
 import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
+import { BudgetMethodPanel } from '../BudgetMethodPanel'
 import { TaxFactsPanel } from '../TaxFactsPanel'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
@@ -241,6 +242,11 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <p className="answer-feedback">{t('questionnaire.savingFeedback', { monthly: cad(inputs.annualSavings / 12), annual: cad(inputs.annualSavings) })}</p></>
       break
     }
+    case 'budget.method':
+      // BE-13 A: one shared panel, so guided and professional record the very
+      // same canonical budget facts.
+      control = <BudgetMethodPanel />
+      break
     case 'work.after':
       control = <ChoiceGroup id={definition.id} value={answer} options={[{ value: 'no', label: t('questionnaire.choice.noWork') }, { value: 'yes', label: t('questionnaire.choice.someWork') }, { value: 'unknown', label: t('questionnaire.choice.undecided') }]} onChange={(value) => {
         setQuestionAnswer(definition.id, value)

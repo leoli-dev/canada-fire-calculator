@@ -1,5 +1,5 @@
 import type { InputsV2, TaxShares } from './model'
-import { ageReachedInYear, precisionGate } from './model'
+import { ageReachedInYear, pricingGate } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { advanceAttributionLedger, applyAttributionLedger, attributeSpousalPayment, resolveSpousalPlan, type SpousalAttributionLedger, type SpousalPremium } from './spousalAttribution'
 
@@ -131,8 +131,8 @@ function sharesForEvent(plan: InputsV2, event: IncomeEvent, year: number, spousa
 
 export function calculatePersonIncome(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): IncomeResult {
   if (!Number.isInteger(year) || year < plan.baseYear || !Array.isArray(events)) return fail('invalid', 'tax year or events invalid')
-  const gate = precisionGate(plan)
-  if (!gate.allowed) return fail('unsupported', `precision gate: ${gate.reasons.join(', ')}`)
+  const gate = pricingGate(plan)
+  if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   const byPerson: Record<string, PersonIncome> = Object.fromEntries(plan.people.map(person => [person.id, {
     personId: person.id, age: ageReachedInYear(person, plan.baseYear, year), gross: 0, netIncome: 0, taxableIncome: 0,
     earnedWork: 0, oasGross: 0, gisIncomeBase: 0, fssIncomeBase: 0, federalPensionEligible: 0, provincialPensionEligible: 0,

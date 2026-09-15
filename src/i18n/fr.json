@@ -1,5 +1,35 @@
 {
   "title": "🇨🇦 Calculateur FIRE Canada",
+  "budget": {
+    "title": "Ce que signifie le montant d’épargne",
+    "intro": "Le plan a besoin d’une base explicite pour l’argent ajouté aux placements. Choisissez celle que vous suivez réellement; les deux ne sont pas interchangeables.",
+    "modeSavings": "Montant d’épargne (argent net à investir)",
+    "modeSavingsDetail": "Vous inscrivez le montant qui reste à investir; les deux questions ci-dessous précisent ce qu’il déduit déjà.",
+    "modeIncome": "Revenu et dépenses",
+    "modeIncomeDetail": "Vous inscrivez les dépenses de la période de travail et le plan puise dans vos revenus. Pas encore modélisé dans cette tranche.",
+    "debtIncluded": "Ce montant déduit-il déjà les remboursements de prêts inscrits?",
+    "debtIncludedDetail": "Oui indique que le montant les déduit déjà; le plan ne doit pas les déduire de nouveau.",
+    "taxBenefitIncluded": "Tient-il déjà compte de l’économie d’impôt REER/FERR?",
+    "taxBenefitIncludedDetail": "Oui indique que le montant en tient déjà compte; aucun remboursement ne s’ajoute.",
+    "yes": "Oui, déjà inclus",
+    "no": "Non, pas encore inclus",
+    "workingSpending": "Dépenses de la période de travail (par année)",
+    "workingSpendingHint": "Inscrivez vos dépenses d’une année de travail normale, sans les remboursements de prêts inscrits plus loin. Ce n’est pas le montant de retraite.",
+    "legacyReview": "Ce montant vient de votre plan précédent, où une définition différente s’appliquait. Précisez ce qu’il signifie avant qu’il soit utilisé.",
+    "legacyKeep": "Le garder comme approximation",
+    "legacyKeepDetail": "Considérer le montant comme déjà net des remboursements de prêts inscrits et sans l’économie d’impôt. Le plan l’enregistre, et le chiffrage reste indisponible tant que la règle n’existe pas.",
+    "legacyAdopt": "Le traiter comme le nouveau montant net d’épargne",
+    "legacyAdoptDetail": "Utiliser le même nombre selon la définition ci-dessus: déjà net du coût de la vie, de l’impôt et des remboursements de prêts inscrits, sans remboursement d’impôt distinct.",
+    "legacyBaseline": "Votre plan précédent amortissait aussi {{annualDebt}} de remboursements de prêts par année. Cette base sert seulement à la comparaison; rien ne s’ajoute automatiquement à votre montant.",
+    "stateTitle": "Base enregistrée",
+    "stateReady": "Prêt: montant net d’épargne de {{value}} par année, net des remboursements de prêts inscrits et de l’économie d’impôt.",
+    "stateUnknown": "À répondre: {{fields}}. Le plan les garde inconnues plutôt que de supposer une réponse.",
+    "stateKnownFalse": "Enregistré comme non inclus: {{detail}}",
+    "stateIncome": "Enregistré comme budget de revenu. {{detail}}",
+    "estimateExcluded": "La base d’épargne que vous avez enregistrée omet un élément que cette projection traite encore comme inclus; le résultat ci-dessous est donc une estimation, et non un chiffre précis, jusqu’à ce que BE-14 B chiffre la base enregistrée.",
+    "fieldDebt": "si les remboursements de prêts inscrits sont déjà déduits",
+    "fieldTax": "si l’économie d’impôt REER/FERR est déjà prise en compte"
+  },
   "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; le tableau fiscal, les classements de stratégies et les comparaisons précises sont masqués.",
   "be11SingleEstimate": "L’impôt, les graphiques et les outils d’une seule personne utilisent encore l’ancienne estimation pendant l’emploi ou pour les événements non pris en charge.",
   "be11QcLimit": "La précision fiscale au Québec est limitée pour ce plan. Une couverture médicaments inconnue ou publique attend l’annexe K 2026 non publiée; les autres événements non pris en charge restent aussi estimatifs. Les conseils et comparaisons précis sont masqués.",
@@ -1002,6 +1032,9 @@
       },
       "saving_amount": {
         "question": "Combien d’argent nouveau ajoutez-vous réellement?"
+      },
+      "budget_method": {
+        "question": "Que tient déjà compte ce montant d’épargne?"
       },
       "work_after": {
         "question": "Prévoyez-vous un revenu de travail après le temps plein?"

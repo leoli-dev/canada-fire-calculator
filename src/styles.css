@@ -271,6 +271,20 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .choice-group input, .check-group input { margin-top: 4px; accent-color: #174ea6; }
 .choice-group span, .check-group span { display: grid; gap: 3px; }
 .choice-group small, .check-group small { color: #526579; font-weight: 400; line-height: 1.45; }
+/* BE-13 A: the recorded basis of the saving figure. One block in both entry
+   modes, so an inclusion answer reads the same wherever it was given. */
+.budget-method { max-width: 620px; margin: 18px 0 22px; }
+.budget-method h3 { margin: 0 0 6px; }
+.budget-method > .hint { margin: 0 0 12px; line-height: 1.55; }
+.budget-method fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.budget-method legend { font-weight: 650; color: #172b3a; padding: 0; }
+.budget-method .choice-group { margin: 12px 0 18px; }
+.budget-method .budget-fact { border-top: 1px solid var(--line); padding-top: 14px; }
+.budget-method .budget-fact .hint { margin: 6px 0 0; line-height: 1.5; }
+.budget-method .budget-mode .choice-group { margin-bottom: 22px; }
+.budget-reconciliation { border-left: 3px solid #b45309; padding-left: 14px; margin: 4px 0 18px; }
+.budget-reconciliation legend { color: #7c2d12; }
+.budget-state { margin: 0; padding: 10px 12px; border-radius: 6px; background: #f0f3f7; color: #172b3a; line-height: 1.55; }
 .strategy-question { max-width: 620px; }
 .strategy-intro { margin: 18px 0 0; color: #526579; line-height: 1.55; }
 .strategy-question .choice-group { margin-top: 16px; }

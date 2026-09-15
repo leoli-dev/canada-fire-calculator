@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
+import { pageIsComplete, type PageState } from '../pageState'
 import { DEFAULT_INPUTS } from '../../store'
 import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
@@ -86,5 +87,76 @@ describe('question catalog', () => {
     expect(expanded.some((page) => page.id === 'cpp.partner')).toBe(true)
     expect(expanded.some((page) => page.id === 'rental.0.value')).toBe(true)
     expect(expanded.some((page) => page.id === 'debt.0.balance')).toBe(true)
+  })
+})
+
+describe('BE-13 A budget page completeness', () => {
+  const budgetPage = pageById('budget.method')!
+  const state = (overrides: Partial<PageState> = {}): PageState => ({
+    inputs: DEFAULT_INPUTS,
+    answerMeta: {},
+    questionAnswers: {},
+    canonical: { budget: { kind: 'savingsBudget' }, migration: { sourcePersistVersion: 11 } },
+    ...overrides,
+  })
+  const confirmed = (fields: string[]) => Object.fromEntries(fields.map((field) => [field, { status: 'confirmed' as const, origin: 'user' as const, updatedAt: '2026-01-01T00:00:00.000Z' }]))
+
+  it('sits in the saving category right after the amount it reinterprets', () => {
+    const ids = QUESTION_CATALOG.filter((page) => page.categoryId === 'saving').map((page) => page.id)
+    expect(ids).toEqual(['saving.method', 'saving.amount', 'budget.method', 'work.after', 'work.amount', 'work.period'])
+  })
+
+  it('is pending until the mode and both inclusion facts are answered', () => {
+    expect(pageIsComplete(budgetPage, state())).toBe(false)
+    expect(pageIsComplete(budgetPage, state({ answerMeta: confirmed(['budget.method']) }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.method', 'budget.debtIncluded']),
+    }))).toBe(false)
+    // Answering both facts answers the mode question even without a separate
+    // mode click, which is what the guided page does.
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.debtIncluded', 'budget.taxBenefitIncluded']),
+    }))).toBe(true)
+  })
+
+  it('keeps a migrated plan pending until its earlier figure is reconciled', () => {
+    const migrated = (answered: boolean) => state({
+      answerMeta: confirmed(['budget.debtIncluded', 'budget.taxBenefitIncluded']),
+      canonical: { budget: { kind: 'savingsBudget' }, migration: { sourcePersistVersion: 10, budgetReconciliation: { answered } } },
+    }) as PageState
+    expect(pageIsComplete(budgetPage, migrated(false))).toBe(false)
+    expect(pageIsComplete(budgetPage, migrated(true))).toBe(true)
+  })
+
+  it('accepts a chosen income budget without the savings-only inclusion facts', () => {
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.method']),
+      canonical: { budget: { kind: 'incomeBudget' }, migration: { sourcePersistVersion: 11 } },
+    }))).toBe(true)
+  })
+
+  it('does not call an unknown or example answer usable', () => {
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
+        'budget.method': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.debtIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(false)
+    // The mode that was only ever an example is not the user's answer, even
+    // when both facts were answered: the fact answers carry the completeness.
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
+        'budget.method': { status: 'confirmed', origin: 'example', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.debtIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
+        'budget.debtIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(true)
   })
 })

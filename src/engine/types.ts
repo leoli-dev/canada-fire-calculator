@@ -295,6 +295,14 @@ export interface Inputs {
   province: Province
   /** after-tax annual savings during accumulation, today's dollars */
   annualSavings: number
+  /**
+   * BE-13 A. Working-period spending for the canonical `incomeBudget` mode.
+   * This form only edits the savings-budget figure, so switching to
+   * `incomeBudget` stores its spending here and the canonical plan derives
+   * `workingSpending` from it. `null` means the user has not recorded it yet —
+   * it is never guessed from the retirement figure.
+   */
+  budgetWorkingSpending?: number | null
   /** fraction of annual savings contributed to each account (sums to 1) */
   savingsSplit: Record<AccountType, number>
   /** desired after-tax annual spending in retirement, today's dollars */

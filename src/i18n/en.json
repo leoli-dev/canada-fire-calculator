@@ -1,5 +1,35 @@
 {
   "title": "🇨🇦 Canada FIRE Calculator",
+  "budget": {
+    "title": "What the saving amount means",
+    "intro": "The plan needs one explicit basis for the money you add to investments. Pick the one you actually track; the two are not interchangeable.",
+    "modeSavings": "Saving amount (net money to invest)",
+    "modeSavingsDetail": "You enter the amount left for investing; the two questions below settle exactly what it already takes off.",
+    "modeIncome": "Income and spending",
+    "modeIncomeDetail": "You enter working-period spending and the plan draws on your income. Not modelled yet in this slice.",
+    "debtIncluded": "Does that amount already subtract the loan payments you listed?",
+    "debtIncludedDetail": "Yes records that the figure already subtracts them, so the plan must not subtract them again.",
+    "taxBenefitIncluded": "Does it already reflect the RRSP/RRIF tax difference?",
+    "taxBenefitIncludedDetail": "Yes records that the figure already reflects it, so no refund is added on top.",
+    "yes": "Yes, already included",
+    "no": "No, not included yet",
+    "workingSpending": "Working-period spending (per year)",
+    "workingSpendingHint": "Enter what you spend in a normal working year, excluding the loan payments listed later. It is not the retirement figure.",
+    "legacyReview": "This figure came from your earlier plan, where a different definition applied. Choose what it means before it is used.",
+    "legacyKeep": "Keep it as an approximation",
+    "legacyKeepDetail": "Treat the figure as already net of the listed loan payments and without the tax difference. The plan records that, and pricing stays unavailable until the rule exists.",
+    "legacyAdopt": "Treat it as the new net saving amount",
+    "legacyAdoptDetail": "Use the same number under the definition above: already net of living costs, tax and the listed loan payments, with no separate tax refund.",
+    "legacyBaseline": "Your earlier plan also amortised {{annualDebt}} of listed loan payments per year. That baseline is only for comparison; nothing is added to your figure automatically.",
+    "stateTitle": "Recorded basis",
+    "stateReady": "Ready: net saving amount of {{value}} per year, net of the listed loan payments and of the tax difference.",
+    "stateUnknown": "Still to answer: {{fields}}. The plan keeps these unknown rather than assuming an answer.",
+    "stateKnownFalse": "Recorded as not included: {{detail}}",
+    "stateIncome": "Recorded as an income budget. {{detail}}",
+    "estimateExcluded": "The saving basis you recorded leaves out a component this projection still treats as included, so the result below is an estimate rather than a precise number until BE-14 B prices the recorded basis.",
+    "fieldDebt": "whether the listed loan payments are already subtracted",
+    "fieldTax": "whether the RRSP/RRIF tax difference is already reflected"
+  },
   "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
   "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
   "be11QcLimit": "Quebec tax precision is limited for this plan. Unknown or public prescription coverage needs the unpublished 2026 Schedule K; other unsupported events also remain estimates. Tax advice and exact comparisons are withheld.",
@@ -1002,6 +1032,9 @@
       },
       "saving_amount": {
         "question": "How much new money do you actually add to savings and investments?"
+      },
+      "budget_method": {
+        "question": "What does that saving amount already take into account?"
       },
       "work_after": {
         "question": "After full-time work ends, do you expect other work income?"

@@ -16,7 +16,7 @@ async function confirmVisibleNumbers(page: Page) {
   }
 }
 
-async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes' | 'no') {
+async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes' | 'no', budgetFacts: 'yes' | 'no' = 'yes') {
   if (pageId === 'family.people') await page.getByRole('radio', { name: /Plan for me/ }).check()
   else if (pageId === 'family.children') await page.getByRole('radio', { name: /No children/ }).check()
   else if (pageId === 'family.province') await page.getByLabel('Province').selectOption('BC')
@@ -30,6 +30,11 @@ async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes'
     expect(widths.document).toBeLessThanOrEqual(widths.viewport)
   }
   else if (pageId === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+  // BE-13 A: the basis question sits next to the amount and needs an answer.
+  else if (pageId === 'budget.method') {
+    await page.getByTestId(`budget-debt-${budgetFacts}`).check()
+    await page.getByTestId(`budget-tax-${budgetFacts}`).check()
+  }
   else if (pageId === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
   else if (pageId === 'assets.identify') {
     await page.getByRole('checkbox', { name: 'TFSA' }).check()
@@ -48,7 +53,7 @@ async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes'
   else await confirmVisibleNumbers(page)
 }
 
-async function completeGuidedQuestionnaire(page: Page, targetChoice: 'yes' | 'no' = 'yes') {
+async function completeGuidedQuestionnaire(page: Page, targetChoice: 'yes' | 'no' = 'yes', budgetFacts: 'yes' | 'no' = 'yes') {
   const visited = new Set<string>()
   while (true) {
     const article = page.locator('.question-page')
@@ -57,7 +62,7 @@ async function completeGuidedQuestionnaire(page: Page, targetChoice: 'yes' | 'no
     if (!pageId) throw new Error('Question page is missing its stable ID')
     if (visited.has(pageId)) throw new Error(`Questionnaire loop detected at ${pageId}`)
     visited.add(pageId)
-    await answerCurrentPage(page, pageId, targetChoice)
+    await answerCurrentPage(page, pageId, targetChoice, budgetFacts)
     const next = page.locator('.question-pager button').last()
     if (await next.innerText() === 'Review answers') { await next.click(); break }
     await next.click()
@@ -91,6 +96,24 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await page.goto('/#/guided/results')
   await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
   await expect(page.locator('.results-column')).toHaveCount(0)
+})
+
+test('an answered-excluded budget basis labels the guided result as an estimate', async ({ page }) => {
+  test.setTimeout(60_000)
+  // Review fix B2. Answering both basis facts "No" records a figure the
+  // projection still prices as net of the debt, so the guided result must be
+  // the labelled estimate rather than a precise summary.
+  await completeGuidedQuestionnaire(page, 'no', 'no')
+  const generate = page.getByRole('button', { name: 'Generate my results' })
+  if (await generate.isDisabled()) throw new Error(await page.locator('.review-blockers').innerText())
+  await generate.click()
+  await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
+  const estimate = page.getByTestId('legacy-estimate')
+  await expect(estimate).toHaveCount(1)
+  await expect(estimate).toContainText('estimate rather than a precise number')
+  await expect(estimate).toContainText('Final net worth:')
+  // The recorded basis is what the user answered, and it stays on the plan.
+  await expect(page.locator('.summary')).not.toContainText('modeled balance lasts')
 })
 
 test('guided users may leave the personal target unset and add it from results', async ({ page }) => {

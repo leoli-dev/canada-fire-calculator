@@ -161,6 +161,10 @@ async function generateGuidedThroughUi(page: Page, options: {
       await page.getByRole('radio', { name: 'I do not have a target yet' }).check()
     }
     else if (id === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+    else if (id === 'budget.method') {
+      await page.getByTestId('budget-debt-yes').check()
+      await page.getByTestId('budget-tax-yes').check()
+    }
     else if (id === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
     else if (id === 'assets.identify') {
       await page.getByRole('checkbox', { name: 'TFSA' }).check()

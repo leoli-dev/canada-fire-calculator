@@ -42,6 +42,9 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
 
   page('saving.method', 'saving', ['savingUnit'], []),
   page('saving.amount', 'saving', ['annualSavings'], ['annualSavings']),
+  // BE-13 A: what the saving figure means. Placed right after the amount so the
+  // basis is decided next to the number it reinterprets.
+  page('budget.method', 'saving', ['budgetMode'], ['budget.method', 'budget.debtIncluded', 'budget.taxBenefitIncluded']),
   page('work.after', 'saving', ['extraIncome'], ['extraIncome']),
   page('work.amount', 'saving', ['extraIncomeAnnual'], ['extraIncome.annual'], {
     applicableWhen: (_inputs, answers) => answerIs(answers, 'work.after', 'yes'),
