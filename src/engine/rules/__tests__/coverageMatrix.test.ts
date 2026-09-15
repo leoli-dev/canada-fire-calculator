@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  COVERAGE_JURISDICTIONS, coverageFor, coverageMatrix, coverageSummary, evidenceFixtureIds,
-  matrixJurisdictions,
+  BLOCKED_SOURCES, COVERAGE_JURISDICTIONS, coverageFor, coverageLimitationIds, coverageMatrix,
+  coverageSummary, evidenceFixtureIds, matrixJurisdictions,
 } from '../coverageMatrix'
 import { PLAN_TAX_YEAR, incomeTax, probateTax, qcFssContribution, qcRamqPremium } from '../../tax'
 import {
@@ -133,7 +133,10 @@ const FIXTURE_SOURCES: Record<string, string> = {
   // the `f-1.3` Act this fixture used to name does not exist on Justice Laws.
   'quebec-abatement-2026': 'https://www.canada.ca/content/dam/fin/publications/taxexp-depfisc/2026/taxexp-depfisc-26-eng.pdf',
   'quebec-fss-2026': RQ,
-  'quebec-ramq-2026': RQ,
+  // BE-38 B3 review (round 3, B1): the RAMQ figures are a legacy preview
+  // indexed from the 2025 table, so the fixture is that table, not the 2026
+  // parameters PDF the row used to cite.
+  'quebec-ramq-2026': 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf',
   'qc-provincial-age-amount-2026': RQ,
   'qc-provincial-pension-amount-2026': RQ,
 }
@@ -273,17 +276,21 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
         // jurisdiction's form: NL's age row named Ontario's TD1.
         expect([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])],
           `${jurisdiction}/${id} fixture authority`).toContain(FIXTURE_SOURCES[credit.evidenceFixture])
-        // BE-38 B3 review (BL1): the row must cite the authority the pack itself
-        // records for every pack field the row prices. The fixture check above
-        // is only self-consistency; this is the one that catches a row pointing
-        // at the *superseded edition* of a figure the pack actually prices —
-        // PE's January chart ($142,250), BC's January 5.06%, NL's January BPA.
+        // BE-38 B3 review (round 2 BL1, round 3 BL3): the row must cite the
+        // authority the pack itself records for every pack field the row prices,
+        // and — since round 3 — the *rendered* `sourceURL` must be exactly that
+        // authority. Containment alone let the QC bracket rows show a bot-gated
+        // page while the pack's own reachable parameters PDF sat unrendered in
+        // `additionalSourceURLs`. The fixture check above is only
+        // self-consistency; this is the one that catches a row pointing at the
+        // *superseded edition* of a figure the pack actually prices — PE's
+        // January chart ($142,250), BC's January 5.06%, NL's January BPA.
         const urls = [credit.sourceURL, ...(credit.additionalSourceURLs ?? [])]
         for (const field of credit.ruleFields) {
           const key = PACK_FIELD_SOURCE[field]
           if (!key) continue
-          expect(urls, `${jurisdiction}/${id} must cite the pack's own ${key} source`)
-            .toContain(pack.fieldSources[key])
+          expect(credit.sourceURL, `${jurisdiction}/${id} must render the pack's own ${key} source`)
+            .toBe(pack.fieldSources[key])
           for (const extra of pack.fieldAdditionalSources?.[key] ?? [])
             expect(urls, `${jurisdiction}/${id} must cite the pack's additional ${key} source`).toContain(extra)
         }
@@ -330,7 +337,7 @@ describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => 
     expect(matrix.unsupported['provincial-refundable-benefits'].scopeStatement).toMatch(/not modelled/i)
     // The rows the pack calls "applied but not year-switched" are named in the
     // positive direction, with the year-switching gap as their limitation.
-    expect(matrix.implemented['provincial-age-amount'].limitation).toMatch(/Pinned 2026 figures/)
+    expect(matrix.implemented['provincial-age-amount'].limitationId).toBe('provincialAgeAmount')
   })
 
   it('reproduces the published charts and credits the official amounts at the lowest rate', () => {
@@ -759,7 +766,7 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
     expect(zeroPriced).toEqual(['MB'])
     expect(PROBATE_RATES.MB).toEqual({ flat: 0, rate: 0, threshold: 0 })
     expect(probateTax(200_000, 'MB'), 'MB abolishes probate, so the pin is the disclosure').toBe(0)
-    expect(coverageFor('MB').implemented['probate-and-estate-fees'].limitation).toMatch(/abolished its probate fee/)
+    expect(coverageFor('MB').implemented['probate-and-estate-fees'].limitationId).toBe('probateFeesMB')
     // Every other jurisdiction's fee is non-zero at 200,000, so the shared row
     // is demonstrably priced rather than zero everywhere.
     for (const province of PROVINCES) if (province !== 'MB')
@@ -787,15 +794,106 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
       } else if (province === 'NT' || province === 'NU') {
         // The declared exception: these price Yukon's $140 flat filing fee, so
         // that is the figure the row evidences, and the row names the published
-        // tier it does not model instead of quietly swapping the authority.
+        // tier it does not model instead of quietly swapping the authority. The
+        // text now lives in the catalogue, keyed by `limitationId`, and the
+        // panel renders it; `solverMessages.test.ts` pins the prose.
         expect(row.sourceURL, `${province} prices Yukon's fee`).toBe(table('YT'))
         expect(urls, `${province} names its own published table`).toContain(table(province))
-        expect(row.limitation, province).toMatch(/Yukon\u2019s \$140 flat filing fee/)
-        expect(row.limitation, province).toMatch(/understated/)
+        expect(row.limitationId, province).toBe(province === 'NT' ? 'probateFeesApproxNT' : 'probateFeesApproxNU')
       } else {
         expect(row.sourceURL, province).toBe(table(province))
+        expect(row.limitationId, province).toBe(province === 'MB' ? 'probateFeesMB' : 'probateFees')
       }
-      expect(row.limitation, `${province} names the table`).toMatch(/TaxTips\.ca/)
+      expect(row.limitationId, `${province} names the table`).toBeTruthy()
     }
+  })
+})
+
+describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualified', () => {
+  const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
+  const QC_PARAMS = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
+  const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
+
+  it('never renders a bot-gated authority, and qualifies every row that cites one', () => {
+    // B2: the rendered authority must be one a reader can reach. The only
+    // authority the suite knows to be unreachable is recorded, dated, in
+    // `BLOCKED_SOURCES`; a row may list one as an additional source only if its
+    // rendered limitation says so. This is the assertion that would have failed
+    // the QC bracket rows while `RQ_RATES` was their `sourceURL`.
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented)) {
+        expect(BLOCKED_SOURCES[credit.sourceURL],
+          `${jurisdiction}/${id} renders a blocked authority`).toBeUndefined()
+        for (const url of credit.additionalSourceURLs ?? [])
+          if (BLOCKED_SOURCES[url])
+            expect(credit.limitationId,
+              `${jurisdiction}/${id} cites a blocked authority with no rendered qualification`).toBeDefined()
+      }
+    // The record cannot be emptied to make the assertion vacuous.
+    expect(Object.keys(BLOCKED_SOURCES)).toContain(RQ_RATES)
+    expect(BLOCKED_SOURCES[RQ_RATES]).toMatch(/403/)
+  })
+
+  it('names a rendered limitation for every row whose cited source does not carry its figures', () => {
+    // B1 + the non-blocking source gaps of the same class: a citation that does
+    // not settle the figure may never be shown unqualified.
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented))
+        if (credit.qualifiedSource)
+          expect(credit.limitationId, `${jurisdiction}/${id} declares a source gap`).toBeDefined()
+    const gaps: string[] = []
+    for (const jurisdiction of COVERAGE_JURISDICTIONS)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented))
+        if (credit.qualifiedSource) gaps.push(`${jurisdiction}/${id}`)
+    // The exact set this round declared, so the flag cannot be dropped silently.
+    expect(gaps.sort()).toEqual([
+      'MB/manitoba-bpa-phase-out', 'QC/provincial-age-amount', 'QC/quebec-basic-personal-amount',
+      'QC/quebec-fss-contribution', 'QC/quebec-income-tax-brackets', 'QC/quebec-ramq-premium',
+      'YT/yukon-bpa-phase-out',
+    ])
+  })
+
+  it('cites the authority the QC RAMQ approximation was derived from, not the parameters PDF', () => {
+    // B1: `taxData.ts` calls the four figures a legacy preview indexed from the
+    // 2025 table, so the parameters PDF — which prints none of them — may not be
+    // the authority this row shows. It now points at that 2025 table and renders
+    // the derivation instead.
+    const row = coverageFor('QC').implemented['quebec-ramq-premium']
+    expect(row.sourceURL).toBe(CFFP_GUIDE)
+    expect(row.limitationId).toBe('quebecRamqPremium')
+    expect(row.qualifiedSource).toBe(true)
+    expect([row.sourceURL, ...(row.additionalSourceURLs ?? [])]).not.toContain(QC_PARAMS)
+  })
+
+  it('renders the pack\u2019s own reachable source for the QC bracket rows and keeps the bot-gated page visible', () => {
+    // B2: the pack's `fieldSources` for QC is the reachable parameters PDF; the
+    // rates-only page is an additional source with a rendered qualification.
+    for (const id of ['quebec-income-tax-brackets', 'quebec-basic-personal-amount']) {
+      const row = coverageFor('QC').implemented[id]
+      expect(row.sourceURL, id).toBe(QC_PARAMS)
+      expect(row.additionalSourceURLs, id).toContain(RQ_RATES)
+      expect(row.limitationId, id).toBeTruthy()
+      expect(row.qualifiedSource, id).toBe(true)
+    }
+  })
+
+  it('cites the CFFP guide for the Quebec figure the parameters PDF does not print', () => {
+    // NTH5: the 18.75% age-credit reduction rate is not in the parameters PDF;
+    // the CFFP guide prints it (and Quebec's 2026 age/retirement parameters), so
+    // it is the row's additional source and the row declares the source gap.
+    const age = coverageFor('QC').implemented['provincial-age-amount']
+    expect(age.sourceURL).toBe(QC_PARAMS)
+    expect(age.additionalSourceURLs).toContain(CFFP_GUIDE)
+    expect(age.qualifiedSource).toBe(true)
+  })
+
+  it('derives the rendered limitation ids from the matrix rather than a hand list', () => {
+    const ids = coverageLimitationIds()
+    expect(ids.length).toBeGreaterThan(20)
+    expect(ids).toEqual([...ids].sort())
+    expect(ids).toContain('quebecRamqPremium')
+    expect(ids).toContain('probateFeesApproxNT')
+    expect(ids).toContain('probateFeesApproxNU')
+    expect(ids).toContain('probateFeesMB')
   })
 })

@@ -106,23 +106,43 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   await expect(professional.getByTestId('rule-coverage-caveat'))
     .toContainText('does not model the GST/HST credit')
 
-  // BE-38 B3 review (BL2): the panel tells the reader that each implemented
-  // entry links to the authority its figures were read from. Tie that claim to
-  // the DOM: every implemented row must carry exactly one real anchor, and it
-  // must point at the authority the matrix row names — the same URL the BL1
-  // assertion forces to be the one the pack prices from.
+  // BE-38 B3 review (BL2 / round 3): the panel tells the reader that each
+  // implemented entry links its cited authority and states its own limit. Tie
+  // that claim to the DOM: every implemented row must render its `sourceURL`
+  // *and* every `additionalSourceURLs` entry, in that order, and a row that
+  // declares a limitation must render it.
   const implementedOn = coverageFor('ON').implemented
   expect(Object.keys(implementedOn).length).toBeGreaterThan(5)
-  const implementedAnchors = await coverage.locator('ul').first().locator('li a')
-    .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
-  expect(implementedAnchors).toHaveLength(Object.keys(implementedOn).length)
-  expect(implementedAnchors.every(href => href?.startsWith('https://'))).toBe(true)
-  for (const [id, credit] of Object.entries(implementedOn))
-    await expect(professional.getByTestId(`rule-coverage-implemented-${id}`).locator('a'), id)
-      .toHaveAttribute('href', credit.sourceURL)
-  // No implemented row may render as bare text: an unlinked row would make the
-  // claim false for that row even if the others were linked.
-  expect(await coverage.locator('ul').first().locator('li').count()).toBe(implementedAnchors.length)
+  expect(await coverage.locator('ul').first().locator('li').count())
+    .toBe(Object.keys(implementedOn).length)
+  for (const [id, credit] of Object.entries(implementedOn)) {
+    const row = professional.getByTestId(`rule-coverage-implemented-${id}`)
+    const hrefs = await row.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+    // The whole cited set is rendered, primary first, so a reader never has to
+    // follow only the one link the assertion used to check.
+    expect(hrefs, id).toEqual([credit.sourceURL, ...(credit.additionalSourceURLs ?? [])])
+    expect(hrefs.every(href => href?.startsWith('https://')), id).toBe(true)
+    if (credit.limitationId) {
+      await expect(professional.getByTestId(`rule-coverage-limitation-${id}`), id).toBeVisible()
+      await expect(row, id).toHaveAttribute('data-limited', 'true')
+    }
+  }
+
+  // BE-38 B3 review (round 3, B1/B2): the two blocking rows' qualifications are
+  // rendered next to their links, including the words that make the citation
+  // honest — the RAMQ derivation pending the 2026 Schedule K, and the bot gate
+  // on the Revenu Québec rates page.
+  await page.getByLabel('Province').selectOption('QC')
+  await expect(professional.getByTestId('rule-coverage-implemented-quebec-ramq-premium')
+    .locator('a').first()).toHaveAttribute('href',
+    coverageFor('QC').implemented['quebec-ramq-premium'].sourceURL)
+  await expect(professional.getByTestId('rule-coverage-limitation-quebec-ramq-premium'))
+    .toContainText('Schedule K')
+  await expect(professional.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets'))
+    .toContainText('403')
+  await expect(professional.getByTestId('rule-coverage-implemented-quebec-income-tax-brackets'))
+    .toContainText('Ministry of Finance')
+  await page.getByLabel('Province').selectOption('ON')
 
   // Every province must render the matrix with both directions populated.
   for (const province of ['BC', 'MB', 'PE', 'QC', 'NL', 'NU']) {
@@ -145,22 +165,38 @@ test('the credit coverage matrix is visible in both modes and claims no complete
     .toBe(await coverage.getAttribute('data-coverage-implemented'))
 })
 
-test('the coverage caveat is native in French and Chinese, not English copy', async ({ page }) => {
-  // BE-38 B3 review (NB4): the panel rendered the English artifact string in
-  // every language. It now reads the catalogue, so each language must render
-  // its own copy of the same caveat.
+test('the coverage caveat and the QC qualifications are native in French and Chinese', async ({ page }) => {
+  // BE-38 B3 review (NB4 + round 3): the panel rendered the English artifact
+  // string in every language. It now reads the catalogue, so each language must
+  // render its own copy of the caveat — and of the two qualifications this
+  // round added, which are the disclosure the blocking findings turned on.
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
   await page.locator('.entry-mode button').nth(1).click()
+  await page.getByLabel('Province').selectOption('QC')
   const caveatEn = await page.getByTestId('rule-coverage-caveat').innerText()
+  const ramqEn = await page.getByTestId('rule-coverage-limitation-quebec-ramq-premium').innerText()
+  const bracketsEn = await page.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets').innerText()
   expect(caveatEn).toContain('does not model the GST/HST credit')
-  for (const [lang, marker] of [['fr', 'TPS/TVH'], ['zh', 'GST/HST']] as const) {
+  expect(ramqEn).toContain('Schedule K')
+  expect(bracketsEn).toContain('403')
+  for (const [lang, marker, ramqMarker] of [
+    ['fr', 'TPS/TVH', 'annexe K'], ['zh', 'GST/HST', '\u9644\u8868 K'],
+  ] as const) {
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
     await page.locator('.entry-mode button').nth(1).click()
-    const caveat = await page.getByTestId('rule-coverage-caveat')
+    await page.getByLabel('Province').selectOption('QC')
+    const caveat = page.getByTestId('rule-coverage-caveat')
     await expect(caveat, lang).toContainText(marker)
     await expect(caveat, lang).not.toHaveText(caveatEn)
+    const ramq = page.getByTestId('rule-coverage-limitation-quebec-ramq-premium')
+    await expect(ramq, lang).toContainText(ramqMarker)
+    await expect(ramq, `${lang} RAMQ qualification is an English placeholder`).not.toHaveText(ramqEn)
+    // 403 is the same number in every language; the sentence around it is not.
+    const brackets = page.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets')
+    await expect(brackets, lang).toContainText('403')
+    await expect(brackets, `${lang} bracket qualification is an English placeholder`).not.toHaveText(bracketsEn)
   }
 })

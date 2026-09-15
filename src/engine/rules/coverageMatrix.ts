@@ -10,18 +10,24 @@
  * `coverageMatrix.test.ts` enforces four properties: every supported
  * jurisdiction has an entry that lists the federal rows too; every
  * `implemented` row names a registered fixture whose URL is one of the row's
- * own URLs **and** cites the pack's own `fieldSources` entry for every pack
- * field the row prices, so the authority the pack says it read a figure from
- * and the authority the row shows a reader cannot disagree; every
- * `unsupported` row carries a concrete reason whose absence is asserted
- * against the engine; and every declaration — implemented or unsupported, for
- * every jurisdiction — is reconciled against what the pricing code actually
- * does, so a row cannot claim a credit is excluded while `tax.ts` prices it
- * (or the reverse). The suite never fetches a URL: reachability and content are
- * checked by hand and dated in `verifiedAt`, and the review round that added
- * the pack-source assertion fetched every URL the matrix cites. Nothing here
- * claims a complete return — the standing negative statement lives in
- * {@link coverageCaveat} and travels with the matrix so no summary can drop it.
+ * own URLs, and for every pack field the row prices the row's *rendered*
+ * `sourceURL` is exactly the `fieldSources` entry the pack records for that
+ * field (every additional pack source must also be among the row's URLs), so
+ * the document a reader is shown and the document the pack says it read that
+ * field from are the same URL; every `unsupported` row carries a concrete
+ * reason whose absence is asserted against the engine; and every declaration —
+ * implemented or unsupported, for every jurisdiction — is reconciled against
+ * what the pricing code actually does, so a row cannot claim a credit is
+ * excluded while `tax.ts` prices it (or the reverse). Two further checks keep a
+ * citation honest: a row marked `qualifiedSource` — the cited document does not
+ * carry one of the priced figures — must name a `limitationId`, which the panel
+ * renders next to the link; and no row may render a URL in
+ * {@link BLOCKED_SOURCES}, which records the authorities that answer a scripted
+ * reader with a bot gate. The suite never fetches a URL: reachability and
+ * content are checked by hand and dated in `verifiedAt`, and
+ * {@link BLOCKED_SOURCES} records the citations the suite refuses to render.
+ * Nothing here claims a complete return — the standing negative statement lives
+ * in {@link coverageCaveat} and travels with the matrix so no summary can drop it.
  */
 
 import { PLAN_TAX_YEAR } from '../planYear'
@@ -45,15 +51,32 @@ export interface ImplementedCreditCoverage {
   ruleFields: string[]
   /** The published rule this row prices, stated as values where the row can. */
   implementedRule?: string
-  /** The authority the figures were read from. */
+  /**
+   * The authority the figures were read from, and the document the panel shows
+   * a reader. Where `qualifiedSource` is set this is instead the document the
+   * figures were derived from; the row's `limitation` says what was derived.
+   */
   sourceURL: string
   additionalSourceURLs?: string[]
   /** `YYYY-MM-DD` the figures were last read against `sourceURL`. */
   verifiedAt: string
   /** Id of the registry entry that pins this row's figures. */
   evidenceFixture: string
-  /** What this row specifically does not do. Never an invitation to read it as complete. */
-  limitation?: string
+  /**
+   * Id of the catalogue string (`coverageLimitation.<id>`) stating what this row
+   * specifically does not do. The panel renders it next to the row's link, so a
+   * declared limit cannot stay invisible. Never an invitation to read the row as
+   * complete.
+   */
+  limitationId?: string
+  /**
+   * True when `sourceURL` does not carry at least one of the priced figures —
+   * because it is an indexed approximation, a derived value, or a figure the
+   * cited page prints only behind a bot gate or not at all. Such a row must
+   * carry a `limitationId`, so a citation that does not settle the figure is
+   * never shown unqualified.
+   */
+  qualifiedSource?: boolean
 }
 
 /** A credit, reduction, surtax or levy the priced numbers do *not* include. */
@@ -107,11 +130,35 @@ const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1/td1-26e
 const TD1_PROV = (code: string) =>
   `https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1${code}/td1${code}-26e.pdf`
 const RQ_RATES = 'https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/'
+/**
+ * The authorities the suite refuses to render. Revenu Québec answers a scripted
+ * client — and, per the B3 review, a real Chromium navigation from the review
+ * network — with HTTP 403 and a CAPTCHA, so a row that cites this page for its
+ * only rendered authority hands the reader a dead link. A row may still list it
+ * as an *additional* source, but only if the row's rendered `limitation` says so.
+ */
+export const BLOCKED_SOURCES: Record<string, string> = {
+  [RQ_RATES]:
+    'HTTP 403 with a CAPTCHA to curl, to an API request context and to a real Chromium navigation (checked 2026-09-16).',
+}
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
  * pack records in `fieldSources`, so a row that prices those fields must cite
  * exactly it rather than the byte-identical `cdn-contenu.quebec.ca` mirror the
  * matrix used to carry. */
 const QC_PARAMS = 'https://www.finances.gouv.qc.ca/Budget_et_mise_a_jour/maj/documents/AUTFR_RegimeImpot2026.pdf'
+/**
+ * The CFFP *Guide des mesures fiscales* (Université de Sherbrooke), the reachable
+ * compilation this build's two derived Quebec rows are evidenced from. It prints
+ * the 2025 RAMQ table (`taxData.ts` calls the premium a legacy preview): the
+ * 5,000 band at 7.84% / 11.76%, the 392 base, the 755 maximum and the 19,890
+ * single threshold this build indexes by 2% to 20,288 and 770. It also prints
+ * Quebec's 2026 age and retirement-income parameters — age amount 3,986,
+ * retirement amount 3,541, reduction threshold 42,955, reduction rate 18.75% and
+ * 14% conversion — so it is the authority for the 18.75% `ageRate` the
+ * parameters PDF does not carry. Reachable (HTTP 200) where Revenu Québec's own
+ * pages are not.
+ */
+const CFFP_GUIDE = 'https://cffp.recherche.usherbrooke.ca/wp-content/uploads/2024/03/cr_2026_04_guide_mesures_fiscales_vf.pdf'
 const ITA_38 = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html'
 /** The editions whose ladders the pack actually prices where they differ from
  * the January chart. Each row must cite the edition carrying its figure; the
@@ -132,52 +179,54 @@ const PROBATE = 'https://www.ontario.ca/laws/statute/90e22'
 const TAXTIPS_PROBATE = (code: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${code}.htm`
 const AT = '2026-09-15'
-/** The two territories this build charges Yukon's flat $140 filing fee, with
- * the published tier it does not model. */
+/** The two territories this build charges Yukon's flat $140 filing fee, mapped to
+ * the catalogue entry that names the published tier the build does not model. */
 const PROBATE_APPROXIMATED: Partial<Record<CoverageJurisdiction, string>> = {
-  NT: 'the Northwest Territories publishes a tiered fee rising to $435',
-  NU: 'Nunavut publishes a tiered fee rising to $425',
+  NT: 'probateFeesApproxNT',
+  NU: 'probateFeesApproxNU',
 }
 const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
   // The pack records each jurisdiction's own T4032 edition as its federal
-  // source; the row carries that edition too, so the pack's `fieldSources` and
-  // the row can never point at different editions.
+  // source, and the row's *rendered* sourceURL is that same edition, so the
+  // document a reader is shown is the document the pack prices the federal
+  // ladder from. The MB and ON editions travel as additional sources because
+  // the pinned fixture is keyed to the MB chart.
   const own = T4032(code.toLowerCase())
   return {
   'federal-income-tax-brackets': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['federal.brackets'],
-    sourceURL: T4032('mb'), additionalSourceURLs: [...new Set([T4032('on'), own])], verifiedAt: AT,
+    sourceURL: own, additionalSourceURLs: [...new Set([T4032('mb'), T4032('on')])], verifiedAt: AT,
     evidenceFixture: 'federal-brackets-2026',
-    limitation: 'Quebec applies its 16.5% abatement on top, which is its own row.',
+    limitationId: 'federalIncomeTaxBrackets',
   },
   'federal-basic-personal-amount': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['federal.bpa', 'federal.bpaMin'],
-    sourceURL: TD1, additionalSourceURLs: [...new Set([T4032('mb'), own])], verifiedAt: AT,
+    sourceURL: own, additionalSourceURLs: [TD1], verifiedAt: AT,
     evidenceFixture: 'federal-bpa-and-phase-out-2026',
-    limitation: 'The phase-out uses taxable income, not the net income the CRA worksheet uses.',
+    limitationId: 'federalBasicPersonalAmount',
   },
   'federal-pension-income-amount': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['taxData.ts:FED_PENSION_AMOUNT'],
     sourceURL: TD1, verifiedAt: AT, evidenceFixture: 'federal-pension-amount-2026',
-    limitation: 'Eligibility by income type is the caller\u2019s job; the amount is not year-switched.',
+    limitationId: 'federalPensionIncomeAmount',
   },
   'federal-age-amount': {
     coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['taxData.ts:FED_AGE_AMOUNT'],
     sourceURL: TD1, verifiedAt: AT, evidenceFixture: 'federal-age-amount-2026',
-    limitation: 'The income test uses taxable income rather than net income, and the amount is a pinned 2026 figure.',
+    limitationId: 'federalAgeAmount',
   },
   'federal-spouse-amount': {
     coverage: 'implemented', scope: 'federal', kind: 'credit',
     ruleFields: ['spouseCredit2026.ts:federalSpouseAmount2026'],
     sourceURL: TD1, verifiedAt: AT, evidenceFixture: 'federal-spouse-amount-2026',
-    limitation: 'Applied only when a spouse net income is supplied, and it draws on the same basic personal amount as the credit above.',
+    limitationId: 'federalSpouseAmount',
   },
   'capital-gains-inclusion-rate': {
     coverage: 'implemented', scope: 'federal', kind: 'inclusion',
     ruleFields: ['taxData.ts:CAPITAL_GAINS_INCLUSION'],
     implementedRule: '50% of a realized capital gain enters taxable income.',
     sourceURL: ITA_38, verifiedAt: AT, evidenceFixture: 'capital-gains-inclusion-2026',
-    limitation: 'The 66.67% rate proposed in 2024 was cancelled and never took effect; the rate is statutory and not year-switched.',
+    limitationId: 'capitalGainsInclusion',
   },
   }
 }
@@ -193,22 +242,15 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const approximation = PROBATE_APPROXIMATED[code]
   // NT and NU price Yukon's flat $140 filing fee, so that is the figure the
   // row must evidence; their own published tiers travel as additional sources
-  // and are named in the limitation rather than silently swapped for the price.
+  // and are named in the row's rendered limitation rather than silently swapped
+  // for the price.
   const pricedFrom = approximation ? TAXTIPS_PROBATE('yt') : table
   return {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
     sourceURL: code === 'ON' ? PROBATE : pricedFrom,
     additionalSourceURLs: [...new Set([...(code === 'ON' ? [table] : []), ...(approximation ? [table] : [])])],
     verifiedAt: AT, evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
-    limitation:
-      'Pinned 2026 figures read from the cited TaxTips.ca table; provinces whose fee is tiered ' +
-      '(BC, AB, PE, NL, NS, NB) are simplified to one flat amount plus rate matching the top tier. ' +
-      (code === 'MB'
-        ? 'Manitoba abolished its probate fee on 2020-11-06, so the correct priced fee is exactly zero and the cited table documents the elimination. '
-        : '') +
-      (approximation
-        ? `This build charges Yukon\u2019s $140 flat filing fee rather than the territory\u2019s own published tiers (${approximation}), so the priced fee is an explicit approximation that is understated above the first tier. `
-        : ''),
+    limitationId: code === 'MB' ? 'probateFeesMB' : approximation ?? 'probateFees',
   }
 }
 
@@ -238,28 +280,25 @@ const provincial = (code: CoverageJurisdiction): Record<string, ImplementedCredi
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
     sourceURL: bpaSource, additionalSourceURLs: bpaSource === january ? [] : [january],
     verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-bpa-2026`,
-    limitation: 'An assumed future year indexes it from the pack\u2019s own policy; the 2026 value is the published one.',
+    limitationId: 'provincialBasicPersonalAmount',
   },
   'provincial-pension-income-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['taxData.ts:PROV_AGE_PENSION.pension'],
     sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-pension-amount-2026`,
-    limitation: 'Not year-switched, and applied with no income test in this model.',
+    limitationId: 'provincialPensionIncomeAmount',
   },
   'provincial-age-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit',
     ruleFields: ['taxData.ts:PROV_AGE_PENSION.ageMax', 'taxData.ts:PROV_AGE_PENSION.ageThreshold',
       'taxData.ts:PROV_AGE_PENSION.ageRate', 'taxData.ts:PROV_AGE_PENSION.seniorSupplement'],
     sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-age-amount-2026`,
-    limitation: 'Pinned 2026 figures, and the income test uses taxable income rather than the net income the TD1 worksheet uses.',
+    limitationId: 'provincialAgeAmount',
   },
   'provincial-spouse-amount': {
     coverage: 'implemented', scope: 'provincial', kind: 'credit',
     ruleFields: ['spouseCredit2026.ts:provincialSpouseAmount2026'],
     sourceURL: TD1_PROV(code.toLowerCase()), verifiedAt: AT, evidenceFixture: `${code.toLowerCase()}-provincial-spouse-amount-2026`,
-    limitation:
-      'The amount is `min(max, threshold \u2212 spouse net income)`, which is algebraically identical to the TD1 ' +
-      'worksheet because every such form publishes `max + low = threshold`; the real gap is the spouse net-income ' +
-      'base, and the maxima and thresholds are pinned 2026 figures.',
+    limitationId: 'provincialSpouseAmount',
   },
   }
 }
@@ -308,12 +347,12 @@ const extras: Partial<Record<CoverageJurisdiction, {
       'ontario-surtax': {
         coverage: 'implemented', scope: 'provincial', kind: 'surtax', ruleFields: ['taxData.ts:ON_SURTAX'],
         sourceURL: T4032('on'), verifiedAt: AT, evidenceFixture: 'ontario-surtax-2026',
-        limitation: 'The two thresholds are pinned 2026 figures, not year-switched.',
+        limitationId: 'ontarioSurtax',
       },
       'ontario-health-premium': {
         coverage: 'implemented', scope: 'provincial', kind: 'levy', ruleFields: ['taxData.ts:ON_HEALTH_PREMIUM'],
         sourceURL: T4032('on'), verifiedAt: AT, evidenceFixture: 'ontario-health-premium-2026',
-        limitation: 'The segments are pinned 2026 figures, not year-switched.',
+        limitationId: 'ontarioHealthPremium',
       },
     },
     unsupported: {
@@ -331,20 +370,31 @@ const extras: Partial<Record<CoverageJurisdiction, {
   },
   QC: {
     implemented: {
+      // BE-38 B3 review (B2): the rendered authority is the Ministry of Finance
+      // parameters PDF the pack itself records as the source of these fields and
+      // which returns 200 and prints the priced 2026 thresholds and BPA. The
+      // bracket *rates* are published only on Revenu Québec's rates page, which
+      // answers a scripted reader with a bot gate; it is listed as an additional
+      // source and the row's rendered limitation says so, so the reader is never
+      // handed an unqualified dead link.
       'quebec-income-tax-brackets': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.brackets'],
-        sourceURL: RQ_RATES, additionalSourceURLs: [QC_PARAMS], verifiedAt: AT, evidenceFixture: 'quebec-brackets-2026',
+        sourceURL: QC_PARAMS, additionalSourceURLs: [RQ_RATES], verifiedAt: AT,
+        evidenceFixture: 'quebec-brackets-2026', limitationId: 'quebecIncomeTaxBrackets',
+        qualifiedSource: true,
       },
       'quebec-basic-personal-amount': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpa'],
-        sourceURL: RQ_RATES, additionalSourceURLs: [QC_PARAMS], verifiedAt: AT, evidenceFixture: 'quebec-bpa-2026',
+        sourceURL: QC_PARAMS, additionalSourceURLs: [RQ_RATES], verifiedAt: AT,
+        evidenceFixture: 'quebec-bpa-2026', limitationId: 'quebecBasicPersonalAmount',
+        qualifiedSource: true,
       },
       'quebec-federal-abatement': {
         coverage: 'implemented', scope: 'federal', kind: 'credit', ruleFields: ['taxData.ts:QC_ABATEMENT'],
         sourceURL: QC_ABATEMENT_2026,
-        additionalSourceURLs: [QC_ABATEMENT_ACT, QC_ABATEMENT_FORM, RQ_RATES], verifiedAt: AT,
+        additionalSourceURLs: [QC_ABATEMENT_ACT, QC_ABATEMENT_FORM], verifiedAt: AT,
         evidenceFixture: 'quebec-abatement-2026',
-        limitation: 'A pinned statutory share, not selected by tax year. No 2026 CRA form is published yet, so the cited form is the most recent edition that prints the 16.5% rate; the Department of Finance report carries it for 2026.',
+        limitationId: 'quebecFederalAbatement',
       },
       // `tax.ts` prices both of these for Quebec: the combined age +
       // retirement-income amount, applied per person on an assumed 50/50
@@ -356,23 +406,30 @@ const extras: Partial<Record<CoverageJurisdiction, {
         coverage: 'implemented', scope: 'provincial', kind: 'credit',
         ruleFields: ['taxData.ts:PROV_AGE_PENSION.ageMax', 'taxData.ts:PROV_AGE_PENSION.ageThreshold',
           'taxData.ts:PROV_AGE_PENSION.ageRate'],
-        sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'qc-provincial-age-amount-2026',
-        limitation: 'Pinned 2026 figures; applied on taxable income per person rather than through Schedule B\u2019s family-income test, which this build does not compute.',
+        sourceURL: QC_PARAMS, additionalSourceURLs: [CFFP_GUIDE], verifiedAt: AT,
+        evidenceFixture: 'qc-provincial-age-amount-2026', limitationId: 'quebecProvincialAgeAmount',
+        qualifiedSource: true,
       },
       'provincial-pension-income-amount': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['taxData.ts:PROV_AGE_PENSION.pension'],
         sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'qc-provincial-pension-amount-2026',
-        limitation: 'Pinned 2026 figures; the retirement-income amount is priced only inside the 65+ combined credit and shares the same per-person Schedule B approximation as the age amount.',
+        limitationId: 'quebecProvincialPensionIncomeAmount',
       },
       'quebec-fss-contribution': {
         coverage: 'implemented', scope: 'provincial', kind: 'levy', ruleFields: ['taxData.ts:QC_FSS'],
         sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'quebec-fss-2026',
-        limitation: 'The legacy preview applies it to taxable income; the person-owned Quebec path uses the Schedule F base.',
+        limitationId: 'quebecFssContribution', qualifiedSource: true,
       },
+      // BE-38 B3 review (B1): the cited document used to be the parameters PDF,
+      // which prints none of these four figures (`taxData.ts` calls them a
+      // legacy preview). The row now cites the 2025 table they were indexed
+      // from and the rendered limitation says they are a derivation pending the
+      // 2026 Schedule K, so the citation no longer records a read that did not
+      // happen.
       'quebec-ramq-premium': {
         coverage: 'implemented', scope: 'provincial', kind: 'levy', ruleFields: ['taxData.ts:QC_RAMQ'],
-        sourceURL: QC_PARAMS, verifiedAt: AT, evidenceFixture: 'quebec-ramq-2026',
-        limitation: 'A legacy preview approximation; Revenu Quebec has not published the 2026 tax-year Schedule K, and the person-owned path gates public coverage instead of pricing it.',
+        sourceURL: CFFP_GUIDE, verifiedAt: AT, evidenceFixture: 'quebec-ramq-2026',
+        limitationId: 'quebecRamqPremium', qualifiedSource: true,
       },
     },
     unsupported: {
@@ -398,7 +455,7 @@ const extras: Partial<Record<CoverageJurisdiction, {
       'manitoba-bpa-phase-out': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpaPhaseOut'],
         sourceURL: T4032('mb'), verifiedAt: AT, evidenceFixture: 'manitoba-bpa-phase-out-2026',
-        limitation: 'The phase-out bounds are not part of the T4032 chart and are a pinned figure.',
+        limitationId: 'manitobaBpaPhaseOut', qualifiedSource: true,
       },
     },
   },
@@ -429,7 +486,7 @@ const extras: Partial<Record<CoverageJurisdiction, {
       'yukon-bpa-phase-out': {
         coverage: 'implemented', scope: 'provincial', kind: 'credit', ruleFields: ['provincial.bpaPhaseOut'],
         sourceURL: T4032('yt'), verifiedAt: AT, evidenceFixture: 'yukon-bpa-phase-out-2026',
-        limitation: 'Mirrors the federal enhanced-BPA phase-down and is a pinned figure rather than a chart line.',
+        limitationId: 'yukonBpaPhaseOut', qualifiedSource: true,
       },
     },
     unsupported: {
@@ -511,6 +568,18 @@ export function evidenceFixtureIds(): string[] {
   const ids = new Set<string>()
   for (const row of coverageMatrix.jurisdictions)
     for (const credit of Object.values(row.implemented)) ids.add(credit.evidenceFixture)
+  return [...ids].sort()
+}
+
+/**
+ * Every `coverageLimitation.<id>` catalogue entry the panel can render, derived
+ * from the matrix rather than hand-listed: a row that gains or loses a limit
+ * changes this list, so the i18n guard cannot drift from the artifact.
+ */
+export function coverageLimitationIds(): string[] {
+  const ids = new Set<string>()
+  for (const row of coverageMatrix.jurisdictions)
+    for (const credit of Object.values(row.implemented)) if (credit.limitationId) ids.add(credit.limitationId)
   return [...ids].sort()
 }
 

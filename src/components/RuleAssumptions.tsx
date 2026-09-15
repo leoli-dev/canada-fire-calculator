@@ -93,8 +93,28 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
       <p>{t('ruleCoverageImplemented', { jurisdiction: coverage.jurisdiction, year: coverage.taxYear })}</p>
       <ul>
         {Object.entries(coverage.implemented).map(([id, credit]) => <li key={id}
-          data-testid={`rule-coverage-implemented-${id}`} data-evidence={credit.evidenceFixture}>
+          data-testid={`rule-coverage-implemented-${id}`} data-evidence={credit.evidenceFixture}
+          data-additional-sources={(credit.additionalSourceURLs ?? []).length}
+          data-limited={String(credit.limitationId !== undefined)}>
           <a href={credit.sourceURL} target="_blank" rel="noreferrer">{t(`coverageImplemented.${id}`)}</a>
+          {/*
+            BE-38 B3 review (B2): `additionalSourceURLs` was modelled and never
+            rendered, so the pack's own authority (and every superseded edition)
+            was invisible while a bot-gated page was the only link. Every cited
+            URL is now shown; a blocked one can only be shown because the row's
+            own rendered limitation says it is blocked.
+          */}
+          {credit.additionalSourceURLs?.length ? <span className="rule-coverage-additional">
+            {credit.additionalSourceURLs.map(url => <a key={url} href={url} target="_blank" rel="noreferrer"
+              data-testid={`rule-coverage-additional-source-${id}`}>{t('ruleCoverageAdditionalSource')}</a>)}
+          </span> : null}
+          {/*
+            BE-38 B3 review (B1): a declared limit that is never rendered is what
+            let the panel tell a reader something the cited document did not
+            support. Every `limitationId` is now rendered with its row.
+          */}
+          {credit.limitationId ? <span className="rule-coverage-limit"
+            data-testid={`rule-coverage-limitation-${id}`}>{t(`coverageLimitation.${credit.limitationId}`)}</span> : null}
         </li>)}
       </ul>
       <p data-testid="rule-coverage-unsupported">
