@@ -226,7 +226,9 @@ export interface ProbateBand {
   fee: number
 }
 /** A jurisdiction's published probate fee. `bands` is a step ladder (NT, NU);
- * every other row is `flat + rate * max(0, value − threshold)`. */
+ * every other row is `flat + rate * max(0, value − threshold)`. A row whose
+ * priced value is a step function with one boundary (YT) still has that shape:
+ * the boundary is `threshold`, the fee is `flat` and the step carries no rate. */
 export interface ProbateRate {
   flat: number
   rate: number
@@ -260,8 +262,22 @@ export interface ProbateRate {
  * tier above it, so every value the instrument covers is priced at the printed
  * amount rather than charged nothing below the boundary.
  *
- * MB's zero is the published abolition of the fee, not a missing figure; YT's
- * $140 and every province remain as before.
+ * BE-38 B4 follow-up (the YT defect this slice prices): YT was `flat: 140,
+ * rate: 0, threshold: 0`, which charged $140 on *every* estate greater than
+ * zero. Yukon's own authority charges nothing there. Its Supreme Court Rules,
+ * Appendix C, Schedule 1 (Fees payable to Territorial Treasurer), item 11 —
+ * "For every grant or ancillary grant of probate and administration ... No fee
+ * is payable ... where a person dies leaving an estate not exceeding $25,000 in
+ * value ... 140" — prints exactly two priced values: $0 inside the exemption
+ * and $140 above it. YT is therefore the third *priced* shape in this table,
+ * not a single unconditional amount, and it is `threshold: 25_000` rather than
+ * 0. The TaxTips.ca table this row used to be keyed to states the same rule in
+ * its own words ("If the estate is worth more than $25,000, the Supreme Court
+ * charges a filing fee of $140") and is the transition source here, never an
+ * authority for the figure.
+ *
+ * MB's zero is the published abolition of the fee, not a missing figure. Every
+ * other province remains as before.
  */
 export const PROBATE_RATES: Record<Province, ProbateRate> = {
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
@@ -274,7 +290,11 @@ export const PROBATE_RATES: Record<Province, ProbateRate> = {
   NB: { flat: 100, rate: 0.005, threshold: 20000 },
   PE: { flat: 400, rate: 0.004, threshold: 100000 },
   NL: { flat: 60, rate: 0.006, threshold: 1000 },
-  YT: { flat: 140, rate: 0, threshold: 0 },
+  // Supreme Court Rules, Appendix C, Schedule 1, item 11: $140 for every grant
+  // of probate and administration, and *no fee* where the estate does not exceed
+  // $25,000 in value. Two priced values, one boundary — not an unconditional
+  // $140 (which is what `threshold: 0` charged).
+  YT: { flat: 140, rate: 0, threshold: 25_000 },
   // R-120-93, Part 2, item 1(a)–(d) — the rungs up to $250,000 — then (e) $435.
   NT: {
     flat: 435, rate: 0, threshold: 250000,
