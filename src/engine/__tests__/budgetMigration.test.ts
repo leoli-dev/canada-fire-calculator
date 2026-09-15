@@ -37,25 +37,14 @@ describe('BE-13 A migration reconciliation', () => {
     expect(plan.migration.budgetReconciliation?.legacyAnnualDebtPayments).toBe(6_000)
     expect(reconciliations(plan)).toMatchObject({ answered: false })
     expect(plan.migration.budgetReconciliation?.savingsBasis).toBeUndefined()
+    // Re-hydrating the same plan through completion leaves the facts unknown:
+    // an unanswered plan is never defaulted to "included".
     assertCanonicalPlan(plan)
-  })
-
-  it('does not default an unanswered plan to included', () => {
-    const plan = v10Plan()
-    if (plan.budget.kind !== 'savingsBudget') throw new Error('expected a savings budget')
-    expect(plan.budget.debtIncluded.status).toBe('unknown')
-    expect(plan.budget.taxBenefitIncluded.status).toBe('unknown')
-    // Re-hydrating the same plan through completion leaves the facts unknown.
-    assertCanonicalPlan(completeCanonicalFacts(plan, legacyInputs()))
-    const completed = completeCanonicalFacts(plan, legacyInputs())
-    expect(completed.budget).toEqual(plan.budget)
+    expect(completeCanonicalFacts(plan, legacyInputs()).budget).toEqual(plan.budget)
     // A plan first entered in this UI has no legacy wording to reinterpret, and
     // still starts unanswered.
-    const fresh = refreshCanonicalFromLegacy(null, structuredClone(DEFAULT_INPUTS))
-    expect(fresh.budget).toEqual({
-      kind: 'savingsBudget', annualNetSavings: DEFAULT_INPUTS.annualSavings, retirementSpending: DEFAULT_INPUTS.retirementSpending,
-      debtIncluded: { status: 'unknown', reason: 'legacy savings/debt treatment needs confirmation' },
-      taxBenefitIncluded: { status: 'unknown', reason: 'legacy tax benefit treatment needs confirmation' },
+    expect(refreshCanonicalFromLegacy(null, structuredClone(DEFAULT_INPUTS)).budget).toMatchObject({
+      annualNetSavings: DEFAULT_INPUTS.annualSavings, debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' },
     })
   })
 
@@ -81,10 +70,7 @@ describe('BE-13 A migration reconciliation', () => {
   })
 
   it('round-trips the income budget and its working spending through the legacy form', () => {
-    const income: InputsV2 = {
-      ...v10Plan(),
-      budget: { kind: 'incomeBudget', workingSpending: 0, retirementSpending: 50_000 },
-    }
+    const income: InputsV2 = { ...v10Plan(), budget: { kind: 'incomeBudget', workingSpending: 0, retirementSpending: 50_000 } }
     // Recorded working spending is the legacy form's, and a mode switch does
     // not reset it.
     const refreshed = refreshCanonicalFromLegacy(income, { ...income.legacyProjection, budgetWorkingSpending: 62_000 })

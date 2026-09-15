@@ -17,7 +17,7 @@ import { NumberInput } from './NumberInput'
 export function budgetStateLabel(budget: BudgetMode): { key: string; params?: Record<string, string> } {
   const facts = budgetFacts(budget)
   if (facts.status === 'ready') return { key: 'budget.stateReady' }
-  if (facts.status === 'needs-facts') return { key: 'budget.stateUnknown', params: { fields: facts.unconfirmed.join(', ') } }
+  if (facts.status === 'needs-facts') return { key: 'budget.stateUnknown', params: { fields: facts.unconfirmed.map(field => field === 'budget.debtIncluded' ? 'budget.fieldDebt' : 'budget.fieldTax').join(', ') } }
   if (facts.status === 'income-budget') return { key: 'budget.stateIncome', params: { detail: facts.detail } }
   return { key: 'budget.stateKnownFalse', params: { detail: facts.detail } }
 }
@@ -31,8 +31,8 @@ function TraceAnswer(props: {
   testId: string
 }) {
   const { t } = useTranslation()
-  return <fieldset className="budget-fact" data-testid={props.testId}>
-    <legend>{props.legend}</legend>
+  return <div className="budget-fact" data-testid={props.testId} role="group" aria-label={props.legend}>
+    <p className="budget-fact-title">{props.legend}</p>
     <p className="hint">{props.detail}</p>
     <div className="choice-group" role="radiogroup" aria-label={props.legend}>
       {([true, false] as const).map((value) => <label key={String(value)} className={props.value === value ? 'selected' : ''}>
@@ -41,7 +41,7 @@ function TraceAnswer(props: {
         <span><strong>{t(value ? 'budget.yes' : 'budget.no')}</strong></span>
       </label>)}
     </div>
-  </fieldset>
+  </div>
 }
 
 export function BudgetMethodPanel() {
@@ -59,8 +59,15 @@ export function BudgetMethodPanel() {
     taxBenefitIncluded: { status: 'unknown', reason: 'not asked yet' },
   }
   const decision: BudgetReconciliation | undefined = canonical?.migration.budgetReconciliation
-  const reconciliationPending = !decision || !decision.answered
-  const debtBaseline = canonical?.migration.budgetReconciliation?.legacyAnnualDebtPayments ?? 0
+  // Only a plan whose figure came from the v10 form has a meaning to reconcile,
+  // and only while its recorded answer still describes the old approximation. A
+  // plan first entered here answers the two facts directly and is never told
+  // that its own amount came from "an earlier plan".
+  const bothRecordedAsNew = budget.kind === 'savingsBudget' &&
+    budget.debtIncluded.status === 'known' && budget.debtIncluded.value &&
+    budget.taxBenefitIncluded.status === 'known' && budget.taxBenefitIncluded.value
+  const migrated = canonical !== null && canonical.migration.sourcePersistVersion !== 11
+  const debtBaseline = decision?.legacyAnnualDebtPayments ?? 0
   const savings = budget.kind === 'savingsBudget' ? budget : null
   const state = budgetStateLabel(budget)
 
@@ -68,9 +75,8 @@ export function BudgetMethodPanel() {
     <h3>{t('budget.title')}</h3>
     <p className="hint">{t('budget.intro')}</p>
 
-    <fieldset className="budget-mode">
-      <legend>{t('budget.title')}</legend>
-      <div className="choice-group" role="radiogroup" aria-label={t('budget.title')}>
+    <div className="budget-mode" role="radiogroup" aria-label={t('budget.title')}>
+      <div className="choice-group">
         <label className={budget.kind === 'savingsBudget' ? 'selected' : ''}>
           <input type="radio" name="budget-mode" checked={budget.kind === 'savingsBudget'} data-testid="budget-mode-savings"
             onChange={() => setBudgetChoice({ kind: 'mode', mode: 'savingsBudget' })} />
@@ -82,7 +88,7 @@ export function BudgetMethodPanel() {
           <span><strong>{t('budget.modeIncome')}</strong><small>{t('budget.modeIncomeDetail')}</small></span>
         </label>
       </div>
-    </fieldset>
+    </div>
 
     {savings && <TraceAnswer
       legend={t('budget.debtIncluded')} detail={t('budget.debtIncludedDetail')} name="budget-debt"
@@ -100,9 +106,9 @@ export function BudgetMethodPanel() {
       <small className="hint">{t('budget.workingSpendingHint')}</small>
     </label>}
 
-    {savings && reconciliationPending && debtBaseline > 0 && canonical?.migration.sourcePersistVersion !== 11 && (
-      <fieldset className="budget-reconciliation" data-testid="budget-reconciliation">
-        <legend>{t('budget.legacyReview')}</legend>
+    {savings && migrated && !bothRecordedAsNew && (
+      <div className="budget-reconciliation" data-testid="budget-reconciliation" role="group" aria-label={t('budget.legacyReview')}>
+        <p className="budget-fact-title">{t('budget.legacyReview')}</p>
         <p className="hint">{t('budget.legacyBaseline', { annualDebt: cad(debtBaseline) })}</p>
         <div className="choice-group" role="radiogroup" aria-label={t('budget.legacyReview')}>
           <label>
@@ -116,14 +122,12 @@ export function BudgetMethodPanel() {
             <span><strong>{t('budget.legacyAdopt')}</strong><small>{t('budget.legacyAdoptDetail')}</small></span>
           </label>
         </div>
-      </fieldset>
+      </div>
     )}
 
     <p className="budget-state" data-testid="budget-state" role="status" aria-live="polite">
       <strong>{t('budget.stateTitle')}</strong>{' '}
-      {reconciliationPending && savings
-        ? t('budget.statePending')
-        : t(state.key, { ...state.params, value: factsAmount(budget, cad) })}
+      {t(state.key, { ...Object.fromEntries(Object.entries(state.params ?? {}).map(([key, value]) => [key, value.split(', ').map(part => part.startsWith('budget.') ? t(part) : part).join(', ')])), value: factsAmount(budget, cad) })}
     </p>
   </section>
 }

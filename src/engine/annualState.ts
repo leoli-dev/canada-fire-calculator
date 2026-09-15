@@ -13,7 +13,7 @@ import {
   fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
 import { plannedFhsaContribution } from './fhsaPlan'
-import { budgetFacts } from './budgetSemantics'
+import { budgetFacts, cashBudget } from './budgetSemantics'
 import { annualTfsaAdditionFor, plannedTfsaLines, tfsaRoomYear, tfsaStatement, type TfsaRoomYear } from './tfsaRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
@@ -184,6 +184,13 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // A snapshot written before BE-36 A has no ledger map; an absent entry means
   // the prior year's FHSA room is not established, not that it was zero.
   const fhsaLedgerByPerson: Record<string, FhsaRoomYear> = state.fhsaLedgers ?? (state.fhsaLedgers = {})
+  // A savings budget is already net of living costs, tax/benefits and separately
+  // listed debt, and the rules below read it. Every reason this kernel cannot
+  // price one is reported on its own, before any of them use it as a fact: a
+  // fact the user has not answered is not the same outcome as an answered flag
+  // whose component is not modelled, and neither is `incomeBudget`.
+  const facts = budgetFacts(plan.budget)
+  if (facts.status !== 'ready') return fail(facts.status === 'invalid' ? 'invalid' : 'unsupported', facts.detail)
   // Rules not yet supplied by BE-11/12/23/38 must not masquerade as exact advice.
   // These obligations follow the account holder's age, even when they remain
   // employed. A does not compute minimums, conversions, or FHSA closure tax.
@@ -277,14 +284,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
   const tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = sum(Object.values(personRows).map(p => p.spending))
-  // A savings budget is already net of living costs, tax/benefits and separately
-  // listed debt. Every reason this kernel cannot price one is reported on its
-  // own: a fact the user has not answered is not the same outcome as an answered
-  // flag whose component is not modelled, and neither is `incomeBudget`.
-  const facts = budgetFacts(plan.budget)
-  if (facts.status !== 'ready') return fail(facts.status === 'invalid' ? 'invalid' : 'unsupported', facts.detail)
-  const cash = facts.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
-  if (!Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
+  const cash = cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
+  if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
   let debtPayments = 0
   for (const [id, debt] of Object.entries(state.byDebt)) {

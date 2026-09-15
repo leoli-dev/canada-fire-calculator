@@ -30,6 +30,11 @@ async function answerCurrentPage(page: Page, pageId: string, targetChoice: 'yes'
     expect(widths.document).toBeLessThanOrEqual(widths.viewport)
   }
   else if (pageId === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+  // BE-13 A: the basis question sits next to the amount and needs an answer.
+  else if (pageId === 'budget.method') {
+    await page.getByTestId('budget-debt-yes').check()
+    await page.getByTestId('budget-tax-yes').check()
+  }
   else if (pageId === 'work.after') await page.getByRole('radio', { name: /No work income/ }).check()
   else if (pageId === 'assets.identify') {
     await page.getByRole('checkbox', { name: 'TFSA' }).check()

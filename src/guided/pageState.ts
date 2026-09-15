@@ -7,7 +7,7 @@ export interface PageState {
   inputs: Inputs
   answerMeta: Record<string, AnswerMeta>
   questionAnswers: Record<string, string | boolean | string[]>
-  canonical: { budget: { kind: 'incomeBudget' | 'savingsBudget' } } | null
+  canonical: { budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } | null
 }
 
 function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
@@ -41,11 +41,21 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
   // labelled legacy preview, while the person-tax capability remains gated.
   if (definition.id === 'income.taxFacts') return true
   if (definition.id === 'budget.method') {
-    if (!answerIsUsable(state.answerMeta['budget.method'])) return false
     const budget = state.canonical?.budget
-    if (!budget || budget.kind === 'incomeBudget') return true
-    return answerIsUsable(state.answerMeta['budget.debtIncluded']) &&
-      answerIsUsable(state.answerMeta['budget.taxBenefitIncluded'])
+    // Answering an inclusion fact is itself an answer to the mode question, so
+    // the mode label is not separately required. What settles the page is the
+    // basis being answerable, plus the migrated-plan question when there is one.
+    const modeAnswered = answerIsUsable(state.answerMeta['budget.method']) || (budget?.kind === 'savingsBudget' &&
+      answerIsUsable(state.answerMeta['budget.debtIncluded']) && answerIsUsable(state.answerMeta['budget.taxBenefitIncluded']))
+    if (!modeAnswered) return false
+    // The basis is answerable when the mode is income, or when both inclusion
+    // facts have been answered; a chosen mode alone is not an answer.
+    const basisAnswerable = !budget || budget.kind === 'incomeBudget' ||
+      (answerIsUsable(state.answerMeta['budget.debtIncluded']) && answerIsUsable(state.answerMeta['budget.taxBenefitIncluded']))
+    // Both facts, not one: a single answered flag leaves the basis unanswerable.
+    const migratedPending = state.canonical !== null && state.canonical.migration.sourcePersistVersion !== 11 &&
+      !(state.canonical.migration.budgetReconciliation?.answered ?? false)
+    return basisAnswerable && !migratedPending
   }
   const choicePages = ['family.people', 'family.children', 'saving.method', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
   if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined

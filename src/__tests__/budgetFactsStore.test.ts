@@ -76,6 +76,9 @@ describe('BE-13 A store budget facts', () => {
     expect(savings().debtIncluded).toEqual({ status: 'known', value: true })
     expect(savings().taxBenefitIncluded).toEqual({ status: 'known', value: true })
     expect(useStore.getState().answerMeta['budget.debtIncluded']?.status).toBe('confirmed')
+    // Answering one flag does not settle the migration question; only an answer
+    // other than "both are included" does.
+    expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: true })
 
     // An amount edit changes only the amount.
     useStore.getState().set({ annualSavings: 30_000 })
@@ -95,7 +98,7 @@ describe('BE-13 A store budget facts', () => {
     assertCanonicalPlan(useStore.getState().canonical)
   })
 
-  it('keeps a recorded answer when the mode round-trips through an income budget', () => {
+  it('keeps a recorded answer through a mode round-trip and a migrated figure through reload', () => {
     openFreshPlan()
     const choice = useStore.getState().setBudgetChoice
     choice({ kind: 'migratedBasis', basis: 'newDefinition' })
@@ -115,20 +118,23 @@ describe('BE-13 A store budget facts', () => {
     expect(savings().debtIncluded).toEqual({ status: 'known', value: true })
     expect(savings().taxBenefitIncluded).toEqual({ status: 'known', value: false })
     expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: true })
-  })
 
-  it('records the migrated-plan answer as a reviewable statement and keeps it after reload', () => {
+    // A persisted v10 figure is presented for review, and its answer is a
+    // reviewable statement that survives a reload without changing the number.
     openMigratedPlan()
     expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: false, legacyAnnualDebtPayments: 6_000 })
     expect(savings().debtIncluded.status).toBe('unknown')
-
     useStore.getState().setBudgetChoice({ kind: 'migratedBasis', basis: 'legacy' })
-    // The legacy value is unchanged; only its meaning is now stated, as "net of
-    // the listed debt and without the tax benefit".
     expect(useStore.getState().canonical?.budget).toMatchObject({
       kind: 'savingsBudget', annualNetSavings: 24_000,
       debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false },
     })
+    // Scenario A keeps the same recorded facts and restores them unchanged.
+    useStore.getState().saveScenarioA()
+    expect(useStore.getState().scenarioACanonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false } })
+    useStore.getState().setBudgetChoice({ kind: 'taxBenefitIncluded', value: true })
+    useStore.getState().restoreScenarioA()
+    expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false }, taxBenefitIncluded: { status: 'known', value: false } })
     reload()
     expect(useStore.getState().canonical?.budget).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: false } })
     expect(useStore.getState().canonical?.migration.budgetReconciliation).toMatchObject({ answered: true, legacyAnnualDebtPayments: 6_000 })

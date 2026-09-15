@@ -264,8 +264,10 @@ export function budgetReviewAnswer(choice: BudgetChoice): string | boolean {
 }
 
 export function setBudgetChoice(state: PlanFieldSnapshot, choice: BudgetChoice): Partial<PlanFieldSnapshot> {
-  if (!state.canonical) throw new Error('A budget choice needs a canonical plan to record it')
-  const previous = state.canonical
+  // A budget answer is often the first thing a user records, so the canonical
+  // plan is created on demand rather than refusing the answer. That first
+  // derivation states nothing the user has not said.
+  const previous = state.canonical ?? refreshCanonicalFromLegacy(null, state.inputs)
   const budget = previous.budget
   const updatedAt = new Date().toISOString()
   const label = BUDGET_REVIEW_FIELD[choice.kind]
@@ -311,8 +313,14 @@ export function setBudgetChoice(state: PlanFieldSnapshot, choice: BudgetChoice):
     nextBudget = choice.kind === 'debtIncluded'
       ? { ...budget, debtIncluded: { status: 'known', value: choice.value } }
       : { ...budget, taxBenefitIncluded: { status: 'known', value: choice.value } }
+    const bothTrue = nextBudget.debtIncluded.status === 'known' && nextBudget.debtIncluded.value &&
+      nextBudget.taxBenefitIncluded.status === 'known' && nextBudget.taxBenefitIncluded.value
     migration = { ...migration, budgetReconciliation: {
-      answered: migration.budgetReconciliation?.answered ?? false,
+      // Answering somewhere other than "both are included" is the answer to
+      // what the figure means, so a plan the user has answered does not keep
+      // asking. A plan still describing the v10 approximation keeps its
+      // separate, explicit review.
+      answered: bothTrue || (migration.budgetReconciliation?.answered ?? false),
       legacyAnnualDebtPayments,
       savingsBasis: { debtIncluded: nextBudget.debtIncluded, taxBenefitIncluded: nextBudget.taxBenefitIncluded },
     } }

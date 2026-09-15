@@ -131,6 +131,10 @@ test('the same funded purchase yields the same result after guided generation an
       await confirmNumbers(page)
       await page.getByRole('radio', { name: 'I do not have a target yet' }).check()
     } else if (id === 'saving.method') await page.getByRole('radio', { name: /monthly amount/ }).check()
+    else if (id === 'budget.method') {
+      await page.getByTestId('budget-debt-yes').check()
+      await page.getByTestId('budget-tax-yes').check()
+    }
     else if (id === 'saving.amount') await page.locator('[data-field="annualSavings"] input').fill('5000')
     else if (id === 'account.tfsa.balance') await page.locator('[data-field="balances.tfsa"] input').fill('5000000')
     else if (id === 'account.rrsp.balance') await page.locator('[data-field="balances.rrsp"] input').fill('1000000')

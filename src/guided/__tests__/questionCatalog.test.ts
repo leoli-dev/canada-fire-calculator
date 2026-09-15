@@ -96,7 +96,7 @@ describe('BE-13 A budget page completeness', () => {
     inputs: DEFAULT_INPUTS,
     answerMeta: {},
     questionAnswers: {},
-    canonical: { budget: { kind: 'savingsBudget' } },
+    canonical: { budget: { kind: 'savingsBudget' }, migration: { sourcePersistVersion: 11 } },
     ...overrides,
   })
   const confirmed = (fields: string[]) => Object.fromEntries(fields.map((field) => [field, { status: 'confirmed' as const, origin: 'user' as const, updatedAt: '2026-01-01T00:00:00.000Z' }]))
@@ -112,15 +112,26 @@ describe('BE-13 A budget page completeness', () => {
     expect(pageIsComplete(budgetPage, state({
       answerMeta: confirmed(['budget.method', 'budget.debtIncluded']),
     }))).toBe(false)
+    // Answering both facts answers the mode question even without a separate
+    // mode click, which is what the guided page does.
     expect(pageIsComplete(budgetPage, state({
-      answerMeta: confirmed(['budget.method', 'budget.debtIncluded', 'budget.taxBenefitIncluded']),
+      answerMeta: confirmed(['budget.debtIncluded', 'budget.taxBenefitIncluded']),
     }))).toBe(true)
+  })
+
+  it('keeps a migrated plan pending until its earlier figure is reconciled', () => {
+    const migrated = (answered: boolean) => state({
+      answerMeta: confirmed(['budget.debtIncluded', 'budget.taxBenefitIncluded']),
+      canonical: { budget: { kind: 'savingsBudget' }, migration: { sourcePersistVersion: 10, budgetReconciliation: { answered } } },
+    }) as PageState
+    expect(pageIsComplete(budgetPage, migrated(false))).toBe(false)
+    expect(pageIsComplete(budgetPage, migrated(true))).toBe(true)
   })
 
   it('accepts a chosen income budget without the savings-only inclusion facts', () => {
     expect(pageIsComplete(budgetPage, state({
       answerMeta: confirmed(['budget.method']),
-      canonical: { budget: { kind: 'incomeBudget' } },
+      canonical: { budget: { kind: 'incomeBudget' }, migration: { sourcePersistVersion: 11 } },
     }))).toBe(true)
   })
 
@@ -132,12 +143,20 @@ describe('BE-13 A budget page completeness', () => {
         'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
       },
     }))).toBe(false)
+    // The mode that was only ever an example is not the user's answer, even
+    // when both facts were answered: the fact answers carry the completeness.
     expect(pageIsComplete(budgetPage, state({
       answerMeta: {
         'budget.method': { status: 'confirmed', origin: 'example', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.debtIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
         'budget.debtIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
         'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
       },
-    }))).toBe(false)
+    }))).toBe(true)
   })
 })

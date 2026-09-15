@@ -63,11 +63,10 @@ describe('BE-13 A budget facts', () => {
     expect(cashBudget({ kind: 'incomeBudget', workingSpending: 1, retirementSpending: 1 }, 2027, 2026, 0.021)).toBeNull()
     const priced = cashBudget(savings({ debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }), 2027, 2026, 0.021)
     expect(priced).toBeCloseTo(40_000 * 1.021, 10)
-  })
-
-  it('reports an unpriceable amount as invalid instead of substituting a number', () => {
-    const facts = budgetFacts(savings({ annualNetSavings: Number.NaN, debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }))
-    expect(facts).toMatchObject({ status: 'invalid' })
+    // The reconciliation baseline is the sum of the listed debt rows, nothing more.
+    expect(listedAnnualDebtPayments({ debts: [{ annualPayment: 6_000 }, { annualPayment: 1_500.5 }] } as Pick<InputsV2, 'debts'>)).toBeCloseTo(7_500.5, 10)
+    // An unpriceable amount is reported as invalid, never substituted with a number.
+    expect(budgetFacts(savings({ annualNetSavings: Number.NaN, debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }))).toMatchObject({ status: 'invalid' })
   })
 })
 
@@ -101,7 +100,4 @@ describe('BE-13 A canonical budget construction', () => {
     expect(budgetFacts(savings()).status).toBe('needs-facts')
   })
 
-  it('sums only the listed debt rows as the reconciliation baseline', () => {
-    expect(listedAnnualDebtPayments({ debts: [{ annualPayment: 6_000 }, { annualPayment: 1_500.5 }] } as Pick<InputsV2, 'debts'>)).toBeCloseTo(7_500.5, 10)
-  })
 })

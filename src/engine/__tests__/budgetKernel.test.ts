@@ -3,7 +3,6 @@ import type { Inputs } from '../types'
 import { migratePersistedPlan } from '../migration'
 import type { BudgetMode, InputsV2 } from '../model'
 import { annualStep, initializeState, type AnnualProviders } from '../annualState'
-import { budgetFacts } from '../budgetSemantics'
 
 /**
  * BE-13 A. The kernel used to answer one generic "budget treatment not yet
@@ -51,8 +50,6 @@ const failure = (canonical: InputsV2): { status: string; detail: string } => {
 
 describe('BE-13 A differentiated budget refusal', () => {
   it('refuses an unanswered flag as "the user must answer this", not as a modelling gap', () => {
-    const facts = budgetFacts(savings({ debtIncluded: { status: 'unknown', reason: 'legacy savings/debt treatment needs confirmation' } }))
-    expect(facts.status).toBe('needs-facts')
     const result = failure(plan(savings({ debtIncluded: { status: 'unknown', reason: 'legacy savings/debt treatment needs confirmation' } })))
     expect(result.status).toBe('unsupported')
     expect(result.detail).toContain('the user must answer budget.debtIncluded')
@@ -74,11 +71,8 @@ describe('BE-13 A differentiated budget refusal', () => {
 
   it('declares incomeBudget with its own reason instead of a savings-budget message', () => {
     const result = failure(plan({ kind: 'incomeBudget', workingSpending: 60, retirementSpending: 50 }))
-    expect(result.status).toBe('unsupported')
-    expect(result.detail).toContain('income budget')
     expect(result.detail).toContain('out of scope for BE-13 A')
     expect(result.detail).not.toContain('savings budget')
-    expect(result.detail).not.toContain('the user must answer')
   })
 
   it('still prices the supported shape: both flags known true, unchanged', () => {

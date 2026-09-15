@@ -22,17 +22,16 @@ export type BudgetFacts =
   | { status: 'invalid'; detail: string }
 
 /**
- * What a `savingsBudget` means, exactly:
- * money available to voluntary investing — FHSA / personal DC / non-registered
- * — *after* living costs, income tax and separately listed debt payments, and
- * *excluding* any tax benefit such as an RRSP deduction difference.
+ * What a `savingsBudget` means, exactly: money available to voluntary investing
+ * (FHSA / personal DC / non-registered) *after* living costs, income tax and
+ * separately listed debt payments, and *excluding* any tax benefit such as an
+ * RRSP deduction difference.
  *
- * The two flags assert the matching facts about the recorded figure. They are
- * `true` only when the user says so:
- * - `debtIncluded`: the figure is already net of the debt payments listed on
- *   this plan, so the ledger must not subtract them a second time.
- * - `taxBenefitIncluded`: the figure already accounts for the RRSP tax
- *   difference, so it must not be added again as refund cash.
+ * Each flag asserts the matching fact about the recorded figure and is `true`
+ * only when the user says so: `debtIncluded` means the figure is already net of
+ * the debt payments listed on this plan (so the ledger must not subtract them
+ * again), and `taxBenefitIncluded` means it already accounts for the RRSP tax
+ * difference (so no refund is added once more).
  */
 export function budgetFacts(budget: BudgetMode): BudgetFacts {
   if (budget.kind === 'incomeBudget') return {
@@ -103,15 +102,11 @@ export function canonicalBudgetForChoice(
 }
 
 /**
- * The canonical budget a recorded migration answer produces, given the balances
- * the legacy form currently holds.
- *
- * `keepLegacy` states on the plan that the v10 figure is *net of* the listed
- * debt payments and excludes the tax benefit — the old meaning, so the kernel
- * reports exactly that shape as unsupported rather than reinterpreting the
- * number. `adoptNewDefinition` asserts both facts, so the same amount now means
- * the new basis. `legacyAnnualDebtPayments` is the baseline the user compared
- * against; it is never added to the figure.
+ * The canonical budget a recorded migration answer produces. `keepLegacy`
+ * states on the plan that the v10 figure is *net of* the listed debt payments
+ * and excludes the tax benefit — the old meaning, so the kernel reports exactly
+ * that shape as unsupported rather than reinterpreting the number. The
+ * alternative asserts both facts, so the same amount now means the new basis.
  */
 export function reconciledBudget(
   legacy: Pick<Inputs, 'annualSavings' | 'retirementSpending'>,
