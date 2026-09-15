@@ -478,6 +478,13 @@ export interface ProjectionResult {
    */
   taxRules?: import('./tax').TaxRuleProvenance
   /**
+   * BE-38 B2: the versioned CCB rule pack and July-June payment period that
+   * priced this run's `ccb` amounts, and whether that period was published or
+   * assumed. Present so a CCB figure is traceable to a sourced pack rather than
+   * to a constant in the engine.
+   */
+  benefitRules?: import('./benefits').BenefitRuleProvenance
+  /**
    * A modeled disposition depends on tax facts this engine cannot verify, so a
    * positive funding, retirement-age or spending claim derived from this run is
    * not verified. `investmentPropertySale` needs a land/building split and CCA

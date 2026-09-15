@@ -62,3 +62,27 @@ it('gives every tax figure the pack does not year-switch a native reason', () =>
     expect(zh[key], key).toBeTruthy()
   }
 })
+
+it('gives every CCB gap the pack names a native reason in all three languages', () => {
+  // BE-38 B2: the CCB pack carries its own unsupported list, so it needs its own
+  // native strings rather than borrowing the GIS or tax ones.
+  const ids = ['ccb-prior-year-afni', 'ccb-shared-custody', 'ccb-child-disability-benefit',
+    'ccb-provincial-top-ups', 'ccb-eligibility-and-residence']
+  for (const id of ids) {
+    const key = `ccbUnsupported.${id}` as keyof typeof en
+    expect(en[key], key).toBeTruthy()
+    expect(fr[key], key).toBeTruthy()
+    expect(zh[key], key).toBeTruthy()
+    expect(fr[key]).not.toBe(en[key])
+    expect(zh[key]).not.toBe(en[key])
+  }
+  for (const key of ['ruleAssumptionsCcbPolicy', 'ruleAssumptionsCcbPolicyPublished',
+    'ruleAssumptionsCcbPolicyAssumed', 'ruleAssumptionsCcbNotModelled',
+    'ruleAssumptionsBenefitRefused'] as const) {
+    expect(en[key], key).toBeTruthy()
+    expect(fr[key], key).toBeTruthy()
+    expect(zh[key], key).toBeTruthy()
+    expect(fr[key]).not.toBe(en[key])
+    expect(zh[key]).not.toBe(en[key])
+  }
+})

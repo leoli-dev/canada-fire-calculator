@@ -13,8 +13,10 @@ import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
+  anchorBenefitRules,
   basisAnnualAmount,
   benefitIncomeBasis,
+  benefitRuleProvenance,
   ccbAnnual,
   oasAfterClawback,
   type BenefitBasis,
@@ -230,7 +232,9 @@ function evaluate(
   const gis = basisAnnualAmount(legacyBasis)
   // CCB's AFNI approximation, unlike GIS, includes OAS
   const totalTaxable = pooledTaxable + extraIncome + oasNet
-  const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable)
+  // BE-38 B2: the CCB is priced from the selected, sourced, versioned pack
+  // (`anchorBenefitRules()`), not from a literal in benefits.ts.
+  const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable, anchorBenefitRules())
   let netCash =
     cpp + pension + oasNet + gis + ccb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
   let rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
@@ -261,7 +265,7 @@ function evaluate(
       const personBasis = benefitIncomeBasis(receivingOas, agesPerPerson, person.taxableExOas,
         { workIncome: person.earnedWork })
       const personGis = basisAnnualAmount(personBasis)
-      const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable)
+      const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable, anchorBenefitRules())
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, gisBasis: personBasis.status === 'modeled' ? personBasis : undefined, ccb: personCcb,
         netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson,
@@ -343,6 +347,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   // instead of silently pricing from another jurisdiction's table.
   const rules = selectPlanTaxRules({ jurisdiction: inputs.province, taxYear: PLAN_TAX_YEAR })
   const taxRules = taxRuleProvenance(rules)
+  // BE-38 B2: one selected, versioned CCB payment-period pack prices every CCB
+  // figure in this run. The plan anchor is a published July-June period, so a
+  // CCB amount is never silently indexed for a projected year.
+  const benefitRules = benefitRuleProvenance(anchorBenefitRules())
   const bal: Record<AccountType, number> = { ...inputs.balances }
   // ACB stays in nominal dollars; liquid balances and public charts remain in
   // base-year purchasing power until the annual-state consumer migration.
@@ -1139,6 +1147,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
     /** BE-38 B1: which versioned pack priced every tax figure above. */
     taxRules,
+    /** BE-38 B2: which versioned CCB pack and payment period priced every `ccb`. */
+    benefitRules,
     capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale'
       : nonRegLossTaxUnverified ? 'nonRegisteredLoss' : undefined,
     rows,

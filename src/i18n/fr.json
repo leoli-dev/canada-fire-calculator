@@ -1392,5 +1392,16 @@
   "taxUnsupported.capital-gains-inclusion": "le taux d’inclusion des gains en capital (part statutaire épinglée de 50 %)",
   "taxUnsupported.probate-fees": "les frais d’homologation et d’administration successorale (valeurs 2026 épinglées servant aux frais de succession)",
   "taxUnsupported.gst-hst-and-cash-benefits": "le crédit pour la TPS/TVH et les prestations provinciales en espèces; aucun résultat n’est donc une situation complète après prestations",
-  "taxUnsupported.provincial-premiums-and-levies": "les primes et cotisations propres à la province (surtaxe et assurance-santé de l’Ontario, ou abattement, cotisation au FSS et prime de la RAMQ au Québec; valeurs épinglées)"
+  "taxUnsupported.provincial-premiums-and-levies": "les primes et cotisations propres à la province (surtaxe et assurance-santé de l’Ontario, ou abattement, cotisation au FSS et prime de la RAMQ au Québec; valeurs épinglées)",
+  "ruleAssumptionsCcbPolicy": "Période de paiement de l’ACE retenue : {{period}} — {{policy}}.",
+  "ruleAssumptionsCcbPolicyPublished": "montants publiés",
+  "ruleAssumptionsCcbPolicyAssumed": "hypothèse : les montants admissibles du paquet indexés une fois par année de programme à {{rate}} depuis la période publiée {{from}}",
+  "ruleAssumptionsCcbNotModelled": "Ce paquet d’ACE ne modélise pas :",
+  "ruleAssumptionsBenefitRefused": "Règles d’ACE indisponibles, aucun montant de prestation pour enfants n’est calculé : {{reason}}",
+  "ccbUnsupported.ccb-prior-year-afni": "le revenu familial net rajusté de l’année précédente : le vrai test utilise le revenu de l’année précédente, ce calculateur utilise celui de la même année",
+  "ccbUnsupported.ccb-shared-custody": "la garde partagée à 50 %, donc un enfant n’est jamais réparti entre deux ménages bénéficiaires",
+  "ccbUnsupported.ccb-child-disability-benefit": "la Prestation pour enfants handicapés, un supplément distinct qui n’est ajouté à aucun montant ici",
+  "ccbUnsupported.ccb-provincial-top-ups": "les prestations provinciales pour enfants (par exemple l’Allocation famille du Québec); aucun résultat n’est donc une situation complète de prestations pour enfants",
+  "ccbUnsupported.ccb-eligibility-and-residence": "les faits d’admissibilité (résidence, statut d’immigration, règles de prestation prolongée de 18 mois) : le calculateur évalue les enfants admissibles qu’on lui indique",
+  "ruleCcbRatesSource": "Taux de réduction de l’ACE (loi)"
 }

@@ -34,6 +34,16 @@ export {
   gisHouseholdCategory,
   gisWorkExemption,
   ccbAnnual,
+  // BE-38 B2: the plan-anchored, versioned CCB rule selection the computation
+  // reads, its refusals and the provenance every priced CCB result carries.
+  PLAN_BENEFIT_PERIOD,
+  anchorBenefitRules,
+  selectPlanBenefitRules,
+  trySelectBenefitRules,
+  benefitRuleProvenance,
+  type BenefitRuleContext,
+  type BenefitRuleSelection,
+  type BenefitRuleProvenance,
   CPP_MAX_AT_65,
   CPP_OAS_UNSUPPORTED_PATHS,
   type BenefitUnsupportedPath,

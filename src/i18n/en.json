@@ -1383,5 +1383,16 @@
   "taxUnsupported.capital-gains-inclusion": "the capital-gains inclusion rate (a pinned 50% statutory share)",
   "taxUnsupported.probate-fees": "probate and estate administration fees (pinned 2026 figures used for the estate fee)",
   "taxUnsupported.gst-hst-and-cash-benefits": "the GST/HST credit and provincial cash benefits, so no result is a complete after-benefit position",
-  "taxUnsupported.provincial-premiums-and-levies": "the jurisdiction’s own premiums and levies (Ontario surtax and health premium, or Quebec’s abatement, FSS contribution and RAMQ premium; pinned figures)"
+  "taxUnsupported.provincial-premiums-and-levies": "the jurisdiction’s own premiums and levies (Ontario surtax and health premium, or Quebec’s abatement, FSS contribution and RAMQ premium; pinned figures)",
+  "ruleAssumptionsCcbPolicy": "Selected CCB payment period: {{period}} — {{policy}}.",
+  "ruleAssumptionsCcbPolicyPublished": "published figures",
+  "ruleAssumptionsCcbPolicyAssumed": "assumed: the pack’s eligible amounts indexed once per program year at {{rate}} from the published period {{from}}",
+  "ruleAssumptionsCcbNotModelled": "This CCB pack does not model:",
+  "ruleAssumptionsBenefitRefused": "CCB rules unavailable, so no child-benefit amount is priced: {{reason}}",
+  "ccbUnsupported.ccb-prior-year-afni": "the prior-year adjusted family net income: the real test uses the previous year’s income, this calculator uses the same year’s",
+  "ccbUnsupported.ccb-shared-custody": "shared custody at 50%, so a child is never split between two recipient households",
+  "ccbUnsupported.ccb-child-disability-benefit": "the Child Disability Benefit, a separate supplement that is not added to any amount here",
+  "ccbUnsupported.ccb-provincial-top-ups": "provincial child benefits (for example Quebec’s Family Allowance), so no result is a complete child-benefit position",
+  "ccbUnsupported.ccb-eligibility-and-residence": "eligibility facts (residency, immigration status, the 18-month extended-benefit rules): the calculator prices the eligible children it is given",
+  "ruleCcbRatesSource": "CCB reduction rates (statute)"
 }

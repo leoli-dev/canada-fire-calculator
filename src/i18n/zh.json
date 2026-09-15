@@ -1392,5 +1392,16 @@
   "taxUnsupported.capital-gains-inclusion": "资本利得计入率（固定的 50% 法定比例）",
   "taxUnsupported.probate-fees": "遗嘱认证与遗产管理费用（用于遗产费用的固定 2026 年数值）",
   "taxUnsupported.gst-hst-and-cash-benefits": "GST/HST 抵免与省级现金福利，因此任何结果都不是完整的税后福利状况",
-  "taxUnsupported.provincial-premiums-and-levies": "该省自身的附加税与征费（安大略省的附加税与健康保险费，或魁北克的减征额、FSS 缴款与 RAMQ 保险费；固定数值）"
+  "taxUnsupported.provincial-premiums-and-levies": "该省自身的附加税与征费（安大略省的附加税与健康保险费，或魁北克的减征额、FSS 缴款与 RAMQ 保险费；固定数值）",
+  "ruleAssumptionsCcbPolicy": "所选 CCB 支付期：{{period}} — {{policy}}。",
+  "ruleAssumptionsCcbPolicyPublished": "已公布数值",
+  "ruleAssumptionsCcbPolicyAssumed": "假设：该规则包中可指数化的金额自已公布支付期 {{from}} 起，每个福利年度按 {{rate}} 调整一次",
+  "ruleAssumptionsCcbNotModelled": "该 CCB 规则包未建模：",
+  "ruleAssumptionsBenefitRefused": "CCB 规则不可用，因此不计算任何儿童福利金额：{{reason}}",
+  "ccbUnsupported.ccb-prior-year-afni": "上一年度调整后家庭净收入：真实测试使用上一年度收入，本计算器使用同一年度收入",
+  "ccbUnsupported.ccb-shared-custody": "50% 共同抚养：本计算器不会把一个孩子分摊到两个领取家庭",
+  "ccbUnsupported.ccb-child-disability-benefit": "儿童残疾福利：这是一项单独的补助，不会加到此处的任何金额上",
+  "ccbUnsupported.ccb-provincial-top-ups": "省级儿童福利（例如魁北克家庭津贴），因此任何结果都不是完整的儿童福利状况",
+  "ccbUnsupported.ccb-eligibility-and-residence": "资格事实（居住、移民身份、18 个月延伸福利规则）：计算器只按输入对符合条件的孩子计价",
+  "ruleCcbRatesSource": "CCB 递减率（法条）"
 }
