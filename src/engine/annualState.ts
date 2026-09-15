@@ -13,6 +13,7 @@ import {
   fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
 import { plannedFhsaContribution } from './fhsaPlan'
+import { budgetFacts } from './budgetSemantics'
 import { annualTfsaAdditionFor, plannedTfsaLines, tfsaRoomYear, tfsaStatement, type TfsaRoomYear } from './tfsaRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
@@ -277,10 +278,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = sum(Object.values(personRows).map(p => p.spending))
   // A savings budget is already net of living costs, tax/benefits and separately
-  // listed debt. Evaluated cash is a consistency check, never extra money.
-  if (plan.budget.kind !== 'savingsBudget' || plan.budget.debtIncluded.status !== 'known' || !plan.budget.debtIncluded.value ||
-      plan.budget.taxBenefitIncluded.status !== 'known' || !plan.budget.taxBenefitIncluded.value) return fail('unsupported', 'budget treatment not yet reconciled')
-  const cash = plan.budget.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
+  // listed debt. Every reason this kernel cannot price one is reported on its
+  // own: a fact the user has not answered is not the same outcome as an answered
+  // flag whose component is not modelled, and neither is `incomeBudget`.
+  const facts = budgetFacts(plan.budget)
+  if (facts.status !== 'ready') return fail(facts.status === 'invalid' ? 'invalid' : 'unsupported', facts.detail)
+  const cash = facts.annualNetSavings * Math.pow(1 + plan.inflation, year - plan.baseYear)
   if (!Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
   let debtPayments = 0

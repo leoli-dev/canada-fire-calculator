@@ -1,8 +1,7 @@
 import type { Inputs, InvestmentProperty } from './types'
-import type { Account, Debt, IncomeSource, InputsV2, Person, Property, Provenance, TaxShares } from './model'
+import type { Account, BudgetMode, Debt, IncomeSource, InputsV2, Person, Property, Provenance, TaxShares } from './model'
 import { fhsaPlanRowId } from './fhsaPlan'
 import { assertLegacyInputs } from './modelValidation'
-
 const unknown = (reason: string): { status: 'unknown'; reason: string } => ({ status: 'unknown', reason })
 const known = <T>(value: T): { status: 'known'; value: T } => ({ status: 'known', value })
 const source: Provenance = { origin: 'legacy', sourceYear: null }
@@ -336,7 +335,14 @@ export function migratePersistedPlan(raw: unknown, persistVersion: number, baseY
     dependents: (input.children ?? []).map((child, index) => ({ id: legacyId('dependent', index), ageInBaseYear: finite(child.age), provenance: source })),
     strategy: input.strategy, goal: input.goal ?? 'legacy', lifeExpectancy: finite(input.lifeExpectancy), targetAssets: input.fireTargetAssets == null ? unknown('target not supplied') : known(finite(input.fireTargetAssets)), legacyProjection: input,
     taxProfile: { spouseSupported: unknown('spouse support/cohabitation not confirmed'), pensionSplit: null },
-    migration: { sourcePersistVersion: persistVersion, ownershipNeedsConfirmation: couple, ageBasisNeedsConfirmation: true, savingsBasisNeedsConfirmation: true },
+    // BE-13 A: the v10 `annualSavings` figure is kept verbatim and the two
+    // inclusion facts stay unknown until the user answers them. The
+    // reconciliation records the debt baseline the user will compare against;
+    // it is pending, so nothing is reinterpreted by migration itself.
+    migration: {
+      sourcePersistVersion: persistVersion, ownershipNeedsConfirmation: couple, ageBasisNeedsConfirmation: true, savingsBasisNeedsConfirmation: true,
+      budgetReconciliation: { answered: false, legacyAnnualDebtPayments: debts.reduce((total, debt) => total + debt.annualPayment, 0) },
+    },
   }
 }
 
@@ -388,6 +394,7 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
     // migrate. Keep unresolved budget facts unknown; do not turn assumptions
     // into user confirmations merely to allow the existing preview.
     next.migration = { ...next.migration, sourcePersistVersion: 11, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
+    next.budget = carryRecordedBudget(inputs, null, next.budget)
     return next
   }
   if (returningPartner) next.people = next.people.map(person => person.id === returningPartner.id ? {
@@ -557,7 +564,36 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   const nextIncomeIds = new Set(next.incomeSources.map(income => income.id))
   next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
   next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.kind !== 'nonReg' && a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }
+  next.budget = carryRecordedBudget(inputs, previous, next.budget)
   return next
+}
+
+/**
+ * BE-13 A. The canonical budget while the legacy form is still the editor.
+ *
+ * The legacy form holds one `annualSavings` figure and no inclusion facts, so
+ * the canonical budget cannot be rebuilt from the form alone without inventing
+ * the user's answers. This keeps the recorded answer and re-bases it on the
+ * current form figure:
+ *
+ * - a settled migration decision keeps its meaning and carries the current
+ *   legacy number, so a later number edit can neither drop nor rewrite it;
+ * - an `incomeBudget` choice round-trips its working spending through the form;
+ * - otherwise the facts the user already answered are preserved exactly as
+ *   recorded (`unknown` included) and only the amount follows the form.
+ * `migrated` is the freshly migrated budget, which is the only source when the
+ * app has no previous canonical plan.
+ */
+function carryRecordedBudget(inputs: Inputs, previous: InputsV2 | null, migrated: BudgetMode): BudgetMode {
+  const recorded = previous?.budget
+  if (!recorded) return migrated
+  // The live answers on the plan's own budget are authoritative; the archive is
+  // only what a turn in `incomeBudget` restores. The legacy form owns the
+  // number, so an amount edit is never silently ignored, and the recorded
+  // answers — an `unknown` included — are carried exactly as they are.
+  return recorded.kind === 'incomeBudget'
+    ? { kind: 'incomeBudget', workingSpending: inputs.budgetWorkingSpending ?? 0, retirementSpending: finite(inputs.retirementSpending) }
+    : { ...recorded, annualNetSavings: finite(inputs.annualSavings), retirementSpending: finite(inputs.retirementSpending) }
 }
 
 /** Swap display roles without changing legal ownership or source references. */

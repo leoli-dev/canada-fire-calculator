@@ -1,45 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
-import { accountSummary, answerIsUsable } from '../guidedReview'
+import { accountSummary } from '../guidedReview'
+import { pageIsComplete } from '../guided/pageState'
 import { pageById, QUESTION_CATEGORIES, questionForField, visibleQuestionPages } from '../guided/questionCatalog'
 import type { QuestionDefinition } from '../guided/schema'
 import { useStore } from '../store'
 import { useCad } from '../format'
 import { QuestionPage } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
-
-function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
-  return definition.fieldBindings.filter((field) => partner ||
-    (!field.startsWith('partner.') && field !== 'lockedRetirement.owner'))
-}
-
-function pageIsComplete(definition: QuestionDefinition, state: ReturnType<typeof useStore.getState>): boolean {
-  if (definition.id === 'time.work' && state.questionAnswers['time.work.target'] === 'yes') {
-    return answerIsUsable(state.answerMeta.fireAge) &&
-      answerIsUsable(state.answerMeta.fireTargetAssets) &&
-      (state.inputs.fireTargetAssets ?? 0) > 0
-  }
-  if (definition.id === 'housing.other') {
-    return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
-  }
-  // Unknown tax facts are a valid saved state: guided users may still see a
-  // labelled legacy preview, while the person-tax capability remains gated.
-  if (definition.id === 'income.taxFacts') return true
-  const choicePages = ['family.people', 'family.children', 'saving.method', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
-  if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined
-  const fields = requiredFields(definition, !!state.inputs.partner)
-  if (!fields.length) return true
-  const fieldsAreUsable = fields.every((field) => answerIsUsable(state.answerMeta[field]) || Object.entries(state.answerMeta).some(([candidate, meta]) => candidate.startsWith(`${field}.`) && answerIsUsable(meta)))
-  if (definition.id === 'locked.access' && state.inputs.partner &&
-      (state.answerMeta['lockedRetirement.owner']?.status !== 'confirmed' ||
-        !answerIsUsable(state.answerMeta['lockedRetirement.owner']))) return false
-  if (definition.id === 'allocation.tfsa') {
-    const split = state.inputs.savingsSplit
-    return fieldsAreUsable && Math.abs(split.tfsa + split.rrsp + split.nonReg - 1) <= 0.005
-  }
-  return fieldsAreUsable
-}
 
 function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
   const { t } = useTranslation()

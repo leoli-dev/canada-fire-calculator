@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
+import { pageIsComplete, type PageState } from '../pageState'
 import { DEFAULT_INPUTS } from '../../store'
 import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
@@ -86,5 +87,57 @@ describe('question catalog', () => {
     expect(expanded.some((page) => page.id === 'cpp.partner')).toBe(true)
     expect(expanded.some((page) => page.id === 'rental.0.value')).toBe(true)
     expect(expanded.some((page) => page.id === 'debt.0.balance')).toBe(true)
+  })
+})
+
+describe('BE-13 A budget page completeness', () => {
+  const budgetPage = pageById('budget.method')!
+  const state = (overrides: Partial<PageState> = {}): PageState => ({
+    inputs: DEFAULT_INPUTS,
+    answerMeta: {},
+    questionAnswers: {},
+    canonical: { budget: { kind: 'savingsBudget' } },
+    ...overrides,
+  })
+  const confirmed = (fields: string[]) => Object.fromEntries(fields.map((field) => [field, { status: 'confirmed' as const, origin: 'user' as const, updatedAt: '2026-01-01T00:00:00.000Z' }]))
+
+  it('sits in the saving category right after the amount it reinterprets', () => {
+    const ids = QUESTION_CATALOG.filter((page) => page.categoryId === 'saving').map((page) => page.id)
+    expect(ids).toEqual(['saving.method', 'saving.amount', 'budget.method', 'work.after', 'work.amount', 'work.period'])
+  })
+
+  it('is pending until the mode and both inclusion facts are answered', () => {
+    expect(pageIsComplete(budgetPage, state())).toBe(false)
+    expect(pageIsComplete(budgetPage, state({ answerMeta: confirmed(['budget.method']) }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.method', 'budget.debtIncluded']),
+    }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.method', 'budget.debtIncluded', 'budget.taxBenefitIncluded']),
+    }))).toBe(true)
+  })
+
+  it('accepts a chosen income budget without the savings-only inclusion facts', () => {
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: confirmed(['budget.method']),
+      canonical: { budget: { kind: 'incomeBudget' } },
+    }))).toBe(true)
+  })
+
+  it('does not call an unknown or example answer usable', () => {
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
+        'budget.method': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.debtIncluded': { status: 'unknown', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(false)
+    expect(pageIsComplete(budgetPage, state({
+      answerMeta: {
+        'budget.method': { status: 'confirmed', origin: 'example', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.debtIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+        'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
+      },
+    }))).toBe(false)
   })
 })

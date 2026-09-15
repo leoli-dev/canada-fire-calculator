@@ -1,5 +1,37 @@
 {
   "title": "🇨🇦 加拿大 FIRE 计算器",
+  "budget": {
+    "title": "储蓄金额的口径",
+    "intro": "计划需要明确你投入投资的金额按哪种口径记录。请选你实际使用的一种，两者不能互换。",
+    "modeSavings": "储蓄金额（可投资的净资金）",
+    "modeSavingsDetail": "填写扣掉生活费、所得税和后面单列贷款还款后，还能用于投资的金额。",
+    "modeIncome": "收入与支出",
+    "modeIncomeDetail": "填写工作期支出，由收入支撑现金流。本切片尚未建模。",
+    "debtIncluded": "这个金额是否已经扣掉了你列出的贷款还款？",
+    "debtIncludedDetail": "选“是”表示计划不会把这些还款再扣一次。",
+    "taxBenefitIncluded": "是否已经反映RRSP/RRIF抵税差额？",
+    "taxBenefitIncludedDetail": "选“是”表示不会再加一笔退税。",
+    "yes": "是，已经包含",
+    "no": "否，还没有包含",
+    "unknown": "我还不能确定",
+    "workingSpending": "工作期支出（每年）",
+    "workingSpendingHint": "填写正常工作年份的支出，不含后面单列的贷款还款。这不是退休支出。",
+    "legacyReview": "这个金额来自你以前的计划，当时用的是另一种定义。请先确认它的含义，再让它参与计算。",
+    "legacyKeep": "保留为近似口径",
+    "legacyKeepDetail": "把该金额视为已扣掉单列贷款还款、且不含抵税差额。计划会如实记录，在规则就绪前不给定价。",
+    "legacyAdopt": "按新的净储蓄口径处理",
+    "legacyAdoptDetail": "同一个数字按上面的定义理解：已扣生活费、税和单列贷款还款，且不含单独退税。",
+    "legacyBaseline": "你以前的计划每年还摊销 {{annualDebt}} 的单列贷款还款。该基线只用于对照，系统不会自动加进你的金额。",
+    "stateTitle": "已记录口径",
+    "stateReady": "就绪：每年净储蓄 {{value}}，已扣单列贷款还款与抵税差额。",
+    "stateUnknown": "仍待回答：{{fields}}。计划保持未知，不会默认选“是”。",
+    "stateKnownFalse": "已记录为未包含：{{detail}}",
+    "stateIncome": "已记录为收入预算。{{detail}}",
+    "stateLegacy": "已记录为旧近似口径：已扣单列贷款还款，且不含抵税差额。",
+    "statePending": "尚未确认。计划不会替你猜测这个储蓄金额的含义。",
+    "fieldDebt": "已扣贷款还款",
+    "fieldTax": "已反映RRSP抵税差额"
+  },
   "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；税表、策略排名和精确比较暂不展示。",
   "be11SingleEstimate": "单人计划的工作期或未支持事件仍沿用旧税额、图表和规划工具估算。",
   "be11QcLimit": "本计划的魁省税务精度受限。药保覆盖未知或使用公保时，仍需尚未公布的2026年附表K；其他未支持事件也保持估算。税务建议与精确比较暂不展示。",
@@ -1002,6 +1034,9 @@
       },
       "saving_amount": {
         "question": "你实际会新增多少储蓄和投资？"
+      },
+      "budget_method": {
+        "question": "这个储蓄金额已经扣掉了哪些项目？"
       },
       "work_after": {
         "question": "停止全职工作后，还会有其他工作收入吗？"

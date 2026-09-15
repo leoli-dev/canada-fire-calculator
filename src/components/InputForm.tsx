@@ -31,6 +31,7 @@ import { PensionSourceNote } from './PensionSourceNote'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 import { parseField, type SharedFieldId } from '../forms/fieldRegistry'
+import { BudgetMethodPanel } from './BudgetMethodPanel'
 import { RuleAssumptions } from './RuleAssumptions'
 import { contentForField, professionalContentApplies } from '../content/fieldContent'
 import { ProfessionalFieldHelp } from './FieldContentHelp'
@@ -179,6 +180,7 @@ export function InputForm() {
           </select>
         </label>
         <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
+        <BudgetMethodPanel />
         <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
         <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
           <summary>{t('worksheetTitle')}</summary>

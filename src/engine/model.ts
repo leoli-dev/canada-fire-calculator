@@ -127,6 +127,29 @@ export interface Dependent {
 export type BudgetMode =
   | { kind: 'incomeBudget'; workingSpending: number; retirementSpending: number }
   | { kind: 'savingsBudget'; annualNetSavings: number; retirementSpending: number; debtIncluded: Known<boolean>; taxBenefitIncluded: Known<boolean> }
+/**
+ * BE-13 A. Whether the user answered what a `savingsBudget` figure means, plus
+ * the answers themselves so they survive a spell in `incomeBudget`.
+ *
+ * The two `Known<boolean>` flags on the active budget are the live answer.
+ * `savingsBasis` archives them while the plan is in `incomeBudget`, so a mode
+ * switch can neither lose the answers nor invent them on the way back, and
+ * `answered` is kept separately so a mode switch can never make an unanswered
+ * plan look settled. `legacyAnnualDebtPayments` is the nominal sum of the debt
+ * rows the v10 plan already amortizes: the comparison baseline, never a
+ * statutory figure, and no pricing path adds it to the recorded amount.
+ */
+export type BudgetBasis = {
+  debtIncluded: Known<boolean>
+  taxBenefitIncluded: Known<boolean>
+}
+export type BudgetReconciliation = {
+  /** Whether the "what does this figure mean?" question has been answered. */
+  answered: boolean
+  legacyAnnualDebtPayments: number
+  /** The savings answers, kept while the plan is in `incomeBudget`. */
+  savingsBasis?: BudgetBasis
+}
 export interface InputsV2 {
   schemaVersion: 2
   baseYear: number
@@ -193,7 +216,16 @@ export interface InputsV2 {
    * addition is assumed. See BE-27 A.
    */
   tfsaStatement?: Record<EntityId, { withdrawals: { id: string; calendarYear: number; amount: number }[]; provenance: Provenance }>
-  migration: { sourcePersistVersion: number; ownershipNeedsConfirmation: boolean; ageBasisNeedsConfirmation: boolean; savingsBasisNeedsConfirmation: boolean }
+  migration: {
+    sourcePersistVersion: number
+    ownershipNeedsConfirmation: boolean
+    ageBasisNeedsConfirmation: boolean
+    savingsBasisNeedsConfirmation: boolean
+    /** BE-13 A. Absent means the savings basis was never asked about. */
+    budgetReconciliation?: BudgetReconciliation
+    /** BE-13 A. Reconciliation baseline only; no pricing path reads it. */
+    legacyAnnualDebtPayments?: number
+  }
 }
 export type PrecisionGate = { allowed: boolean; reasons: string[] }
 export function precisionGate(plan: InputsV2): PrecisionGate {

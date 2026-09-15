@@ -6,7 +6,7 @@ import { track, trackOnce } from './analytics'
 import type { InputsV2 } from './engine/model'
 import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegacy } from './engine/migration'
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
-import { applyBenefitAnswerMeta, changeAccountPresence, changeIntent, editField, reconcileDirectFields, writtenBenefitFields, type RewrittenBenefitField } from './forms/planCommands'
+import { applyBenefitAnswerMeta, changeAccountPresence, changeIntent, editField, reconcileDirectFields, setBudgetChoice as applyBudgetChoice, writtenBenefitFields, type BudgetChoice, type RewrittenBenefitField } from './forms/planCommands'
 import type { SharedFieldId } from './forms/fieldRegistry'
 
 export const DEFAULT_PARTNER: Partner = {
@@ -38,6 +38,9 @@ export const DEFAULT_INPUTS: Inputs = {
   lifeExpectancy: 90,
   province: 'ON',
   annualSavings: 40000,
+  // BE-13 A: an unrecorded working-period spending is `null`, not a guess from
+  // the retirement figure.
+  budgetWorkingSpending: null,
   savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
   retirementSpending: 50000,
   returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
@@ -166,6 +169,7 @@ interface Store {
   scenarioA: Inputs | null
   set: (patch: Partial<Inputs>) => void
   editSharedField: (field: SharedFieldId, raw: string, unit?: 'canonical' | 'monthly', origin?: AnswerOrigin) => void
+  setBudgetChoice: (choice: BudgetChoice) => void
   setAccountPresence: (account: 'tfsa' | 'rrsp' | 'nonReg', present: boolean) => void
   commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
   setDisplayMode: (m: DisplayMode) => void
@@ -421,6 +425,13 @@ export const useStore = create<Store>()(
       editSharedField: (field, raw, unit = 'canonical', origin = 'user') => {
         trackOnce('adjust_inputs')
         set((s) => editField(s, field, raw, unit, origin))
+      },
+      // BE-13 A. A budget answer is a recorded financial fact, not a display
+      // preference, so it goes through one command that rewrites canonical and
+      // never through a raw `set` that would drop the previous facts.
+      setBudgetChoice: (choice) => {
+        track('budget_choice', { kind: choice.kind })
+        set((s) => applyBudgetChoice(s, choice))
       },
       setAccountPresence: (account, present) => {
         trackOnce('adjust_inputs')
