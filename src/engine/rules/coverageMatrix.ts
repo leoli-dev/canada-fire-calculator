@@ -53,8 +53,10 @@ export interface ImplementedCreditCoverage {
   implementedRule?: string
   /**
    * The authority the figures were read from, and the document the panel shows
-   * a reader. Where `qualifiedSource` is set this is instead the document the
-   * figures were derived from; the row's `limitation` says what was derived.
+   * a reader. Where `qualifiedSource` is set, at least one priced figure is not
+   * printed here — it is an approximation derived from another table, or a rate
+   * carried by a page linked as an additional source — and the row's rendered
+   * `limitation` says which figure and where it is printed.
    */
   sourceURL: string
   additionalSourceURLs?: string[]
