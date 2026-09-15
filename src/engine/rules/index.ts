@@ -244,6 +244,41 @@ const BC_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-pub
 const NL_2026_JULY = 'https://www.canada.ca/en/revenue-agency/services/forms-publications/payroll/t4008-payroll-deductions-supplementary-tables/t4008nl-july/t4008nl-july-general-information.html'
 const PE_2026_GOV = 'https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax'
 /**
+ * BE-38 B3: the dedicated CRA T4032-PE edition that carries PE's sixth bracket.
+ * PE's own page is bot-gated, so the July guide and CRA's per-province rate
+ * table are what this pack could verify the resolution against.
+ */
+const PE_2026_JULY = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-pe-7-26e.pdf'
+/**
+ * The two source conflicts the pack recorded that BE-38 B3 had to resolve,
+ * with the authority that governs and whether the resolution moved a priced
+ * number. Exported so the coverage matrix, a test and the UI read the same
+ * record rather than three paraphrases of it.
+ */
+export const sourceResolutions = [
+  {
+    jurisdiction: 'MB' as Province,
+    resolvedAt: '2026-09-15',
+    governingSourceURL: TAX_2026_PDF('MB'),
+    corroboratingSourceURLs: ['https://www.gov.mb.ca/finance/budget26/'],
+    conflictingSourceURL: CRA_2026_RATES,
+    resolution:
+      'The dedicated CRA T4032-MB (January 2026) guide governs. Its Chart 2 lists the 2026 brackets as $47,000 at 10.8%, $100,000 at 12.75% and 17.4% above, and its basic personal amount as $15,780; all match this pack. The competing figure on CRA\u2019s general "current year" rates page ($47,564/$101,200) is contradicted by the dedicated provincial guide and by Manitoba\u2019s 2026 budget, which paused bracket indexation for the 2026 tax year. A generic multi-jurisdiction page does not outrank the jurisdiction\u2019s own guide.',
+    pricedChange: 'none',
+  },
+  {
+    jurisdiction: 'PE' as Province,
+    resolvedAt: '2026-09-15',
+    governingSourceURL: PE_2026_JULY,
+    corroboratingSourceURLs: [CRA_2026_RATES, PE_2026_GOV],
+    conflictingSourceURL: TAX_2026_PDF('PE'),
+    resolution:
+      'The dedicated CRA T4032-PE July 2026 guide governs. Its Chart 2 lists the fourth threshold at $142,520 rather than January\u2019s $142,250, and its "what\u2019s new" states that PE\u2019s new over-$200,000 bracket is 20% for 2026 and subsequent years. The 21% that chart prints is a six-month prorated withholding rate, not the annual statutory rate, so this pack keeps 17.62% and 19% and carries the 20% top rate. The retained ladder is therefore the January five-bracket table in its fourth and fifth brackets, with the fifth threshold split at $200,000 so the sixth bracket can apply the statutory 20%: it differs from a straight January ladder only by the 19% charged on the $142,250-$142,520 band.',
+    pricedChange:
+      'PE provincial tax falls by $3.726 at every taxable income above $142,520 (no effect at or below it): the $270 band between the January and July fourth thresholds is the only income the retained January ladder charged at 19% and this pack now charges at 17.62%.',
+  },
+] as const
+/**
  * The figures `tax.ts` reads straight from `taxData.ts` rather than from a
  * pack, listed once so no pack can claim to govern a figure it does not carry.
  * They are the same for every jurisdiction except the provincial premiums and
@@ -295,14 +330,19 @@ const TAX_PACKS: TaxRulePack[] = [
     frozenProvincialBracketIndexes: jurisdiction === 'ON' ? [2, 3] : jurisdiction === 'YT' ? [3] : jurisdiction === 'MB' ? [0, 1] : [],
     sourceURL: jurisdiction === 'BC' ? BC_2026_JULY : TAX_2026_PDF(jurisdiction), effectiveDate: '2026-01-01', verifiedAt: '2026-09-13',
     fieldSources: { federalBrackets: TAX_2026_PDF(jurisdiction), federalBpa: TAX_2026_PDF(jurisdiction),
-      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'BC' ? BC_2026_JULY : TAX_2026_PDF(jurisdiction),
+      provincialBrackets: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'BC' ? BC_2026_JULY : jurisdiction === 'PE' ? PE_2026_JULY : TAX_2026_PDF(jurisdiction),
       provincialBpa: jurisdiction === 'QC' ? QC_2026 : jurisdiction === 'NL' ? NL_2026_JULY : TAX_2026_PDF(jurisdiction) },
-    fieldAdditionalSources: jurisdiction === 'PE' ? { provincialBrackets: [PE_2026_GOV] } : undefined,
+    fieldAdditionalSources: jurisdiction === 'PE'
+      ? { provincialBrackets: [TAX_2026_PDF('PE'), PE_2026_GOV] }
+      : undefined,
     additionalSourceURLs: jurisdiction === 'MB' ? [CRA_2026_RATES] : [],
+    // BE-38 B3 resolved both recorded conflicts; the note now records the
+    // resolution and its authority instead of an open question. See
+    // `sourceResolutions` below for the full evidence trail.
     sourceConflict: jurisdiction === 'MB'
-      ? 'CRA generic 2026 rate page lists $47,564/$101,200; dedicated T4032-MB 2026 lists $47,000/$100,000 and $15,780 BPA, matching this retained legacy snapshot. BE-38 B must reconcile legal authority before changing calculations.'
+      ? 'Resolved 2026-09-15: the dedicated CRA T4032-MB (January 2026) guide governs. Its Chart 2 lists $47,000/$100,000 at 10.8%/12.75%/17.4% and its basic personal amount is $15,780, matching this pack. CRA\u2019s general "current year" rates page lists $47,564/$101,200, which the dedicated provincial guide and Manitoba\u2019s 2026 budget (which paused bracket indexation for 2026) both contradict; the general page is the same page that is stale for PE. Retained values, no number changed.'
       : jurisdiction === 'PE'
-      ? 'Mixed-vintage legacy PE snapshot: January CRA T4032-PE 2026 supports the retained $142,250 fourth threshold at 17.62% and 19% above it. The PE government 2026 table instead lists $142,520 and adds a sixth bracket over $200,000 at 20%. This pack combines the January threshold with the later sixth bracket; BE-38 B must reconcile before changing calculations.'
+      ? 'Resolved 2026-09-15: the dedicated CRA T4032-PE July 2026 guide governs. Its Chart 2 lists the fourth threshold at $142,520 (as does CRA\u2019s general rates page), and states that PE\u2019s new over-$200,000 bracket is 20% for 2026 and subsequent years (the 21% in that chart is a six-month prorated withholding rate). This pack therefore keeps the January 17.62% and 19% rates and the 20% top rate, and moves the fourth threshold from $142,250 to $142,520. Priced change: PE provincial tax falls by $3.726 at every taxable income above $142,520, the $270 band the January ladder charged at 19%.'
       : undefined,
     indexationRule: jurisdiction === 'MB' ? 'frozen' : 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
@@ -964,7 +1004,20 @@ export function selectBenefitRules(program: string, period: string, future?: { a
 export function publishedBenefitPacks(): BenefitRulePack[] {
   return BENEFIT_PACKS.map(pack => structuredClone(pack))
 }
-export const publishedTaxCoverage = TAX_PACKS.map(p => ({ jurisdiction: p.jurisdiction, taxYear: p.taxYear, coverage: p.coverage, limitation: p.limitation }))
+/**
+ * BE-38 B3: the per-jurisdiction credit coverage matrix is the published
+ * artifact; `publishedTaxCoverage`'s old `{jurisdiction, taxYear, coverage,
+ * limitation}` shape could not say which credits were inside a result, so it is
+ * superseded rather than kept alongside a better answer.
+ *
+ * These are re-exported for consumers that already import from the rules index;
+ * the matrix module itself imports nothing from here except the 2026 snapshot,
+ * so the re-export adds no cycle.
+ */
+export { coverageFor, coverageMatrix, coverageSummary, COVERAGE_JURISDICTIONS } from './coverageMatrix'
+export type {
+  CreditCoverage, CoverageJurisdiction, CoverageMatrixArtifact, JurisdictionCoverageMatrix,
+} from './coverageMatrix'
 
 /**
  * BE-36: the FHSA limits are frozen statute, so there is no year to select and

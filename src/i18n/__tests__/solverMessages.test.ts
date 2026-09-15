@@ -63,6 +63,31 @@ it('gives every tax figure the pack does not year-switch a native reason', () =>
   }
 })
 
+it('gives every coverage-matrix row a string in all three languages', () => {
+  // BE-38 B3: the matrix names credits in both directions, so every row needs a
+  // string or the panel would render a raw key.
+  const ids = [
+    'capital-gains-inclusion-rate', 'federal-age-amount', 'federal-basic-personal-amount',
+    'federal-income-tax-brackets', 'federal-pension-income-amount', 'federal-spouse-amount',
+    'manitoba-bpa-phase-out', 'ontario-health-premium', 'ontario-surtax', 'probate-and-estate-fees',
+    'provincial-age-amount', 'provincial-basic-personal-amount', 'provincial-income-tax-brackets',
+    'provincial-pension-income-amount', 'provincial-spouse-amount', 'quebec-basic-personal-amount',
+    'quebec-federal-abatement', 'quebec-fss-contribution', 'quebec-income-tax-brackets',
+    'quebec-ramq-premium', 'alberta-supplemental-tax-credit', 'british-columbia-tax-reduction',
+    'canada-employment-amount', 'ontario-refundable-benefits', 'ontario-tax-reduction',
+    'provincial-dividend-tax-credits', 'provincial-low-income-reduction',
+    'provincial-other-non-refundable-credits', 'provincial-refundable-benefits',
+    'quebec-senior-amount', 'quebec-specific-deductions', 'quebec-work-premium-and-refundable-credits',
+    'territorial-cost-of-living-allowance', 'yukon-cost-of-living-credits',
+  ]
+  for (const id of ids) {
+    const key = `coverageImplemented.${id}` as keyof typeof en
+    const unsupported = `coverageUnsupported.${id}` as keyof typeof en
+    const found = [en[key] ?? en[unsupported], fr[key] ?? fr[unsupported], zh[key] ?? zh[unsupported]]
+    expect(found.every(Boolean), id).toBe(true)
+  }
+})
+
 it('gives every CCB gap the pack names a native reason in all three languages', () => {
   // BE-38 B2: the CCB pack carries its own unsupported list, so it needs its own
   // native strings rather than borrowing the GIS or tax ones.

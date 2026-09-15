@@ -40,7 +40,9 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(guided).toContainText('CA-CCB-2026-07-v1')
   // The pack that priced the numbers, stated in both modes.
   await expect(guided).toContainText('Selected tax rule year: 2026')
-  await expect(guided).toContainText('BE-38 B')
+  // BE-38 B3: the panel states the current coverage position rather than the
+  // placeholder the earlier slices carried.
+  await expect(guided).toContainText('per-jurisdiction credit coverage list')
   expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
 
@@ -62,14 +64,61 @@ test('guided and professional expose the same pinned rule versions, policy and s
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByLabel('Province').selectOption('PE')
-  await expect(professional).toContainText('$142,250 threshold')
+  // BE-38 B3 resolved the PE conflict against the dedicated July 2026 guide:
+  // the retained $142,250 is gone and the resolution is what the panel states.
+  await expect(professional).toContainText('Resolved 2026-09-15')
   await expect(professional).toContainText('$142,520')
-  await expect(professional).toContainText('January CRA')
+  await expect(professional).toContainText('$3.726')
+  // The old value may appear only inside the resolution sentence that says it
+  // was replaced, never as a live threshold.
+  await expect(professional).toContainText("replacing January's $142,250")
   const peLinks = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
-  expect(peLinks[2]).toContain('/2026/t4032-pe-1-26e.pdf')
-  expect(peLinks).toContain('https://www.princeedwardisland.ca/en/information/finance-and-affordability/provincial-personal-income-tax')
+  expect(peLinks[2]).toContain('/2026/t4032-pe-7-26e.pdf')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
-  await expect(guided).toContainText('$142,250 threshold')
+  await expect(guided).toContainText('$142,520')
   expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(peLinks)
+})
+
+test('the credit coverage matrix is visible in both modes and claims no completeness', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const professional = page.getByTestId('rule-assumptions')
+  const coverage = professional.getByTestId('rule-coverage')
+  await expect(coverage).toBeVisible()
+  // The matrix names the rows that are inside the numbers and the rows that are
+  // not, and it never asserts a complete return.
+  await expect(coverage).toHaveAttribute('data-coverage-jurisdiction', 'ON')
+  await expect(professional.getByTestId('rule-coverage-implemented-federal-income-tax-brackets')).toBeVisible()
+  await expect(professional.getByTestId('rule-coverage-implemented-ontario-health-premium')).toBeVisible()
+  await expect(professional.getByTestId('rule-coverage-implemented-ontario-surtax')).toBeVisible()
+  await expect(professional.getByTestId('rule-coverage-unsupported-provincial-low-income-reduction')).toBeVisible()
+  await expect(professional.getByTestId('rule-coverage-unsupported-provincial-refundable-benefits')).toContainText('GST/HST')
+  // The negative statement travels with the matrix rather than being implied by
+  // a summary label.
+  await expect(professional.getByTestId('rule-coverage-caveat'))
+    .toContainText('does not model the GST/HST credit')
+
+  // Every province must render the matrix with both directions populated.
+  for (const province of ['BC', 'MB', 'PE', 'QC', 'NL', 'NU']) {
+    await page.getByLabel('Province').selectOption(province)
+    await expect(coverage, province).toHaveAttribute('data-coverage-jurisdiction', province)
+    expect(Number(await coverage.getAttribute('data-coverage-implemented')), `${province} implemented`).toBeGreaterThan(5)
+    expect(Number(await coverage.getAttribute('data-coverage-unsupported')), `${province} unsupported`).toBeGreaterThan(3)
+    await expect(professional.getByTestId('rule-coverage-unsupported-provincial-refundable-benefits'), province).toBeVisible()
+  }
+
+  // Same matrix, same caveat, in guided mode.
+  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await page.goto('/#/guided/review')
+  const guided = page.getByTestId('rule-assumptions')
+  const guidedCoverage = guided.getByTestId('rule-coverage')
+  await expect(guidedCoverage).toBeVisible()
+  await expect(guided.getByTestId('rule-coverage-caveat')).toContainText('does not model the GST/HST credit')
+  await expect(guided.getByTestId('rule-coverage-unsupported-provincial-low-income-reduction')).toBeVisible()
+  expect(await guidedCoverage.getAttribute('data-coverage-implemented'))
+    .toBe(await coverage.getAttribute('data-coverage-implemented'))
 })

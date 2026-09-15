@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { selectBenefitRules, selectGisRules } from '../engine/rules'
+import { coverageFor, coverageMatrix, selectBenefitRules, selectGisRules } from '../engine/rules'
 import { PLAN_BENEFIT_PERIOD, benefitRuleProvenance, trySelectBenefitRules } from '../engine/benefits'
 import { PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules } from '../engine/tax'
 import type { Province } from '../engine/types'
@@ -38,6 +38,10 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   const tax = selection.context.pack
   const provenance = taxRuleProvenance(selection.context)
   const policy = provenance.projectionPolicy
+  // BE-38 B3: the published per-jurisdiction matrix, read from the same module
+  // the engine's tests check, so the panel cannot show a different coverage
+  // list from the one the suite pins.
+  const coverage = coverageFor(province)
   // BE-38 B2: the CCB pack is no longer display-only either — `ccbAnnual`
   // computes from it — so the panel states which payment period priced the CCB,
   // whether that period was published or assumed, and the gap it refuses. The
@@ -77,6 +81,32 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
           {t('ruleAssumptionsBenefitRefused', { reason: ccbSelection.status === 'unsupported' ? ccbSelection.reason : '' })}
         </p>}
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
+    {/*
+      BE-38 B3: the per-jurisdiction credit coverage matrix. It names what these
+      numbers include and what they leave out for the province that is actually
+      being priced, and it carries the standing negative statement rather than
+      letting "tax complete" stand in for it.
+    */}
+    <div data-testid="rule-coverage" data-coverage-jurisdiction={coverage.jurisdiction}
+      data-coverage-implemented={Object.keys(coverage.implemented).length}
+      data-coverage-unsupported={Object.keys(coverage.unsupported).length}>
+      <p>{t('ruleCoverageImplemented', { jurisdiction: coverage.jurisdiction, year: coverage.taxYear })}</p>
+      <ul>
+        {Object.entries(coverage.implemented).map(([id, credit]) => <li key={id}
+          data-testid={`rule-coverage-implemented-${id}`} data-evidence={credit.evidenceFixture}>
+          {t(`coverageImplemented.${id}`)}
+        </li>)}
+      </ul>
+      <p data-testid="rule-coverage-unsupported">
+        {t('ruleCoverageUnsupported', { jurisdiction: coverage.jurisdiction })}
+      </p>
+      <ul data-testid="rule-coverage-unsupported-list">
+        {Object.keys(coverage.unsupported).map(id => <li key={id}
+          data-testid={`rule-coverage-unsupported-${id}`}>{t(`coverageUnsupported.${id}`)}</li>)}
+      </ul>
+      <p data-testid="rule-coverage-not-modelled">{t('ruleCoverageNotModelled')}</p>
+      <p data-testid="rule-coverage-caveat">{coverageMatrix.caveat}</p>
+    </div>
     <p data-testid="rule-ccb-not-modelled">
       {t('ruleAssumptionsCcbNotModelled')}{' '}
       {ccb.unsupportedPaths.map((path, index) => <span key={path.id}>

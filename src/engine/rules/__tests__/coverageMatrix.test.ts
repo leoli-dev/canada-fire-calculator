@@ -1,0 +1,431 @@
+import { describe, expect, it } from 'vitest'
+import {
+  COVERAGE_JURISDICTIONS, coverageFor, coverageMatrix, coverageSummary, evidenceFixtureIds,
+  matrixJurisdictions,
+} from '../coverageMatrix'
+import { PLAN_TAX_YEAR, incomeTax, qcFssContribution, qcRamqPremium } from '../../tax'
+import {
+  CAPITAL_GAINS_INCLUSION, FED_AGE_AMOUNT, FED_PENSION_AMOUNT, ON_HEALTH_PREMIUM, ON_SURTAX,
+  PROBATE_RATES, PROV_AGE_PENSION, QC_ABATEMENT, QC_FSS, QC_RAMQ, type TaxTable,
+} from '../../taxData'
+import { selectTaxRules, sourceResolutions } from '../index'
+import { PROVINCIAL_2026_SNAPSHOT } from '../tax2026Snapshot'
+import type { Province } from '../../types'
+
+const PROVINCES: Province[] = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']
+const CRA = 'https://www.canada.ca/content/dam/cra-arc/migration/cra-arc/tx/bsnss/tpcs/pyrll/t4032/2026/t4032-'
+const TD1 = 'https://www.canada.ca/content/dam/cra-arc/formspubs/pbg/td1'
+const RQ = 'https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/finances/publications-adm/parametres/AUTFR_RegimeImpot2026.pdf'
+
+/** Chart 2 of each jurisdiction's own 2026 T4032: thresholds, rates, and the tax
+ * the printed rates accumulate at every finite threshold. Hand-keyed. */
+const BRACKETS: Record<string, { t: number[]; r: number[]; k: number[] }> = {
+  ON: { t: [53891, 107785, 150000, 220000, Infinity], r: [0.0505, 0.0915, 0.1116, 0.1216, 0.1316], k: [2721.4955, 7652.7965, 12363.9905, 20875.9905] },
+  AB: { t: [61200, 154259, 185111, 246813, 370220, Infinity], r: [0.08, 0.1, 0.12, 0.13, 0.14, 0.15], k: [4896, 14201.9, 17904.14, 25925.4, 43202.38] },
+  BC: { t: [50363, 100728, 115648, 140430, 190405, 265545, Infinity], r: [0.056, 0.077, 0.105, 0.1229, 0.147, 0.168, 0.205], k: [2820.328, 6698.433, 8265.033, 11310.7408, 18657.0658, 31280.5858] },
+  SK: { t: [54532, 155805, Infinity], r: [0.105, 0.125, 0.145], k: [5725.86, 18384.985] },
+  NS: { t: [30995, 61991, 97417, 157124, Infinity], r: [0.0879, 0.1495, 0.1667, 0.175, 0.21], k: [2724.4605, 7358.3625, 13263.8767, 23712.6017] },
+  NB: { t: [52333, 104666, 193861, Infinity], r: [0.094, 0.14, 0.16, 0.195], k: [4919.302, 12245.922, 26517.122] },
+  NL: { t: [44678, 89354, 159528, 223340, 285319, 570638, 1141275, Infinity], r: [0.087, 0.145, 0.158, 0.178, 0.198, 0.208, 0.213, 0.218], k: [3886.986, 10365.006, 21452.498, 32811.034, 45082.876, 104429.228, 225974.909] },
+  YT: { t: [58523, 117045, 181440, 500000, Infinity], r: [0.064, 0.09, 0.109, 0.128, 0.15], k: [3745.472, 9012.452, 16031.507, 56807.187] },
+  NT: { t: [53003, 106009, 172346, Infinity], r: [0.059, 0.086, 0.122, 0.1405], k: [3127.177, 7685.693, 15778.807] },
+  NU: { t: [55801, 111602, 181439, Infinity], r: [0.04, 0.07, 0.09, 0.115], k: [2232.04, 6138.11, 12423.44] },
+  MB: { t: [47000, 100000, Infinity], r: [0.108, 0.1275, 0.174], k: [5076, 11833.5] },
+  PE: { t: [33928, 65820, 106890, 142520, 200000, Infinity], r: [0.095, 0.1347, 0.166, 0.1762, 0.19, 0.2], k: [3223.16, 7519.0124, 14336.6324, 20614.6384, 31535.8384] },
+}
+const BPA: Record<string, number> = { ON: 12989, AB: 22769, BC: 13216, SK: 20381, NS: 11932,
+  NB: 13664, NL: 13094, YT: 16452, NT: 18198, NU: 19659, MB: 15780, PE: 15000 }
+const PENSION: Record<string, number> = { ON: 1796, AB: 1753, BC: 1000, SK: 1000, NS: 1173,
+  NB: 1000, NL: 1000, YT: 2000, NT: 1000, NU: 2000, MB: 1000, PE: 1000 }
+/** Each 2026 TD1's "Age amount ... between $Y and $Z" line. NL is absent: its
+ * 2026 TD1 publishes no age amount, so the retained figure is a follow-up. */
+const AGE: Record<string, { max: number; threshold: number; end: number; supplement?: number }> = {
+  ON: { max: 6342, threshold: 47210, end: 89490 }, AB: { max: 6345, threshold: 47234, end: 89534 },
+  BC: { max: 5927, threshold: 44119, end: 83633 }, SK: { max: 5901, threshold: 43927, end: 83267, supplement: 2569 },
+  NS: { max: 5826, threshold: 30828, end: 69668 }, NB: { max: 6158, threshold: 45844, end: 86898 },
+  YT: { max: 9208, threshold: 46432, end: 107819 }, NT: { max: 8902, threshold: 46432, end: 105779 },
+  NU: { max: 12550, threshold: 46432, end: 130099 }, MB: { max: 3728, threshold: 27749, end: 52602 },
+  PE: { max: 6510, threshold: 36600, end: 80000 } }
+/** The TD1 spouse line: `max` is the published amount, `threshold` where it
+ * reaches zero, `low` the TD1's own start-of-reduction bound this build skips. */
+const SPOUSE: Record<string, { max: number; threshold: number; low?: number }> = {
+  ON: { max: 11029, threshold: 12132, low: 1103 }, AB: { max: 22769, threshold: 22769 },
+  BC: { max: 11317, threshold: 12449, low: 1132 }, SK: { max: 20381, threshold: 22419, low: 2038 },
+  NS: { max: 11932, threshold: 12820, low: 888 }, NB: { max: 10709, threshold: 11781, low: 1072 },
+  NL: { max: 9142, threshold: 10057 }, YT: { max: 16452, threshold: 16452, low: 2740 },
+  NT: { max: 18198, threshold: 18198 }, NU: { max: 19659, threshold: 19659 },
+  MB: { max: 9134, threshold: 9134 }, PE: { max: 12740, threshold: 14014, low: 1274 } }
+const FEDERAL = { t: [58523, 117045, 181440, 258482, Infinity], r: [0.14, 0.205, 0.26, 0.29, 0.33] }
+const FEDERAL_BPA = { bpa: 16452, bpaMin: 14829, from: 181440, to: 258482 }
+const FEDERAL_AGE = { max: 9208, threshold: 46432, rate: 0.15, end: 107819 }
+const FEDERAL_PENSION = 2000
+const QUEBEC = { t: [54345, 108680, 132245, Infinity], r: [0.14, 0.19, 0.24, 0.2575] }
+
+/**
+ * The registry every `implemented` matrix row must name, each pointing at the
+ * authority its row was keyed from. A row cannot be added without a fixture,
+ * and a fixture cannot be dropped without its row noticing.
+ */
+const FIXTURE_SOURCES: Record<string, string> = {
+  'federal-brackets-2026': `${CRA}mb-1-26e.pdf`,
+  'federal-bpa-and-phase-out-2026': `${TD1}/td1-26e.pdf`,
+  'federal-pension-amount-2026': `${TD1}/td1-26e.pdf`,
+  'federal-age-amount-2026': `${TD1}/td1-26e.pdf`,
+  'federal-spouse-amount-2026': `${TD1}/td1-26e.pdf`,
+  'capital-gains-inclusion-2026': 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-38.html',
+  'probate-fees-2026': 'https://www.ontario.ca/laws/statute/90e22',
+  'provincial-brackets-2026': `${CRA}mb-1-26e.pdf`,
+  'provincial-bpa-2026': `${CRA}mb-1-26e.pdf`,
+  'provincial-pension-amount-2026': `${TD1}on/td1on-26e.pdf`,
+  'provincial-age-amount-2026': `${TD1}on/td1on-26e.pdf`,
+  'provincial-spouse-amount-2026': `${TD1}on/td1on-26e.pdf`,
+  'ontario-surtax-2026': `${CRA}on-1-26e.pdf`,
+  'ontario-health-premium-2026': `${CRA}on-1-26e.pdf`,
+  'manitoba-bpa-phase-out-2026': `${CRA}mb-1-26e.pdf`,
+  'quebec-brackets-2026': RQ,
+  'quebec-bpa-2026': RQ,
+  'quebec-abatement-2026': 'https://laws-lois.justice.gc.ca/eng/acts/f-1.3/section-4.html',
+  'quebec-fss-2026': RQ,
+  'quebec-ramq-2026': RQ,
+}
+
+const packTable = (p: Province): TaxTable => selectTaxRules(p, PLAN_TAX_YEAR).provincial
+const thresholds = (t: TaxTable) => t.brackets.map(b => b.upTo)
+const rates = (t: TaxTable) => t.brackets.map(b => b.rate)
+
+/** The 2026 federal return from the published chart alone: CRA's own worksheet. */
+function expectedFederalTax(taxable: number): number {
+  const brackets: [number, number][] = [[58523, 0.14], [117045, 0.205], [181440, 0.26],
+    [258482, 0.29], [Infinity, 0.33]]
+  if (taxable <= 0) return 0
+  let previous = 0
+  let tax = 0
+  for (const [upTo, rate] of brackets) {
+    const slice = Math.min(taxable, upTo) - previous
+    if (slice > 0) tax += slice * rate
+    previous = upTo
+    if (taxable <= upTo) break
+  }
+  const bpa = 16452 - (16452 - 14829) * Math.min(1, Math.max(0, (taxable - 181440) / 77042))
+  return Math.max(0, tax - bpa * 0.14)
+}
+
+/** The tax the published chart alone produces, before every credit but the BPA. */
+function bracketOnlyProvincial(province: Province, taxable: number): number {
+  const table = packTable(province)
+  let previous = 0
+  let tax = 0
+  for (const bracket of table.brackets) {
+    const slice = Math.min(taxable, bracket.upTo) - previous
+    if (slice > 0) tax += slice * bracket.rate
+    previous = bracket.upTo
+    if (taxable <= bracket.upTo) break
+  }
+  return Math.max(0, tax - table.bpa * table.brackets[0].rate)
+}
+
+/** What one credit column is worth, measured by turning it off. */
+function creditWorth(target: Record<string, unknown>, key: string, income: number,
+  province: Province, credits?: Parameters<typeof incomeTax>[2]): number {
+  const saved = target[key]
+  const before = incomeTax(income, province, credits)
+  let after: number
+  try {
+    target[key] = 0
+    after = incomeTax(income, province, credits)
+  } finally {
+    target[key] = saved
+  }
+  return after - before
+}
+
+describe('BE-38 B3: the coverage matrix is exhaustive and drift-checked', () => {
+  it('covers exactly the jurisdictions the app can price, with no extra and no missing', () => {
+    expect(matrixJurisdictions()).toEqual([...COVERAGE_JURISDICTIONS])
+    expect([...COVERAGE_JURISDICTIONS].sort()).toEqual([...PROVINCES].sort())
+    expect([...COVERAGE_JURISDICTIONS].sort()).toEqual(Object.keys(PROVINCIAL_2026_SNAPSHOT).sort())
+    expect(coverageMatrix.taxYear).toBe(PLAN_TAX_YEAR)
+    for (const jurisdiction of COVERAGE_JURISDICTIONS) {
+      expect(coverageFor(jurisdiction).jurisdiction).toBe(jurisdiction)
+      expect(coverageFor(jurisdiction).taxYear).toBe(PLAN_TAX_YEAR)
+    }
+    expect(() => coverageFor('XX')).toThrow(/no coverage matrix entry for jurisdiction "XX"/)
+    expect(() => coverageSummary('XX')).toThrow()
+    expect(coverageSummary('MB').caveat).toBe(coverageMatrix.caveat)
+  })
+
+  it('names every unimplemented row as a negation, with a concrete reason and no completeness claim', () => {
+    for (const row of coverageMatrix.jurisdictions) {
+      for (const [id, credit] of Object.entries(row.unsupported)) {
+        expect(id.length).toBeGreaterThan(0)
+        expect(credit.scopeStatement.length, id).toBeGreaterThan(15)
+        expect(credit.reason.length, id).toBeGreaterThan(40)
+        expect(credit.scopeStatement, id).toMatch(/not |no |never|absent|outside/i)
+        // A reason may *negate* completeness ("not a complete return"); it may
+        // never assert it positively.
+        const text = `${credit.reason} ${credit.scopeStatement}`
+        expect(text, id).not.toMatch(/not (?:a )?complete/i)
+        expect(text, id).not.toMatch(/(?<!no result )is a complete/i)
+      }
+      // Every jurisdiction carries the standing gaps, including the ones a
+      // "tax complete" label would otherwise imply are already counted.
+      for (const id of ['provincial-refundable-benefits', 'provincial-low-income-reduction',
+        'provincial-other-non-refundable-credits', 'provincial-dividend-tax-credits'])
+        expect(Object.keys(row.unsupported), `${row.jurisdiction}/${id}`).toContain(id)
+      if (row.jurisdiction === 'QC') expect(Object.keys(row.unsupported)).toContain('provincial-spouse-amount')
+      else expect(Object.keys(row.implemented)).toContain('provincial-spouse-amount')
+    }
+    expect(coverageMatrix.caveat).toMatch(/does not model the GST\/HST credit/)
+    expect(coverageMatrix.caveat).toMatch(/complete after-benefit position/)
+  })
+
+  it('derives every implemented row from the pack, with a registered fixture and a source', () => {
+    for (const jurisdiction of COVERAGE_JURISDICTIONS) {
+      const pack = selectTaxRules(jurisdiction, PLAN_TAX_YEAR)
+      expect(pack.jurisdiction).toBe(jurisdiction)
+      expect(pack.limitation.length).toBeGreaterThan(0)
+      for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented)) {
+        expect(credit.ruleFields.length, `${jurisdiction}/${id} ruleFields`).toBeGreaterThan(0)
+        expect(credit.sourceURL, `${jurisdiction}/${id} source`).toMatch(/^https:\/\//)
+        expect(credit.verifiedAt, `${jurisdiction}/${id} date`).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+        expect(FIXTURE_SOURCES[credit.evidenceFixture], `${jurisdiction}/${id}`).toBeDefined()
+        for (const field of credit.ruleFields) {
+          if (field.startsWith('provincial.')) expect(id).toMatch(/bracket|basic-personal|phase-out/)
+          if (field.startsWith('federal.')) expect(credit.scope).toBe('federal')
+        }
+      }
+    }
+    // No fixture without a row, and no row without a fixture.
+    const referenced = new Set<string>()
+    for (const row of coverageMatrix.jurisdictions)
+      for (const credit of Object.values(row.implemented)) referenced.add(credit.evidenceFixture)
+    for (const id of evidenceFixtureIds()) expect(FIXTURE_SOURCES[id], `unregistered ${id}`).toBeDefined()
+    for (const id of Object.keys(FIXTURE_SOURCES))
+      expect(referenced.has(id), `orphan fixture ${id} is referenced by no matrix row`).toBe(true)
+  })
+
+  it('names the source each implemented row reads from, so a changed source invalidates the row', () => {
+    // The matrix points at `taxData.ts:PROV_AGE_PENSION.ON.pension`; mutating
+    // that constant must change a priced result, or the row describes a field
+    // that never reaches a number.
+    const credits = { pensionIncome: 5_000, provincialPensionIncome: 5_000 }
+    const before = incomeTax(90_000, 'ON', credits)
+    const saved = PROV_AGE_PENSION.ON.pension
+    try {
+      PROV_AGE_PENSION.ON.pension = 0
+      const changed = incomeTax(90_000, 'ON', credits)
+      expect(changed).not.toBe(before)
+      expect(changed - before).toBeCloseTo(1796 * 0.0505, 6)
+    } finally {
+      PROV_AGE_PENSION.ON.pension = saved
+    }
+    expect(incomeTax(90_000, 'ON', credits)).toBe(before)
+  })
+
+  it('enumerates the unmapped figures the tax function applies on top of the pack', () => {
+    const gaps = new Set(selectTaxRules('ON', PLAN_TAX_YEAR).unsupportedPaths.map(path => path.id))
+    expect(gaps.has('gst-hst-and-cash-benefits')).toBe(true)
+    expect(gaps.has('low-income-tax-reductions')).toBe(true)
+    const matrix = coverageFor('ON')
+    for (const id of ['provincial-low-income-reduction', 'provincial-refundable-benefits'])
+      expect(matrix.unsupported[id], id).toBeDefined()
+    expect(matrix.unsupported['provincial-refundable-benefits'].scopeStatement).toMatch(/not modelled/i)
+    // The rows the pack calls "applied but not year-switched" are named in the
+    // positive direction, with the year-switching gap as their limitation.
+    expect(matrix.implemented['provincial-age-amount'].limitation).toMatch(/Pinned 2026 figures/)
+  })
+
+  it('reproduces the published charts and credits the official amounts at the lowest rate', () => {
+    for (const province of Object.keys(BRACKETS) as Province[]) {
+      const expected = BRACKETS[province]
+      expect(thresholds(packTable(province)), province).toEqual(expected.t)
+      expect(rates(packTable(province)), province).toEqual(expected.r)
+      // The tax the printed chart accumulates at every finite threshold; the
+      // tolerance is one cent because every expected value is rounded there.
+      const brackets = packTable(province).brackets
+      let tax = 0
+      expected.k.forEach((expectedTax, index) => {
+        tax += (brackets[index].upTo - (index === 0 ? 0 : brackets[index - 1].upTo)) * brackets[index].rate
+        expect(Math.abs(tax - expectedTax), `${province}@${index + 1}`).toBeLessThan(0.01)
+      })
+    }
+    const federal = selectTaxRules('ON', PLAN_TAX_YEAR).federal
+    expect(thresholds(federal)).toEqual(FEDERAL.t)
+    expect(rates(federal)).toEqual(FEDERAL.r)
+    expect([federal.bpa, federal.bpaMin, federal.brackets[2].upTo, federal.brackets[3].upTo])
+      .toEqual([FEDERAL_BPA.bpa, FEDERAL_BPA.bpaMin, FEDERAL_BPA.from, FEDERAL_BPA.to])
+    expect(expectedFederalTax(30_000)).toBeCloseTo(30_000 * 0.14 - 16_452 * 0.14, 6)
+    const quebec = packTable('QC')
+    expect(thresholds(quebec)).toEqual(QUEBEC.t)
+    expect(rates(quebec)).toEqual(QUEBEC.r)
+    expect(quebec.bpa).toBe(18952)
+    for (const province of PROVINCES) {
+      if (province === 'QC') continue
+      expect(packTable(province).bpa, province).toBe(BPA[province])
+    }
+    expect(FED_PENSION_AMOUNT).toBe(FEDERAL_PENSION)
+    expect([FED_AGE_AMOUNT.max, FED_AGE_AMOUNT.threshold, FED_AGE_AMOUNT.rate])
+      .toEqual([FEDERAL_AGE.max, FEDERAL_AGE.threshold, FEDERAL_AGE.rate])
+    expect(FEDERAL_AGE.threshold + FEDERAL_AGE.max / FEDERAL_AGE.rate).toBeCloseTo(FEDERAL_AGE.end, 0)
+    for (const province of PROVINCES) {
+      // QC's senior credit is its own family-tested framework; NL's 2026 TD1
+      // publishes no age amount, so neither is in the fixture.
+      if (province === 'QC' || province === 'NL') continue
+      const lowest = packTable(province).brackets[0].rate
+      const rule = PROV_AGE_PENSION[province]
+      expect(rule.pension, `${province} pension`).toBe(PENSION[province])
+      expect([rule.ageMax, rule.ageThreshold, rule.ageRate, rule.seniorSupplement], `${province} age`)
+        .toEqual([AGE[province].max, AGE[province].threshold, 0.15, AGE[province].supplement])
+      expect(rule.ageThreshold + rule.ageMax / rule.ageRate, `${province} window`).toBeCloseTo(AGE[province].end, -1)
+      expect(creditWorth(PROV_AGE_PENSION[province], 'pension', 90_000, province,
+        { pensionIncome: 5_000, provincialPensionIncome: 5_000 }), `${province} pension credit`)
+        .toBeCloseTo(PENSION[province] * lowest, 6)
+      const phase = Math.min(1, (50_000 - rule.ageThreshold) / (rule.ageMax / rule.ageRate))
+      expect(creditWorth(PROV_AGE_PENSION[province], 'ageMax', 50_000, province, { age: 65 }), `${province} age credit`)
+        .toBeCloseTo(rule.ageMax * (1 - phase) * lowest, 6)
+      // The provincial spouse amount is the published threshold less the
+      // spouse's net income, floored and capped; the federal amount sits on top.
+      const amount = Math.min(SPOUSE[province].max, Math.max(0, SPOUSE[province].threshold - 4_000))
+      expect(incomeTax(90_000, province) - incomeTax(90_000, province, { spouseNetIncome: 4_000 }),
+        `${province} spouse credit`).toBeCloseTo(amount * lowest + (16_452 - 4_000) * 0.14, 6)
+      expect(SPOUSE[province].threshold).toBeGreaterThanOrEqual(SPOUSE[province].max)
+    }
+    expect(ON_SURTAX).toEqual({ t1: 5818, r1: 0.2, t2: 7446, r2: 0.36 })
+    expect(ON_HEALTH_PREMIUM[4]).toEqual({ from: 200000, base: 750, rate: 0.25, cap: 900 })
+    expect(incomeTax(30_000, 'ON')).toBeCloseTo(
+      expectedFederalTax(30_000) + 30_000 * 0.0505 - 12_989 * 0.0505 + 300, 6)
+    // The surtax adds to basic Ontario tax above the published thresholds.
+    expect(incomeTax(250_000, 'ON'))
+      .toBeGreaterThan(expectedFederalTax(250_000) + bracketOnlyProvincial('ON', 250_000))
+    expect(CAPITAL_GAINS_INCLUSION).toBe(0.5)
+    expect([PROBATE_RATES.ON.rate, PROBATE_RATES.MB.rate, PROBATE_RATES.NS.rate]).toEqual([0.015, 0, 0.01695])
+    expect(QC_ABATEMENT).toBe(0.165)
+    expect(QC_FSS).toEqual({ t1: 18500, t2: 64355, cap1: 150, cap2: 1000 })
+    expect(QC_RAMQ).toEqual({ threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 })
+    expect(qcFssContribution(20_000)).toBeCloseTo(15, 6)
+    expect(qcFssContribution(100_000)).toBeCloseTo(150 + (100_000 - 64_355) * 0.01, 6)
+    expect(qcFssContribution(300_000)).toBeCloseTo(1000, 6)
+    expect(qcRamqPremium(25_288)).toBeCloseTo(5_000 * 0.0784, 6)
+    expect(qcRamqPremium(1_000_000)).toBeCloseTo(770, 6)
+  })
+})
+
+describe('BE-38 B3: the two promised source conflicts are resolved', () => {
+  it('resolves PE to the July 2026 T4032-PE threshold, rates and statutory top rate', () => {
+    const pe = packTable('PE')
+    expect(thresholds(pe)).toEqual([33928, 65820, 106890, 142520, 200000, Infinity])
+    expect(thresholds(pe)).not.toContain(142250)
+    expect(rates(pe)).toEqual([0.095, 0.1347, 0.166, 0.1762, 0.19, 0.2])
+    // The 20% statutory rate PE enacted, never the 21% six-month prorated
+    // withholding rate the July chart also prints.
+    expect(pe.brackets.at(-1)!.rate).toBe(0.2)
+    expect(selectTaxRules('PE', PLAN_TAX_YEAR).fieldSources.provincialBrackets).toContain('t4032-pe-7-26e')
+  })
+
+  it('prices the intended PE value and the exact delta the threshold move produces', () => {
+    const tax = (brackets: { upTo: number; rate: number }[], income: number, bpa: number) => {
+      let previous = 0
+      let total = 0
+      for (const bracket of brackets) {
+        const slice = Math.min(income, bracket.upTo) - previous
+        if (slice > 0) total += slice * bracket.rate
+        previous = bracket.upTo
+        if (income <= bracket.upTo) break
+      }
+      return total - bpa * brackets[0].rate
+    }
+    const pe = selectTaxRules('PE', PLAN_TAX_YEAR)
+    // Before BE-38 B3 the pack combined January's $142,250 fourth threshold
+    // with a 19% top rate. Reverting both at once isolates what the resolution
+    // changed: the 270-dollar band is now taxed at 17.62% instead of 19%.
+    const january = pe.provincial.brackets.map((bracket, index) =>
+      index === 3 ? { ...bracket, upTo: 142250 } : index === 5 ? { ...bracket, rate: 0.19 } : bracket)
+    const intended = tax(pe.provincial.brackets, 150_000, pe.provincial.bpa)
+    expect(intended).toBeCloseTo(20_610.8384, 4)
+    expect(tax(january, 150_000, pe.provincial.bpa) - intended).toBeCloseTo(270 * (0.19 - 0.1762), 6)
+    // Below the threshold the two ladders are identical, so nothing else moved.
+    expect(tax(pe.provincial.brackets, 120_000, pe.provincial.bpa))
+      .toBeCloseTo(tax(january, 120_000, pe.provincial.bpa), 6)
+    expect(incomeTax(150_000, 'PE')).toBeCloseTo(expectedFederalTax(150_000) + intended, 6)
+  })
+
+  it('retains the Manitoba values the dedicated T4032-MB guide and the 2026 budget publish', () => {
+    const mb = packTable('MB')
+    expect(thresholds(mb)).toEqual([47000, 100000, Infinity])
+    expect(rates(mb)).toEqual([0.108, 0.1275, 0.174])
+    expect(mb.bpa).toBe(15780)
+    expect(selectTaxRules('MB', PLAN_TAX_YEAR).additionalSourceURLs).toContain(
+      'https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html')
+  })
+
+  it('records both resolutions with a governing authority and whether a number moved', () => {
+    const mb = sourceResolutions.find(entry => entry.jurisdiction === 'MB')!
+    const pe = sourceResolutions.find(entry => entry.jurisdiction === 'PE')!
+    expect(mb.governingSourceURL).toContain('t4032-mb-1-26e')
+    expect(mb.resolution).toMatch(/dedicated CRA T4032-MB/)
+    expect(mb.resolution).toMatch(/\$47,564/)
+    expect(mb.pricedChange).toBe('none')
+    expect(pe.governingSourceURL).toContain('t4032-pe-7-26e')
+    expect(pe.resolution).toMatch(/142,520/)
+    expect(pe.resolution).toMatch(/20% for 2026 and subsequent years/)
+    expect(pe.pricedChange).toMatch(/\$3\.726/)
+    for (const entry of sourceResolutions) {
+      expect(entry.governingSourceURL).toMatch(/^https:\/\//)
+      expect(entry.resolvedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
+    // The pack notes say the same thing, and no pack still carries an open question.
+    expect(selectTaxRules('MB', PLAN_TAX_YEAR).sourceConflict).toMatch(/Resolved 2026-09-15/)
+    expect(selectTaxRules('MB', PLAN_TAX_YEAR).sourceConflict).toMatch(/no number changed/)
+    expect(selectTaxRules('PE', PLAN_TAX_YEAR).sourceConflict).toMatch(/Resolved 2026-09-15/)
+    for (const province of PROVINCES)
+      expect(selectTaxRules(province, PLAN_TAX_YEAR).sourceConflict ?? '').not.toMatch(/must reconcile|awaits review/)
+  })
+})
+
+describe('BE-38 B3: the declared-unimplemented items are really absent from the code path', () => {
+  it('never prices a result below the published bracket arithmetic', () => {
+    // A low-income or refundable reduction would push the result below the
+    // bracket-only line. Sweeping several incomes catches a phase-out a single
+    // point could miss; the Ontario surtax only ever raises the result.
+    for (const province of PROVINCES) {
+      if (province === 'QC') continue
+      for (const income of [15_000, 25_000, 40_000, 60_000, 120_000]) {
+        const lowerBound = expectedFederalTax(income) + bracketOnlyProvincial(province, income)
+        expect(incomeTax(income, province), `${province}@${income}`).toBeGreaterThanOrEqual(lowerBound - 1e-6)
+      }
+    }
+  })
+
+  it('does not apply Ontario\u2019s tax reduction or Alberta\u2019s supplemental credit', () => {
+    // T4032-ON and T4032-AB both publish a low-income reduction in their worked
+    // examples. At 20,000 the result is exactly the federal return plus the
+    // province's own published bracket arithmetic.
+    expect(incomeTax(20_000, 'ON')).toBeCloseTo(
+      expectedFederalTax(20_000) + 20_000 * 0.0505 - 12_989 * 0.0505, 6)
+    // Alberta's 8% bracket tax on 30,000 is 2,400 and its 22,769 credit is worth
+    // 1,821.52, so the provincial side is 578.48 with nothing subtracted.
+    expect(incomeTax(30_000, 'AB')).toBeCloseTo(expectedFederalTax(30_000) + 2_400 - 1_821.52, 6)
+    // Above the point where the basic personal amount stops absorbing the tax,
+    // the marginal delta is the published 8% provincial plus 14% federal.
+    expect(incomeTax(50_000, 'AB') - incomeTax(46_000, 'AB')).toBeCloseTo(4_000 * (0.08 + 0.14), 6)
+    expect(bracketOnlyProvincial('AB', 50_000) - bracketOnlyProvincial('AB', 46_000))
+      .toBeCloseTo(4_000 * 0.08, 6)
+  })
+
+  it('adds no provincial cash benefit and prices the reduction as absent, not as zero', () => {
+    for (const province of PROVINCES) {
+      const row = coverageFor(province)
+      for (const id of ['provincial-refundable-benefits', 'provincial-other-non-refundable-credits',
+        'provincial-dividend-tax-credits', 'provincial-low-income-reduction'])
+        expect(row.unsupported[id], `${province}/${id}`).toBeDefined()
+      expect(row.implemented['provincial-low-income-reduction'], province).toBeUndefined()
+      expect(row.unsupported['provincial-low-income-reduction'].scopeStatement).toMatch(/not applied/)
+      expect(row.unsupported['provincial-refundable-benefits'].reason, province)
+        .toMatch(/no provincial cash-benefit program/i)
+    }
+    // British Columbia names its reduction with the published amount and the
+    // rate change the same budget made, so the reason is not generic.
+    expect(coverageFor('BC').unsupported['british-columbia-tax-reduction'].scopeStatement)
+      .toMatch(/\$690|prorated|withdrawn/)
+  })
+})
