@@ -340,6 +340,29 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
     .toMatch(/Court Services Fees Regulations \(R-120-93, Part 2, item 1\)/)
   expect(EN['coverageLimitation.probateFeesApproxNU'])
     .toMatch(/Court Fees Regulations \(C\.R\.Nu\. R-042-2021, Schedule C, item 5\)/)
+  // BE-38 B4 follow-up: Nunavut's instrument is recorded in `BLOCKED_SOURCES`
+  // with gate marker `403`, so every language's qualification must carry that
+  // literal — the engine-side guard and the rendered disclosure name the same
+  // gate.
+  for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const)
+    expect(catalogue['coverageLimitation.probateFeesApproxNU'], `${lang} NU gate marker`)
+      .toContain('403')
+  // BE-38 B4 follow-up: Yukon's row now cites its own fee schedule and renders
+  // its own qualification. The text must state both priced values — the $25,000
+  // exemption and the $140 above it — because that is what the engine charges,
+  // and the claim that caused the defect (an unconditional $140 for every
+  // estate) must not come back in any language.
+  for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const) {
+    const text = catalogue['coverageLimitation.probateFeesYT']
+    expect(text, `${lang} YT qualification`).toBeTruthy()
+    expect(text, `${lang} YT exemption`).toMatch(/25[ ,]000/)
+    expect(text, `${lang} YT fee`).toMatch(/140/)
+    expect(text, `${lang} YT authority`).toMatch(/Supreme Court Rules|Cour suprême|最高法院规则/)
+  }
+  expect(EN['coverageLimitation.probateFeesYT']).toMatch(/does not exceed \$25,000/)
+  expect(EN['coverageLimitation.probateFeesYT']).toMatch(/Neither value is inferred or approximated/)
+  expect(FR['coverageLimitation.probateFeesYT']).not.toBe(EN['coverageLimitation.probateFeesYT'])
+  expect(ZH['coverageLimitation.probateFeesYT']).not.toBe(EN['coverageLimitation.probateFeesYT'])
   expect(EN['coverageLimitation.probateFeesMB']).toMatch(/abolished its probate fee/)
   expect(EN['coverageLimitation.provincialAgeAmount']).toMatch(/Pinned 2026 figures/)
 })

@@ -117,7 +117,7 @@ const PROBATE_HAND: Record<string, { flat: number; rate: number; threshold: numb
   MB: { flat: 0, rate: 0, threshold: 0 }, SK: { flat: 200, rate: 0.007, threshold: 0 },
   NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, NB: { flat: 100, rate: 0.005, threshold: 20000 },
   PE: { flat: 400, rate: 0.004, threshold: 100000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
-  YT: { flat: 140, rate: 0, threshold: 0 },
+  YT: { flat: 140, rate: 0, threshold: 25000 },
 }
 /**
  * BE-38 B4 review N2: the full five-band ladder each territory's own regulation
@@ -155,15 +155,28 @@ const PROBATE_LADDER: Partial<Record<string, readonly { upTo: number; fee: numbe
 }
 /** The hand formula the probate pins are read against, kept separate from
  * `probateTax` so the expectation is the *published* rule rather than a
- * line-for-line copy of the implementation. A laddered jurisdiction is priced
- * from `PROBATE_LADDER`, read off its own instrument; every other row is the
- * flat-plus-rate the province prints. */
+ * line-for-line copy of the implementation. YT is here rather than in
+ * `PROBATE_LADDER` because its authority prints a step with no ladder: no fee
+ * up to and including $25,000, $140 above it (Supreme Court Rules, Appendix C,
+ * Schedule 1, item 11 — "No fee is payable ... where a person dies leaving an
+ * estate not exceeding $25,000 in value", and $140 for every grant or ancillary
+ * grant of probate and administration). A laddered jurisdiction (NT, NU) is
+ * priced from `PROBATE_LADDER`, read off its own instrument. */
 function handProbate(province: string, value: number): number {
   const ladder = PROBATE_LADDER[province]
   if (ladder) {
     for (const rung of ladder) if (value <= rung.upTo) return rung.fee
   }
+  // YT's published wording is a step, not the general flat-plus-rate: item 11
+  // is "$0 where the estate does not exceed $25,000" and "$140 above it", so the
+  // expectation is spelled out from the sentence rather than from the shape the
+  // engine stores.
+  if (province === 'YT') {
+    if (value <= 0) return 0
+    return value > 25_000 ? 140 : 0
+  }
   const hand = PROBATE_HAND[province]
+  if (value <= 0) return 0
   return hand.flat + hand.rate * Math.max(0, value - hand.threshold)
 }
 /** The only provincial BPA phase-outs the pack carries, and the matrix row that
@@ -216,7 +229,11 @@ const FIXTURE_SOURCES: Record<string, string> = {
  * their fixture is no longer Yukon's table. Each is the territory's own
  * regulation — the document that prints the $435 (NT) and $425 (NU) top tier
  * the build prices — which is also the row's `sourceURL`, so the fixture the
- * suite registers, the citation a reader sees and the priced value agree. */
+ * suite registers, the citation a reader sees and the priced value agree.
+ *
+ * BE-38 B4 follow-up: YT itself is the third row that stopped pricing from the
+ * TaxTips.ca table. Its fixture is now Yukon's fee schedule, the document that
+ * prints both the $140 and the $25,000 exemption boundary. */
 const PROBATE_TABLE = (province: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
 /** NT's Department of Justice consolidation of the Court Services Fees
@@ -225,8 +242,18 @@ const PROBATE_TABLE = (province: string) =>
 const NT_PROBATE = 'https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf'
 /** Nunavut's official consolidation of the Court Fees Regulations,
  * C.R.Nu. R-042-2021, Schedule C item 5: $425 where the value exceeds
- * $250,000. */
+ * $250,000. Recorded in `BLOCKED_SOURCES`: it answers curl, an API request
+ * context and a real headless Chromium navigation with Cloudflare's 403
+ * challenge page. */
 const NU_PROBATE = 'https://www.nunavutlegislation.ca/en/file-download/download/public/7022'
+/** Yukon's own tariff for probate fees: the Supreme Court Rules, Appendix C,
+ * Schedule 1 (fees payable to the Territorial Treasurer), item 11. It prints
+ * the two priced values this build charges — "No fee is payable ... where a
+ * person dies leaving an estate not exceeding $25,000 in value" and $140 for
+ * every grant or ancillary grant of probate and administration — and it is the
+ * document the row's `sourceURL` and the `probate-fees-yt-2026` fixture both
+ * name. The TaxTips.ca table the row used to cite is its additional source. */
+const YT_PROBATE = 'https://www.yukoncourts.ca/sites/default/files/2023-08/rules_combined.pdf'
 /** Ontario's probate rate and threshold, hand-keyed from `98e34` s. 2(6.1):
  * "$15 for each $1,000 or part thereof by which the value of the estate exceeds
  * $50,000", with an estate of $50,000 or less exempt. The old `90e22` citation
@@ -235,8 +262,9 @@ const ON_PROBATE_STATUTE = 'https://www.ontario.ca/laws/statute/98e34'
 for (const province of PROVINCES) {
   FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`] =
     province === 'ON' ? ON_PROBATE_STATUTE
-      : province === 'NT' ? NT_PROBATE
-        : province === 'NU' ? NU_PROBATE : PROBATE_TABLE(province)
+      : province === 'YT' ? YT_PROBATE
+        : province === 'NT' ? NT_PROBATE
+          : province === 'NU' ? NU_PROBATE : PROBATE_TABLE(province)
 }
 for (const province of PROVINCES) {
   if (province === 'QC') continue
@@ -903,6 +931,18 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
         expect(row.verifiedAt, `${province} checked date`).toBe(
           CONTENT_VERIFIED_AUTHORITIES[province === 'NT' ? NT_PROBATE : NU_PROBATE].checkedOn)
         expect(row.limitationId, province).toBe(province === 'NT' ? 'probateFeesApproxNT' : 'probateFeesApproxNU')
+      } else if (province === 'YT') {
+        // BE-38 B4 follow-up: YT used to cite its TaxTips.ca table for an
+        // unconditional $140, which is not what the cited rule prints. It now
+        // cites Yukon's Supreme Court Rules' fee schedule — the document whose
+        // item 11 prints both the $140 and the $25,000 exemption — and is
+        // content-checked against it, with its own limitation id rather than the
+        // generic one that lists the provinces this build simplifies.
+        expect(row.sourceURL, 'YT cites its own fee schedule').toBe(YT_PROBATE)
+        expect(urls, 'YT also lists its TaxTips.ca table').toContain(table('YT'))
+        expect(row.contentChecked, 'YT probate must be content-checked').toBe(true)
+        expect(row.verifiedAt, 'YT checked date').toBe(CONTENT_VERIFIED_AUTHORITIES[YT_PROBATE].checkedOn)
+        expect(row.limitationId, 'YT names its own limitation').toBe('probateFeesYT')
       } else {
         expect(row.sourceURL, province).toBe(table(province))
         expect(row.limitationId, province).toBe(province === 'MB' ? 'probateFeesMB' : 'probateFees')
@@ -999,9 +1039,117 @@ describe('BE-38 B4: the territories are priced from their own published fees', (
     expect(probateTax(30_000_000, 'AB')).toBe(525)
     expect(probateTax(2_000_000, 'QC')).toBe(243)
     expect(probateTax(2_000_000, 'MB')).toBe(0)
-    // Yukon keeps its own $140 filing fee now that it is no longer lent out.
-    expect(PROBATE_RATES.YT).toEqual({ flat: 140, rate: 0, threshold: 0 })
+    // Yukon keeps its own $140 filing fee now that it is no longer lent out,
+    // and the fee it charges inside the published exemption is exactly zero.
+    expect(PROBATE_RATES.YT).toEqual({ flat: 140, rate: 0, threshold: 25_000 })
     expect(probateTax(1_000_000, 'YT')).toBe(140)
+  })
+})
+
+describe('BE-38 B4 follow-up: Yukon is priced from its own fee schedule, not an unconditional $140', () => {
+  /** The two priced values Yukon's Supreme Court Rules, Appendix C, Schedule 1,
+   * item 11 prints, hand-keyed from the instrument — not read back from
+   * `PROBATE_RATES`, whose value is the thing under test:
+   *
+   *   "For every grant or ancillary grant of probate and administration, and on
+   *    every resealing of an extra-territorial grant of probate or
+   *    administration. No fee is payable to obtain a grant of probate and
+   *    administration where a person dies leaving an estate not exceeding
+   *    $25,000 in value ... 140"
+   *
+   * The fee is a step, not a rate: the boundary "$25,000" is *inclusive* of the
+   * exemption, so $25,000 itself is charged nothing and only a value above it is
+   * charged $140. The document prints no other probate figure, and states no
+   * other band, so there is no rung to price between the two.
+   */
+  const YT_FEE_ABOVE = 140
+  const YT_EXEMPTION = 25_000
+
+  it('prices both values item 11 prints, on both sides of the exemption boundary', () => {
+    // The two published values, probed where the instrument's wording turns:
+    // "not exceeding $25,000" is $0, and the boundary itself belongs to that
+    // exemption rather than to the $140 step.
+    expect(probateTax(YT_EXEMPTION - 1, 'YT'), 'just below the exemption').toBe(0)
+    expect(probateTax(YT_EXEMPTION, 'YT'), 'at the exemption boundary ("not exceeding")').toBe(0)
+    expect(probateTax(YT_EXEMPTION + 1, 'YT'), 'just above the exemption').toBe(YT_FEE_ABOVE)
+    // The defect itself: a small estate used to be charged the full $140.
+    expect(probateTax(5_000, 'YT'), 'the $5,000 estate the defect overcharged').toBe(0)
+    expect(probateTax(1, 'YT'), 'the smallest non-empty estate').toBe(0)
+    expect(probateTax(0, 'YT'), 'an estate with nothing probatable').toBe(0)
+    // The fee does not scale with the estate above the boundary.
+    expect(probateTax(25_001, 'YT')).toBe(YT_FEE_ABOVE)
+    expect(probateTax(1_000_000, 'YT')).toBe(YT_FEE_ABOVE)
+    expect(probateTax(50_000_000, 'YT')).toBe(YT_FEE_ABOVE)
+    // The implementation carries exactly those two values and no third band.
+    expect(PROBATE_RATES.YT).toEqual({ flat: YT_FEE_ABOVE, rate: 0, threshold: YT_EXEMPTION })
+    expect(PROBATE_RATES.YT.bands, 'item 11 prints no intermediate rung').toBeUndefined()
+    // The independent expectation, from the instrument's wording: nothing up to
+    // and including the boundary, $140 strictly above it.
+    for (const value of [0, 1, 5_000, 24_999, 25_000, 25_001, 200_000, 1_000_000])
+      expect(probateTax(value, 'YT'), `YT at ${value}`)
+        .toBe(value <= YT_EXEMPTION ? 0 : YT_FEE_ABOVE)
+    expect(PROBATE_HAND.YT).toEqual({ flat: YT_FEE_ABOVE, rate: 0, threshold: YT_EXEMPTION })
+    for (const value of [1, 5_000, 24_999, 25_000, 25_001, 200_000, 1_000_000])
+      expect(probateTax(value, 'YT'), `YT at ${value} vs the hand rule`)
+        .toBeCloseTo(handProbate('YT', value), 6)
+  })
+
+  it('holds the cited authority\'s recorded figures equal to the priced values', () => {
+    // The equality the earlier round added for NT/NU, extended to YT: the fee
+    // figures the registry records for the row's *cited authority* must be
+    // exactly the values the engine prices. Deleting `$0` or `$140` from the
+    // registry, or pricing a third band the instrument does not print, fails.
+    const row = coverageFor('YT').implemented['probate-and-estate-fees']
+    expect(row.sourceURL, 'YT source is its own fee schedule').toBe(YT_PROBATE)
+    expect(row.additionalSourceURLs, 'YT also lists the table it used to cite').toEqual([PROBATE_TABLE('YT')])
+    const record = CONTENT_VERIFIED_AUTHORITIES[row.sourceURL]
+    expect(record, 'YT cited authority must be content-checked').toBeDefined()
+    expect(record.checkedOn, 'YT checked date').toBe(row.verifiedAt)
+    expect(record.checkedFigures.filter(figure => /^\$[\d,]+$/.test(figure)),
+      'the citation must carry exactly the two priced values').toEqual(['$0', '$140'])
+    expect(record.checkedFigures, 'the exemption boundary as item 11 words it')
+      .toContain('not exceeding $25,000 in value')
+    // The TaxTips.ca table the row used to cite is now its additional source,
+    // and it states the same boundary in its own words rather than supplying a
+    // figure the primary does not print.
+    expect(record.checkedFigures, 'the boundary is not inferred').not.toContain('$25,000')
+  })
+
+  it('moves YT alone: every other jurisdiction\'s probate keeps its published value', () => {
+    // The confinement control. ON, BC, AB, QC, SK, NS, NB, PE, NL and MB are
+    // exactly the values the build charged before this slice, keyed here from
+    // their own authorities rather than from `PROBATE_RATES`, so a change that
+    // leaks into another province fails. NT/NU are covered by their own ladder
+    // suite above and are asserted non-zero here to prove the two shapes still
+    // coexist.
+    const CONTROL: Record<string, number> = {
+      ON: (1_000_000 - 50_000) * 0.015, BC: 200 + 0.014 * (1_000_000 - 50_000),
+      AB: 525, QC: 243, MB: 0, SK: 200 + 0.007 * 1_000_000,
+      NS: 1003 + 0.01695 * (1_000_000 - 100_000), NB: 100 + 0.005 * (1_000_000 - 20_000),
+      PE: 400 + 0.004 * (1_000_000 - 100_000), NL: 60 + 0.006 * (1_000_000 - 1_000),
+    }
+    for (const [province, expected] of Object.entries(CONTROL))
+      expect(probateTax(1_000_000, province as Province), `${province} probate`).toBeCloseTo(expected, 6)
+    for (const province of ['NT', 'NU'] as const)
+      expect(probateTax(1_000_000, province), `${province} top tier`).toBeGreaterThan(0)
+    // The shared flat-plus-rate expression still serves every province the same
+    // way; only YT's row gained a boundary.
+    expect(PROBATE_RATES.ON).toEqual({ flat: 0, rate: 0.015, threshold: 50_000 })
+    expect(PROBATE_RATES.BC).toEqual({ flat: 200, rate: 0.014, threshold: 50_000 })
+    expect(PROBATE_RATES.AB).toEqual({ flat: 525, rate: 0, threshold: 0 })
+    expect(PROBATE_RATES.QC).toEqual({ flat: 243, rate: 0, threshold: 0 })
+    expect(PROBATE_RATES.MB).toEqual({ flat: 0, rate: 0, threshold: 0 })
+    // The three no-rate shapes still coexist: AB's and QC's flat amounts are
+    // unconditional (charged on the first dollar, as their own tables print),
+    // MB's is exactly zero, and YT's alone is a step above its exemption. A
+    // change that turned YT's boundary into a general "rate 0 ⇒ free below
+    // threshold" rule would zero AB and QC here.
+    expect(probateTax(1, 'AB')).toBe(525)
+    expect(probateTax(1, 'QC')).toBe(243)
+    expect(probateTax(1, 'MB')).toBe(0)
+    expect(probateTax(1, 'YT')).toBe(0)
+    expect(probateTax(1_000_000, 'AB')).toBe(525)
+    expect(probateTax(1_000_000, 'QC')).toBe(243)
   })
 })
 
@@ -1012,9 +1160,10 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
   it('never renders a bot-gated authority, and qualifies every row that cites one', () => {
     // B2: the rendered authority must be one a reader can reach. The authorities
     // the suite knows to be unreachable are recorded, dated, in
-    // `BLOCKED_SOURCES`; a row may list one as an additional source only if its
-    // rendered limitation says so. This is the assertion that would have failed
-    // the QC bracket rows while `RQ_RATES` was their `sourceURL`.
+    // `BLOCKED_SOURCES`; a row may cite one — as primary or as an additional
+    // source — only if its rendered limitation names the gate. This is the
+    // assertion that would have failed the QC bracket rows while `RQ_RATES` was
+    // their `sourceURL`.
     //
     // BE-38 B3 review (round 4, B2): the registry now also carries a source that
     // answers **200** to curl and to an API request context (PE's own page). A
@@ -1022,12 +1171,17 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     // registry — populated from real Chromium navigations — and not off HTTP
     // status. `RuleAssumptions.tsx` marks each such link with its gate, and the
     // e2e suite pins the rendered marker.
+    //
+    // BE-38 B4 follow-up: Nunavut's own regulation is the fourth entry, and it
+    // is a row's *primary* source. A blocked primary is permitted only with a
+    // rendered qualification naming the gate, so the guard now asserts the
+    // limitation for every blocked URL a row renders rather than only for the
+    // additional ones — the e2e suite holds that qualification's marker in
+    // en/fr/zh.
     for (const jurisdiction of COVERAGE_JURISDICTIONS)
       for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented)) {
-        expect(BLOCKED_SOURCES[credit.sourceURL],
-          `${jurisdiction}/${id} renders a blocked authority`).toBeUndefined()
-        for (const url of credit.additionalSourceURLs ?? [])
-          if (BLOCKED_SOURCES[url])
+        for (const authority of rowAuthorities(credit))
+          if (authority.blocked)
             expect(credit.limitationId,
               `${jurisdiction}/${id} cites a blocked authority with no rendered qualification`).toBeDefined()
       }
@@ -1041,6 +1195,19 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     expect(BLOCKED_SOURCES[PE_2026_GOV].reason).toMatch(/200/)
     expect(BLOCKED_SOURCES[PE_2026_GOV].reason).toMatch(/CAPTCHA/)
     expect(BLOCKED_SOURCES[PE_2026_GOV].observedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    // BE-38 B4 follow-up: the gate the NT/NU slice left unrecorded. Measured on
+    // a headless Chromium navigation to the cited URL: HTTP 403 and Cloudflare's
+    // "Just a moment..." challenge. Deleting this entry makes the row render as
+    // content-checked over a link a scripted reader cannot open, and the
+    // assertion below is what refuses that.
+    expect(Object.keys(BLOCKED_SOURCES)).toContain(NU_PROBATE)
+    expect(BLOCKED_SOURCES[NU_PROBATE].gateMarker).toBe('403')
+    expect(BLOCKED_SOURCES[NU_PROBATE].reason).toMatch(/403/)
+    expect(BLOCKED_SOURCES[NU_PROBATE].reason).toMatch(/Cloudflare/)
+    expect(BLOCKED_SOURCES[NU_PROBATE].reason).toMatch(/Chromium/)
+    expect(BLOCKED_SOURCES[NU_PROBATE].observedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(coverageFor('NU').implemented['probate-and-estate-fees'].limitationId,
+      'NU cannot cite the gated regulation unqualified').toBe('probateFeesApproxNU')
     for (const [url, blocked] of Object.entries(BLOCKED_SOURCES)) {
       expect(blocked.reason.length, url).toBeGreaterThan(40)
       expect(blocked.observedAt, url).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -1050,10 +1217,12 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
 
   it('derives the registered gate marker for every blocked URL a row renders', () => {
     // The generic shape of round 4's B2: for *every* recorded block, a row that
-    // cites it as `additionalSourceURLs` must name that block's own marker in a
-    // rendered limitation. Dropping the marker from the catalogue, or citing a
-    // newly recorded URL without naming its gate, fails here rather than
-    // shipping an unqualified dead link for the next jurisdiction.
+    // renders it — as `sourceURL` or as an `additionalSourceURLs` entry — must
+    // carry a rendered limitation naming that block's own marker. Dropping the
+    // marker from the catalogue, or citing a newly recorded URL without naming
+    // its gate, fails here rather than shipping an unqualified dead link for the
+    // next jurisdiction. BE-38 B4 follow-up moved NU's regulation into this set
+    // as a primary source, so the check is no longer additional-source-only.
     for (const jurisdiction of COVERAGE_JURISDICTIONS)
       for (const [id, credit] of Object.entries(coverageFor(jurisdiction).implemented))
         for (const authority of rowAuthorities(credit))
@@ -1161,19 +1330,23 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     for (const url of Object.keys(BLOCKED_SOURCES))
       expect(cited.has(url), `blocked entry cited by no row: ${url}`).toBe(true)
     // The two rendered categories, counted over unique authorities: the surface
-    // says "content-checked" for 10 of the 53 distinct URLs it links and "listed
-    // only" for the other 43. A reader can therefore tell which citations this
-    // artifact actually claims a document↔figure correspondence for.
+    // says "content-checked" for 12 of the 54 distinct URLs it links and "listed
+    // only" for the other 42. A reader can therefore tell which citations this
+    // artifact actually claims a document↔figure correspondence for. BE-38 B4
+    // follow-up added two: Yukon's own fee schedule and the TaxTips.ca table the
+    // YT row still lists alongside it.
     expect([...verified].sort()).toEqual([
       BC_2026_JULY, CFFP_GUIDE, NL_2026_JULY, PE_2026_JULY, ON_PROBATE_STATUTE,
       'https://www.taxtips.ca/willsandestates/probatefees/on.htm',
       // BE-38 B4: the two territories' own regulations, plus the two TaxTips.ca
       // territory tables their now-content-checked rows also list.
       NT_PROBATE, NU_PROBATE, PROBATE_TABLE('NT'), PROBATE_TABLE('NU'),
+      // BE-38 B4 follow-up: Yukon's fee schedule and the table it used to cite.
+      YT_PROBATE, PROBATE_TABLE('YT'),
     ].sort())
-    expect(cited.size).toBe(53)
-    expect(verified.size).toBe(10)
-    expect(merelyListed.size).toBe(43)
+    expect(cited.size).toBe(54)
+    expect(verified.size).toBe(12)
+    expect(merelyListed.size).toBe(42)
     expect(verified.size + merelyListed.size).toBe(cited.size)
     expect(CONTENT_VERIFIED_AUTHORITIES[PE_2026_JULY].checkedFigures).toContain('142,520')
     expect(CONTENT_VERIFIED_AUTHORITIES[BC_2026_JULY].checkedFigures.join(' ')).toMatch(/5\.60/)

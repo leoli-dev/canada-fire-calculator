@@ -186,7 +186,14 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   // unqualified, in any province, in either the coverage list or the sources
   // block. This is generic over `BLOCKED_SOURCES`, so the next gate recorded for
   // any jurisdiction is covered without editing this test.
-  for (const province of ['ON', 'QC', 'PE', 'BC', 'NL', 'MB']) {
+  //
+  // BE-38 B4 follow-up: NT and NU joined the loop. Nunavut's own regulation is
+  // now recorded in `BLOCKED_SOURCES` (HTTP 403 and Cloudflare's challenge to
+  // curl, to an API request context and to headless Chromium), and it is that
+  // row's *primary* source, so the rendered row must carry the gate and the
+  // qualification. Without NT/NU in this loop the guard could not reach the one
+  // recorded block the territory slice left behind.
+  for (const province of ['ON', 'QC', 'PE', 'BC', 'NL', 'MB', 'NT', 'NU']) {
     await page.getByLabel('Province').selectOption(province)
     for (const authority of renderedAuthorities(province)) {
       if (!BLOCKED_SOURCES[authority.url]) continue
