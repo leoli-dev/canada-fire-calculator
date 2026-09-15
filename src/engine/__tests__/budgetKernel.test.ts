@@ -3,7 +3,6 @@ import type { Inputs } from '../types'
 import { migratePersistedPlan } from '../migration'
 import type { BudgetMode, InputsV2 } from '../model'
 import { annualStep, initializeState, type AnnualProviders } from '../annualState'
-import { reconciledBudget } from '../budgetSemantics'
 import { runProjection } from '../projection'
 
 /**
@@ -100,8 +99,8 @@ describe('BE-13 A differentiated budget refusal', () => {
     expect(refused.detail).not.toContain('budgetBasisExcluded')
 
     const priced = (canonical: InputsV2) => runProjection(input(), undefined, canonical)
-    const legacyKept = priced(plan(reconciledBudget({ annualSavings: 40, retirementSpending: 50 }, { keepLegacy: true })))
-    const adopted = priced(plan(reconciledBudget({ annualSavings: 40, retirementSpending: 50 }, { keepLegacy: false })))
+    const legacyKept = priced(plan(savings({ taxBenefitIncluded: { status: 'known', value: false } })))
+    const adopted = priced(plan(savings()))
     expect(legacyKept.finalNetWorth).toBe(adopted.finalNetWorth)
     expect(legacyKept.taxCapability?.status).toBe(adopted.taxCapability?.status)
   })
