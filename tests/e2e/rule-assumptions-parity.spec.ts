@@ -60,11 +60,11 @@ test('guided and professional expose the same pinned rule versions, policy and s
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByLabel('Province').selectOption('NL')
-  const nlLinks = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+  const nlLinks = await professional.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(nlLinks[3]).toContain('t4008nl-july')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
-  expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(nlLinks)
+  expect(await guided.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(nlLinks)
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByLabel('Province').selectOption('PE')
@@ -76,12 +76,12 @@ test('guided and professional expose the same pinned rule versions, policy and s
   // The old value may appear only inside the resolution sentence that says it
   // was replaced, never as a live threshold.
   await expect(professional).toContainText("replacing January's $142,250")
-  const peLinks = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
+  const peLinks = await professional.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(peLinks[2]).toContain('/2026/t4032-pe-7-26e.pdf')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
   await expect(guided).toContainText('$142,520')
-  expect(await guided.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(peLinks)
+  expect(await guided.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(peLinks)
 })
 
 test('the credit coverage matrix is visible in both modes and claims no completeness', async ({ page }) => {
