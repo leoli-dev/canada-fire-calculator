@@ -1393,5 +1393,6 @@
   "ccbUnsupported.ccb-shared-custody": "shared custody at 50%, so a child is never split between two recipient households",
   "ccbUnsupported.ccb-child-disability-benefit": "the Child Disability Benefit, a separate supplement that is not added to any amount here",
   "ccbUnsupported.ccb-provincial-top-ups": "provincial child benefits (for example Quebec’s Family Allowance), so no result is a complete child-benefit position",
-  "ccbUnsupported.ccb-eligibility-and-residence": "eligibility facts (residency, immigration status, the 18-month extended-benefit rules): the calculator prices the eligible children it is given"
+  "ccbUnsupported.ccb-eligibility-and-residence": "eligibility facts (residency, immigration status, the 18-month extended-benefit rules): the calculator prices the eligible children it is given",
+  "ruleCcbRatesSource": "CCB reduction rates (statute)"
 }

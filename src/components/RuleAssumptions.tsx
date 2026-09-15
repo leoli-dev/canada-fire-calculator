@@ -98,6 +98,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
         ['ruleProvincialBpaSource', tax.fieldSources.provincialBpa],
         ['ruleCcbAmountsSource', ccb.fieldSources.amounts],
         ['ruleCcbThresholdsSource', ccb.fieldSources.thresholds],
+        ['ruleCcbRatesSource', ccb.fieldSources.rates],
         ['ruleGisQuarterSource', gis.sourceURL],
         ['ruleGisTablesSource', gis.categories.single.fieldSources.reductionSegments],
         ['ruleGisAllowanceSource', gis.allowance.fieldSources.maxMonthly],

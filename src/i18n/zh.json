@@ -1402,5 +1402,6 @@
   "ccbUnsupported.ccb-shared-custody": "50% 共同抚养：本计算器不会把一个孩子分摊到两个领取家庭",
   "ccbUnsupported.ccb-child-disability-benefit": "儿童残疾福利：这是一项单独的补助，不会加到此处的任何金额上",
   "ccbUnsupported.ccb-provincial-top-ups": "省级儿童福利（例如魁北克家庭津贴），因此任何结果都不是完整的儿童福利状况",
-  "ccbUnsupported.ccb-eligibility-and-residence": "资格事实（居住、移民身份、18 个月延伸福利规则）：计算器只按输入对符合条件的孩子计价"
+  "ccbUnsupported.ccb-eligibility-and-residence": "资格事实（居住、移民身份、18 个月延伸福利规则）：计算器只按输入对符合条件的孩子计价",
+  "ruleCcbRatesSource": "CCB 递减率（法条）"
 }

@@ -13,16 +13,18 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(professional).toContainText('CA-BC-tax-2026-legacy-v1')
   const text = await professional.innerText()
   const links = await professional.locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
-  // Four tax sources, two CCB sources, and the three GIS/Allowance ones the
-  // panel now discloses: the quarterly page and the two tables its fitted
-  // reduction is measured against.
-  expect(links).toHaveLength(9)
+  // Four tax sources, three CCB sources (amounts, thresholds and, since BE-38
+  // B2, the statutory rates the computation applies), and the three
+  // GIS/Allowance ones the panel discloses: the quarterly page and the two
+  // tables its fitted reduction is measured against.
+  expect(links).toHaveLength(10)
   expect(links[0]).toContain('/2026/')
   expect(links[2]).toContain('t4032bc-july')
   expect(links[4]).toContain('/2026/')
-  expect(links[6]).toContain('2026-quarterly-july-september')
-  expect(links[7]).toContain('table1_gis_for_single')
-  expect(links[8]).toContain('allowance/benefit-amount')
+  expect(links[6]).toContain('laws-lois.justice.gc.ca')
+  expect(links[7]).toContain('2026-quarterly-july-september')
+  expect(links[8]).toContain('table1_gis_for_single')
+  expect(links[9]).toContain('allowance/benefit-amount')
   // The paths the pack does not price are named, not buried in a limitation
   // string nothing rendered.
   await expect(professional.getByTestId('rule-gis-not-modelled')).toContainText('prior-year base period')
@@ -48,7 +50,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/review')
   await expect(guided).toContainText('Manitoba\'s dedicated 2026 CRA guide')
-  await expect(guided.locator('a')).toHaveCount(10)
+  await expect(guided.locator('a')).toHaveCount(11)
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByLabel('Province').selectOption('NL')
