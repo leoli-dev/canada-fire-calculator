@@ -66,6 +66,8 @@ test('scenario final-net-worth heading aligns with its amounts', async ({ page }
 })
 
 test('timing comparison preserves unsupported spending-solver status for a funded planned home', async ({ page }) => {
+  // Real spending-solver run (~18s locally for TFSA 5M + dieWithZero on a planned purchase); CI runners are slower than the 30s default.
+  test.setTimeout(90_000)
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await field(page, 'TFSA').first().fill('5000000')
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
