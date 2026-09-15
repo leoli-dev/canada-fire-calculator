@@ -536,7 +536,7 @@ export function selectPlanBenefitRules(request: {
   futureIndexation?: { annualRate: number }
 }): BenefitRuleContext {
   const selection = trySelectBenefitRules(request)
-  if (selection.status !== 'unsupported') return selection.context
+  if (selection.status === 'ok') return selection.context
   throw new Error(selection.reason)
 }
 
