@@ -8,8 +8,8 @@ import {
   type TaxBySource,
   type YearRow,
 } from './types'
-import { incomeTax, probateTax } from './tax'
-import { CAPITAL_GAINS_INCLUSION, FEDERAL, PROVINCIAL } from './taxData'
+import { incomeTax, PLAN_TAX_YEAR, probateTax, selectPlanTaxRules, taxRuleProvenance } from './tax'
+import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
   OAS_CLAWBACK_THRESHOLD,
@@ -337,6 +337,12 @@ export function pensionStartAge(inputs: Inputs): number {
 }
 
 export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?: InputsV2): ProjectionResult {
+  // BE-38 B1: one selected, versioned rule pack prices every tax figure in this
+  // run — the year's income tax, the meltdown bracket ceiling and the closing
+  // return. An unknown jurisdiction raises the selector's concrete reason here
+  // instead of silently pricing from another jurisdiction's table.
+  const rules = selectPlanTaxRules({ jurisdiction: inputs.province, taxYear: PLAN_TAX_YEAR })
+  const taxRules = taxRuleProvenance(rules)
   const bal: Record<AccountType, number> = { ...inputs.balances }
   // ACB stays in nominal dollars; liquid balances and public charts remain in
   // base-year purchasing power until the annual-state consumer migration.
@@ -907,7 +913,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         const bracketTop =
           capMode === 'oasClawback'
             ? OAS_CLAWBACK_THRESHOLD
-            : Math.min(FEDERAL.brackets[bIdx].upTo, PROVINCIAL[inputs.province].brackets[bIdx].upTo)
+            : Math.min(rules.pack.federal.brackets[bIdx].upTo, rules.pack.provincial.brackets[bIdx].upTo)
         const persons = partner ? 2 : 1
         const committedTaxable =
           cpp + pension + extraTaxable + rent + extraIncome +
@@ -1119,6 +1125,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     remainingRegistered: bal.rrsp + lockedBal,
     nonRegisteredGain: nonRegGain,
     investmentPropertyGain: ipGain,
+    rules,
   }) : null
   // probate applies to the net value of non-registered holdings and unsold
   // real estate (a registered mortgage against the property reduces the
@@ -1130,6 +1137,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   return {
     taxCapability: { status: canonical && !taxUnsupportedReason && inputs.fireAge <= inputs.currentAge ? 'person' : 'legacyEstimate',
       reason: taxUnsupportedReason ?? (inputs.fireAge > inputs.currentAge ? 'working-year tax uses an unverified marginal-rate approximation' : undefined) },
+    /** BE-38 B1: which versioned pack priced every tax figure above. */
+    taxRules,
     capitalTaxLimit: investmentSaleTaxUnsupported ? 'investmentPropertySale'
       : nonRegLossTaxUnverified ? 'nonRegisteredLoss' : undefined,
     rows,

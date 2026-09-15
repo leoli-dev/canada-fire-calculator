@@ -1,7 +1,7 @@
 import type { EntityId, InputsV2, QcDrugCoverage } from './model'
 import type { PersonIncome } from './personIncome'
-import { federalIncomeTax, ordinaryQuebecIncomeTax } from './tax'
-import { PROV_AGE_PENSION, PROVINCIAL, QC_FSS } from './taxData'
+import { federalIncomeTax, ordinaryQuebecIncomeTax, PLAN_TAX_YEAR, trySelectPlanTaxRules, type TaxRuleContext } from './tax'
+import { PROV_AGE_PENSION, QC_FSS } from './taxData'
 
 export interface QuebecTaxRow {
   federalTax: number
@@ -146,20 +146,28 @@ function provincialPeople(plan: InputsV2, original: Record<string, PersonIncome>
 
 /** Québec Schedule B line 30 combines both spouses' age and retirement
  * amounts; line 31 applies one 18.75% reduction against family net income.
- * It is then a non-refundable credit at the 2026 lowest provincial rate.
+ * It is then a non-refundable credit at the selected pack's lowest provincial
+ * rate, which the caller passes in rather than this module holding a literal.
  * Source form mechanics: https://www.revenuquebec.ca/documents/en/formulaires/tp/2025-12/TP-1.D.B-V%282025-12%29.pdf
  * 2026 amounts/threshold: Québec Finance 2026 Table 3. */
-export function scheduleB2026(people: Record<string, PersonIncome>): { availableAmount: number; credit: number; familyIncome: number } {
+export function scheduleB2026(people: Record<string, PersonIncome>, lowestProvincialRate: number): { availableAmount: number; credit: number; familyIncome: number } {
   const rows = Object.values(people)
   const p = PROV_AGE_PENSION.QC
   const familyIncome = rows.reduce((sum, row) => sum + row.netIncome, 0)
   const beforeReduction = rows.reduce((sum, row) => sum + (row.age >= 65 ? p.ageMax : 0) +
     Math.min(p.pension, row.provincialPensionEligible * 1.25), 0)
   const availableAmount = Math.max(0, beforeReduction - p.ageRate * Math.max(0, familyIncome - p.ageThreshold))
-  return { availableAmount, credit: availableAmount * PROVINCIAL.QC.brackets[0].rate, familyIncome }
+  return { availableAmount, credit: availableAmount * lowestProvincialRate, familyIncome }
 }
 
 export function calculateQuebecTax(plan: InputsV2, original: Record<string, PersonIncome>, federalPeople: Record<string, PersonIncome>): QuebecTaxResult {
+  // The federal and Quebec bracket ladders come from the plan's selected,
+  // versioned pack. A plan whose jurisdiction or year no pack covers is refused
+  // with its reason rather than priced from another jurisdiction's table.
+  const selection = trySelectPlanTaxRules({ jurisdiction: plan.province, taxYear: PLAN_TAX_YEAR })
+  if (selection.status !== 'ok') return selection
+  const rules: TaxRuleContext = selection.context
+  if (rules.pack.jurisdiction !== 'QC') return { status: 'invalid', reason: 'Quebec tax needs a Quebec rule pack' }
   const provincial = provincialPeople(plan, original)
   if (provincial.status !== 'ok') return provincial
   const people = provincial.people
@@ -172,8 +180,8 @@ export function calculateQuebecTax(plan: InputsV2, original: Record<string, Pers
     ? ids.reduce((a, b) => federalPeople[a].netIncome >= federalPeople[b].netIncome ? a : b) : null
   // Credit belongs to the household once; assign it to the highest-tax
   // claimant, then pass any unusable remainder to the spouse (Schedule B 33).
-  const b = scheduleB2026(people)
-  const ordinary = Object.fromEntries(ids.map(id => [id, ordinaryQuebecIncomeTax(people[id].taxableIncome)]))
+  const b = scheduleB2026(people, rules.pack.provincial.brackets[0].rate)
+  const ordinary = Object.fromEntries(ids.map(id => [id, ordinaryQuebecIncomeTax(people[id].taxableIncome, rules)]))
   const claims: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]))
   let remaining = b.credit
   for (const id of [...ids].sort((a, z) => ordinary[z] - ordinary[a])) {
@@ -188,7 +196,7 @@ export function calculateQuebecTax(plan: InputsV2, original: Record<string, Pers
     const ramq = ramqPremium2026(plan.taxProfile?.qcDrugCoverage?.[id])
     if (ramq.status !== 'ok') return ramq
     const federal = federalPeople[id]
-    byPerson[id] = { federalTax: federalIncomeTax(federal.taxableIncome, {
+    byPerson[id] = { federalTax: federalIncomeTax(federal.taxableIncome, rules, {
       age: federal.age, pensionIncome: federal.federalPensionEligible,
       spouseNetIncome: claimant === id ? federalPeople[ids.find(other => other !== id)!].netIncome : undefined,
     }, true), provincialIncomeTax: ordinary[id] - claims[id], scheduleBCredit: claims[id],

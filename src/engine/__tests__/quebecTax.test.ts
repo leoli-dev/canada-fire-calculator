@@ -36,7 +36,8 @@ describe('BE-35 Quebec source-owned household schedules', () => {
     const income = calculatePersonIncome(p, 2026, events)
     expect(income.status).toBe('ok')
     if (income.status !== 'ok') return
-    const b = scheduleB2026(income.byPerson)
+    // The lowest provincial rate now comes from the selected pack, not a literal.
+    const b = scheduleB2026(income.byPerson, 0.14)
     expect(b.familyIncome).toBe(80_000)
     expect(b.availableAmount).toBeCloseTo(15_054 - (80_000 - 42_955) * .1875, 6)
     expect(b.credit).toBeCloseTo(1_135.12875, 6)

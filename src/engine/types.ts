@@ -471,6 +471,13 @@ export interface ProjectionResult {
   /** An explicit limit prevents an old pooled preview from becoming advice. */
   taxCapability?: { status: 'person' | 'legacyEstimate'; reason?: string }
   /**
+   * BE-38 B1: the versioned tax rule pack that priced this run's bracket ladder
+   * and basic personal amount, and whether that year was published or assumed.
+   * Present so a reader can trace every tax figure to a pack rather than to a
+   * constant in the source.
+   */
+  taxRules?: import('./tax').TaxRuleProvenance
+  /**
    * A modeled disposition depends on tax facts this engine cannot verify, so a
    * positive funding, retirement-age or spending claim derived from this run is
    * not verified. `investmentPropertySale` needs a land/building split and CCA

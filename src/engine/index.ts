@@ -1,5 +1,18 @@
 export * from './types'
 export { incomeTax, marginalRate, probateTax, qcFssContribution, qcRamqPremium } from './tax'
+// BE-38 B1: the plan-anchored, versioned tax rule selection the computation
+// reads, its refusals and the provenance every priced result carries.
+export {
+  PLAN_TAX_YEAR,
+  anchorTaxRules,
+  selectPlanTaxRules,
+  trySelectPlanTaxRules,
+  taxRuleProvenance,
+  type TaxRuleContext,
+  type TaxRuleRequest,
+  type TaxRuleSelection,
+  type TaxRuleProvenance,
+} from './tax'
 export { calculateQuebecTax, scheduleB2026, scheduleF2026, ramqPremium2026, ramqScheduleK2025,
   ramqMonthlyPeriodMaximum, qcCoverageUniform, qcCoverageAnnualStatus, applyQcAnnualCoverage,
   QC_DRUG_MONTHS_PER_YEAR, type QuebecTaxResult, type QuebecTaxRow } from './quebecTax'
