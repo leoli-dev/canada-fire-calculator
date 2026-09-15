@@ -20,7 +20,92 @@ describe('dated rule selection', () => {
     expect(selectBenefitRules('CCB', '2025-07/2026-06').values.maxUnder6).toBe(7997)
     expect(selectBenefitRules('CCB', '2026-07/2027-06').values).toEqual({
       maxUnder6: 8157, max6to17: 6883, th1: 38237, th2: 82847,
+      rate1: [0.07, 0.135, 0.19, 0.23], rate2: [0.032, 0.057, 0.08, 0.095],
+      basePhaseOutAmounts: [3123, 6022, 8476, 10260],
     })
+  })
+
+  it('publishes each CCB parameter with its own dated source', () => {
+    // BE-38 B2: the pack is now what the computation reads, so `rate1`/`rate2`
+    // and the published phase-out amounts must be sourced like the amounts and
+    // thresholds rather than implied by a limitation string.
+    for (const pack of [selectBenefitRules('CCB', '2025-07/2026-06'), selectBenefitRules('CCB', '2026-07/2027-06')]) {
+      expect(pack.values.rate1).toHaveLength(4)
+      expect(pack.values.rate2).toHaveLength(4)
+      expect(pack.values.basePhaseOutAmounts).toHaveLength(4)
+      expect(pack.fieldSources.amounts).toContain('/news/')
+      expect(pack.fieldSources.thresholds).toContain('adjustment-personal-income-tax-benefit-amounts')
+      expect(pack.fieldSources.rates).toContain('laws-lois.justice.gc.ca')
+      expect(pack.unsupportedPaths.map(path => path.id)).toContain('ccb-prior-year-afni')
+      expect(pack.unsupportedPaths.map(path => path.id)).toContain('ccb-provincial-top-ups')
+    }
+  })
+
+  it('refuses an unknown benefit program and an unpublished period with distinct reasons', () => {
+    // An unknown program is never answered with the CCB pack, and never with a
+    // generic message that reads the same as a malformed period.
+    expect(() => selectBenefitRules('GST', '2026-07/2027-06')).toThrow(/unknown benefit program "GST".*CCB/)
+    // A period that is not a whole July-June program year is never shifted into
+    // one; the reason says which shape was expected.
+    for (const malformed of ['2026', '2026-07', '2026-07/2028-06', '2026-06/2027-07', '2026-07/2026-06']) {
+      expect(() => selectBenefitRules('CCB', malformed)).toThrow(/not a whole July-to-June program year/)
+    }
+    // A period before the published ones is refused with the published list,
+    // not priced at the first published period's amounts.
+    expect(() => selectBenefitRules('CCB', '2024-07/2025-06')).toThrow(/published periods are 2025-07\/2026-06, 2026-07\/2027-06/)
+    // A later period without a rate is refused; the refusal names the latest
+    // published period and the rate it needs.
+    expect(() => selectBenefitRules('CCB', '2027-07/2028-06')).toThrow(/not published \(latest published period 2026-07\/2027-06\)/)
+    expect(() => selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: -1 })).toThrow(/between 0 and 1/)
+  })
+
+  it('projects a beyond-publication period from the latest published pack, once per year', () => {
+    const assumed = selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: 0.02 })
+    const published = selectBenefitRules('CCB', '2026-07/2027-06')
+    expect(assumed.assumedFutureRule).toBe(true)
+    expect(assumed.basedOnRuleId).toBe('CA-CCB-2026-07-v1')
+    expect(assumed.basedOnPaymentPeriod).toBe('2026-07/2027-06')
+    expect(assumed.incomeTaxYear).toBe(2026)
+    // Exactly one elapsed program year: the published figures × 1.02, once.
+    expect(assumed.values.maxUnder6).toBe(Math.round(published.values.maxUnder6 * 1.02))
+    expect(assumed.values.max6to17).toBe(Math.round(published.values.max6to17 * 1.02))
+    expect(assumed.values.th1).toBe(Math.round(published.values.th1 * 1.02))
+    expect(assumed.values.th2).toBe(Math.round(published.values.th2 * 1.02))
+    // The rates and the published-year phase-out amounts are not indexed.
+    expect(assumed.values.rate1).toEqual(published.values.rate1)
+    expect(assumed.values.rate2).toEqual(published.values.rate2)
+    expect(assumed.values.basePhaseOutAmounts).toEqual(published.values.basePhaseOutAmounts)
+    // Two program years means two applications, from the published pack — the
+    // projection never starts from an already-indexed pack.
+    const later = selectBenefitRules('CCB', '2028-07/2029-06', { annualRate: 0.02 })
+    expect(later.values.maxUnder6).toBe(Math.round(published.values.maxUnder6 * 1.02 ** 2))
+    // A frozen pack carries its values across unchanged: a frozen value does
+    // not inflate in an assumed period.
+    expect(selectBenefitRules('CCB', '2026-07/2027-06').indexationRule).toBe('cpi-assumption')
+  })
+
+  it('rejects a CCB pack whose rates or unsupported list are incomplete', () => {
+    const ccb = selectBenefitRules('CCB', '2026-07/2027-06')
+    // A malformed pack is a publication-time failure, so the fixture is built
+    // as a loose record rather than by lying about the type.
+    const packWith = (values: Record<string, unknown>, rest: Record<string, unknown> = {}) =>
+      ({ ...ccb, values: { ...ccb.values, ...values }, ...rest })
+    expect(() => publishRulePack(ccb)).not.toThrow()
+    // A short rate row would price a larger family off `undefined`.
+    expect(() => publishRulePack(packWith({ rate1: [0.07, 0.135] }))).toThrow()
+    expect(() => publishRulePack(packWith({ rate2: [0.032, 0.057, 0.08, 0.095, 0.1] }))).toThrow()
+    // A second-threshold rate above the first would accelerate the reduction.
+    expect(() => publishRulePack(packWith({ rate2: [0.5, 0.057, 0.08, 0.095] }))).toThrow()
+    // Rates must be ordered by family size and strictly positive.
+    expect(() => publishRulePack(packWith({ rate1: [0.135, 0.07, 0.19, 0.23] }))).toThrow()
+    expect(() => publishRulePack(packWith({ rate1: [0, 0.135, 0.19, 0.23] }))).toThrow()
+    expect(() => publishRulePack(packWith({ basePhaseOutAmounts: [0, 6022, 8476, 10260] }))).toThrow()
+    // The known gaps have to be named, and the rate source has to be a URL.
+    expect(() => publishRulePack({ ...ccb, unsupportedPaths: [] })).toThrow()
+    expect(() => publishRulePack({ ...ccb, fieldSources: { ...ccb.fieldSources, rates: '' } })).toThrow()
+    // An assumed pack must say which published period it was indexed from.
+    const assumed = selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: 0.02 })
+    expect(() => publishRulePack({ ...assumed, basedOnPaymentPeriod: undefined })).toThrow()
   })
 
   it('rejects unknown past periods and jurisdictions, marks future assumptions', () => {
@@ -41,7 +126,7 @@ describe('dated rule selection', () => {
     expect(beforeCollision.provincial.brackets[2].upTo).toBe(150000)
     expect(() => publishRulePack(beforeCollision)).not.toThrow()
     expect(() => selectTaxRules('ON', 2042, { annualRate: 0.021 })).toThrow(/collision|overlap|ordered/i)
-    expect(() => selectBenefitRules('CCB', '2024-07/2025-06')).toThrow()
+    expect(() => selectBenefitRules('CCB', '2024-07/2025-06')).toThrow(/published periods are 2025-07\/2026-06, 2026-07\/2027-06/)
     expect(selectBenefitRules('CCB', '2027-07/2028-06', { annualRate: 0.02 }).values.maxUnder6).toBe(8320)
   })
 

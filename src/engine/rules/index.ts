@@ -59,16 +59,59 @@ export interface TaxRulePack extends Provenance {
    */
   basedOnTaxYear?: number
 }
+/**
+ * The four eligible-child-count brackets a CCB reduction rate is indexed by:
+ * 0 = one child, 1 = two, 2 = three, 3 = four or more.
+ */
+export type ChildCountBracket = [number, number, number, number]
+/**
+ * The dollar amounts a CCB result is computed from. Every one of them is
+ * published (or, for an assumed future period, indexed from one that is), so a
+ * pack is complete: the computation never falls back to a constant of its own.
+ *
+ * `rate1`/`rate2` are the two reduction rates per child-count bracket, and
+ * `basePhaseOutAmounts` the published first-threshold phase-out amount per
+ * bracket that those rates are the ratio of (`rate1[i]` =
+ * `basePhaseOutAmounts[i] / th1`). Keeping the published amounts with the rates
+ * makes the derivation auditable instead of turning rounded percentages into
+ * the only statement of the rule.
+ */
+export interface CcbValues {
+  maxUnder6: number
+  max6to17: number
+  th1: number
+  th2: number
+  rate1: ChildCountBracket
+  rate2: ChildCountBracket
+  basePhaseOutAmounts: ChildCountBracket
+}
+/**
+ * A path the pack knowingly does not price, with a reason a caller can show.
+ * CCB has its own gaps (the prior-year AFNI lag, shared custody), so it names
+ * them itself rather than borrowing the tax or GIS lists.
+ */
+export interface BenefitUnsupportedPath {
+  id: string
+  reason: string
+}
 export interface BenefitRulePack extends Provenance {
   id: string
   program: 'CCB'
   paymentPeriod: string
   incomeTaxYear: number
-  values: { maxUnder6: number; max6to17: number; th1: number; th2: number }
-  fieldSources: { amounts: string; thresholds: string }
+  values: CcbValues
+  fieldSources: { amounts: string; thresholds: string; rates: string }
+  /** The figures this pack does not model, each with a reason. */
+  unsupportedPaths: BenefitUnsupportedPath[]
   assumedFutureRule: boolean
   assumedAnnualRate?: number
   basedOnRuleId?: string
+  /**
+   * The payment period the projected pack was indexed from, so "indexed once
+   * per elapsed program year" is auditable from the pack alone instead of
+   * inferred from its id string. Required on an assumed pack.
+   */
+  basedOnPaymentPeriod?: string
 }
 /**
  * BE-36: the two FHSA limits that a contribution-room ledger needs and cannot
@@ -269,27 +312,65 @@ const TAX_PACKS: TaxRulePack[] = [
   })),
 ]
 
+const CCB_2025_AMOUNTS = 'https://www.canada.ca/en/employment-social-development/news/2025/07/canada-child-benefit-payments-increasing-in-2025-2026.html'
+const CCB_2025_SHEET = 'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html'
+const CCB_2026_AMOUNTS = 'https://www.canada.ca/en/employment-social-development/news/2026/07/canada-child-benefit-payments-increasing-in-2026-2027.html'
+/**
+ * The CCB base benefit amounts and both phase-out thresholds are published per
+ * benefit year on the indexation page (July-to-June program year), and the
+ * reduction *rates* are statutory: 7% / 13.5% / 19% / 23% of adjusted family net
+ * income above the first threshold, then a further 3.2% / 5.7% / 8% / 9.5%
+ * above the second. The published per-bracket first-threshold phase-out amounts
+ * are stored alongside them; each is the amount the bracket's 7% / 13.5% / 19%
+ * / 23% share of the threshold interval removes up to the second threshold
+ * ($6,022 / $38,237 = 15.75% is *not* the applied two-child rate — the applied
+ * rate is the statute's 13.5%, and the difference is exactly why the rates are
+ * stored as rates and the published amounts as a cross-check). The rates are
+ * fixed percentages in the statute and are not themselves indexed, so an
+ * assumed future period indexes only the amounts.
+ */
+const CCB_RATES = 'https://laws-lois.justice.gc.ca/eng/acts/i-3.3/section-122.61.html'
+const CCB_PUBLISHED_THRESHOLDS = 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/adjustment-personal-income-tax-benefit-amounts.html'
+/** The limits of what this pack prices, each named once with its concrete reason. */
+const CCB_UNSUPPORTED_PATHS: BenefitUnsupportedPath[] = [
+  { id: 'ccb-prior-year-afni',
+    reason: "The Canada Child Benefit is paid on the prior year's adjusted family net income; this calculator tests the same year's income." },
+  { id: 'ccb-shared-custody',
+    reason: 'A shared-custody child is paid at 50%; this calculator assumes one recipient household and never splits a child count.' },
+  { id: 'ccb-child-disability-benefit',
+    reason: 'The Child Disability Benefit is a separate supplement with its own $3,480 maximum and is not added to any amount this pack prices.' },
+  { id: 'ccb-provincial-top-ups',
+    reason: "Provincial child benefits (for example Quebec's Family Allowance) are not modelled, so no result this pack prices is a complete child-benefit position." },
+  { id: 'ccb-eligibility-and-residence',
+    reason: 'Eligibility facts (residency, immigration status, the 18-month extended-benefit rules) are not tested; the calculator prices a count of eligible children it is given.' },
+]
 const BENEFIT_PACKS: BenefitRulePack[] = [
   {
     id: 'CA-CCB-2025-07-v1', program: 'CCB', paymentPeriod: '2025-07/2026-06', incomeTaxYear: 2024,
-    values: { maxUnder6: 7997, max6to17: 6748, th1: 37487, th2: 81222 },
-    sourceURL: 'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html',
-    fieldSources: { amounts: 'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html',
-      thresholds: 'https://www.canada.ca/en/revenue-agency/services/child-family-benefits/canada-child-benefit/canada-child-benefit-ccb-calculation-sheet-july-2025-june-2026-payments-2024-tax-year.html' },
+    values: { maxUnder6: 7997, max6to17: 6748, th1: 37487, th2: 81222,
+      rate1: [0.07, 0.135, 0.19, 0.23], rate2: [0.032, 0.057, 0.08, 0.095],
+      basePhaseOutAmounts: [3061, 5904, 8310, 10059] },
+    sourceURL: CCB_2025_AMOUNTS,
+    fieldSources: { amounts: CCB_2025_AMOUNTS, thresholds: CCB_PUBLISHED_THRESHOLDS, rates: CCB_RATES },
+    additionalSourceURLs: [CCB_2025_SHEET],
     effectiveDate: '2025-07-01', verifiedAt: '2026-09-13', indexationRule: 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
     limitation: 'Federal CCB parameter snapshot only; projection still approximates AFNI and has no prior-year lag or provincial top-ups.',
+    unsupportedPaths: CCB_UNSUPPORTED_PATHS,
     assumedFutureRule: false,
   },
   {
     id: 'CA-CCB-2026-07-v1', program: 'CCB', paymentPeriod: '2026-07/2027-06', incomeTaxYear: 2025,
-    values: { maxUnder6: 8157, max6to17: 6883, th1: 38237, th2: 82847 },
-    sourceURL: 'https://www.canada.ca/en/employment-social-development/news/2026/07/canada-child-benefit-payments-increasing-in-2026-2027.html',
-    fieldSources: { amounts: 'https://www.canada.ca/en/employment-social-development/news/2026/07/canada-child-benefit-payments-increasing-in-2026-2027.html',
-      thresholds: 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/adjustment-personal-income-tax-benefit-amounts.html' },
+    values: { maxUnder6: 8157, max6to17: 6883, th1: 38237, th2: 82847,
+      rate1: [0.07, 0.135, 0.19, 0.23], rate2: [0.032, 0.057, 0.08, 0.095],
+      basePhaseOutAmounts: [3123, 6022, 8476, 10260] },
+    sourceURL: CCB_2026_AMOUNTS,
+    fieldSources: { amounts: CCB_2026_AMOUNTS, thresholds: CCB_PUBLISHED_THRESHOLDS, rates: CCB_RATES },
+    additionalSourceURLs: [CCB_PUBLISHED_THRESHOLDS],
     effectiveDate: '2026-07-01', verifiedAt: '2026-09-13', indexationRule: 'cpi-assumption',
     rounding: 'nearest-dollar', coverage: 'estimated',
     limitation: 'Federal CCB parameter snapshot only; projection still approximates AFNI and has no prior-year lag or provincial top-ups.',
+    unsupportedPaths: CCB_UNSUPPORTED_PATHS,
     assumedFutureRule: false,
   },
 ]
@@ -642,12 +723,34 @@ function validTaxPack(meta: RulePackMeta, p: Partial<TaxRulePack>): boolean {
 
 function validBenefitPack(meta: RulePackMeta, p: Partial<BenefitRulePack>): boolean {
   const start = Number(p.paymentPeriod?.slice(0, 4))
+  // A child-count bracket is a four-entry rate (or dollar) row, one per
+  // eligible-child count 1, 2, 3, 4-or-more: a shorter row would silently price
+  // a larger family off `undefined`.
+  const bracket = (value: unknown): value is ChildCountBracket =>
+    Array.isArray(value) && value.length === 4 && value.every(amount)
+  const values = p.values
   return p.program === 'CCB' && Number.isInteger(start) && start >= 1900 &&
     p.paymentPeriod === `${start}-07/${start + 1}-06` && p.incomeTaxYear === start - 1 &&
-    meta.effectiveDate === `${start}-07-01` && !!p.values &&
-    ['maxUnder6', 'max6to17', 'th1', 'th2'].every(k => amount(p.values?.[k as keyof typeof p.values])) &&
-    (p.values.th1 ?? 0) < (p.values.th2 ?? 0) &&
-    !!p.fieldSources && validURL(p.fieldSources.amounts) && validURL(p.fieldSources.thresholds)
+    meta.effectiveDate === `${start}-07-01` && !!values &&
+    ['maxUnder6', 'max6to17', 'th1', 'th2'].every(k => amount(values?.[k as keyof CcbValues])) &&
+    (values.maxUnder6 ?? 0) > 0 && (values.max6to17 ?? 0) > 0 &&
+    (values.th1 ?? 0) < (values.th2 ?? 0) &&
+    bracket(values.rate1) && bracket(values.rate2) &&
+    // A reduction rate is a fraction of income; the second-threshold rate can
+    // never exceed the first, or the reduction would accelerate with income.
+    values.rate1.every(rate => rate > 0 && rate <= 1) && values.rate2.every(rate => rate >= 0 && rate <= 1) &&
+    values.rate1.every((rate, index) => index === 0 || rate >= values.rate1[index - 1]) &&
+    values.rate2.every((rate, index) => index === 0 || rate >= values.rate2[index - 1]) &&
+    values.rate2.every((rate, index) => rate <= values.rate1[index]) &&
+    bracket(values.basePhaseOutAmounts) && values.basePhaseOutAmounts.every(value => value > 0) &&
+    validUnsupportedPaths(p.unsupportedPaths) && (p.unsupportedPaths?.length ?? 0) > 0 &&
+    // An assumed period must say which published period it was indexed from,
+    // and the two must not be the same period.
+    (!p.assumedFutureRule || (typeof p.basedOnPaymentPeriod === 'string' &&
+      p.basedOnPaymentPeriod !== p.paymentPeriod &&
+      /^\d{4}-07\/\d{4}-06$/.test(p.basedOnPaymentPeriod))) &&
+    !!p.fieldSources && validURL(p.fieldSources.amounts) && validURL(p.fieldSources.thresholds) &&
+    validURL(p.fieldSources.rates)
 }
 
 function validFhsaPack(p: Partial<FhsaRulePack>): boolean {
@@ -758,22 +861,86 @@ export function selectTaxRules(jurisdiction: string, taxYear: number, future?: {
     throw new Error('Projected tax bracket collision or invalid indexed value')
   return publishRulePack<TaxRulePack>(projected)
 }
-export function selectBenefitRules(program: 'CCB', period: string, future?: { annualRate: number }): BenefitRulePack {
-  if (program !== 'CCB') throw new Error('Unknown benefit program')
+/** The programs a published pack exists for; a caller can be told what is covered. */
+export const PUBLISHED_BENEFIT_PROGRAMS: string[] = [...new Set(BENEFIT_PACKS.map(p => p.program))].sort()
+/** The payment periods the packs publish, oldest first, for a concrete refusal message. */
+function publishedBenefitPeriods(program: string): string[] {
+  return BENEFIT_PACKS.filter(p => p.program === program).map(p => p.paymentPeriod).sort()
+}
+/**
+ * Why a (program, payment period) request cannot be priced, or null when it can.
+ * CCB is selected by *payment period* (`2026-07/2027-06` is the July-June
+ * program year whose base year is the 2025 tax year), never by a calendar tax
+ * year. Each distinct failure gets its own reason: an unknown program is never
+ * answered with a CCB pack, a malformed period is never shifted into the
+ * published one, and a period before the published ones is never priced at the
+ * first published period's amounts.
+ */
+function benefitRefusalReason(program: string, period: string, future?: { annualRate: number }): string | null {
+  if (!PUBLISHED_BENEFIT_PROGRAMS.includes(program))
+    return `unknown benefit program "${String(program)}": published packs cover ${PUBLISHED_BENEFIT_PROGRAMS.join(', ')}`
+  const match = /^(\d{4})-07\/(\d{4})-06$/.exec(period ?? '')
+  if (!match || period !== `${match[1]}-07/${Number(match[1]) + 1}-06`)
+    return `benefit payment period "${String(period)}" for ${program} is not a whole July-to-June program year (expected e.g. "2026-07/2027-06")`
+  const start = Number(match[1])
+  if (BENEFIT_PACKS.some(p => p.program === program && p.paymentPeriod === period)) return null
+  const published = publishedBenefitPeriods(program)
+  const base = BENEFIT_PACKS
+    .filter(p => p.program === program && Number(p.paymentPeriod.slice(0, 4)) < start)
+    .sort((a, b) => a.paymentPeriod.localeCompare(b.paymentPeriod)).at(-1)
+  if (!base)
+    return `no published ${program} rule pack for payment period ${period} and none can be projected: published periods are ${published.join(', ')}, and a later period is projected from the latest of them`
+  if (!future || !Number.isFinite(future.annualRate) || future.annualRate < 0 || future.annualRate > 1)
+    return `${program} payment period ${period} is not published (latest published period ${base.paymentPeriod}); pass an explicit future indexation rate between 0 and 1`
+  return null
+}
+/**
+ * The pack that prices one CCB payment period. A period the packs publish is
+ * returned exactly as published; a later one is projected from the *latest*
+ * published pack under that pack's own indexation policy, applied exactly once
+ * per elapsed program year, and is flagged `assumedFutureRule` with the pack it
+ * came from. A frozen pack does not inflate: its values are carried across
+ * unchanged. Nothing here consults the clock.
+ */
+export function selectBenefitRules(program: string, period: string, future?: { annualRate: number }): BenefitRulePack {
+  const refusal = benefitRefusalReason(program, period, future)
+  if (refusal) throw new Error(refusal)
   const exact = BENEFIT_PACKS.find(p => p.program === program && p.paymentPeriod === period)
   if (exact) return structuredClone(exact)
   const start = Number(period.slice(0, 4))
-  if (!/^\d{4}-07\/\d{4}-06$/.test(period) || period !== `${start}-07/${start + 1}-06` ||
-      start <= 2026 || !future || !Number.isFinite(future.annualRate) || future.annualRate < 0 || future.annualRate > 1)
-    throw new Error('Unpublished benefit period requires an explicit future indexation assumption')
-  const base = BENEFIT_PACKS[1]
-  const years = start - 2026
-  const projected: BenefitRulePack = { ...base, id: `${base.id}+assumed-${start}-${future.annualRate}`,
+  const base = BENEFIT_PACKS
+    .filter(p => p.program === program && Number(p.paymentPeriod.slice(0, 4)) < start)
+    .sort((a, b) => a.paymentPeriod.localeCompare(b.paymentPeriod)).at(-1)!
+  const years = start - Number(base.paymentPeriod.slice(0, 4))
+  // Only the amounts are indexed. The rates are statutory percentages and the
+  // published per-bracket phase-out amounts are a record of a published year,
+  // so both are carried across unchanged, however long the horizon.
+  const rate = base.indexationRule === 'frozen' ? 0 : future!.annualRate
+  const projected: BenefitRulePack = {
+    ...base,
+    id: `${base.id}+assumed-${start}-${rate}`,
     paymentPeriod: period, incomeTaxYear: start - 1, effectiveDate: `${start}-07-01`,
-    values: Object.fromEntries(Object.entries(base.values).map(([k, v]) => [k, indexed(v, years, future.annualRate)])) as BenefitRulePack['values'],
-    assumedFutureRule: true, assumedAnnualRate: future.annualRate, basedOnRuleId: base.id,
+    values: {
+      ...base.values,
+      maxUnder6: indexed(base.values.maxUnder6, years, rate),
+      max6to17: indexed(base.values.max6to17, years, rate),
+      th1: indexed(base.values.th1, years, rate),
+      th2: indexed(base.values.th2, years, rate),
+    },
+    assumedFutureRule: true, assumedAnnualRate: future!.annualRate, basedOnRuleId: base.id,
+    basedOnPaymentPeriod: base.paymentPeriod,
+    coverage: 'estimated',
   }
   return publishRulePack<BenefitRulePack>(projected)
+}
+/**
+ * The published CCB packs, read-only. Exported so a consumer can look up the
+ * period a projected pack was indexed from without parsing an id, and so a
+ * test can cross-check a computation against a pack rather than against a
+ * second copy of its numbers.
+ */
+export function publishedBenefitPacks(): BenefitRulePack[] {
+  return BENEFIT_PACKS.map(pack => structuredClone(pack))
 }
 export const publishedTaxCoverage = TAX_PACKS.map(p => ({ jurisdiction: p.jurisdiction, taxYear: p.taxYear, coverage: p.coverage, limitation: p.limitation }))
 
