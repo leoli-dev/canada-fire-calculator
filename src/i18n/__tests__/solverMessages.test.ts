@@ -312,7 +312,17 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
   // lives in the catalogues because the panel renders it; these are the same
   // claims, pinned where the panel reads them.
   expect(EN['coverageLimitation.probateFees']).toMatch(/TaxTips\.ca/)
-  expect(EN['coverageLimitation.probateFeesApproxNT']).toMatch(/Yukon\u2019s \$140 flat filing fee/)
+  // BE-38 B4: the territories are priced from their own regulations now, so the
+  // rendered text may no longer say the build charges Yukon's fee. It names the
+  // cited instrument, the priced top tier, and what the build still simplifies.
+  expect(EN['coverageLimitation.probateFeesApproxNT'])
+    .toMatch(/Court Services Fees Regulations \(R-120-93, Part 2, item 1\(e\)\)/)
+  expect(EN['coverageLimitation.probateFeesApproxNT']).toMatch(/\$435/)
+  expect(EN['coverageLimitation.probateFeesApproxNT']).not.toMatch(/Yukon/)
+  expect(EN['coverageLimitation.probateFeesApproxNU'])
+    .toMatch(/Court Fees Regulations \(R\.C\.Nun\. R-042-2021, Schedule C, item 5\)/)
+  expect(EN['coverageLimitation.probateFeesApproxNU']).toMatch(/\$425/)
+  expect(EN['coverageLimitation.probateFeesApproxNU']).not.toMatch(/Yukon/)
   expect(EN['coverageLimitation.probateFeesApproxNT']).toMatch(/understated/)
   expect(EN['coverageLimitation.probateFeesApproxNU']).toMatch(/understated/)
   expect(EN['coverageLimitation.probateFeesMB']).toMatch(/abolished its probate fee/)
