@@ -228,6 +228,27 @@ export interface ContentVerifiedAuthority {
   /** The figures found on that page, as printed. */
   checkedFigures: string[]
 }
+/**
+ * BE-38 B4: the two authorities that carry the territories' *own* probate fees,
+ * read on the page themselves and recorded below. NT's is the Department of
+ * Justice office consolidation of the Court Services Fees Regulations (R-120-93
+ * as amended to R-071-2017), whose Part 2 item 1(e) prints $435 where the value
+ * exceeds $250,000. NU's is the official consolidation of the Court Fees
+ * Regulations (C.R.Nu. R-042-2021), whose Schedule C item 5 prints $425 on the
+ * same boundary. Both are served by the government that made them, so a reader
+ * can reproduce the figure; the TaxTips.ca territory table each row also lists
+ * prints the same top tier and is recorded too, because a `contentChecked` row
+ * may not contain an authority whose content was not checked.
+ */
+const NT_COURT_FEES =
+  'https://www.justice.gov.nt.ca/en/files/legislation/judicature/judicature.r10.pdf'
+const NU_COURT_FEES =
+  'https://www.nunavutlegislation.ca/en/file-download/download/public/7022'
+const TAXTIPS_PROBATE_URL = (code: string) =>
+  `https://www.taxtips.ca/willsandestates/probatefees/${code}.htm`
+/** BE-38 B4's date: the NT and NU regulations above and their two TaxTips.ca
+ * tables were opened and read against the recorded figures. */
+const CHECKED_B4 = '2026-09-15'
 export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthority> = {
   'https://www.ontario.ca/laws/statute/98e34': {
     checkedOn: '2026-09-17',
@@ -253,6 +274,41 @@ export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthori
     checkedOn: '2026-09-17',
     checkedFigures: ['5 000 band at 7,84 % / 11,76 %', '755 maximum', '19 890 threshold',
       'age 3 986', 'retirement 3 541', 'reduction threshold 42 955', '18,75 %', '54 345 / 108 680 / 132 245', '14 / 19 / 24 / 25,75 %'],
+  },
+  // BE-38 B4 review B1: the whole ladder each regulation prints, band by band
+  // with its own boundary wording, so a reader can see that the priced value is
+  // the document's and the suite can hold the two equal (see the ladder test).
+  [NT_COURT_FEES]: {
+    checkedOn: CHECKED_B4,
+    checkedFigures: [
+      '$10,000 or under', '$30',
+      'more than $10,000 but not more than $25,000', '$110',
+      'more than $25,000 but not more than $125,000', '$215',
+      'more than $125,000 but not more than $250,000', '$325',
+      'more than $250,000', '$435',
+    ],
+  },
+  [NU_COURT_FEES]: {
+    checkedOn: CHECKED_B4,
+    checkedFigures: [
+      '$10,000 or under', '$30',
+      'More than $10,000 but not more than $25,000', '$110',
+      'More than $25,000 but not more than $125,000', '$215',
+      'More than $125,000 but not more than $250,000', '$325',
+      'More than $250,000', '$425',
+    ],
+  },
+  // The two TaxTips.ca territory tables the NT/NU probate rows carry as their
+  // additional source. A row marked `contentChecked` may not contain an
+  // unverified authority, so these are recorded for the figures read on them
+  // rather than left to inherit the primary regulation's claim.
+  [TAXTIPS_PROBATE_URL('nt')]: {
+    checkedOn: CHECKED_B4,
+    checkedFigures: ['$30', '$110', '$215', '$325', '$435', 'over $250,000'],
+  },
+  [TAXTIPS_PROBATE_URL('nu')]: {
+    checkedOn: CHECKED_B4,
+    checkedFigures: ['$30', '$110', '$215', '$325', '$425', 'More than $250,000'],
   },
 }
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
@@ -301,11 +357,18 @@ const AT = '2026-09-15'
  * figures. A row is only `contentChecked` when its `verifiedAt` is this date, so
  * a `verifiedAt` that never had its content read cannot inherit the claim. */
 const CHECKED = '2026-09-17'
-/** The two territories this build charges Yukon's flat $140 filing fee, mapped to
- * the catalogue entry that names the published tier the build does not model. */
-const PROBATE_APPROXIMATED: Partial<Record<CoverageJurisdiction, string>> = {
-  NT: 'probateFeesApproxNT',
-  NU: 'probateFeesApproxNU',
+/**
+ * BE-38 B4: each territory's own regulation, the document that carries the fee
+ * `PROBATE_RATES` now prices. NT and NU are no longer charged Yukon's $140, so
+ * the row cites the authority its figures are in rather than the table it was
+ * approximated from. Review B1: the row also prices that document's full
+ * five-band ladder rather than its top tier alone, so the qualification the two
+ * rows render (`probateFeesApproxNT` / `probateFeesApproxNU`) states the
+ * modelled ladder instead of a gap.
+ */
+const PROBATE_OWN: Partial<Record<CoverageJurisdiction, string>> = {
+  NT: NT_COURT_FEES,
+  NU: NU_COURT_FEES,
 }
 const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
   // The pack records each jurisdiction's own T4032 edition as its federal
@@ -360,30 +423,43 @@ const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCo
 /**
  * BE-38 B3 review (NB6): probate used to be one row citing Ontario's statute for
  * all thirteen jurisdictions. `taxData.ts` reads the pinned figures from the
- * cited TaxTips.ca per-jurisdiction table, so each row now names its own; the
- * two territories whose priced fee is Yukon's say so in the row's limitation.
+ * cited TaxTips.ca per-jurisdiction table, so each row now names its own.
  *
  * BE-38 B3 review (round 4, B1): Ontario's own row now cites the Estate
  * Administration Tax Act (`98e34`, the statute that prints the $15-per-$1,000
  * tax over $50,000) rather than the Estates Administration Act the citation used
  * to name, and the row is marked `contentChecked` because that authority is in
  * {@link CONTENT_VERIFIED_AUTHORITIES} with the figures read on the page.
+ *
+ * BE-38 B4: NT and NU used to price Yukon's $140 filing fee and cite Yukon's
+ * table for it, so citation, priced value and fixture all named another
+ * jurisdiction's document. Each now cites its own regulation — the document
+ * that actually prints the $435 (NT) and $425 (NU) top tier `taxData.ts`
+ * prices — and is `contentChecked` against it. The published tier ladder is
+ * still simplified to its top tier, so the row keeps its rendered
+ * qualification; the TaxTips.ca territory table travels as an additional source
+ * rather than as the cited authority.
  */
 const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const table = TAXTIPS_PROBATE(code.toLowerCase())
-  const approximation = PROBATE_APPROXIMATED[code]
-  // NT and NU price Yukon's flat $140 filing fee, so that is the figure the
-  // row must evidence; their own published tiers travel as additional sources
-  // and are named in the row's rendered limitation rather than silently swapped
-  // for the price.
-  const pricedFrom = approximation ? TAXTIPS_PROBATE('yt') : table
+  const own = PROBATE_OWN[code]
+  // Every row's sourceURL is the document the priced figure is printed in: the
+  // statute for ON, the territory's own regulation for NT/NU, the per-
+  // jurisdiction table otherwise. A row whose priced figure is not printed in
+  // its own authority is listed in `PROBATE_OWN` rather than approximated.
+  const sourceURL = code === 'ON' ? PROBATE : own ?? table
+  // ON's additional source is the reachable TaxTips.ca table, which every
+  // content-checked row in the registry has always carried; the two territory
+  // rows add their own table for the same reason. Every other row, and every
+  // *sourceURL* outside ON/NT/NU, is exactly what it was before this slice.
+  const extras = code === 'ON' || own ? [table] : []
   return {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
-    sourceURL: code === 'ON' ? PROBATE : pricedFrom,
-    additionalSourceURLs: [...new Set([...(code === 'ON' ? [table] : []), ...(approximation ? [table] : [])])],
-    verifiedAt: code === 'ON' ? CHECKED : AT, evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
-    contentChecked: code === 'ON' ? true : undefined,
-    limitationId: code === 'MB' ? 'probateFeesMB' : approximation ?? 'probateFees',
+    sourceURL, additionalSourceURLs: [...new Set(extras)],
+    verifiedAt: code === 'ON' ? CHECKED : own ? CHECKED_B4 : AT,
+    evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
+    contentChecked: code === 'ON' || own ? true : undefined,
+    limitationId: code === 'MB' ? 'probateFeesMB' : own ? `probateFeesApprox${code}` : 'probateFees',
   }
 }
 

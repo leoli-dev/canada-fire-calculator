@@ -332,10 +332,21 @@ export function qcRamqPremium(income: number): number {
   return Math.min(max, band1 * rate1 + (excess - band1) * rate2)
 }
 
-/** Probate / estate administration fee on probatable assets — see taxData.ts. */
+/**
+ * Probate / estate administration fee on probatable assets — see taxData.ts.
+ *
+ * Two published shapes and `bands` says which one a jurisdiction has. NT and NU
+ * print a step ladder: `bands` carries every rung up to the top tier's boundary
+ * and the first rung that reaches the value is the printed fee. Every other
+ * jurisdiction prints one flat amount plus a rate on the excess over its
+ * threshold — `rate` is 0 where the flat amount is unconditional (AB, QC), so
+ * the excess term vanishes. Because `bands` ends exactly on `threshold`, a
+ * laddered jurisdiction's top tier is the straight-line branch below.
+ */
 export function probateTax(value: number, province: Province): number {
   if (value <= 0) return 0
-  const { flat, rate, threshold } = PROBATE_RATES[province]
+  const { flat, rate, threshold, bands } = PROBATE_RATES[province]
+  if (bands) for (const band of bands) if (value <= band.upTo) return band.fee
   return flat + rate * Math.max(0, value - threshold)
 }
 
