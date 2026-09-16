@@ -227,6 +227,23 @@ const BC_PROBATE_ACT =
 const BC_COURT_FEES =
   'https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/168_2009_06'
 /**
+ * BE-38 B4 (the AB/NS/PE defect): the three instruments carrying the band
+ * ladders these rows used to approximate with one top-tier flat amount, read on
+ * the documents themselves — AB's Surrogate Rules, Alta. Reg. 130/95, Sch. 2
+ * item 1(1) (Rule 44 authorises the clerk's Schedule 2 fees); NS's Probate Act,
+ * R.S.N.S. 1989, c. 359, s. 87(2); PEI's Probate Act, R.S.P.E.I. 1974, c. P-21,
+ * s. 119.1(4). Each band's own wording is in
+ * {@link CONTENT_VERIFIED_AUTHORITIES}. All three answer HTTP 200. PEI's
+ * *landing page* is the Radware-gated {@link BLOCKED_SOURCES} entry; the PDF is
+ * not gated, so it is cited with no gate note.
+ */
+const AB_SURROGATE_RULES =
+  'https://kings-printer.alberta.ca/documents/Regs/1995_130.pdf'
+const NS_PROBATE_ACT =
+  'https://nslegislature.ca/sites/default/files/legc/statutes/probate.htm'
+const PE_PROBATE_ACT =
+  'https://www.princeedwardisland.ca/sites/default/files/legislation/p-21-probate_act.pdf'
+/**
  * One authority a scripted reader cannot reach, with the gate that stops it and
  * the token every language's rendered qualification must contain. The marker is
  * not necessarily a status code: it is whatever the gate actually is, so a gate
@@ -324,6 +341,9 @@ const CHECKED_B4_YT = '2026-09-15'
  * Court Civil Rules' $200 filing fee, and the TaxTips.ca table the row carried
  * before. */
 const CHECKED_B4_BC = '2026-09-17'
+/** BE-38 B4 (AB/NS/PE): the date these three band-ladder instruments were
+ * opened and read against the figures each row now prices. */
+const CHECKED_B4_LADDERS = '2026-09-17'
 export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthority> = {
   'https://www.ontario.ca/laws/statute/98e34': {
     checkedOn: '2026-09-17',
@@ -433,6 +453,58 @@ export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthori
     checkedOn: CHECKED_B4_BC,
     checkedFigures: ['$25,000', '$6 per $1,000', '$50,000', '$14 per $1,000', '$200'],
   },
+  // The TaxTips.ca tables the three AB/NS/PE rows carry as their *additional*
+  // source, recorded for the figures read on them like every other additional
+  // source of a content-checked row. They state the same ladders in their own
+  // words and are never the authority for a priced figure.
+  [TAXTIPS_PROBATE_URL('ab')]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: ['$35', '$135', '$275', '$400', '$525', 'over $250,000'],
+  },
+  [TAXTIPS_PROBATE_URL('ns')]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: ['$85.60', '$215.20', '$358.15', '$1,002.65', '$16.95 per $1,000'],
+  },
+  [TAXTIPS_PROBATE_URL('pe')]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: ['$50', '$100', '$200', '$400', '$4 for each $1,000'],
+  },
+  // BE-38 B4 (AB/NS/PE): the instruments, recorded band by band in each
+  // document's own boundary wording, so the ladder test can hold citation and
+  // priced behaviour equal. Only fee figures carry a `$` (the equality check
+  // filters on that).
+  [AB_SURROGATE_RULES]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: [
+      '$10 000 or under', '$35',
+      'over $10 000 but not more than $25 000', '$135',
+      'over $25 000 but not more than $125 000', '$275',
+      'over $125 000 but not more than $250 000', '$400',
+      'over $250 000', '$525',
+    ],
+  },
+  [NS_PROBATE_ACT]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: [
+      'in estates not exceeding $10,000', '$85.60',
+      'in estates exceeding $10,000 but not exceeding $25,000', '$215.20',
+      'in estates exceeding $25,000 but not exceeding $50,000', '$358.15',
+      'in estates exceeding $50,000 but not exceeding $100,000', '$1002.65',
+      'in estates exceeding $100,000', '$16.95',
+      'plus an additional $16.95 for every $1,000 or fraction thereof in excess of $100,000',
+    ],
+  },
+  [PE_PROBATE_ACT]: {
+    checkedOn: CHECKED_B4_LADDERS,
+    checkedFigures: [
+      'up to $10,000', '$50',
+      '$10,001 to $25,000', '$100',
+      '$25,001 to $50,000', '$200',
+      '$50,001 to $100,000', '$400',
+      'exceeding $100,000', '$4',
+      'plus $4 for each $1,000 or fraction thereof in excess of $100,000',
+    ],
+  },
 }
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
  * pack records in `fieldSources`, so a row that prices those fields must cite
@@ -504,12 +576,22 @@ const CHECKED = '2026-09-17'
  * authority because that item prints the $200 filing fee the engine's
  * `surcharge` adds. Its qualification is the rule itself (`probateFeesBC`), not
  * a simplification.
+ *
+ * BE-38 B4 (the AB/NS/PE defect): these three rows each applied a single
+ * top-tier flat amount from the first dollar, so a $10,000 estate paid $525
+ * (AB), $1,003 (NS) or $400 (PE) against the $35, $85.60 and $50 their own
+ * first bands print. Each now cites the instrument carrying its whole ladder —
+ * AB's Surrogate Rules Sch. 2, NS's Probate Act s. 87(2), PEI's Probate Act
+ * s. 119.1(4) — prices every rung, and renders its own rule-naming limitation.
  */
 const PROBATE_OWN: Partial<Record<CoverageJurisdiction, { source: string; limitationId: string }>> = {
   YT: { source: YT_COURT_RULES, limitationId: 'probateFeesYT' },
   NT: { source: NT_COURT_FEES, limitationId: 'probateFeesApproxNT' },
   NU: { source: NU_COURT_FEES, limitationId: 'probateFeesApproxNU' },
   BC: { source: BC_PROBATE_ACT, limitationId: 'probateFeesBC' },
+  AB: { source: AB_SURROGATE_RULES, limitationId: 'probateFeesAB' },
+  NS: { source: NS_PROBATE_ACT, limitationId: 'probateFeesNS' },
+  PE: { source: PE_PROBATE_ACT, limitationId: 'probateFeesPE' },
 }
 const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
   // The pack records each jurisdiction's own T4032 edition as its federal
@@ -602,17 +684,13 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const table = TAXTIPS_PROBATE(code.toLowerCase())
   const own = PROBATE_OWN[code]
   // Every row's sourceURL is the document the priced figure is printed in: the
-  // statute for ON, the jurisdiction's own instrument for BC/YT/NT/NU, the
-  // per-jurisdiction table otherwise. A row whose priced figure is not printed
-  // in its own authority is listed in `PROBATE_OWN` rather than approximated.
+  // statute for ON, the jurisdiction's own instrument for AB/BC/NS/PE/YT/NT/NU,
+  // the per-jurisdiction table otherwise.
   const sourceURL = code === 'ON' ? PROBATE : own?.source ?? table
   // ON's additional source is the reachable TaxTips.ca table, which every
-  // content-checked row in the registry has always carried; the BC/YT/NT/NU
-  // rows add their own table for the same reason. BC is the one row with a
-  // *second* authority to render: the Court Rules item that carries the $200
-  // filing fee its `surcharge` prices, so a reader can check both figures the
-  // row charges. Every other row, and every *sourceURL* outside ON/BC/YT/NT/NU,
-  // is exactly what it was before this slice.
+  // content-checked row carries; AB/BC/NS/PE/YT/NT/NU add their own table for
+  // the same reason. BC alone renders a *second* authority: the Court Rules item
+  // that carries the $200 filing fee its `surcharge` prices.
   const extras = code === 'ON' || own ? [table] : []
   if (code === 'BC') extras.unshift(BC_COURT_FEES)
   return {
@@ -621,7 +699,8 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
     verifiedAt: code === 'ON' ? CHECKED
       : code === 'YT' ? CHECKED_B4_YT
         : code === 'BC' ? CHECKED_B4_BC
-          : own ? CHECKED_B4 : AT,
+          : code === 'AB' || code === 'NS' || code === 'PE' ? CHECKED_B4_LADDERS
+            : own ? CHECKED_B4 : AT,
     evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
     contentChecked: code === 'ON' || own ? true : undefined,
     limitationId: own?.limitationId ?? (code === 'MB' ? 'probateFeesMB' : 'probateFees'),
