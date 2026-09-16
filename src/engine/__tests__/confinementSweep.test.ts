@@ -67,6 +67,13 @@ const BAND_TARGETS = [
   // tier — bands the three BC-era probes above cannot reach.
   { tag: 'abTopTier', nonReg: 300_000 },
   { tag: 'over100kRateTier', nonReg: 150_000 },
+  // BE-38 B4 (NB): NB's Schedule A, item 1 turns at $20,000 and $100,000, which
+  // none of the five probes above lands on. The edge + 1 values put the probate
+  // base exactly one dollar inside each new tier, so a boundary that moved (or a
+  // shape that stepped instead of meeting continuously) shows up as a delta here
+  // rather than being averaged away by a mid-band estate.
+  { tag: 'nbJustOver20k', nonReg: 20_001 },
+  { tag: 'nbJustOver100k', nonReg: 100_001 },
 ] as const
 
 /** The published AB/NS/PE schedules, hand-keyed from the instruments each row
@@ -93,6 +100,24 @@ const BC_FILING_FEE = 200
 const bcPublishedFee = (value: number) => value <= BC_EXEMPT_UP_TO ? 0
   : BC_FILING_FEE + (BC_BAND_1_RATE / 1_000) * (Math.min(value, 50_000) - BC_EXEMPT_UP_TO)
     + (BC_TOP_RATE / 1_000) * Math.max(0, value - 50_000)
+/** The published New Brunswick schedule, hand-keyed from the three tiers the
+ * Probate Court Act's Schedule A, item 1 prints as amended by S.N.B. 2026,
+ * c. 12, s. 4 — never from `PROBATE_RATES`/`probateTax`:
+ *   (a) "does not exceed $20,000, $200";
+ *   (b) "exceeds $20,000 but not $100,000, $200 plus $5 per $1,000 or part of
+ *       $1,000 by which the value of the estate exceeds $20,000";
+ *   (c) "exceeds $100,000, $600 plus $15 per $1,000 or part of $1,000 by which
+ *       the value of the estate exceeds $100,000".
+ * The tiers meet at $20,000 ($200) and $100,000 ($200 + $5 × 80), so the
+ * schedule is continuous; the Act's "or part of $1,000" rounding is not modelled
+ * here or in the engine. */
+const NB_MINIMUM = 200
+const NB_BAND_1_RATE = 5
+const NB_TOP_RATE = 15
+const nbPublishedFee = (value: number) => value <= 0 ? 0
+  : value <= 20_000 ? NB_MINIMUM
+    : value <= 100_000 ? NB_MINIMUM + (NB_BAND_1_RATE / 1_000) * (value - 20_000)
+      : NB_MINIMUM + (NB_BAND_1_RATE / 1_000) * 80_000 + (NB_TOP_RATE / 1_000) * (value - 100_000)
 
 function planForBand(province: Province, nonReg: number): Inputs {
   // Built from `planFor` so the horizon is the terminal one the main plan uses,
@@ -170,6 +195,11 @@ it('prints the confinement sweep for one runtime', () => {
     AB: { fee: abPublishedFee, probes: ['abTopTier', 'band25kTo50k', 'exemptUnder25k'] },
     NS: { fee: nsPublishedFee, probes: ['over100kRateTier', 'band25kTo50k', 'exemptUnder25k'] },
     PE: { fee: pePublishedFee, probes: ['over100kRateTier', 'band25kTo50k', 'exemptUnder25k'] },
+    // BE-38 B4 (NB): every band the row moved, including the two edge + 1 probes
+    // that straddle its $20,000 and $100,000 boundaries.
+    NB: { fee: nbPublishedFee,
+      probes: ['exemptUnder25k', 'band25kTo50k', 'nbJustOver20k', 'nbJustOver100k',
+        'over100kRateTier', 'abTopTier'] },
   } as const
   for (const [province, { fee, probes }] of Object.entries(moved))
     for (const tag of probes) {
@@ -186,4 +216,22 @@ it('prints the confinement sweep for one runtime', () => {
     .toBeCloseTo(1002.65 + 0.01695 * 50_000, 6)
   expect(probesFor('PE').over100kRateTier.probateFee, 'PE $150,000 estate')
     .toBeCloseTo(400 + 0.004 * 50_000, 6)
+  // BE-38 B4 (NB): the edge + 1 probes put one dollar inside each tier, so a
+  // boundary that moved by a dollar or a shape that stepped at the edge is
+  // caught here, and the two mid-band estates pin the rates themselves. The
+  // expectation is the hand-keyed schedule above, not `probateTax`.
+  expect(probesFor('NB').exemptUnder25k.probateFee, 'NB $10,000 estate').toBe(200)
+  expect(probesFor('NB').nbJustOver20k.probateFee, 'NB $20,001 estate')
+    .toBeCloseTo(200 + 5 / 1_000, 9)
+  expect(probesFor('NB').band25kTo50k.probateFee, 'NB $35,000 estate').toBeCloseTo(200 + 5 * 15, 9)
+  expect(probesFor('NB').nbJustOver100k.probateFee, 'NB $100,001 estate')
+    .toBeCloseTo(600 + 15 / 1_000, 9)
+  expect(probesFor('NB').over100kRateTier.probateFee, 'NB $150,000 estate')
+    .toBeCloseTo(600 + 15 * 50, 9)
+  expect(probesFor('NB').abTopTier.probateFee, 'NB $300,000 estate')
+    .toBeCloseTo(600 + 15 * 200, 9)
+  // The old approximation charged $1,000 on a $200,000 estate; $300,000 is the
+  // probe here, where it charged $1,500 against item 1(c)'s $3,600.
+  expect(probesFor('NB').abTopTier.probateFee, 'NB no longer pays the repealed schedule')
+    .not.toBeCloseTo(100 + 0.005 * (300_000 - 20_000), 6)
 })

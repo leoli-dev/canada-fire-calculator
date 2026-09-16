@@ -248,6 +248,32 @@ const NS_PROBATE_ACT =
 const PE_PROBATE_ACT =
   'https://www.princeedwardisland.ca/sites/default/files/legislation/p-21-probate_act.pdf'
 /**
+ * BE-38 B4 (the NB defect): New Brunswick's own instrument, read on the page.
+ * The *Probate Court Act*, R.S.N.B. 1982, c. P-17.1, s. 75.1 and Schedule A,
+ * item 1, as amended by S.N.B. 2026, c. 12, ss. 3–4, in the Queen's Printer
+ * consolidation current to 2026-07-16, prints the three tiers this row prices:
+ * "(a) if the value of the estate or the part of the estate being administered
+ * does not exceed $20,000, $200; (b) if ... exceeds $20,000 but not $100,000,
+ * $200 plus $5 per $1,000 or part of $1,000 by which the value of the estate
+ * exceeds $20,000; (c) if ... exceeds $100,000, $600 plus $15 per $1,000 or part
+ * of $1,000 by which the value of the estate exceeds $100,000". The TaxTips.ca
+ * table the row was keyed to still prints the schedule the amending Act
+ * repealed, so it is an additional source, not the authority.
+ */
+const NB_PROBATE_ACT = 'https://laws.gnb.ca/en/document/cs/P-17.1'
+/**
+ * The amending instrument itself: S.N.B. 2026, c. 12, *An Act to Amend the
+ * Probate Court Act*, assented to June 12, 2026, whose s. 4 prints the same
+ * three tiers verbatim. It carries no commencement provision of its own, so it
+ * commenced on assent under the *Interpretation Act*, R.S.N.B. 1973, c. I-13,
+ * s. 3(2) — "the date of the assent ... is the date of the commencement of the
+ * Act, if no other commencement is therein provided"
+ * (`https://laws.gnb.ca/en/document/cs/I-13`) — which is why the amended
+ * schedule, not the one the TaxTips.ca table prints, is the fee in force for the
+ * estate year this build prices.
+ */
+const NB_PROBATE_AMEND = 'https://laws.gnb.ca/en/document/as/2026,%20c.12'
+/**
  * One authority a scripted reader cannot reach, with the gate that stops it and
  * the token every language's rendered qualification must contain. The marker is
  * not necessarily a status code: it is whatever the gate actually is, so a gate
@@ -348,6 +374,10 @@ const CHECKED_B4_BC = '2026-09-17'
 /** BE-38 B4 (AB/NS/PE): the date these three band-ladder instruments were
  * opened and read against the figures each row now prices. */
 const CHECKED_B4_LADDERS = '2026-09-17'
+/** BE-38 B4 (NB): the date the Probate Court Act consolidation, the amending
+ * S.N.B. 2026, c. 12 and the TaxTips.ca table the row carried before were
+ * opened and read against the recorded figures. */
+const CHECKED_B4_NB = '2026-09-16'
 export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthority> = {
   'https://www.ontario.ca/laws/statute/98e34': {
     checkedOn: '2026-09-17',
@@ -509,6 +539,46 @@ export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthori
       'plus $4 for each $1,000 or fraction thereof in excess of $100,000',
     ],
   },
+  // BE-38 B4 (NB): the Act's own Schedule A, item 1, recorded band by band in
+  // the document's wording, plus the fact that the consolidation is current to
+  // 2026-07-16 and that the amending Act carries the same three tiers. The
+  // priced shape (two continuous marginal tiers over a printed $200 floor) is
+  // read off these phrases, not inferred from another province's ladder.
+  [NB_PROBATE_ACT]: {
+    checkedOn: CHECKED_B4_NB,
+    checkedFigures: [
+      'does not exceed $20,000', '$200',
+      'exceeds $20,000 but not $100,000', '$200 plus $5 per $1,000 or part of $1,000',
+      'exceeds $100,000', '$600 plus $15 per $1,000 or part of $1,000',
+      'consolidated to July 16, 2026',
+    ],
+  },
+  [NB_PROBATE_AMEND]: {
+    checkedOn: CHECKED_B4_NB,
+    checkedFigures: [
+      'Assented to June 12, 2026',
+      'does not exceed $20,000', '$200',
+      'exceeds $20,000 but not $100,000', '$200 plus $5 per $1,000 or part of $1,000',
+      'exceeds $100,000', '$600 plus $15 per $1,000 or part of $1,000',
+    ],
+  },
+  // The TaxTips.ca table the NB row was keyed to before this slice, still listed
+  // beside the Act. It prints the *superseded* schedule ("$5,000 or less $25",
+  // "over $5,000 up to $10,000 $50", "over $10,000 up to $15,000 $75", "over
+  // $15,000 up to $20,000 $100", "over $20,000 $5 per $1,000 or portion
+  // (0.5%)", "current as of January 25, 2026"), which is the defect this row
+  // fixes, so it is never the authority for a priced figure.
+  [TAXTIPS_PROBATE_URL('nb')]: {
+    checkedOn: CHECKED_B4_NB,
+    checkedFigures: [
+      '$5,000 or less', '$25',
+      'over $5,000 up to $10,000', '$50',
+      'over $10,000 up to $15,000', '$75',
+      'over $15,000 up to $20,000', '$100',
+      'over $20,000', '$5 per $1,000 or portion(0.5%)',
+      'current as of January 25, 2026',
+    ],
+  },
 }
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
  * pack records in `fieldSources`, so a row that prices those fields must cite
@@ -566,6 +636,7 @@ export const LIVE_PROBED_CITATIONS = [
   TAXTIPS_PROBATE('nt'), TAXTIPS_PROBATE('nu'), TAXTIPS_PROBATE('yt'), TAXTIPS_PROBATE('bc'),
   TAXTIPS_PROBATE('ab'), TAXTIPS_PROBATE('ns'), TAXTIPS_PROBATE('pe'),
   AB_SURROGATE_RULES, NS_PROBATE_ACT, PE_PROBATE_ACT,
+  NB_PROBATE_ACT, NB_PROBATE_AMEND, TAXTIPS_PROBATE('nb'),
 ]
 /** The date the reachability sweep and the hand content checks behind most rows
  * were made. */
@@ -606,6 +677,11 @@ const CHECKED = '2026-09-17'
  * first bands print. Each now cites the instrument carrying its whole ladder —
  * AB's Surrogate Rules Sch. 2, NS's Probate Act s. 87(2), PEI's Probate Act
  * s. 119.1(4) — prices every rung, and renders its own rule-naming limitation.
+ *
+ * BE-38 B4 (the NB defect): NB is the seventh, and the last one still keyed to a
+ * TaxTips.ca table. It now cites its own Probate Court Act, whose Schedule A,
+ * item 1 (as amended) prints all three tiers the engine prices, and renders
+ * `probateFeesNB`.
  */
 const PROBATE_OWN: Partial<Record<CoverageJurisdiction, { source: string; limitationId: string }>> = {
   YT: { source: YT_COURT_RULES, limitationId: 'probateFeesYT' },
@@ -615,6 +691,7 @@ const PROBATE_OWN: Partial<Record<CoverageJurisdiction, { source: string; limita
   AB: { source: AB_SURROGATE_RULES, limitationId: 'probateFeesAB' },
   NS: { source: NS_PROBATE_ACT, limitationId: 'probateFeesNS' },
   PE: { source: PE_PROBATE_ACT, limitationId: 'probateFeesPE' },
+  NB: { source: NB_PROBATE_ACT, limitationId: 'probateFeesNB' },
 }
 const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
   // The pack records each jurisdiction's own T4032 edition as its federal
@@ -702,20 +779,32 @@ const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCo
  * Court Civil Rules' Appendix C, Schedule 1, item 1, and the citation↔figure
  * equality test holds that second instrument to the $200 filing fee the
  * engine's `surcharge` adds.
+ *
+ * BE-38 B4 (the NB defect): NB was the last row still citing its TaxTips.ca
+ * table, which prints the schedule S.N.B. 2026, c. 12, s. 4 repealed. It now
+ * cites the *Probate Court Act* consolidation whose Schedule A, item 1 prints
+ * the three tiers the engine prices, and lists the amending Act (assented
+ * 2026-06-12, in force on assent, and printing the same tiers) beside the table
+ * so the change of authority is visible. It renders its own `probateFeesNB`
+ * qualification rather than the generic one.
  */
 const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const table = TAXTIPS_PROBATE(code.toLowerCase())
   const own = PROBATE_OWN[code]
   // Every row's sourceURL is the document the priced figure is printed in: the
-  // statute for ON, the jurisdiction's own instrument for AB/BC/NS/PE/YT/NT/NU,
-  // the per-jurisdiction table otherwise.
+  // statute for ON, the jurisdiction's own instrument for AB/BC/NS/PE/YT/NT/NU/
+  // NB, the per-jurisdiction table otherwise.
   const sourceURL = code === 'ON' ? PROBATE : own?.source ?? table
   // ON's additional source is the reachable TaxTips.ca table, which every
-  // content-checked row carries; AB/BC/NS/PE/YT/NT/NU add their own table for
-  // the same reason. BC alone renders a *second* authority: the Court Rules item
-  // that carries the $200 filing fee its `surcharge` prices.
+  // content-checked row carries; AB/BC/NS/PE/YT/NT/NU/NB add their own table for
+  // the same reason. BC renders a *second* authority — the Court Rules item that
+  // carries the $200 filing fee its `surcharge` prices — and NB the amending Act
+  // that both made the change and prints its three tiers, so the reader can see
+  // the priced schedule is the one in force rather than the table's superseded
+  // one.
   const extras = code === 'ON' || own ? [table] : []
   if (code === 'BC') extras.unshift(BC_COURT_FEES)
+  if (code === 'NB') extras.unshift(NB_PROBATE_AMEND)
   return {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
     sourceURL, additionalSourceURLs: [...new Set(extras)],
@@ -723,14 +812,12 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
       : code === 'YT' ? CHECKED_B4_YT
         : code === 'BC' ? CHECKED_B4_BC
           : code === 'AB' || code === 'NS' || code === 'PE' ? CHECKED_B4_LADDERS
-            : own ? CHECKED_B4 : AT,
+            : code === 'NB' ? CHECKED_B4_NB
+              : own ? CHECKED_B4 : AT,
     evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
     contentChecked: code === 'ON' || own ? true : undefined,
-    // BE-38 B4 follow-up: NB gets its own limitation so the rendered row can
-    // disclose that the schedule it prices was repealed in 2026 and that the
-    // current one charges more — the deferral is honest, not silent.
     limitationId: own?.limitationId
-      ?? (code === 'MB' ? 'probateFeesMB' : code === 'NB' ? 'probateFeesNB' : 'probateFees'),
+      ?? (code === 'MB' ? 'probateFeesMB' : 'probateFees'),
   }
 }
 

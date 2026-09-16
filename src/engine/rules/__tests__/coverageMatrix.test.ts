@@ -118,11 +118,13 @@ const PROBATE_HAND: Record<string, { flat: number; rate: number; threshold: numb
   // BE-38 B4 moved AB, NS and PE to `PROBATE_LADDER` for the same reason: each
   // is a printed step ladder (NS and PE then a marginal rate above it), so a
   // flat-plus-rate entry here would re-encode the approximation this slice
-  // replaced. QC stays — one unconditional court fee — and MB is the abolished
-  // zero.
+  // replaced. BE-38 B4 then moved NB too — its Schedule A, item 1 is a printed
+  // $200 floor plus two marginal tiers, also not a flat-plus-rate, so it is
+  // priced by `nbPublishedFee` below. QC stays — one unconditional court fee —
+  // and MB is the abolished zero.
   QC: { flat: 243, rate: 0, threshold: 0 },
   MB: { flat: 0, rate: 0, threshold: 0 }, SK: { flat: 200, rate: 0.007, threshold: 0 },
-  NB: { flat: 100, rate: 0.005, threshold: 20000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
+  NL: { flat: 60, rate: 0.006, threshold: 1000 },
   YT: { flat: 140, rate: 0, threshold: 25000 },
 }
 /**
@@ -209,13 +211,42 @@ const PROBATE_LADDER: Partial<Record<string, {
   },
 }
 /**
+ * New Brunswick's Schedule A, item 1, hand-keyed from the three tiers the
+ * instrument prints — never read back from `PROBATE_RATES`/`probateTax`, whose
+ * shape is the thing under test:
+ *   (a) "if the value of the estate or the part of the estate being administered
+ *       does not exceed $20,000, $200";
+ *   (b) "if the value ... exceeds $20,000 but not $100,000, $200 plus $5 per
+ *       $1,000 or part of $1,000 by which the value of the estate exceeds
+ *       $20,000";
+ *   (c) "if the value ... exceeds $100,000, $600 plus $15 per $1,000 or part of
+ *       $1,000 by which the value of the estate exceeds $100,000".
+ * The tiers meet exactly at both boundaries ($200 + $5 × 80 = $600), so this is
+ * a continuous schedule; the Act's "or part of $1,000" rounding is not modelled
+ * by the engine or by this expectation.
+ */
+const NB_MINIMUM = 200
+const NB_MIDDLE_BASE = 200
+const NB_MIDDLE_RATE_PER_1000 = 5
+const NB_TOP_BASE = 600
+const NB_TOP_RATE_PER_1000 = 15
+const NB_MIDDLE_FROM = 20_000
+const NB_TOP_FROM = 100_000
+const nbPublishedFee = (value: number): number => value <= 0 ? 0
+  : value <= NB_MIDDLE_FROM ? NB_MINIMUM
+    : value <= NB_TOP_FROM
+      ? NB_MIDDLE_BASE + (NB_MIDDLE_RATE_PER_1000 / 1_000) * (value - NB_MIDDLE_FROM)
+      : NB_TOP_BASE + (NB_TOP_RATE_PER_1000 / 1_000) * (value - NB_TOP_FROM)
+/**
  * The hand formula the probate pins are read against, kept separate from
  * `probateTax` so the expectation is the *published* rule rather than a
  * line-for-line copy. YT is a step with no ladder (no fee to $25,000, $140
  * above it); a laddered jurisdiction (AB, NS, PE, NT, NU) comes from
- * `PROBATE_LADDER`, and NS/PE add that printed rate over the last closed rung.
+ * `PROBATE_LADDER`, and NS/PE add that printed rate over the last closed rung;
+ * NB is the printed floor plus two marginal tiers above.
  */
 function handProbate(province: string, value: number): number {
+  if (province === 'NB') return nbPublishedFee(value)
   const ladder = PROBATE_LADDER[province]
   if (ladder) {
     if (value <= 0) return 0
@@ -319,8 +350,12 @@ const FIXTURE_SOURCES: Record<string, string> = {
  * stop pricing from a TaxTips.ca table. Each row's fixture is now its own
  * instrument's full band ladder (Surrogate Rules Schedule 2; Probate Act
  * s. 87(2); Probate Act s. 119.1(4)), which is also the row's `sourceURL`, so a
- * fixture cannot stand in for a figure its own document lacks. Only NL and NB
- * still carry `PROBATE_TABLE`, and neither is a ladder.
+ * fixture cannot stand in for a figure its own document lacks.
+ *
+ * BE-38 B4 (the NB defect): NB is the last row to stop pricing from a
+ * TaxTips.ca table. Its fixture and `sourceURL` are now the Probate Court Act
+ * consolidation whose Schedule A, item 1 prints the three tiers the row prices,
+ * so only NL still carries `PROBATE_TABLE`.
  */
 const PROBATE_TABLE = (province: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
@@ -377,6 +412,17 @@ const bcTop = (excess: number) => (BC_TOP_RATE / 1_000) * excess
  * $50,000", with an estate of $50,000 or less exempt. The old `90e22` citation
  * prints neither figure. */
 const ON_PROBATE_STATUTE = 'https://www.ontario.ca/laws/statute/98e34'
+/** New Brunswick's own instrument, hand-keyed from the page: the *Probate Court
+ * Act*, R.S.N.B. 1982, c. P-17.1, Schedule A, item 1, as amended by S.N.B. 2026,
+ * c. 12, ss. 3–4 (assented 2026-06-12; no commencement provision, so it
+ * commenced on assent under the Interpretation Act, R.S.N.B. 1973, c. I-13,
+ * s. 3(2)) — the consolidation current to 2026-07-16. Its item 1 prints the
+ * $200 / $5-per-$1,000 / $600-plus-$15-per-$1,000 tiers `nbPublishedFee`
+ * expects, and it is the document the row's `sourceURL`, `probateFeesNB` and the
+ * `probate-fees-nb-2026` fixture all name. The amending Act and the TaxTips.ca
+ * table that still prints the repealed schedule are additional sources. */
+const NB_PROBATE_ACT = 'https://laws.gnb.ca/en/document/cs/P-17.1'
+const NB_PROBATE_AMEND = 'https://laws.gnb.ca/en/document/as/2026,%20c.12'
 
 for (const province of PROVINCES) {
   FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`] =
@@ -387,7 +433,8 @@ for (const province of PROVINCES) {
             : province === 'NU' ? NU_PROBATE
               : province === 'AB' ? LADDERS.AB.instrument
                 : province === 'NS' ? LADDERS.NS.instrument
-                  : province === 'PE' ? LADDERS.PE.instrument : PROBATE_TABLE(province)
+                  : province === 'PE' ? LADDERS.PE.instrument
+                    : province === 'NB' ? NB_PROBATE_ACT : PROBATE_TABLE(province)
 }
 for (const province of PROVINCES) {
   if (province === 'QC') continue
@@ -1095,12 +1142,23 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
         expect(row.contentChecked, 'BC probate must be content-checked').toBe(true)
         expect(row.verifiedAt, 'BC checked date').toBe(CONTENT_VERIFIED_AUTHORITIES[BC_PROBATE_ACT].checkedOn)
         expect(row.limitationId, 'BC names its own limitation').toBe('probateFeesBC')
+      } else if (province === 'NB') {
+        // BE-38 B4 (the NB defect): the row used to cite the TaxTips.ca table
+        // for a flat $100 + 0.5%, which is the schedule S.N.B. 2026, c. 12, s. 4
+        // repealed. It now cites the Probate Court Act, whose Schedule A, item 1
+        // prints all three tiers the engine prices, and lists both the amending
+        // Act (which prints the same tiers and fixes the in-force date) and the
+        // table that still shows the repealed schedule, so a reader can see why
+        // the priced fee is the one it is.
+        expect(row.sourceURL, 'NB cites the Act that prints its tiers').toBe(NB_PROBATE_ACT)
+        expect(urls, 'NB also lists the amending Act').toContain(NB_PROBATE_AMEND)
+        expect(urls, 'NB also lists its TaxTips.ca table').toContain(table('NB'))
+        expect(row.contentChecked, 'NB probate must be content-checked').toBe(true)
+        expect(row.verifiedAt, 'NB checked date').toBe(CONTENT_VERIFIED_AUTHORITIES[NB_PROBATE_ACT].checkedOn)
+        expect(row.limitationId, 'NB names its own limitation').toBe('probateFeesNB')
       } else {
         expect(row.sourceURL, province).toBe(table(province))
-        // BE-38 B4 follow-up: NB is the one table row with its own limitation,
-        // because it prices a schedule repealed in 2026 and must disclose it.
-        expect(row.limitationId, province)
-          .toBe(province === 'MB' ? 'probateFeesMB' : province === 'NB' ? 'probateFeesNB' : 'probateFees')
+        expect(row.limitationId, province).toBe(province === 'MB' ? 'probateFeesMB' : 'probateFees')
       }
       expect(row.limitationId, `${province} names the table`).toBeTruthy()
     }
@@ -1272,20 +1330,21 @@ describe('BE-38 B4 follow-up: Yukon is priced from its own fee schedule, not an 
   })
 
   it('moves YT alone: every other jurisdiction\'s probate keeps its published value', () => {
-    // The confinement control. ON, QC, MB, SK, NB and NL keep exactly the values
+    // The confinement control. ON, QC, MB, SK and NL keep exactly the values
     // the build charged before this slice, keyed here from their own authorities
     // rather than from `PROBATE_RATES`, so a change that leaks into another
     // province fails. NT/NU are covered by their own ladder suite above and are
     // asserted non-zero here to prove the shapes still coexist. AB, NS and PE
     // are *not* in this list: they moved in this slice and are pinned band by
-    // band in their own suite below.
+    // band in their own suite below; BE-38 B4 moved NB the same way, and its
+    // control moved to the NB suite so this one does not encode the price this
+    // slice replaced.
     const CONTROL: Record<string, number> = {
       ON: (1_000_000 - 50_000) * 0.015,
       // BE-38 B4 moved BC: its published total is the Act's ladder plus the
       // Court Rules' $200 filing fee, not the old flat $200 + 1.4%.
       BC: BC_FILING_FEE + bcBand1(50_000 - 25_000) + bcTop(1_000_000 - 50_000),
       QC: 243, MB: 0, SK: 200 + 0.007 * 1_000_000,
-      NB: 100 + 0.005 * (1_000_000 - 20_000),
       NL: 60 + 0.006 * (1_000_000 - 1_000),
     }
     for (const [province, expected] of Object.entries(CONTROL))
@@ -1457,11 +1516,17 @@ describe('BE-38 B4: British Columbia is priced from the Probate Fee Act and the 
     expect(probateTax(1_000_000, 'AB')).toBe(525)
     expect(probateTax(1_000_000, 'QC')).toBe(243)
     expect(probateTax(1_000_000, 'NS')).toBeCloseTo(1002.65 + 0.01695 * (1_000_000 - 100_000), 6)
-    expect(PROBATE_RATES.BC, 'only BC gained a second tier').toHaveProperty('baseRate')
+    expect(PROBATE_RATES.BC, 'BC gained a second tier').toHaveProperty('baseRate')
     expect(PROBATE_RATES.BC, 'only BC gained a filing-fee surcharge').toHaveProperty('surcharge')
-    for (const province of ['ON', 'AB', 'QC', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU'] as Province[]) {
+    // BE-38 B4 (the NB defect): NB is the second row with a lower marginal tier,
+    // and the only one with a printed floor (`minimum`); neither may leak into a
+    // row that did not move here.
+    expect(PROBATE_RATES.NB, 'NB gained a second tier').toHaveProperty('baseRate')
+    expect(PROBATE_RATES.NB, 'NB gained a printed floor').toHaveProperty('minimum')
+    for (const province of ['ON', 'AB', 'QC', 'MB', 'SK', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU'] as Province[]) {
       expect(PROBATE_RATES[province], `${province} must not gain a surcharge`).not.toHaveProperty('surcharge')
       expect(PROBATE_RATES[province], `${province} must not gain a second tier`).not.toHaveProperty('baseRate')
+      expect(PROBATE_RATES[province], `${province} must not gain a printed floor`).not.toHaveProperty('minimum')
     }
   })
 })
@@ -1643,14 +1708,16 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     for (const url of Object.keys(BLOCKED_SOURCES))
       expect(cited.has(url), `blocked entry cited by no row: ${url}`).toBe(true)
     // The two rendered categories, counted over unique authorities: the surface
-    // says "content-checked" for 15 of the 56 distinct URLs it links and "listed
-    // only" for the other 41. A reader can therefore tell which citations this
+    // says "content-checked" for 24 of the 61 distinct URLs it links and "listed
+    // only" for the other 37. A reader can therefore tell which citations this
     // artifact actually claims a document↔figure correspondence for. BE-38 B4
     // follow-up added two: Yukon's own fee schedule and the TaxTips.ca table the
     // YT row still lists alongside it. BE-38 B4 (BC) added three more: the
     // Probate Fee Act, the Court Rules item carrying the $200 filing fee, and the
     // BC TaxTips.ca table (which was already among the cited 54 but now renders
-    // content-checked, having stopped being the row's primary source).
+    // content-checked, having stopped being the row's primary source). BE-38 B4
+    // (NB) added three: the Probate Court Act, the amending S.N.B. 2026, c. 12
+    // and the TaxTips.ca table the row still lists.
     expect([...verified].sort()).toEqual([
       BC_2026_JULY, CFFP_GUIDE, NL_2026_JULY, PE_2026_JULY, ON_PROBATE_STATUTE,
       'https://www.taxtips.ca/willsandestates/probatefees/on.htm',
@@ -1666,10 +1733,13 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
       // TaxTips.ca table it still lists as an additional source.
       LADDERS.AB.instrument, LADDERS.NS.instrument, LADDERS.PE.instrument,
       PROBATE_TABLE('AB'), PROBATE_TABLE('NS'), PROBATE_TABLE('PE'),
+      // BE-38 B4 (NB): the Probate Court Act, the amending Act that prints the
+      // same tiers, and the table the row still lists as an additional source.
+      NB_PROBATE_ACT, NB_PROBATE_AMEND, PROBATE_TABLE('NB'),
     ].sort())
-    expect(cited.size).toBe(59)
-    expect(verified.size).toBe(21)
-    expect(merelyListed.size).toBe(38)
+    expect(cited.size).toBe(61)
+    expect(verified.size).toBe(24)
+    expect(merelyListed.size).toBe(37)
     expect(verified.size + merelyListed.size).toBe(cited.size)
     expect(CONTENT_VERIFIED_AUTHORITIES[PE_2026_JULY].checkedFigures).toContain('142,520')
     expect(CONTENT_VERIFIED_AUTHORITIES[BC_2026_JULY].checkedFigures.join(' ')).toMatch(/5\.60/)
@@ -1820,7 +1890,6 @@ describe('BE-38 B4: AB, NS and PE are priced from their own band ladders, not a 
       QC: () => 243,
       MB: () => 0,
       SK: value => 200 + 0.007 * value,
-      NB: value => 100 + 0.005 * Math.max(0, value - 20_000),
       NL: value => 60 + 0.006 * Math.max(0, value - 1_000),
       YT: value => value > 25_000 ? 140 : 0,
       NT: value => value <= 10_000 ? 30 : value <= 25_000 ? 110 : value <= 125_000 ? 215
@@ -1829,20 +1898,122 @@ describe('BE-38 B4: AB, NS and PE are priced from their own band ladders, not a 
         : value <= 250_000 ? 325 : 425,
     }
     expect(Object.keys(CONTROL).sort()).toEqual(
-      PROVINCES.filter(province => !MOVED.includes(province as typeof MOVED[number])).sort())
+      PROVINCES.filter(province => province !== 'NB'
+        && !MOVED.includes(province as typeof MOVED[number])).sort())
     for (const [province, expected] of Object.entries(CONTROL))
       for (const value of [1, 10_000, 200_000, 1_000_000])
         expect(probateTax(value, province as Province), `${province} at ${value}`)
           .toBeCloseTo(expected(value), 6)
-    // The moved rows gain neither BC's surcharge nor its second tier.
-    for (const province of ['NL', 'NB'] as const) {
-      expect(PROBATE_RATES[province].bands, `${province} is not a ladder`).toBeUndefined()
-      expect(PROBATE_RATES[province].rate, `${province} keeps its rate`).toBeGreaterThan(0)
-    }
+    // The moved rows gain neither BC's surcharge nor its second tier; NB is the
+    // one row that moved to a lower marginal tier, and it carries no `bands`.
+    expect(PROBATE_RATES.NL.bands, 'NL is not a ladder').toBeUndefined()
+    expect(PROBATE_RATES.NL.rate, 'NL keeps its rate').toBeGreaterThan(0)
     for (const province of MOVED) {
       expect(PROBATE_RATES[province].bands, `${province} is a ladder`).toBeDefined()
       expect(PROBATE_RATES[province]).not.toHaveProperty('baseRate')
       expect(PROBATE_RATES[province]).not.toHaveProperty('surcharge')
     }
+  })
+})
+
+describe('BE-38 B4: New Brunswick is priced from its own Schedule A, not the repealed TaxTips approximation', () => {
+  // Every expected value is hand-keyed from the instrument — the Probate Court
+  // Act, Schedule A, item 1, as amended by S.N.B. 2026, c. 12, s. 4 — never read
+  // back from `PROBATE_RATES` or `probateTax`, whose shape is the thing under
+  // test. The Act's "or part of $1,000" rounding is disclosed but not modelled
+  // (it is unmodelled project-wide), so the boundary probes below expect the
+  // exact proportional amount.
+
+  it('prices every printed tier on both sides of every boundary', () => {
+    // The pinned shape the instrument's own wording forces: a printed $200 floor
+    // (item 1(a)), $5 per $1,000 over $20,000 (item 1(b)), $15 per $1,000 over
+    // $100,000 (item 1(c)), with `flat` the $400 item 1(b) accumulates by
+    // $100,000 so that `minimum + flat` is item 1(c)'s printed $600.
+    expect(PROBATE_RATES.NB).toEqual({
+      minimum: 200, baseRate: 5 / 1000, baseUpTo: 20_000,
+      flat: 400, rate: 15 / 1000, threshold: 100_000,
+    })
+    // Boundary probes: the edge value and edge + 1 at each tier edge, by hand.
+    expect(probateTax(0, 'NB'), 'NB zero estate').toBe(0)
+    expect(probateTax(1, 'NB'), 'NB first dollar is item 1(a)').toBe(200)
+    expect(probateTax(NB_MIDDLE_FROM, 'NB'), 'NB at $20,000 (item 1(a) edge)').toBe(200)
+    expect(probateTax(NB_MIDDLE_FROM + 1, 'NB'), 'NB at $20,001 (item 1(b) edge)')
+      .toBeCloseTo(200 + 5 / 1_000, 6)
+    expect(probateTax(NB_TOP_FROM, 'NB'), 'NB at $100,000 (item 1(b) edge)').toBe(600)
+    expect(probateTax(NB_TOP_FROM + 1, 'NB'), 'NB at $100,001 (item 1(c) edge)')
+      .toBeCloseTo(600 + 15 / 1_000, 6)
+    // A spread inside each tier, typed from the printed rates.
+    expect(probateTax(5_000, 'NB'), 'NB $5,000').toBe(200)
+    expect(probateTax(50_000, 'NB'), 'NB $50,000').toBeCloseTo(200 + 5 * 30, 6)
+    expect(probateTax(99_999, 'NB'), 'NB $99,999').toBeCloseTo(200 + 5 * 79.999, 6)
+    expect(probateTax(200_000, 'NB'), 'NB $200,000').toBeCloseTo(600 + 15 * 100, 6)
+    expect(probateTax(1_000_000, 'NB'), 'NB $1M').toBeCloseTo(600 + 15 * 900, 6)
+    // The schedule is *continuous* at both edges, so it is not a step ladder:
+    // the next tier's own expression equals the current tier's printed fee at
+    // the boundary, with no jump. A `bands` shape (which returns a printed rung
+    // unchanged) would leave the $20,000–$100,000 range unpriced and a step
+    // shape would jump by the accumulated amount here.
+    expect(nbPublishedFee(NB_MIDDLE_FROM), 'NB (b) equals (a) at $20,000').toBe(200)
+    expect(nbPublishedFee(NB_TOP_FROM), 'NB (c) equals (b) at $100,000').toBe(600)
+    expect(probateTax(NB_MIDDLE_FROM, 'NB') - probateTax(NB_MIDDLE_FROM - 1, 'NB'),
+      'NB item 1(a) is flat at its upper edge').toBe(0)
+    expect(probateTax(NB_TOP_FROM, 'NB') - probateTax(NB_TOP_FROM - 1, 'NB'),
+      'NB item 1(b) accumulates $5 per $1,000 into the boundary').toBeCloseTo(5 / 1_000, 9)
+    expect(probateTax(NB_TOP_FROM + 1, 'NB') - probateTax(NB_TOP_FROM, 'NB'),
+      'NB item 1(c) starts at the boundary with no step').toBeCloseTo(15 / 1_000, 9)
+    // The full schedule against the hand formula, so a branch edit that keeps
+    // the probes above but shifts a tier fails here.
+    for (const value of [0, 1, 5_000, 19_999, 20_000, 20_001, 35_000, 50_000, 99_999,
+      100_000, 100_001, 125_000, 150_000, 250_000, 300_000, 1_000_000, 50_000_000])
+      expect(probateTax(value, 'NB'), `NB at ${value}`).toBeCloseTo(nbPublishedFee(value), 6)
+    // The defect, in one number: the repealed table charged this estate $1,000
+    // (100 + 0.005 × 180,000) where item 1(c) prints $2,100.
+    expect(probateTax(200_000, 'NB'), 'the old approximation is gone').not.toBeCloseTo(1_000, 6)
+  })
+
+  it('holds the cited authority\'s recorded figures equal to the priced tiers', () => {
+    const row = coverageFor('NB').implemented['probate-and-estate-fees']
+    expect(row.sourceURL, 'NB source').toBe(NB_PROBATE_ACT)
+    expect(row.additionalSourceURLs, 'NB also lists the amending Act').toContain(NB_PROBATE_AMEND)
+    expect(row.additionalSourceURLs, 'NB also lists the repealed table it moved off').toContain(PROBATE_TABLE('NB'))
+    expect(row.contentChecked, 'NB probate must be content-checked').toBe(true)
+    const act = CONTENT_VERIFIED_AUTHORITIES[NB_PROBATE_ACT]
+    expect(act, 'NB cited authority must be content-checked').toBeDefined()
+    expect(act.checkedOn, 'NB checked date').toBe(row.verifiedAt)
+    // The Act's own tier wording, recorded as printed, so citation and priced
+    // shape cannot drift apart.
+    for (const phrase of ['does not exceed $20,000', '$200',
+      'exceeds $20,000 but not $100,000', '$200 plus $5 per $1,000 or part of $1,000',
+      'exceeds $100,000', '$600 plus $15 per $1,000 or part of $1,000'])
+      expect(act.checkedFigures, `NB must record "${phrase}"`).toContain(phrase)
+    // The amending Act carries the same three tiers and the in-force date the
+    // commencement rule turns on; the table carries the repealed schedule.
+    const amend = CONTENT_VERIFIED_AUTHORITIES[NB_PROBATE_AMEND]
+    expect(amend.checkedOn, 'amending Act checked date').toBe(row.verifiedAt)
+    expect(amend.checkedFigures, 'the assent date is the commencement date')
+      .toContain('Assented to June 12, 2026')
+    expect(amend.checkedFigures, 'the amending Act prints the same tiers')
+      .toContain('$600 plus $15 per $1,000 or part of $1,000')
+    const table = CONTENT_VERIFIED_AUTHORITIES[PROBATE_TABLE('NB')]
+    expect(table.checkedOn, 'table checked date').toBe(row.verifiedAt)
+    expect(table.checkedFigures.join(' '), 'the table still prints the repealed schedule')
+      .toMatch(/\$5,000 or less.*\$25/)
+    expect(FIXTURE_SOURCES['probate-fees-nb-2026'], 'NB fixture').toBe(NB_PROBATE_ACT)
+  })
+
+  it('moves NB alone: the row it replaced is the only value that changed', () => {
+    // ON, QC, MB, SK and NL keep the values the build charged before this slice,
+    // keyed from their own authorities rather than from `PROBATE_RATES`. BC, YT,
+    // NT, NU and AB/NS/PE are pinned in their own suites above and below.
+    expect(probateTax(1_000_000, 'ON')).toBeCloseTo((1_000_000 - 50_000) * 0.015, 6)
+    expect(probateTax(1_000_000, 'QC')).toBe(243)
+    expect(probateTax(1_000_000, 'MB')).toBe(0)
+    expect(probateTax(1_000_000, 'SK')).toBeCloseTo(200 + 0.007 * 1_000_000, 6)
+    expect(probateTax(1_000_000, 'NL')).toBeCloseTo(60 + 0.006 * (1_000_000 - 1_000), 6)
+    // The row that did change: the repealed TaxTips approximation at the same
+    // estate, hand-computed from the table's own "$100 up to $20,000 then
+    // 0.5% of the whole value" reading.
+    expect(probateTax(1_000_000, 'NB')).not.toBeCloseTo(0.005 * 1_000_000, 6)
+    expect(PROBATE_RATES.NB.rate).toBe(15 / 1_000)
   })
 })
