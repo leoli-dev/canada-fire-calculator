@@ -233,14 +233,18 @@ const BC_COURT_FEES =
  * item 1(1) (Rule 44 authorises the clerk's Schedule 2 fees); NS's Probate Act,
  * R.S.N.S. 1989, c. 359, s. 87(2); PEI's Probate Act, R.S.P.E.I. 1974, c. P-21,
  * s. 119.1(4). Each band's own wording is in
- * {@link CONTENT_VERIFIED_AUTHORITIES}. All three answer HTTP 200. PEI's
- * *landing page* is the Radware-gated {@link BLOCKED_SOURCES} entry; the PDF is
- * not gated, so it is cited with no gate note.
+ * {@link CONTENT_VERIFIED_AUTHORITIES}. All three were probed live and answer
+ * HTTP 200 — Nova Scotia's consolidation is served as `probate.pdf`; the
+ * `probate.htm` sibling the first revision of this slice cited answers HTTP 404
+ * (6/6 probes, with and without a browser User-Agent), so it may not be the
+ * rendered authority for a figure. PEI's *landing page* is the Radware-gated
+ * {@link BLOCKED_SOURCES} entry; the PDF is not gated, so it is cited with no
+ * gate note.
  */
 const AB_SURROGATE_RULES =
   'https://kings-printer.alberta.ca/documents/Regs/1995_130.pdf'
 const NS_PROBATE_ACT =
-  'https://nslegislature.ca/sites/default/files/legc/statutes/probate.htm'
+  'https://nslegislature.ca/sites/default/files/legc/statutes/probate.pdf'
 const PE_PROBATE_ACT =
   'https://www.princeedwardisland.ca/sites/default/files/legislation/p-21-probate_act.pdf'
 /**
@@ -544,6 +548,25 @@ const QC_ABATEMENT_FORM = 'https://www.canada.ca/content/dam/cra-arc/formspubs/p
 const PROBATE = 'https://www.ontario.ca/laws/statute/98e34'
 const TAXTIPS_PROBATE = (code: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${code}.htm`
+/**
+ * BE-38 B4 follow-up (blocking finding): the Nova Scotia citation this slice
+ * added was a dead `probate.htm` — HTTP 404 on 6/6 probes, with and without a
+ * browser User-Agent — yet it rendered as that row's *content-verified*
+ * authority, because nothing recorded whether a cited URL had ever resolved.
+ * These are the authorities a scripted reader fetched and got **HTTP 200** from
+ * (probing repeated 2026-09-16). The suite requires an entry here for every
+ * {@link CONTENT_VERIFIED_AUTHORITIES} URL that is not a recorded
+ * {@link BLOCKED_SOURCES} gate, so a citation cannot become the rendered
+ * authority for a figure without a live probe. The guard is the recorded status,
+ * not a fetch: CI has no network.
+ */
+export const LIVE_PROBED_CITATIONS = [
+  PROBATE, TAXTIPS_PROBATE('on'), PE_2026_JULY, BC_2026_JULY, NL_2026_JULY, CFFP_GUIDE,
+  NT_COURT_FEES, YT_COURT_RULES, BC_PROBATE_ACT, BC_COURT_FEES,
+  TAXTIPS_PROBATE('nt'), TAXTIPS_PROBATE('nu'), TAXTIPS_PROBATE('yt'), TAXTIPS_PROBATE('bc'),
+  TAXTIPS_PROBATE('ab'), TAXTIPS_PROBATE('ns'), TAXTIPS_PROBATE('pe'),
+  AB_SURROGATE_RULES, NS_PROBATE_ACT, PE_PROBATE_ACT,
+]
 /** The date the reachability sweep and the hand content checks behind most rows
  * were made. */
 const AT = '2026-09-15'
@@ -703,7 +726,11 @@ const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
             : own ? CHECKED_B4 : AT,
     evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
     contentChecked: code === 'ON' || own ? true : undefined,
-    limitationId: own?.limitationId ?? (code === 'MB' ? 'probateFeesMB' : 'probateFees'),
+    // BE-38 B4 follow-up: NB gets its own limitation so the rendered row can
+    // disclose that the schedule it prices was repealed in 2026 and that the
+    // current one charges more — the deferral is honest, not silent.
+    limitationId: own?.limitationId
+      ?? (code === 'MB' ? 'probateFeesMB' : code === 'NB' ? 'probateFeesNB' : 'probateFees'),
   }
 }
 

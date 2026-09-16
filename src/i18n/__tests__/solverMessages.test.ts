@@ -398,8 +398,24 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
     }
     expect(EN[key], `${province} names its own instrument`).toMatch(row.authority)
   }
-  expect(EN['coverageLimitation.probateFees']).toMatch(/\(NL, NB\)/)
-  expect(EN['coverageLimitation.probateFeesMB']).toMatch(/\(NL, NB\)/)
+  expect(EN['coverageLimitation.probateFees']).toMatch(/\(NB\)/)
+  expect(EN['coverageLimitation.probateFeesMB']).toMatch(/\(NB\)/)
+  // BE-38 B4 follow-up: NL is not simplified — its Services Charges Act
+  // s. 4(2)–(3) is reproduced exactly by `{flat: 60, rate: 0.006, threshold:
+  // 1000}` — so the shared text this diff edits may not name it as simplified.
+  for (const key of ['coverageLimitation.probateFees', 'coverageLimitation.probateFeesMB',
+    'coverageLimitation.probateFeesNB'])
+    for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const)
+      expect(catalogue[key], `${lang} ${key} may not call NL simplified`).not.toMatch(/\bNL\b|Terre-Neuve|紐芬蘭|纽芬兰/)
+  // NB prices a repealed schedule and the rendered qualification must say so,
+  // in every language, naming the current figures (2026, c. 12, s. 4).
+  for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const) {
+    const text = catalogue['coverageLimitation.probateFeesNB']
+    expect(text, `${lang} NB qualification`).toBeTruthy()
+    expect(text, `${lang} NB repeal`).toMatch(/2026, c\. 12, s\. 4|2026, ch\. 12, art\. 4/)
+    expect(text, `${lang} NB current figures`).toMatch(/\$?15|15 \$|15 加元/)
+    if (lang !== 'en') expect(text, `${lang} NB is not English`).not.toBe(EN['coverageLimitation.probateFeesNB'])
+  }
   expect(EN['coverageLimitation.provincialAgeAmount']).toMatch(/Pinned 2026 figures/)
 })
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCKED_SOURCES, CONTENT_VERIFIED_AUTHORITIES, COVERAGE_JURISDICTIONS, coverageFor,
-  coverageLimitationIds, coverageMatrix, coverageSummary, evidenceFixtureIds, matrixJurisdictions,
-  rowAuthorities,
+  BLOCKED_SOURCES, CONTENT_VERIFIED_AUTHORITIES, COVERAGE_JURISDICTIONS, LIVE_PROBED_CITATIONS,
+  coverageFor, coverageLimitationIds, coverageMatrix, coverageSummary, evidenceFixtureIds,
+  matrixJurisdictions, rowAuthorities,
 } from '../coverageMatrix'
 import type { ImplementedCreditCoverage } from '../coverageMatrix'
 import { PLAN_TAX_YEAR, incomeTax, probateTax, qcFssContribution, qcRamqPremium } from '../../tax'
@@ -153,7 +153,7 @@ const LADDERS = {
     ],
   },
   NS: {
-    instrument: 'https://nslegislature.ca/sites/default/files/legc/statutes/probate.htm',
+    instrument: 'https://nslegislature.ca/sites/default/files/legc/statutes/probate.pdf',
     literal: ['$85.60', '$215.20', '$358.15', '$1002.65'],
     rate: 16.95 / 1_000, rateLiteral: 16.95,
     rungs: [
@@ -1097,7 +1097,10 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
         expect(row.limitationId, 'BC names its own limitation').toBe('probateFeesBC')
       } else {
         expect(row.sourceURL, province).toBe(table(province))
-        expect(row.limitationId, province).toBe(province === 'MB' ? 'probateFeesMB' : 'probateFees')
+        // BE-38 B4 follow-up: NB is the one table row with its own limitation,
+        // because it prices a schedule repealed in 2026 and must disclose it.
+        expect(row.limitationId, province)
+          .toBe(province === 'MB' ? 'probateFeesMB' : province === 'NB' ? 'probateFeesNB' : 'probateFees')
       }
       expect(row.limitationId, `${province} names the table`).toBeTruthy()
     }
@@ -1672,6 +1675,26 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     expect(CONTENT_VERIFIED_AUTHORITIES[BC_2026_JULY].checkedFigures.join(' ')).toMatch(/5\.60/)
     expect(CONTENT_VERIFIED_AUTHORITIES[NL_2026_JULY].checkedFigures.join(' ')).toMatch(/13,094/)
     expect(CONTENT_VERIFIED_AUTHORITIES[CFFP_GUIDE].checkedFigures.join(' ')).toMatch(/19 890/)
+  })
+
+  it('requires a recorded HTTP 200 probe for every citation rendered as content-checked', () => {
+    // BE-38 B4 follow-up (blocking finding): the NS row cited a `probate.htm`
+    // that answers 404 while rendering it as the row's *content-verified*
+    // authority, because nothing recorded whether a citation had ever resolved.
+    // A live re-fetch is not asserted here — CI has no network — so the suite
+    // asserts the recorded probe instead: every URL the artifact claims a
+    // document↔figure correspondence for must be in `LIVE_PROBED_CITATIONS`,
+    // which only holds a URL a scripted reader actually fetched at HTTP 200. A
+    // `BLOCKED_SOURCES` gate is exempt: it renders its own qualification rather
+    // than the checked claim.
+    const probed = new Set(LIVE_PROBED_CITATIONS)
+    for (const url of Object.keys(CONTENT_VERIFIED_AUTHORITIES)) {
+      if (BLOCKED_SOURCES[url]) continue
+      expect(probed.has(url), `${url} renders as content-checked with no recorded live probe`).toBe(true)
+    }
+    for (const url of probed)
+      expect(CONTENT_VERIFIED_AUTHORITIES[url] ?? BLOCKED_SOURCES[url],
+        `live probe recorded for a URL no row cites as checked: ${url}`).toBeDefined()
   })
 
   it('cites the authority the QC RAMQ approximation was derived from, not the parameters PDF', () => {
