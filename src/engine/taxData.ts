@@ -228,7 +228,10 @@ export interface ProbateBand {
 /** A jurisdiction's published probate fee. `bands` is a step ladder (NT, NU);
  * every other row is `flat + rate * max(0, value − threshold)`. A row whose
  * priced value is a step function with one boundary (YT) still has that shape:
- * the boundary is `threshold`, the fee is `flat` and the step carries no rate. */
+ * the boundary is `threshold`, the fee is `flat` and the step carries no rate.
+ * `baseRate`/`baseUpTo` add a *second* marginal tier below `threshold` (BC
+ * alone), where the published fee is a rate on the excess over one boundary up
+ * to a second one rather than a single flat-plus-rate. */
 export interface ProbateRate {
   flat: number
   rate: number
@@ -236,6 +239,22 @@ export interface ProbateRate {
   /** The rungs at or below `threshold`, ascending, ending exactly on it. The
    * tier above `threshold` is `flat`, so it is not repeated here. */
   bands?: readonly ProbateBand[]
+  /** The marginal rate the published schedule charges on the excess over
+   * `baseUpTo`, up to `threshold` — BC's Probate Fee Act s. 2(3)(a) "$6 for
+   * every $1 000 or part of $1 000 by which the value of the estate exceeds
+   * $25 000 but is not more than $50 000", i.e. 0.006 over $25,000. `flat` is
+   * the amount that rate accumulates at `threshold`, so the lower tier meets the
+   * top tier there with no step. Absent for every row whose schedule has one
+   * rate. */
+  baseRate?: number
+  /** The boundary `baseRate` starts at. Required wherever `baseRate` is set. */
+  baseUpTo?: number
+  /** A fixed amount the published schedule adds on top of `flat` and the priced
+   * rate, switched on at `baseUpTo` where there is a lower tier. BC's is the
+   * $200 filing fee the Supreme Court Civil Rules, Appendix C, Schedule 1, item
+   * 1 charges to file for a grant above $25,000 — a second instrument's figure,
+   * stored apart from the Act's own accumulated $150 in `flat`. */
+  surcharge?: number
 }
 
 /**
@@ -276,12 +295,46 @@ export interface ProbateRate {
  * charges a filing fee of $140") and is the transition source here, never an
  * authority for the figure.
  *
- * MB's zero is the published abolition of the fee, not a missing figure. Every
- * other province remains as before.
+ * MB's zero is the published abolition of the fee, not a missing figure.
+ *
+ * BE-38 B4 (the BC defect this slice prices): BC was `flat: 200, rate: 0.014,
+ * threshold: 50000`, which is not a ladder at all — it charged $200 on a
+ * $10,000 estate that the Probate Fee Act exempts outright, skipped the
+ * $25,000–$50,000 band the Act prices, and under-charged $150 above $50,000.
+ * The row now carries the whole published ladder, hand-read from the two
+ * instruments above (the Probate Fee Act and the Supreme Court Civil Rules'
+ * Appendix C, Schedule 1, item 1), and the coverage row cites the Act that
+ * carries the priced figures. Every other province remains as before.
  */
 export const PROBATE_RATES: Record<Province, ProbateRate> = {
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
-  BC: { flat: 200, rate: 0.014, threshold: 50000 },
+  // Probate Fee Act, SBC 1999, c. 4, s. 2 (bclaws.gov.bc.ca, current to
+  // 2026-09-08): s. 2(2)(b) charges *no fee* where the value "does not exceed
+  // $25 000"; s. 2(3)(a) charges $6 "for every $1 000 or part of $1 000" by
+  // which the value exceeds $25 000 but is not more than $50 000; s. 2(3)(b)
+  // charges $14 for every $1 000 above $50 000. On top of that Act fee, the
+  // Supreme Court Civil Rules' Appendix C, Schedule 1, item 1 ("for commencing
+  // a proceeding ... No fee is payable under this item to file for and obtain a
+  // grant of probate or administration if a person dies leaving an estate that
+  // does not exceed $25 000 in value ... 200") charges $200 to file for the
+  // grant itself — the `surcharge`, waived at the same $25,000 the Act exempts.
+  // The row this replaced was `flat: 200, rate: 0.014, threshold: 50000`: it
+  // charged $200 inside the $25,000 exemption (the Law Reform sweep found
+  // `probateTax(10_000, 'BC') === 200` against s. 2(2)(b)'s "no fee"), it
+  // omitted the $25,000–$50,000 band entirely (s. 2(3)(a)'s $6 per $1,000), and
+  // above $50,000 it under-charged by $150: the old model never added the $150
+  // the s. 2(3)(a) tier accumulates at the $50,000 boundary ($6 × 25).
+  //
+  // The two Act tiers are modelled as two marginal rates on one row rather than
+  // as `bands`, because the Act's schedule is *continuous* at $50,000: bands
+  // are step fees and would have to store the accumulated total, losing the
+  // published $6-per-$1,000 rate. `flat` is the $150 the Act accumulates at the
+  // boundary, `surcharge` the Court Rules' $200 filing fee, `baseRate` the
+  // $6-per-$1,000 the lower tier charges and `rate` the $14-per-$1,000 above it.
+  BC: {
+    flat: 150, rate: 14 / 1000, threshold: 50_000, surcharge: 200,
+    baseRate: 6 / 1000, baseUpTo: 25_000,
+  },
   AB: { flat: 525, rate: 0, threshold: 0 },
   QC: { flat: 243, rate: 0, threshold: 0 }, // court will-verification fee
   MB: { flat: 0, rate: 0, threshold: 0 }, // abolished November 2020

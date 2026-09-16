@@ -200,6 +200,33 @@ const NU_COURT_FEES =
 const YT_COURT_RULES =
   'https://www.yukoncourts.ca/sites/default/files/2023-08/rules_combined.pdf'
 /**
+ * BE-38 B4: the two British Columbia instruments that between them carry every
+ * figure the BC probate row prices, read on the pages themselves.
+ *   - `BC_PROBATE_ACT` is the *Probate Fee Act*, SBC 1999, c. 4, s. 2 (current
+ *     to 2026-09-08). This row used to cite the TaxTips.ca table, which states
+ *     the same rule in its own words but is not the Act. Its s. 2(2)(b) is the
+ *     exempt band ("No fee is payable under this Act ... if the value of the
+ *     estate does not exceed $25 000"), s. 2(3)(a) is the $25,000–$50,000 band
+ *     ($6 for every $1 000 or part of $1 000) and s. 2(3)(b) the tier above
+ *     ($14 for every $1 000 or part of $1 000), so the ladder the engine prices
+ *     is the Act's own.
+ *   - `BC_COURT_FEES` is the Supreme Court Civil Rules, Appendix C, Schedule 1,
+ *     item 1 (as amended to B.C. Reg. 152/2025). It charges the $200 filing fee
+ *     the engine's `surcharge` adds — "No fee is payable under this item to file
+ *     for and obtain a grant of probate or administration if a person dies
+ *     leaving an estate that does not exceed $25 000 in value" against a $200
+ *     fee, so the same $25,000 boundary turns it on. The Act itself charges no
+ *     filing fee; pricing the Act's ladder alone would understate what a BC
+ *     executor pays by that $200.
+ * Both are served by the BC King's Printer and answer a plain HTTP 200; both
+ * are recorded in {@link CONTENT_VERIFIED_AUTHORITIES} for the figures read on
+ * them.
+ */
+const BC_PROBATE_ACT =
+  'https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/99004_01'
+const BC_COURT_FEES =
+  'https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/168_2009_06'
+/**
  * One authority a scripted reader cannot reach, with the gate that stops it and
  * the token every language's rendered qualification must contain. The marker is
  * not necessarily a status code: it is whatever the gate actually is, so a gate
@@ -248,13 +275,18 @@ export const BLOCKED_SOURCES: Record<string, BlockedSource> = {
   // BE-38 B4 follow-up: Nunavut's own Court Fees Regulations were cited without
   // this entry, so the row rendered as content-checked over a link a scripted
   // reader cannot open. Observed on a real headless Chromium navigation:
-  // Cloudflare's "Just a moment..." challenge, HTTP 403, same for curl and for
-  // an API request context. The instrument remains the authority for the priced
-  // ladder — a person can open it in an ordinary browser session — but the row
-  // may only cite it with a rendered qualification naming this gate.
+  // Cloudflare's "Just a moment..." challenge, HTTP 403, and the same for an
+  // `APIRequestContext`. The gate is User-Agent-sensitive: `curl` with its
+  // *default* UA gets 200 and the genuine 221 KB PDF, while an empty UA and a
+  // Chrome UA both get 403 — so a bare "403 to curl" would be a false record,
+  // and the entry keys off the requests that are actually refused. The
+  // instrument remains the authority for the priced ladder — a person can open
+  // it in an ordinary browser session — but the row may only cite it with a
+  // rendered qualification naming this gate.
   [NU_COURT_FEES]: {
-    reason: 'HTTP 403 and the Cloudflare "Just a moment..." challenge to curl, to an API request context and to '
-      + 'a real headless Chromium navigation, so a scripted reader cannot see the page from this link.',
+    reason: 'HTTP 403 and the Cloudflare "Just a moment..." challenge to an API request context and to a real '
+      + 'headless Chromium navigation; curl is refused (403) with an empty UA and with a Chrome UA, though its '
+      + 'default UA receives the PDF, so a scripted reader cannot rely on this link.',
     observedAt: '2026-09-15',
     gateMarker: '403',
   },
@@ -287,6 +319,11 @@ const CHECKED_B4 = '2026-09-15'
 /** The date the Yukon defect slice read its primary authority: the Supreme Court
  * Rules' own fee schedule and the TaxTips.ca table the row carried before. */
 const CHECKED_B4_YT = '2026-09-15'
+/** BE-38 B4 (BC): the date the two BC instruments above were opened and read
+ * against the recorded figures — the Probate Fee Act's band ladder, the Supreme
+ * Court Civil Rules' $200 filing fee, and the TaxTips.ca table the row carried
+ * before. */
+const CHECKED_B4_BC = '2026-09-17'
 export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthority> = {
   'https://www.ontario.ca/laws/statute/98e34': {
     checkedOn: '2026-09-17',
@@ -366,6 +403,36 @@ export const CONTENT_VERIFIED_AUTHORITIES: Record<string, ContentVerifiedAuthori
     checkedOn: CHECKED_B4_YT,
     checkedFigures: ['worth more than $25,000', '$140', 'not greater than $25,000'],
   },
+  // BE-38 B4 (BC): the whole ladder, band by band, in the Act's own wording and
+  // with its own boundary phrases, so the equality test can hold the citation to
+  // the ladder the engine prices rather than to a summary of it. The Act prints
+  // exactly these figures: no fee at or below $25,000, $6 per $1,000 (or part)
+  // from there to $50,000, and $14 per $1,000 (or part) above.
+  [BC_PROBATE_ACT]: {
+    checkedOn: CHECKED_B4_BC,
+    checkedFigures: [
+      'does not exceed $25 000', '$0',
+      '$25 000 but is not more than $50 000', '$6 for every $1 000 or part of $1 000',
+      '$50 000', '$14 for every $1 000 or part of $1 000',
+    ],
+  },
+  // The second BC instrument, recorded for the one figure it contributes: the
+  // $200 filing fee the engine adds as `surcharge`, switched on by the same
+  // $25,000 the Act's exemption ends at.
+  [BC_COURT_FEES]: {
+    checkedOn: CHECKED_B4_BC,
+    checkedFigures: [
+      'does not exceed $25 000 in value', '$200',
+      'to file for and obtain a grant of probate or administration',
+    ],
+  },
+  // BC's TaxTips.ca table stays as the row's additional source — it is the table
+  // the row was keyed to before this slice and it states the Act's rule in its
+  // own words — so a `contentChecked` row has no unchecked link in it.
+  [TAXTIPS_PROBATE_URL('bc')]: {
+    checkedOn: CHECKED_B4_BC,
+    checkedFigures: ['$25,000', '$6 per $1,000', '$50,000', '$14 per $1,000', '$200'],
+  },
 }
 /** The Ministry of Finance's 2026 parameters PDF. This is the URL the province's
  * pack records in `fieldSources`, so a row that prices those fields must cite
@@ -427,11 +494,22 @@ const CHECKED = '2026-09-17'
  * and $140 above it — so YT's qualification is the rule itself, not a
  * simplification, and it carries its own id (`probateFeesYT`) rather than the
  * generic one whose text lists the provinces this build simplifies.
+ *
+ * BE-38 B4 (the BC defect): BC is the fourth. Its row used to cite the
+ * TaxTips.ca table for `flat: 200, rate: 0.014, threshold: 50000`, a price no
+ * instrument prints — it charged $200 inside the Act's $25,000 exemption and
+ * skipped the $25,000–$50,000 band. The row now cites the *Probate Fee Act*,
+ * whose s. 2(2)(b)–(3)(b) prints the whole ladder the engine prices, and lists
+ * the Supreme Court Civil Rules' Appendix C, Schedule 1, item 1 as its second
+ * authority because that item prints the $200 filing fee the engine's
+ * `surcharge` adds. Its qualification is the rule itself (`probateFeesBC`), not
+ * a simplification.
  */
 const PROBATE_OWN: Partial<Record<CoverageJurisdiction, { source: string; limitationId: string }>> = {
   YT: { source: YT_COURT_RULES, limitationId: 'probateFeesYT' },
   NT: { source: NT_COURT_FEES, limitationId: 'probateFeesApproxNT' },
   NU: { source: NU_COURT_FEES, limitationId: 'probateFeesApproxNU' },
+  BC: { source: BC_PROBATE_ACT, limitationId: 'probateFeesBC' },
 }
 const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCoverage> => {
   // The pack records each jurisdiction's own T4032 edition as its federal
@@ -507,26 +585,43 @@ const federal = (code: CoverageJurisdiction): Record<string, ImplementedCreditCo
  * lent the fee out. Its row used to cite Yukon's own TaxTips.ca table for an
  * unconditional $140; it now cites the Supreme Court Rules' fee schedule that
  * prints both the $140 and the $25,000 exemption, prices exactly those two
- * values, and renders `probateFeesYT` because that schedule is gated to a
- * scripted reader.
+ * values, and renders `probateFeesYT`. (The schedule is served by the Yukon
+ * courts and answers HTTP 200; the gated document is the unrendered
+ * `laws.yukon.ca` mirror of the same Act, which this comment used to misname as
+ * the citation.)
+ *
+ * BE-38 B4 (the BC defect): BC is the fifth, and the one whose citation the
+ * sweep found disagreeing with the priced value. Its row now cites the *Probate
+ * Fee Act*, whose s. 2(2)(b)–(3)(b) prints the whole band ladder the engine
+ * prices; the rendered `probateFeesBC` qualification also names the Supreme
+ * Court Civil Rules' Appendix C, Schedule 1, item 1, and the citation↔figure
+ * equality test holds that second instrument to the $200 filing fee the
+ * engine's `surcharge` adds.
  */
 const probate = (code: CoverageJurisdiction): ImplementedCreditCoverage => {
   const table = TAXTIPS_PROBATE(code.toLowerCase())
   const own = PROBATE_OWN[code]
   // Every row's sourceURL is the document the priced figure is printed in: the
-  // statute for ON, the jurisdiction's own instrument for YT/NT/NU, the
+  // statute for ON, the jurisdiction's own instrument for BC/YT/NT/NU, the
   // per-jurisdiction table otherwise. A row whose priced figure is not printed
   // in its own authority is listed in `PROBATE_OWN` rather than approximated.
   const sourceURL = code === 'ON' ? PROBATE : own?.source ?? table
   // ON's additional source is the reachable TaxTips.ca table, which every
-  // content-checked row in the registry has always carried; the YT/NT/NU rows
-  // add their own table for the same reason. Every other row, and every
-  // *sourceURL* outside ON/YT/NT/NU, is exactly what it was before this slice.
+  // content-checked row in the registry has always carried; the BC/YT/NT/NU
+  // rows add their own table for the same reason. BC is the one row with a
+  // *second* authority to render: the Court Rules item that carries the $200
+  // filing fee its `surcharge` prices, so a reader can check both figures the
+  // row charges. Every other row, and every *sourceURL* outside ON/BC/YT/NT/NU,
+  // is exactly what it was before this slice.
   const extras = code === 'ON' || own ? [table] : []
+  if (code === 'BC') extras.unshift(BC_COURT_FEES)
   return {
     coverage: 'implemented', scope: 'provincial', kind: 'fee', ruleFields: ['taxData.ts:PROBATE_RATES'],
     sourceURL, additionalSourceURLs: [...new Set(extras)],
-    verifiedAt: code === 'ON' ? CHECKED : code === 'YT' ? CHECKED_B4_YT : own ? CHECKED_B4 : AT,
+    verifiedAt: code === 'ON' ? CHECKED
+      : code === 'YT' ? CHECKED_B4_YT
+        : code === 'BC' ? CHECKED_B4_BC
+          : own ? CHECKED_B4 : AT,
     evidenceFixture: `probate-fees-${code.toLowerCase()}-2026`,
     contentChecked: code === 'ON' || own ? true : undefined,
     limitationId: own?.limitationId ?? (code === 'MB' ? 'probateFeesMB' : 'probateFees'),
