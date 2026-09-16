@@ -19,8 +19,14 @@ describe('Yukon probate as its own fee schedule prints it', () => {
     expect(PROBATE_RATES.YT).toEqual({ flat: 140, rate: 0, threshold: 25_000 })
   })
 
-  it('leaves the other no-rate jurisdictions unconditional', () => {
-    expect(probateTax(1, 'AB')).toBe(525)
+  it('leaves the other no-rate jurisdictions priced from their own schedules', () => {
+    // BE-38 B4: AB stopped being unconditional — its Surrogate Rules Schedule 2
+    // item 1(1)(a) charges $35 on "$10 000 or under", so the first dollar is that
+    // printed rung rather than the old top-tier $525. QC's court fee is the one
+    // unconditional flat amount left.
+    expect(probateTax(1, 'AB')).toBe(35)
+    expect(probateTax(10_000, 'AB')).toBe(35)
+    expect(probateTax(250_001, 'AB')).toBe(525)
     expect(probateTax(1, 'QC')).toBe(243)
     expect(probateTax(1_000_000, 'ON')).toBeCloseTo((1_000_000 - 50_000) * 0.015, 6)
   })

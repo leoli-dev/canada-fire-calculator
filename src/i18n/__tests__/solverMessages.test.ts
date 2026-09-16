@@ -364,6 +364,42 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
   expect(FR['coverageLimitation.probateFeesYT']).not.toBe(EN['coverageLimitation.probateFeesYT'])
   expect(ZH['coverageLimitation.probateFeesYT']).not.toBe(EN['coverageLimitation.probateFeesYT'])
   expect(EN['coverageLimitation.probateFeesMB']).toMatch(/abolished its probate fee/)
+  // BE-38 B4 (AB/NS/PE): each of the three rows the sweep found charging the top
+  // tier from the first dollar now renders its own qualification, so the generic
+  // `probateFees` text may no longer name it as simplified. Every language must
+  // name every band its instrument prints and say plainly that no band is
+  // approximated, because that is what `PROBATE_RATES` now charges. The fee
+  // literals are per language (each catalogue uses its own number formatting),
+  // and the ordered sequence is what proves the bands are listed, not just
+  // present somewhere in the sentence.
+  expect(EN['coverageLimitation.probateFees']).not.toMatch(/\(AB, PE, NL, NS, NB\)/)
+  // Each moved row renders its own rule, in every language: the whole printed
+  // ladder in that language's number formatting, the instrument's name, and a
+  // plain statement that no band is approximated.
+  const ROWS = {
+    AB: { en: /\$35.*\$135.*\$275.*\$400.*\$525/, fr: /35 \$.*135 \$.*400 \$.*525 \$/,
+      zh: /35 加元.*135 加元.*400 加元.*525 加元/, authority: /Surrogate Rules/ },
+    NS: { en: /\$85\.60.*\$215\.20.*\$358\.15.*\$1002\.65.*\$16\.95/,
+      fr: /85,60 \$.*215,20 \$.*358,15 \$.*1002,65 \$.*16,95 \$/,
+      zh: /85\.60 加元.*215\.20 加元.*358\.15 加元.*1002\.65 加元.*16\.95 加元/,
+      authority: /Probate Act/ },
+    PE: { en: /\$50.*\$100.*\$200.*\$400.*\$4 for each \$1,000/,
+      fr: /50 \$.*100 \$.*200 \$.*400 \$.*4 \$ par tranche/,
+      zh: /50 加元.*100 加元.*200 加元.*400 加元.*4 加元/, authority: /Probate Act/ },
+  }
+  const NO_APPROX = { en: /none is approximated/, fr: /aucun n’est approximé/, zh: /未作任何近似处理/ }
+  for (const [province, row] of Object.entries(ROWS)) {
+    const key = `coverageLimitation.probateFees${province}`
+    for (const lang of ['en', 'fr', 'zh'] as const) {
+      const text = lang === 'en' ? EN[key] : lang === 'fr' ? FR[key] : ZH[key]
+      expect(text, `${lang} ${key}`).toMatch(row[lang])
+      expect(text, `${lang} ${key} approximates nothing`).toMatch(NO_APPROX[lang])
+      if (lang !== 'en') expect(text, `${lang} ${key} is not English`).not.toBe(EN[key])
+    }
+    expect(EN[key], `${province} names its own instrument`).toMatch(row.authority)
+  }
+  expect(EN['coverageLimitation.probateFees']).toMatch(/\(NL, NB\)/)
+  expect(EN['coverageLimitation.probateFeesMB']).toMatch(/\(NL, NB\)/)
   expect(EN['coverageLimitation.provincialAgeAmount']).toMatch(/Pinned 2026 figures/)
 })
 
