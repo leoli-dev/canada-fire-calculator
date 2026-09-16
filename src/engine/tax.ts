@@ -335,10 +335,14 @@ export function qcRamqPremium(income: number): number {
 /**
  * Probate / estate administration fee on probatable assets — see taxData.ts.
  *
- * Three published shapes:
+ * Four published shapes:
  *  - a step ladder (NT, NU): `bands` carries every rung up to the top tier's
  *    boundary, and the first rung that reaches the value is the printed fee;
- *  - a flat amount plus a rate on the excess over `threshold` (ON, BC, SK, NS,
+ *  - two marginal tiers (BC): `baseRate` prices the excess over `baseUpTo` up to
+ *    `threshold`, `rate` the excess over `threshold` — the Act's $6-per-$1,000
+ *    band then its $14-per-$1,000 tier, with `flat` the lower tier's accumulated
+ *    amount at the boundary;
+ *  - a flat amount plus a rate on the excess over `threshold` (ON, SK, NS,
  *    NB, PE, NL), where a value at or below the threshold owes the flat amount
  *    alone;
  *  - a flat amount with no rate at all, which is unconditional where the table
@@ -350,14 +354,26 @@ export function qcRamqPremium(income: number): number {
  *    exemption rather than a charge on the first dollar.
  *
  * Because `bands` ends exactly on `threshold`, a laddered jurisdiction's top
- * tier is the straight-line branch below.
+ * tier is the straight-line branch below. `surcharge` (BC alone) is a second
+ * instrument's fixed amount, payable from `baseUpTo` and added on top of the
+ * branch that prices the value, never inside the published exemption.
  */
 export function probateTax(value: number, province: Province): number {
   if (value <= 0) return 0
-  const { flat, rate, threshold, bands } = PROBATE_RATES[province]
+  const { flat, rate, threshold, bands, surcharge = 0, baseRate, baseUpTo } = PROBATE_RATES[province]
   if (bands) for (const band of bands) if (value <= band.upTo) return band.fee
   if (rate === 0 && value <= threshold) return 0
-  return flat + rate * Math.max(0, value - threshold)
+  // A second, lower marginal tier (BC's Act charges $6 per $1,000 over $25,000
+  // up to $50,000, then $14 above). `flat` is the tier-1 amount accumulated at
+  // `threshold`, so this branch is the tier-1 rate on the excess over `baseUpTo`
+  // and meets the branch below exactly at the boundary. `surcharge` is the
+  // second instrument's filing fee, payable from `baseUpTo`, so it is inside the
+  // expression and never reaches the published exemption below it.
+  if (baseRate !== undefined && baseUpTo !== undefined) {
+    if (value <= baseUpTo) return 0
+    if (value <= threshold) return surcharge + baseRate * (value - baseUpTo)
+  }
+  return surcharge + flat + rate * Math.max(0, value - threshold)
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */
