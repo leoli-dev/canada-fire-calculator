@@ -335,28 +335,19 @@ export function qcRamqPremium(income: number): number {
 /**
  * Probate / estate administration fee on probatable assets — see taxData.ts.
  *
- * Four published shapes:
- *  - a step ladder (NT, NU): `bands` carries every rung up to the top tier's
- *    boundary, and the first rung that reaches the value is the printed fee;
- *  - two marginal tiers (BC): `baseRate` prices the excess over `baseUpTo` up to
- *    `threshold`, `rate` the excess over `threshold` — the Act's $6-per-$1,000
- *    band then its $14-per-$1,000 tier, with `flat` the lower tier's accumulated
- *    amount at the boundary;
- *  - a flat amount plus a rate on the excess over `threshold` (ON, SK, NS,
- *    NB, PE, NL), where a value at or below the threshold owes the flat amount
- *    alone;
- *  - a flat amount with no rate at all, which is unconditional where the table
- *    prints no boundary (AB, QC — `threshold` 0) and a *step* where it does:
- *    YT owes nothing until the value exceeds $25,000 and $140 above it
- *    (Supreme Court Rules, Appendix C, Schedule 1, item 11: "No fee is payable
- *    ... where a person dies leaving an estate not exceeding $25,000 in
- *    value"). A rate of 0 with a published boundary means the flat amount is an
- *    exemption rather than a charge on the first dollar.
+ * Five published shapes:
+ *  - a step ladder (AB, NT, NU): `bands` carries every printed rung;
+ *  - a step ladder then a marginal rate (NS, PE): the same `bands`, then `flat`
+ *    (the last printed rung) plus `rate` over `threshold`;
+ *  - two marginal tiers (BC): `baseRate` over `baseUpTo` to `threshold`, then
+ *    `rate`, with `flat` the lower tier's accumulated amount at the boundary;
+ *  - a flat amount plus a rate over `threshold` (ON, SK, NB, NL);
+ *  - a flat amount with no rate (QC) and a *step* where a boundary is printed
+ *    with no rate (YT: nothing to $25,000, $140 above).
  *
- * Because `bands` ends exactly on `threshold`, a laddered jurisdiction's top
- * tier is the straight-line branch below. `surcharge` (BC alone) is a second
- * instrument's fixed amount, payable from `baseUpTo` and added on top of the
- * branch that prices the value, never inside the published exemption.
+ * `bands` is checked before any rate branch, so a ladder's printed rungs win
+ * inside it. `surcharge` (BC alone) is a second instrument's fixed amount,
+ * payable from `baseUpTo` and never inside the published exemption.
  */
 export function probateTax(value: number, province: Province): number {
   if (value <= 0) return 0

@@ -220,15 +220,21 @@ export const QC_FSS = { t1: 18500, t2: 64355, cap1: 150, cap2: 1000 }
 export const QC_RAMQ = { threshold: 20288, band1: 5000, rate1: 0.0784, rate2: 0.1176, max: 770 }
 
 /** One rung of a published probate step ladder: the fee that applies while the
- * probatable value is at most `upTo` (and above the preceding rung's `upTo`). */
+ * probatable value is at most `upTo` (and above the preceding rung's `upTo`).
+ * `bands` carries the rungs *below* the top tier, ascending, ending exactly on
+ * `threshold`; where the published schedule then continues as a rate (NS, PE)
+ * the `upTo` that closes the ladder is also the boundary the rate starts at. */
 export interface ProbateBand {
   upTo: number
   fee: number
 }
-/** A jurisdiction's published probate fee. `bands` is a step ladder (NT, NU);
- * every other row is `flat + rate * max(0, value − threshold)`. A row whose
- * priced value is a step function with one boundary (YT) still has that shape:
- * the boundary is `threshold`, the fee is `flat` and the step carries no rate.
+/** A jurisdiction's published probate fee. `bands` is a step ladder (AB, NT,
+ * NU) and takes precedence over everything below it; a row that is a step
+ * ladder *followed by* a marginal rate (NS, PE) carries both, with `flat` the
+ * last printed rung and `rate` the published amount per dollar above
+ * `threshold`. A row whose priced value is a step function with one boundary
+ * (YT) still has the flat-plus-rate shape with `rate: 0`: the boundary is
+ * `threshold`, the fee is `flat` and the step carries no rate.
  * `baseRate`/`baseUpTo` add a *second* marginal tier below `threshold` (BC
  * alone), where the published fee is a rate on the excess over one boundary up
  * to a second one rather than a single flat-plus-rate. */
@@ -263,9 +269,9 @@ export interface ProbateRate {
  * (non-registered account, unsold real estate). Registered accounts
  * (RRSP/RRIF/TFSA) bypass probate via named beneficiary designation — the norm
  * in Canada — so they're excluded from the base. 2026 figures (taxtips.ca,
- * current as of 2026-01-25); small provinces with multiple tiers below their
- * main rate (AB, PE, NL, NS, NB) are simplified to a single flat+rate matching
- * the top tier — immaterial for the sizeable estates this calculator projects.
+ * current as of 2026-01-25). BE-38 B4 left NL and NB the only two rows still
+ * simplified to a single flat + rate matching the top tier; every other row in
+ * this table now prices the schedule its own instrument prints, band by band.
  *
  * BE-38 B4: NT and NU are no longer priced from Yukon's $140 filing fee. Each
  * is priced from the *full* ladder its own regulation prints, and each row in
@@ -305,6 +311,15 @@ export interface ProbateRate {
  * instruments above (the Probate Fee Act and the Supreme Court Civil Rules'
  * Appendix C, Schedule 1, item 1), and the coverage row cites the Act that
  * carries the priced figures. Every other province remains as before.
+ *
+ * BE-38 B4 (the AB/NS/PE defect this slice prices): each of these three rows
+ * was a top-tier-only approximation charged from the first dollar — a $10,000
+ * estate paid AB $525 against $35, NS $1,003 against $85.60 and PE $400 against
+ * $50. Each now prices its own instrument's ladder band by band: AB's Surrogate
+ * Rules, Alta. Reg. 130/95, Sch. 2 item 1(1) (a step ladder); NS's Probate Act,
+ * R.S.N.S. 1989, c. 359, s. 87(2) and PE's Probate Act, R.S.P.E.I. 1974,
+ * c. P-21, s. 119.1(4) (four printed rungs to $100,000 then a printed rate).
+ * Every figure is recorded in `coverageMatrix.ts`'s content-verified registry.
  */
 export const PROBATE_RATES: Record<Province, ProbateRate> = {
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
@@ -335,13 +350,47 @@ export const PROBATE_RATES: Record<Province, ProbateRate> = {
     flat: 150, rate: 14 / 1000, threshold: 50_000, surcharge: 200,
     baseRate: 6 / 1000, baseUpTo: 25_000,
   },
-  AB: { flat: 525, rate: 0, threshold: 0 },
+  // Surrogate Rules, Alta. Reg. 130/95, Schedule 2, item 1(1) — the net value of
+  // property in Alberta, five printed rungs ending at "over $250 000 $525".
+  // The row this replaced was `flat: 525, rate: 0, threshold: 0`, which charged
+  // the top tier from the first dollar: `probateTax(10_000, 'AB')` was $525
+  // against item 1(1)(a)'s "$10 000 or under $35".
+  AB: {
+    flat: 525, rate: 0, threshold: 250_000,
+    bands: [
+      { upTo: 10_000, fee: 35 }, { upTo: 25_000, fee: 135 },
+      { upTo: 125_000, fee: 275 }, { upTo: 250_000, fee: 400 },
+    ],
+  },
   QC: { flat: 243, rate: 0, threshold: 0 }, // court will-verification fee
   MB: { flat: 0, rate: 0, threshold: 0 }, // abolished November 2020
   SK: { flat: 200, rate: 0.007, threshold: 0 },
-  NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, // highest in Canada
+  // Probate Act, R.S.N.S. 1989, c. 359, s. 87(2): four printed rungs up to
+  // $100,000, then "$1002.65 plus an additional $16.95 for every $1,000 ...
+  // in excess of $100,000". The rungs meet the rate exactly at the boundary, so
+  // `flat` is s. 87(2)(d)'s $1002.65 and the four rungs are `bands`. The row this
+  // replaced was `flat: 1003, rate: 0.01695, threshold: 100000`, which charged
+  // $1,003 on a $10,000 estate that s. 87(2)(a) prices at $85.60.
+  NS: {
+    flat: 1002.65, rate: 0.01695, threshold: 100_000,
+    bands: [
+      { upTo: 10_000, fee: 85.6 }, { upTo: 25_000, fee: 215.2 },
+      { upTo: 50_000, fee: 358.15 }, { upTo: 100_000, fee: 1002.65 },
+    ],
+  },
   NB: { flat: 100, rate: 0.005, threshold: 20000 },
-  PE: { flat: 400, rate: 0.004, threshold: 100000 },
+  // Probate Act, R.S.P.E.I. 1974, c. P-21, s. 119.1(4): four printed rungs up
+  // to $100,000, then "$400 plus $4 for each $1,000 or fraction thereof in
+  // excess of $100,000". Same shape as NS. The row this replaced was
+  // `flat: 400, rate: 0.004, threshold: 100000`, which charged $400 on a
+  // $10,000 estate that s. 119.1(4) prices at $50.
+  PE: {
+    flat: 400, rate: 0.004, threshold: 100_000,
+    bands: [
+      { upTo: 10_000, fee: 50 }, { upTo: 25_000, fee: 100 },
+      { upTo: 50_000, fee: 200 }, { upTo: 100_000, fee: 400 },
+    ],
+  },
   NL: { flat: 60, rate: 0.006, threshold: 1000 },
   // Supreme Court Rules, Appendix C, Schedule 1, item 11: $140 for every grant
   // of probate and administration, and *no fee* where the estate does not exceed

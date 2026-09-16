@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCKED_SOURCES, CONTENT_VERIFIED_AUTHORITIES, COVERAGE_JURISDICTIONS, coverageFor,
-  coverageLimitationIds, coverageMatrix, coverageSummary, evidenceFixtureIds, matrixJurisdictions,
-  rowAuthorities,
+  BLOCKED_SOURCES, CONTENT_VERIFIED_AUTHORITIES, COVERAGE_JURISDICTIONS, LIVE_PROBED_CITATIONS,
+  coverageFor, coverageLimitationIds, coverageMatrix, coverageSummary, evidenceFixtureIds,
+  matrixJurisdictions, rowAuthorities,
 } from '../coverageMatrix'
 import type { ImplementedCreditCoverage } from '../coverageMatrix'
 import { PLAN_TAX_YEAR, incomeTax, probateTax, qcFssContribution, qcRamqPremium } from '../../tax'
@@ -115,64 +115,119 @@ const PROBATE_HAND: Record<string, { flat: number; rate: number; threshold: numb
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
   // BC is priced from the BC ladder block below rather than here: its rule is
   // the Act's two bands plus the Court Rules' filing fee, not a flat-plus-rate.
-  AB: { flat: 525, rate: 0, threshold: 0 }, QC: { flat: 243, rate: 0, threshold: 0 },
+  // BE-38 B4 moved AB, NS and PE to `PROBATE_LADDER` for the same reason: each
+  // is a printed step ladder (NS and PE then a marginal rate above it), so a
+  // flat-plus-rate entry here would re-encode the approximation this slice
+  // replaced. QC stays — one unconditional court fee — and MB is the abolished
+  // zero.
+  QC: { flat: 243, rate: 0, threshold: 0 },
   MB: { flat: 0, rate: 0, threshold: 0 }, SK: { flat: 200, rate: 0.007, threshold: 0 },
-  NS: { flat: 1003, rate: 0.01695, threshold: 100000 }, NB: { flat: 100, rate: 0.005, threshold: 20000 },
-  PE: { flat: 400, rate: 0.004, threshold: 100000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
+  NB: { flat: 100, rate: 0.005, threshold: 20000 }, NL: { flat: 60, rate: 0.006, threshold: 1000 },
   YT: { flat: 140, rate: 0, threshold: 25000 },
 }
 /**
- * BE-38 B4 review N2: the full five-band ladder each territory's own regulation
- * prints, hand-keyed from the documents themselves — including the boundary
- * wording, so the expectation for the sub-boundary domain comes from the
- * instrument rather than from the engine's own branch. The review found the
- * previous `handProbate` re-encoded that branch (`rate === 0 && value <=
- * threshold → 0`), which is how the missing bands passed review-grade tests.
- * The rungs are exactly what the two instruments print:
- *   - NT: Court Services Fees Regulations R-120-93, Part 2, item 1(a)–(e),
- *     `judicature.r10.pdf` page 8:
- *     "$10,000 or under $30" · "more than $10,000 but not more than $25,000
- *     $110" · "more than $25,000 but not more than $125,000 $215" · "more than
- *     $125,000 but not more than $250,000 $325" · "more than $250,000 $435".
- *   - NU: Court Fees Regulations C.R.Nu. R-042-2021 (in force 2021-09-28),
- *     Schedule C (s. 4) item 5 TABLE, `public/7022` page 11: the same four
- *     lower rungs and "$425" above $250,000. The capitalization follows each
- *     document; `Infinity` closes the top band.
+ * The full ladder each jurisdiction's own instrument prints, hand-keyed with
+ * every rung's fee and boundary wording. The three moved rows come from
+ * `LADDERS`; NT/NU stay here. The expectations are independent of
+ * `PROBATE_RATES`.
  */
-const PROBATE_LADDER: Partial<Record<string, readonly { upTo: number; fee: number; phrase: string }[]>> = {
-  NT: [
-    { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
-    { upTo: 25_000, fee: 110, phrase: 'more than $10,000 but not more than $25,000' },
-    { upTo: 125_000, fee: 215, phrase: 'more than $25,000 but not more than $125,000' },
-    { upTo: 250_000, fee: 325, phrase: 'more than $125,000 but not more than $250,000' },
-    { upTo: Infinity, fee: 435, phrase: 'more than $250,000' },
-  ],
-  NU: [
-    { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
-    { upTo: 25_000, fee: 110, phrase: 'More than $10,000 but not more than $25,000' },
-    { upTo: 125_000, fee: 215, phrase: 'More than $25,000 but not more than $125,000' },
-    { upTo: 250_000, fee: 325, phrase: 'More than $125,000 but not more than $250,000' },
-    { upTo: Infinity, fee: 425, phrase: 'More than $250,000' },
-  ],
+/**
+ * BE-38 B4 (the AB/NS/PE defect): per moved jurisdiction, the instrument, its
+ * ladder rungs with the document's boundary wording, the figures as printed (so
+ * "$85.60" is not compared through the number `85.6`), and the per-$1,000 rate
+ * above the last rung. `sourceURL`, fixtures and expectations all derive from
+ * this entry, so citation, ladder and priced value cannot drift apart. PEI's
+ * *landing page* is the Radware-gated `BLOCKED_SOURCES` entry; the PDF is not.
+ */
+const LADDERS = {
+  AB: {
+    instrument: 'https://kings-printer.alberta.ca/documents/Regs/1995_130.pdf',
+    literal: ['$35', '$135', '$275', '$400', '$525'],
+    rate: 0, rateLiteral: 0,
+    rungs: [
+      { upTo: 10_000, fee: 35, phrase: '$10 000 or under' },
+      { upTo: 25_000, fee: 135, phrase: 'over $10 000 but not more than $25 000' },
+      { upTo: 125_000, fee: 275, phrase: 'over $25 000 but not more than $125 000' },
+      { upTo: 250_000, fee: 400, phrase: 'over $125 000 but not more than $250 000' },
+      { upTo: Infinity, fee: 525, phrase: 'over $250 000' },
+    ],
+  },
+  NS: {
+    instrument: 'https://nslegislature.ca/sites/default/files/legc/statutes/probate.pdf',
+    literal: ['$85.60', '$215.20', '$358.15', '$1002.65'],
+    rate: 16.95 / 1_000, rateLiteral: 16.95,
+    rungs: [
+      { upTo: 10_000, fee: 85.6, phrase: 'in estates not exceeding $10,000' },
+      { upTo: 25_000, fee: 215.2, phrase: 'in estates exceeding $10,000 but not exceeding $25,000' },
+      { upTo: 50_000, fee: 358.15, phrase: 'in estates exceeding $25,000 but not exceeding $50,000' },
+      { upTo: 100_000, fee: 1002.65, phrase: 'in estates exceeding $50,000 but not exceeding $100,000' },
+      { upTo: Infinity, fee: 1002.65, phrase: 'in estates exceeding $100,000' },
+    ],
+  },
+  PE: {
+    instrument: 'https://www.princeedwardisland.ca/sites/default/files/legislation/p-21-probate_act.pdf',
+    literal: ['$50', '$100', '$200', '$400'],
+    rate: 4 / 1_000, rateLiteral: 4,
+    rungs: [
+      { upTo: 10_000, fee: 50, phrase: 'up to $10,000' },
+      { upTo: 25_000, fee: 100, phrase: '$10,001 to $25,000' },
+      { upTo: 50_000, fee: 200, phrase: '$25,001 to $50,000' },
+      { upTo: 100_000, fee: 400, phrase: '$50,001 to $100,000' },
+      { upTo: Infinity, fee: 400, phrase: 'exceeding $100,000' },
+    ],
+  },
+} as const
+
+const PROBATE_LADDER: Partial<Record<string, {
+  rungs: readonly { upTo: number; fee: number; phrase: string }[]
+  rate: number
+  rateLiteral: number
+}>> = {
+  // The three moved rows come from `LADDERS`, so the independent expectations and
+  // the citation fixtures are the same hand-keyed figures. NT/NU stay here.
+  ...Object.fromEntries(Object.entries(LADDERS).map(([province, entry]) =>
+    [province, { rungs: entry.rungs, rate: entry.rate, rateLiteral: entry.rateLiteral }])),
+  NT: {
+    rungs: [
+      { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
+      { upTo: 25_000, fee: 110, phrase: 'more than $10,000 but not more than $25,000' },
+      { upTo: 125_000, fee: 215, phrase: 'more than $25,000 but not more than $125,000' },
+      { upTo: 250_000, fee: 325, phrase: 'more than $125,000 but not more than $250,000' },
+      { upTo: Infinity, fee: 435, phrase: 'more than $250,000' },
+    ],
+    rate: 0, rateLiteral: 0,
+  },
+  NU: {
+    rungs: [
+      { upTo: 10_000, fee: 30, phrase: '$10,000 or under' },
+      { upTo: 25_000, fee: 110, phrase: 'More than $10,000 but not more than $25,000' },
+      { upTo: 125_000, fee: 215, phrase: 'More than $25,000 but not more than $125,000' },
+      { upTo: 250_000, fee: 325, phrase: 'More than $125,000 but not more than $250,000' },
+      { upTo: Infinity, fee: 425, phrase: 'More than $250,000' },
+    ],
+    rate: 0, rateLiteral: 0,
+  },
 }
-/** The hand formula the probate pins are read against, kept separate from
+/**
+ * The hand formula the probate pins are read against, kept separate from
  * `probateTax` so the expectation is the *published* rule rather than a
- * line-for-line copy of the implementation. YT is here rather than in
- * `PROBATE_LADDER` because its authority prints a step with no ladder: no fee
- * up to and including $25,000, $140 above it (Supreme Court Rules, Appendix C,
- * Schedule 1, item 11 — "No fee is payable ... where a person dies leaving an
- * estate not exceeding $25,000 in value", and $140 for every grant or ancillary
- * grant of probate and administration). A laddered jurisdiction (NT, NU) is
- * priced from `PROBATE_LADDER`, read off its own instrument. */
+ * line-for-line copy. YT is a step with no ladder (no fee to $25,000, $140
+ * above it); a laddered jurisdiction (AB, NS, PE, NT, NU) comes from
+ * `PROBATE_LADDER`, and NS/PE add that printed rate over the last closed rung.
+ */
 function handProbate(province: string, value: number): number {
   const ladder = PROBATE_LADDER[province]
   if (ladder) {
-    for (const rung of ladder) if (value <= rung.upTo) return rung.fee
+    if (value <= 0) return 0
+    // `rungs` is [closed ..., closed, open]: inside a closed rung the printed fee
+    // applies unchanged, past the last one the printed rate is added to `top`.
+    const closed = ladder.rungs.slice(0, -1)
+    const top = ladder.rungs[ladder.rungs.length - 1].fee
+    for (const rung of closed) if (value <= rung.upTo) return rung.fee
+    const boundary = closed[closed.length - 1].upTo
+    return top + ladder.rate * (value - boundary)
   }
-  // YT's published wording is a step, not the general flat-plus-rate: item 11
-  // is "$0 where the estate does not exceed $25,000" and "$140 above it", so the
-  // expectation is spelled out from the sentence rather than from the shape the
-  // engine stores.
+  // YT's wording is a step, spelled out from the sentence rather than the shape.
   if (province === 'YT') {
     if (value <= 0) return 0
     return value > 25_000 ? 140 : 0
@@ -259,6 +314,13 @@ const FIXTURE_SOURCES: Record<string, string> = {
  * old TaxTips.ca-table fixture was the approximation this slice replaced. The
  * Court Rules item carrying the additional $200 filing fee is asserted
  * separately, so a fixture cannot stand in for a figure its own document lacks.
+ *
+ * BE-38 B4 (the AB/NS/PE defect): AB, NS and PE are the last three rows to
+ * stop pricing from a TaxTips.ca table. Each row's fixture is now its own
+ * instrument's full band ladder (Surrogate Rules Schedule 2; Probate Act
+ * s. 87(2); Probate Act s. 119.1(4)), which is also the row's `sourceURL`, so a
+ * fixture cannot stand in for a figure its own document lacks. Only NL and NB
+ * still carry `PROBATE_TABLE`, and neither is a ladder.
  */
 const PROBATE_TABLE = (province: string) =>
   `https://www.taxtips.ca/willsandestates/probatefees/${province.toLowerCase()}.htm`
@@ -315,13 +377,17 @@ const bcTop = (excess: number) => (BC_TOP_RATE / 1_000) * excess
  * $50,000", with an estate of $50,000 or less exempt. The old `90e22` citation
  * prints neither figure. */
 const ON_PROBATE_STATUTE = 'https://www.ontario.ca/laws/statute/98e34'
+
 for (const province of PROVINCES) {
   FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`] =
     province === 'ON' ? ON_PROBATE_STATUTE
       : province === 'BC' ? BC_PROBATE_ACT
         : province === 'YT' ? YT_PROBATE
           : province === 'NT' ? NT_PROBATE
-            : province === 'NU' ? NU_PROBATE : PROBATE_TABLE(province)
+            : province === 'NU' ? NU_PROBATE
+              : province === 'AB' ? LADDERS.AB.instrument
+                : province === 'NS' ? LADDERS.NS.instrument
+                  : province === 'PE' ? LADDERS.PE.instrument : PROBATE_TABLE(province)
 }
 for (const province of PROVINCES) {
   if (province === 'QC') continue
@@ -990,6 +1056,19 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
         expect(row.verifiedAt, `${province} checked date`).toBe(
           CONTENT_VERIFIED_AUTHORITIES[province === 'NT' ? NT_PROBATE : NU_PROBATE].checkedOn)
         expect(row.limitationId, province).toBe(province === 'NT' ? 'probateFeesApproxNT' : 'probateFeesApproxNU')
+      } else if (province === 'AB' || province === 'NS' || province === 'PE') {
+        // BE-38 B4 (the AB/NS/PE defect): each of these three rows used to cite
+        // its TaxTips.ca table for a single top-tier flat amount. Each now cites
+        // its own instrument's band ladder — the document that prints the exact
+        // fees `taxData.ts` charges, first rung included — and is content-checked
+        // against it, so dropping a band from the registry fails the ladder test.
+        expect(row.sourceURL, `${province} cites its own instrument`).toBe(
+          province === 'AB' ? LADDERS.AB.instrument : province === 'NS' ? LADDERS.NS.instrument : LADDERS.PE.instrument)
+        expect(urls, `${province} also lists its TaxTips.ca table`).toContain(table(province))
+        expect(row.contentChecked, `${province} probate must be content-checked`).toBe(true)
+        expect(row.verifiedAt, `${province} checked date`).toBe(
+          CONTENT_VERIFIED_AUTHORITIES[row.sourceURL].checkedOn)
+        expect(row.limitationId, `${province} names its own limitation`).toBe(`probateFees${province}`)
       } else if (province === 'YT') {
         // BE-38 B4 follow-up: YT used to cite its TaxTips.ca table for an
         // unconditional $140, which is not what the cited rule prints. It now
@@ -1018,7 +1097,10 @@ describe('BE-38 B3 review: every declared status is verified against the pricing
         expect(row.limitationId, 'BC names its own limitation').toBe('probateFeesBC')
       } else {
         expect(row.sourceURL, province).toBe(table(province))
-        expect(row.limitationId, province).toBe(province === 'MB' ? 'probateFeesMB' : 'probateFees')
+        // BE-38 B4 follow-up: NB is the one table row with its own limitation,
+        // because it prices a schedule repealed in 2026 and must disclose it.
+        expect(row.limitationId, province)
+          .toBe(province === 'MB' ? 'probateFeesMB' : province === 'NB' ? 'probateFeesNB' : 'probateFees')
       }
       expect(row.limitationId, `${province} names the table`).toBeTruthy()
     }
@@ -1043,7 +1125,7 @@ describe('BE-38 B4: the territories are priced from their own published fees', (
     // BE-38 B4 review B1: the priced value is the instrument's own ladder, not
     // its top tier alone. A missing or one-rung-shifted band fails here.
     for (const province of TERRITORIES) {
-      const ladder = PROBATE_LADDER[province]!
+      const ladder = PROBATE_LADDER[province]!.rungs
       expect(ladder.map(rung => [rung.upTo, rung.fee])).toEqual([
         [10_000, 30], [25_000, 110], [125_000, 215], [250_000, 325], [Infinity, TOP_TIER[province]],
       ])
@@ -1092,7 +1174,8 @@ describe('BE-38 B4: the territories are priced from their own published fees', (
       const record = CONTENT_VERIFIED_AUTHORITIES[row.sourceURL]
       expect(record, `${province} cited authority must be content-checked`).toBeDefined()
       expect(record.checkedOn, `${province} checked date`).toBe(row.verifiedAt)
-      const ladder = PROBATE_LADDER[province]!
+      const ladder = PROBATE_LADDER[province]!.rungs
+      // The record carries the five printed fees, the open top rung included.
       const pricedFees = ladder.map(rung => `$${rung.fee}`)
       expect(record.checkedFigures.filter(figure => /^\$[\d,]+$/.test(figure)),
         `${province} citation must carry exactly the priced ladder`).toEqual(pricedFees)
@@ -1189,20 +1272,21 @@ describe('BE-38 B4 follow-up: Yukon is priced from its own fee schedule, not an 
   })
 
   it('moves YT alone: every other jurisdiction\'s probate keeps its published value', () => {
-    // The confinement control. ON, AB, QC, SK, NS, NB, PE, NL and MB keep
-    // exactly the values the build charged before this slice, keyed here from
-    // their own authorities rather than from `PROBATE_RATES`, so a change that
-    // leaks into another province fails. NT/NU are covered by their own ladder
-    // suite above and are asserted non-zero here to prove the two shapes still
-    // coexist.
+    // The confinement control. ON, QC, MB, SK, NB and NL keep exactly the values
+    // the build charged before this slice, keyed here from their own authorities
+    // rather than from `PROBATE_RATES`, so a change that leaks into another
+    // province fails. NT/NU are covered by their own ladder suite above and are
+    // asserted non-zero here to prove the shapes still coexist. AB, NS and PE
+    // are *not* in this list: they moved in this slice and are pinned band by
+    // band in their own suite below.
     const CONTROL: Record<string, number> = {
       ON: (1_000_000 - 50_000) * 0.015,
       // BE-38 B4 moved BC: its published total is the Act's ladder plus the
       // Court Rules' $200 filing fee, not the old flat $200 + 1.4%.
       BC: BC_FILING_FEE + bcBand1(50_000 - 25_000) + bcTop(1_000_000 - 50_000),
-      AB: 525, QC: 243, MB: 0, SK: 200 + 0.007 * 1_000_000,
-      NS: 1003 + 0.01695 * (1_000_000 - 100_000), NB: 100 + 0.005 * (1_000_000 - 20_000),
-      PE: 400 + 0.004 * (1_000_000 - 100_000), NL: 60 + 0.006 * (1_000_000 - 1_000),
+      QC: 243, MB: 0, SK: 200 + 0.007 * 1_000_000,
+      NB: 100 + 0.005 * (1_000_000 - 20_000),
+      NL: 60 + 0.006 * (1_000_000 - 1_000),
     }
     for (const [province, expected] of Object.entries(CONTROL))
       expect(probateTax(1_000_000, province as Province), `${province} probate`).toBeCloseTo(expected, 6)
@@ -1215,20 +1299,23 @@ describe('BE-38 B4 follow-up: Yukon is priced from its own fee schedule, not an 
     // published ladder and the Court Rules' filing fee, asserted in its own
     // suite below, so only the boundary it shares with ON is pinned here.
     expect(PROBATE_RATES.BC.threshold).toBe(50_000)
-    expect(PROBATE_RATES.AB).toEqual({ flat: 525, rate: 0, threshold: 0 })
-    expect(PROBATE_RATES.QC).toEqual({ flat: 243, rate: 0, threshold: 0 })
-    expect(PROBATE_RATES.MB).toEqual({ flat: 0, rate: 0, threshold: 0 })
-    // The three no-rate shapes still coexist: AB's and QC's flat amounts are
-    // unconditional (charged on the first dollar, as their own tables print),
-    // MB's is exactly zero, and YT's alone is a step above its exemption. A
-    // change that turned YT's boundary into a general "rate 0 ⇒ free below
-    // threshold" rule would zero AB and QC here.
-    expect(probateTax(1, 'AB')).toBe(525)
+    // The three no-rate shapes still coexist: QC's flat amount is unconditional
+    // (charged on the first dollar, as its own table prints), MB's is exactly
+    // zero, and YT's alone is a step above its exemption. A change that turned
+    // YT's boundary into a general "rate 0 ⇒ free below threshold" rule would
+    // zero QC here. AB used to be the second unconditional flat pin; it is now a
+    // ladder, so its first-dollar value is pinned in its own suite instead.
     expect(probateTax(1, 'QC')).toBe(243)
     expect(probateTax(1, 'MB')).toBe(0)
     expect(probateTax(1, 'YT')).toBe(0)
-    expect(probateTax(1_000_000, 'AB')).toBe(525)
     expect(probateTax(1_000_000, 'QC')).toBe(243)
+    // QC is now the only row in the table with an unconditional *non-zero* flat
+    // fee; MB is the other `rate: 0, threshold: 0` row and is exactly zero by
+    // abolition. AB used to be the third, and is a ladder now.
+    expect(PROVINCES.filter(province => {
+      const rule = PROBATE_RATES[province]
+      return rule.rate === 0 && rule.threshold === 0 && rule.bands === undefined && rule.flat > 0
+    })).toEqual(['QC'])
   })
 })
 
@@ -1358,6 +1445,10 @@ describe('BE-38 B4: British Columbia is priced from the Probate Fee Act and the 
     // own ladder tops and the remaining flat rows are the values the build
     // charged before this slice — keyed from their own authorities, not from
     // `PROBATE_RATES` — so a change that leaked into another province fails.
+    // AB and NS are asserted at $1M too, but on their *new* published top tiers
+    // (Surrogate Rules item 1(1)(e) $525; Probate Act s. 87(2)(e) $1002.65 +
+    // $16.95 per $1,000), which is the same value the old approximation happened
+    // to reach there — this slice moved their lower bands, not their top tier.
     expect(probateTax(1_000_000, 'ON')).toBeCloseTo((1_000_000 - 50_000) * 0.015, 6)
     expect(PROBATE_RATES.ON).toEqual({ flat: 0, rate: 0.015, threshold: 50_000 })
     expect(probateTax(1_000_000, 'NT')).toBe(435)
@@ -1365,7 +1456,7 @@ describe('BE-38 B4: British Columbia is priced from the Probate Fee Act and the 
     expect(probateTax(1_000_000, 'YT')).toBe(140)
     expect(probateTax(1_000_000, 'AB')).toBe(525)
     expect(probateTax(1_000_000, 'QC')).toBe(243)
-    expect(probateTax(1_000_000, 'NS')).toBeCloseTo(1003 + 0.01695 * (1_000_000 - 100_000), 6)
+    expect(probateTax(1_000_000, 'NS')).toBeCloseTo(1002.65 + 0.01695 * (1_000_000 - 100_000), 6)
     expect(PROBATE_RATES.BC, 'only BC gained a second tier').toHaveProperty('baseRate')
     expect(PROBATE_RATES.BC, 'only BC gained a filing-fee surcharge').toHaveProperty('surcharge')
     for (const province of ['ON', 'AB', 'QC', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU'] as Province[]) {
@@ -1571,15 +1662,39 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
       // BE-38 B4 (BC): the Act, the Court Rules filing-fee item, and the table
       // the row still lists as an additional source.
       BC_PROBATE_ACT, BC_COURT_FEES, PROBATE_TABLE('BC'),
+      // BE-38 B4 (AB/NS/PE): each moved row's own band-ladder instrument and the
+      // TaxTips.ca table it still lists as an additional source.
+      LADDERS.AB.instrument, LADDERS.NS.instrument, LADDERS.PE.instrument,
+      PROBATE_TABLE('AB'), PROBATE_TABLE('NS'), PROBATE_TABLE('PE'),
     ].sort())
-    expect(cited.size).toBe(56)
-    expect(verified.size).toBe(15)
-    expect(merelyListed.size).toBe(41)
+    expect(cited.size).toBe(59)
+    expect(verified.size).toBe(21)
+    expect(merelyListed.size).toBe(38)
     expect(verified.size + merelyListed.size).toBe(cited.size)
     expect(CONTENT_VERIFIED_AUTHORITIES[PE_2026_JULY].checkedFigures).toContain('142,520')
     expect(CONTENT_VERIFIED_AUTHORITIES[BC_2026_JULY].checkedFigures.join(' ')).toMatch(/5\.60/)
     expect(CONTENT_VERIFIED_AUTHORITIES[NL_2026_JULY].checkedFigures.join(' ')).toMatch(/13,094/)
     expect(CONTENT_VERIFIED_AUTHORITIES[CFFP_GUIDE].checkedFigures.join(' ')).toMatch(/19 890/)
+  })
+
+  it('requires a recorded HTTP 200 probe for every citation rendered as content-checked', () => {
+    // BE-38 B4 follow-up (blocking finding): the NS row cited a `probate.htm`
+    // that answers 404 while rendering it as the row's *content-verified*
+    // authority, because nothing recorded whether a citation had ever resolved.
+    // A live re-fetch is not asserted here — CI has no network — so the suite
+    // asserts the recorded probe instead: every URL the artifact claims a
+    // document↔figure correspondence for must be in `LIVE_PROBED_CITATIONS`,
+    // which only holds a URL a scripted reader actually fetched at HTTP 200. A
+    // `BLOCKED_SOURCES` gate is exempt: it renders its own qualification rather
+    // than the checked claim.
+    const probed = new Set(LIVE_PROBED_CITATIONS)
+    for (const url of Object.keys(CONTENT_VERIFIED_AUTHORITIES)) {
+      if (BLOCKED_SOURCES[url]) continue
+      expect(probed.has(url), `${url} renders as content-checked with no recorded live probe`).toBe(true)
+    }
+    for (const url of probed)
+      expect(CONTENT_VERIFIED_AUTHORITIES[url] ?? BLOCKED_SOURCES[url],
+        `live probe recorded for a URL no row cites as checked: ${url}`).toBeDefined()
   })
 
   it('cites the authority the QC RAMQ approximation was derived from, not the parameters PDF', () => {
@@ -1629,5 +1744,105 @@ describe('BE-38 B3 review (round 3): a citation is reachable or visibly qualifie
     expect(ids).toContain('probateFeesApproxNT')
     expect(ids).toContain('probateFeesApproxNU')
     expect(ids).toContain('probateFeesMB')
+  })
+})
+
+/** The first printed band's fee, as each document writes it, so the $10,000
+ * probe compares against the instrument's own decimal precision. */
+const EXACT_AT_10K: Record<string, number> = { AB: 35, NS: 85.6, PE: 50 }
+
+describe('BE-38 B4: AB, NS and PE are priced from their own band ladders, not a top-tier flat amount', () => {
+/** The three rows this slice moved; every expected value is hand-keyed from the
+ * instruments, never from `PROBATE_RATES` or `probateTax`. */
+  const MOVED = ['AB', 'NS', 'PE'] as const
+
+  it('prices every band each instrument prints, on both sides of every boundary', () => {
+    for (const province of MOVED) {
+      const { rungs, rate } = PROBATE_LADDER[province]!
+      const printed = rungs.filter(rung => Number.isFinite(rung.upTo))
+      const top = rungs[rungs.length - 1]
+      const boundary = printed[printed.length - 1].upTo
+      // A ladder then a rate: `bands` the printed rungs, `flat` at the boundary.
+      expect(PROBATE_RATES[province], `${province} pinned rule`).toEqual({
+        flat: top.fee, rate, threshold: boundary,
+        bands: printed.map(rung => ({ upTo: rung.upTo, fee: rung.fee })),
+      })
+      expect(probateTax(boundary + 1, province), `${province} open band lower end`)
+        .toBeCloseTo(top.fee + rate, 6)
+      for (const [index, rung] of printed.entries()) {
+        const previous = index === 0 ? 0 : printed[index - 1].upTo
+        expect(probateTax(previous + 1, province), `${province} ${rung.phrase} (lower end)`).toBeCloseTo(rung.fee, 6)
+        expect(probateTax(rung.upTo, province), `${province} ${rung.phrase} (upper end)`).toBeCloseTo(rung.fee, 6)
+      }
+      expect(probateTax(boundary, province), `${province} at the boundary`)
+        .toBeCloseTo(printed[printed.length - 1].fee, 6)
+      expect(probateTax(boundary + 1, province) - probateTax(boundary, province),
+        `${province} step into the open band`).toBeCloseTo(top.fee - printed[printed.length - 1].fee + rate, 6)
+      for (const value of [0, 1, 5_000, 10_000, 10_001, 25_000, 25_001, 50_000, 50_001, 100_000,
+        100_001, 125_000, 125_001, 200_000, 250_000, 250_001, 1_000_000, 50_000_000])
+        expect(probateTax(value, province), `${province} at ${value}`)
+          .toBeCloseTo(handProbate(province, value), 6)
+      // The published figure at the $10,000 probe the defect turned on, in the
+      // documents' own decimal precision (AB item 1(1)(a) $35; NS s. 87(2)(a)
+      // $85.60; PE s. 119.1(4) $50).
+      expect(probateTax(10_000, province), `${province} first printed band`).toBe(EXACT_AT_10K[province])
+      expect(probateTax(0, province), `${province} zero estate`).toBe(0)
+    }
+  })
+
+  it('holds each cited authority\'s recorded figures equal to the priced ladder', () => {
+    // This ID's equality check: the registry's figures for each row's *cited
+    // authority* must be exactly the ladder the engine prices, wording included.
+    for (const province of MOVED) {
+      const row = coverageFor(province).implemented['probate-and-estate-fees']
+      expect(row.sourceURL, `${province} source`).toBe(LADDERS[province].instrument)
+      const record = CONTENT_VERIFIED_AUTHORITIES[row.sourceURL]
+      expect(record, `${province} cited authority must be content-checked`).toBeDefined()
+      expect(record.checkedOn, `${province} checked date`).toBe(row.verifiedAt)
+      const ladder = LADDERS[province]
+      // Hand-keyed literals, so "85.60" is not compared through the number 85.6.
+      const pricedFees: string[] = [...ladder.literal]
+      if (ladder.rate > 0) pricedFees.push(`$${ladder.rateLiteral}`)
+      expect(record.checkedFigures.filter(figure => /^\$[\d,]+(\.\d+)?$/.test(figure)),
+        `${province} citation must carry exactly the priced figures`).toEqual(pricedFees)
+      for (const rung of ladder.rungs)
+        expect(record.checkedFigures, `${province} must record "${rung.phrase}"`).toContain(rung.phrase)
+      expect(FIXTURE_SOURCES[`probate-fees-${province.toLowerCase()}-2026`], `${province} fixture`).toBe(LADDERS[province].instrument)
+    }
+  })
+
+  it('moves AB, NS and PE alone: no untouched jurisdiction\'s probate changed', () => {
+    // Untouched jurisdictions keep their exact base-3188a7c value.
+    const CONTROL: Record<string, (value: number) => number> = {
+      ON: value => 0.015 * Math.max(0, value - 50_000),
+      BC: value => value <= 25_000 ? 0
+        : BC_FILING_FEE + bcBand1(Math.min(value, 50_000) - 25_000) + bcTop(Math.max(0, value - 50_000)),
+      QC: () => 243,
+      MB: () => 0,
+      SK: value => 200 + 0.007 * value,
+      NB: value => 100 + 0.005 * Math.max(0, value - 20_000),
+      NL: value => 60 + 0.006 * Math.max(0, value - 1_000),
+      YT: value => value > 25_000 ? 140 : 0,
+      NT: value => value <= 10_000 ? 30 : value <= 25_000 ? 110 : value <= 125_000 ? 215
+        : value <= 250_000 ? 325 : 435,
+      NU: value => value <= 10_000 ? 30 : value <= 25_000 ? 110 : value <= 125_000 ? 215
+        : value <= 250_000 ? 325 : 425,
+    }
+    expect(Object.keys(CONTROL).sort()).toEqual(
+      PROVINCES.filter(province => !MOVED.includes(province as typeof MOVED[number])).sort())
+    for (const [province, expected] of Object.entries(CONTROL))
+      for (const value of [1, 10_000, 200_000, 1_000_000])
+        expect(probateTax(value, province as Province), `${province} at ${value}`)
+          .toBeCloseTo(expected(value), 6)
+    // The moved rows gain neither BC's surcharge nor its second tier.
+    for (const province of ['NL', 'NB'] as const) {
+      expect(PROBATE_RATES[province].bands, `${province} is not a ladder`).toBeUndefined()
+      expect(PROBATE_RATES[province].rate, `${province} keeps its rate`).toBeGreaterThan(0)
+    }
+    for (const province of MOVED) {
+      expect(PROBATE_RATES[province].bands, `${province} is a ladder`).toBeDefined()
+      expect(PROBATE_RATES[province]).not.toHaveProperty('baseRate')
+      expect(PROBATE_RATES[province]).not.toHaveProperty('surcharge')
+    }
   })
 })
