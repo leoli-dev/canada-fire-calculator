@@ -40,6 +40,25 @@ describe('probateTax', () => {
     expect(probateTax(2_000_000, 'MB')).toBe(0)
   })
 
+  it('New Brunswick is priced from its own Schedule A as amended, not the repealed flat+rate', () => {
+    // Hand-keyed from the Probate Court Act, R.S.N.B. 1982, c. P-17.1,
+    // Schedule A, item 1, as amended by S.N.B. 2026, c. 12, s. 4 (in force on
+    // assent 2026-06-12), never from `PROBATE_RATES`:
+    //   (a) "does not exceed $20,000, $200";
+    //   (b) "exceeds $20,000 but not $100,000, $200 plus $5 per $1,000 ...";
+    //   (c) "exceeds $100,000, $600 plus $15 per $1,000 ...".
+    expect(probateTax(5_000, 'NB')).toBe(200)
+    expect(probateTax(20_000, 'NB'), 'item 1(a) upper edge').toBe(200)
+    expect(probateTax(20_001, 'NB'), 'item 1(b) lower edge').toBeCloseTo(200 + 5 / 1_000, 9)
+    expect(probateTax(50_000, 'NB'), 'the middle tier is a rate, not a printed rung')
+      .toBeCloseTo(200 + 5 * 30, 9)
+    expect(probateTax(100_000, 'NB'), 'item 1(b) upper edge').toBe(600)
+    expect(probateTax(100_001, 'NB'), 'item 1(c) lower edge').toBeCloseTo(600 + 15 / 1_000, 9)
+    expect(probateTax(200_000, 'NB')).toBeCloseTo(600 + 15 * 100, 6)
+    // The superseded TaxTips row charged this estate $1,000.
+    expect(probateTax(200_000, 'NB'), 'the repealed schedule is gone').not.toBeCloseTo(1_000, 6)
+  })
+
   it('is zero for a zero or negative estate', () => {
     expect(probateTax(0, 'ON')).toBe(0)
     expect(probateTax(-100, 'ON')).toBe(0)

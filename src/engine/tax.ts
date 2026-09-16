@@ -339,32 +339,40 @@ export function qcRamqPremium(income: number): number {
  *  - a step ladder (AB, NT, NU): `bands` carries every printed rung;
  *  - a step ladder then a marginal rate (NS, PE): the same `bands`, then `flat`
  *    (the last printed rung) plus `rate` over `threshold`;
- *  - two marginal tiers (BC): `baseRate` over `baseUpTo` to `threshold`, then
- *    `rate`, with `flat` the lower tier's accumulated amount at the boundary;
- *  - a flat amount plus a rate over `threshold` (ON, SK, NB, NL);
+ *  - two marginal tiers (BC, and NB with a printed floor): `baseRate` over
+ *    `baseUpTo` to `threshold`, then `rate`, with `flat` the lower tier's
+ *    accumulated amount at the boundary and `minimum` the amount the schedule
+ *    charges from the first dollar;
+ *  - a flat amount plus a rate over `threshold` (ON, SK, NL);
  *  - a flat amount with no rate (QC) and a *step* where a boundary is printed
  *    with no rate (YT: nothing to $25,000, $140 above).
  *
  * `bands` is checked before any rate branch, so a ladder's printed rungs win
  * inside it. `surcharge` (BC alone) is a second instrument's fixed amount,
- * payable from `baseUpTo` and never inside the published exemption.
+ * payable from `baseUpTo` and never inside the published exemption. `minimum`
+ * (NB alone) is the schedule's own floor, charged at every value above zero and
+ * never added twice at a boundary.
  */
 export function probateTax(value: number, province: Province): number {
   if (value <= 0) return 0
-  const { flat, rate, threshold, bands, surcharge = 0, baseRate, baseUpTo } = PROBATE_RATES[province]
+  const { flat, rate, threshold, bands, surcharge = 0, baseRate, baseUpTo, minimum = 0 } =
+    PROBATE_RATES[province]
   if (bands) for (const band of bands) if (value <= band.upTo) return band.fee
-  if (rate === 0 && value <= threshold) return 0
+  if (rate === 0 && value <= threshold) return minimum
   // A second, lower marginal tier (BC's Act charges $6 per $1,000 over $25,000
-  // up to $50,000, then $14 above). `flat` is the tier-1 amount accumulated at
-  // `threshold`, so this branch is the tier-1 rate on the excess over `baseUpTo`
-  // and meets the branch below exactly at the boundary. `surcharge` is the
-  // second instrument's filing fee, payable from `baseUpTo`, so it is inside the
-  // expression and never reaches the published exemption below it.
+  // up to $50,000, then $14 above; NB's Schedule A charges $5 per $1,000 over
+  // $20,000 up to $100,000, then $15 above a printed $200 floor). `flat` is the
+  // tier-1 amount accumulated at `threshold`, so this branch is the tier-1 rate
+  // on the excess over `baseUpTo` and meets the branch below exactly at the
+  // boundary. `surcharge` is the second instrument's filing fee, payable from
+  // `baseUpTo`, so it is inside the expression and never reaches the published
+  // exemption below it; `minimum` is the schedule's own floor, charged even
+  // below `baseUpTo` (BC sets none, so it keeps returning 0 there).
   if (baseRate !== undefined && baseUpTo !== undefined) {
-    if (value <= baseUpTo) return 0
-    if (value <= threshold) return surcharge + baseRate * (value - baseUpTo)
+    if (value <= baseUpTo) return minimum
+    if (value <= threshold) return minimum + surcharge + baseRate * (value - baseUpTo)
   }
-  return surcharge + flat + rate * Math.max(0, value - threshold)
+  return minimum + surcharge + flat + rate * Math.max(0, value - threshold)
 }
 
 /** Statutory combined marginal rate at a taxable income (QC abatement applied). */

@@ -386,6 +386,13 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
     PE: { en: /\$50.*\$100.*\$200.*\$400.*\$4 for each \$1,000/,
       fr: /50 \$.*100 \$.*200 \$.*400 \$.*4 \$ par tranche/,
       zh: /50 加元.*100 加元.*200 加元.*400 加元.*4 加元/, authority: /Probate Act/ },
+    // BE-38 B4 (the NB defect): the row prices the three tiers S.N.B. 2026,
+    // c. 12, s. 4 substituted into Schedule A, item 1 — $200, $5 per $1,000 over
+    // $20,000, $600 plus $15 per $1,000 above $100,000 — so the rendered text
+    // must name them in every language and say no tier is approximated.
+    NB: { en: /\$200.*\$5 per \$1,000.*\$600.*\$15 per \$1,000/,
+      fr: /200 \$.*5 \$.*600 \$.*15 \$/,
+      zh: /200 加元.*5 加元.*600 加元.*15 加元/, authority: /Probate Court Act/ },
   }
   const NO_APPROX = { en: /none is approximated/, fr: /aucun n’est approximé/, zh: /未作任何近似处理/ }
   for (const [province, row] of Object.entries(ROWS)) {
@@ -398,8 +405,14 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
     }
     expect(EN[key], `${province} names its own instrument`).toMatch(row.authority)
   }
-  expect(EN['coverageLimitation.probateFees']).toMatch(/\(NB\)/)
-  expect(EN['coverageLimitation.probateFeesMB']).toMatch(/\(NB\)/)
+  // BE-38 B4 (the NB defect): NB used to be the one province the generic text
+  // named as simplified, and the row it qualified priced a schedule S.N.B. 2026,
+  // c. 12 repealed. The row now prices its own Act's Schedule A, item 1, so the
+  // shared text may not name NB as simplified any longer.
+  for (const key of ['coverageLimitation.probateFees', 'coverageLimitation.probateFeesMB'])
+    for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const)
+      expect(catalogue[key], `${lang} ${key} may not call NB simplified`)
+        .not.toMatch(/\(NB\)|Nouveau-Brunswick|新不伦瑞克|新不倫瑞克/)
   // BE-38 B4 follow-up: NL is not simplified — its Services Charges Act
   // s. 4(2)–(3) is reproduced exactly by `{flat: 60, rate: 0.006, threshold:
   // 1000}` — so the shared text this diff edits may not name it as simplified.
@@ -407,13 +420,17 @@ it('pins the moved limitation prose to the catalogue rather than to the engine s
     'coverageLimitation.probateFeesNB'])
     for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const)
       expect(catalogue[key], `${lang} ${key} may not call NL simplified`).not.toMatch(/\bNL\b|Terre-Neuve|紐芬蘭|纽芬兰/)
-  // NB prices a repealed schedule and the rendered qualification must say so,
-  // in every language, naming the current figures (2026, c. 12, s. 4).
+  // The NB row no longer prices the schedule S.N.B. 2026, c. 12, s. 4 repealed,
+  // so the qualification must name the amending instrument and the three tiers
+  // the build now charges — and must not resurrect the deferral claim.
   for (const [lang, catalogue] of [['en', EN], ['fr', FR], ['zh', ZH]] as const) {
     const text = catalogue['coverageLimitation.probateFeesNB']
     expect(text, `${lang} NB qualification`).toBeTruthy()
-    expect(text, `${lang} NB repeal`).toMatch(/2026, c\. 12, s\. 4|2026, ch\. 12, art\. 4/)
+    expect(text, `${lang} NB names the amending instrument`)
+      .toMatch(/2026, c\. 12, s\. 4|2026, ch\. 12, art\. 4/)
     expect(text, `${lang} NB current figures`).toMatch(/\$?15|15 \$|15 加元/)
+    expect(text, `${lang} NB may not defer the re-keying it now does`)
+      .not.toMatch(/superseded|repealed|deferred|abrogé|remplacé|report[ée]|废止|推迟|替换/)
     if (lang !== 'en') expect(text, `${lang} NB is not English`).not.toBe(EN['coverageLimitation.probateFeesNB'])
   }
   expect(EN['coverageLimitation.provincialAgeAmount']).toMatch(/Pinned 2026 figures/)

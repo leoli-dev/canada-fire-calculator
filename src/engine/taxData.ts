@@ -235,9 +235,9 @@ export interface ProbateBand {
  * `threshold`. A row whose priced value is a step function with one boundary
  * (YT) still has the flat-plus-rate shape with `rate: 0`: the boundary is
  * `threshold`, the fee is `flat` and the step carries no rate.
- * `baseRate`/`baseUpTo` add a *second* marginal tier below `threshold` (BC
- * alone), where the published fee is a rate on the excess over one boundary up
- * to a second one rather than a single flat-plus-rate. */
+ * `baseRate`/`baseUpTo` add a *second* marginal tier below `threshold` (BC and
+ * NB), where the published fee is a rate on the excess over one boundary up to
+ * a second one rather than a single flat-plus-rate. */
 export interface ProbateRate {
   flat: number
   rate: number
@@ -261,6 +261,13 @@ export interface ProbateRate {
    * 1 charges to file for a grant above $25,000 — a second instrument's figure,
    * stored apart from the Act's own accumulated $150 in `flat`. */
   surcharge?: number
+  /** The fee the published schedule charges from the first dollar — its printed
+   * minimum — inside every non-ladder branch above zero. NB's is the $200 that
+   * Schedule A, item 1(a) charges an estate whose value "does not exceed
+   * $20,000", the floor both of its marginal tiers sit on. Absent where a
+   * schedule charges nothing below its first boundary (BC, YT), so the default
+   * leaves every other row's price unchanged. */
+  minimum?: number
 }
 
 /**
@@ -269,9 +276,10 @@ export interface ProbateRate {
  * (non-registered account, unsold real estate). Registered accounts
  * (RRSP/RRIF/TFSA) bypass probate via named beneficiary designation — the norm
  * in Canada — so they're excluded from the base. 2026 figures (taxtips.ca,
- * current as of 2026-01-25). BE-38 B4 left NL and NB the only two rows still
- * simplified to a single flat + rate matching the top tier; every other row in
- * this table now prices the schedule its own instrument prints, band by band.
+ * current as of 2026-01-25). BE-38 B4 followed the YT, BC, AB, NS and PE defects
+ * with the last row still keyed to a TaxTips.ca approximation: NB's row below
+ * now prices Schedule A, item 1 of the province's own Probate Court Act, so no
+ * row in this table is priced from the schedule that Act repealed in 2026.
  *
  * BE-38 B4: NT and NU are no longer priced from Yukon's $140 filing fee. Each
  * is priced from the *full* ladder its own regulation prints, and each row in
@@ -320,6 +328,20 @@ export interface ProbateRate {
  * R.S.N.S. 1989, c. 359, s. 87(2) and PE's Probate Act, R.S.P.E.I. 1974,
  * c. P-21, s. 119.1(4) (four printed rungs to $100,000 then a printed rate).
  * Every figure is recorded in `coverageMatrix.ts`'s content-verified registry.
+ *
+ * BE-38 B4 (the NB defect this slice prices): NB was the last row in this table
+ * keyed to the TaxTips.ca table (`flat: 100, rate: 0.005, threshold: 20000`),
+ * which still prints the schedule S.N.B. 2026, c. 12, s. 4 repealed. The Act's
+ * own Schedule A, item 1, as amended (consolidation current to 2026-07-16),
+ * prints three tiers — $200 where the value does not exceed $20,000; $200 plus
+ * $5 per $1,000 over $20,000 to $100,000; and $600 plus $15 per $1,000 above
+ * $100,000 — so a $200,000 estate owes $2,100 where the old row charged $1,000,
+ * and a $5,000 estate owes $200 where the old row charged $100 against the
+ * superseded item 1(a)'s $25. The tiers meet exactly at both boundaries
+ * ($200 + $5 × 80 = $600), so the schedule is *continuous*, not a step ladder:
+ * the row is the two-marginal-tier shape BC uses, plus the printed $200 floor in
+ * `minimum`. `flat: 400` is the lower tier's accumulation at $100,000, so
+ * `minimum + flat` is the $600 item 1(c) prints.
  */
 export const PROBATE_RATES: Record<Province, ProbateRate> = {
   ON: { flat: 0, rate: 0.015, threshold: 50000 },
@@ -378,7 +400,15 @@ export const PROBATE_RATES: Record<Province, ProbateRate> = {
       { upTo: 50_000, fee: 358.15 }, { upTo: 100_000, fee: 1002.65 },
     ],
   },
-  NB: { flat: 100, rate: 0.005, threshold: 20000 },
+  // Probate Court Act, R.S.N.B. 1982, c. P-17.1, Schedule A, item 1, as amended
+  // by S.N.B. 2026, c. 12, s. 4 (assented 2026-06-12 and in force on assent
+  // under the Interpretation Act, R.S.N.B. 1973, c. I-13, s. 3(2); consolidation
+  // current to 2026-07-16): $200 to $20,000, then $5 per $1,000 to $100,000,
+  // then $15 per $1,000 above — continuous at both edges, so not a step ladder.
+  NB: {
+    minimum: 200, baseRate: 5 / 1000, baseUpTo: 20_000,
+    flat: 400, rate: 15 / 1000, threshold: 100_000,
+  },
   // Probate Act, R.S.P.E.I. 1974, c. P-21, s. 119.1(4): four printed rungs up
   // to $100,000, then "$400 plus $4 for each $1,000 or fraction thereof in
   // excess of $100,000". Same shape as NS. The row this replaced was
