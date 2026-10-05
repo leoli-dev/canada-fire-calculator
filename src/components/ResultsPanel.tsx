@@ -77,8 +77,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
   const lockedWithdrawalUnverified = hasUnverifiedLockedWithdrawals(inputs)
   const lastResultUnverified = result.success && (props.taxWarning || lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
+  // BE-42: a FIRE number priced from the projected FIRE-year basis is a labelled estimate.
+  const fireNumberProjected = mode === 'number' && fireNumber?.status === 'solved' && fireNumber.assumptions.includes('projectedFireYearAllocation')
   const quickResultUnverified = (mode === 'when' && earliest?.reason === 'lockedWithdrawalLimits') ||
-    (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits')
+    (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits') || fireNumberProjected
   const targetResultUnverified = mode === 'target' && goal?.status === 'supported' && lockedWithdrawalUnverified
   const resultUnverified = props.taxWarning || props.taxEstimate || (mode === 'last' && lastResultUnverified) || quickResultUnverified || targetResultUnverified
 
@@ -255,6 +257,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           <p className="hint">
             <Jargon text={t('numberExplain', { age: inputs.fireAge, life: inputs.lifeExpectancy })} />
           </p>
+          {fireNumberProjected && <p className="hint" data-testid="fire-number-projected">{t('fireNumberProjectedBasis', { age: inputs.fireAge })}</p>}
           </>}
           <p className="hint">{t('solverNumberAssumptions')}</p>
         </>

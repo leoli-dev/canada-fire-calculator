@@ -91,14 +91,18 @@ for (const mode of ['guided', 'professional'] as const) {
     await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
-  test(`${mode} FIRE-number tab withholds P06 false sufficiency at desktop and 320px`, async ({ page }) => {
+  test(`${mode} FIRE-number tab prices P06 from its projected basis, with no false sufficiency, at desktop and 320px`, async ({ page }) => {
+    // BE-42: the 500,000 the plan holds falls 16,018 short once the eroded
+    // cost base is taxed, so the number is labelled an estimate and shows a gap.
     await seed(page, 'nonReg', mode)
     await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
-    await expect(page.locator('.summary .verdict')).toContainText('cannot preserve the verified nominal cost history')
-    await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
-    for (const [language, phrase] of [['FR', "ne peut pas conserver l'historique"], ['中文', '无法保留非注册投资']] as const) {
+    await expect(page.locator('.summary .verdict')).toContainText('FIRE number')
+    await expect(page.locator('.summary')).toHaveClass(/uncertain/)
+    await expect(page.getByTestId('fire-number-projected')).toContainText('cost base your plan projects for age 60')
+    await expect(page.locator('.summary')).toContainText('a shortfall of')
+    for (const [language, phrase] of [['FR', 'prix de base non enregistré'], ['中文', '非注册成本基础']] as const) {
       await page.getByRole('button', { name: language, exact: true }).click()
-      await expect(page.locator('.summary .verdict')).toContainText(phrase)
+      await expect(page.getByTestId('fire-number-projected')).toContainText(phrase)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
@@ -156,7 +160,7 @@ for (const mode of ['guided', 'professional'] as const) {
     })
     await page.reload()
     await page.getByRole('tab', { name: 'When can I retire?' }).click()
-    await expect(page.locator('.summary .verdict')).toContainText('verified nominal cost history')
+    await expect(page.locator('.summary .verdict')).toContainText('confirmed non-registered cost base')
     await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
   })
 }

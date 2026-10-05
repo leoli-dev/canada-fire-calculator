@@ -581,7 +581,7 @@
   "solver_infeasible": "Aucune réponse réalisable avec ces paramètres, même au montant minimal testé.",
   "solver_invalid": "Les données saisies sont invalides. Vérifiez les champs signalés avant d'utiliser cette estimation.",
   "solver_unsupported": "Ce scénario dépasse les hypothèses prises en charge par le solveur rapide. Consultez la projection complète.",
-  "solverReason_nominalCapitalBasis": "La cible de portefeuille à l'âge FIRE ne peut pas conserver l'historique vérifié du coût nominal des placements non enregistrés ou de l'immeuble de placement. Un coût de base inconnu ou un traitement des pertes non vérifié empêche aussi un chiffre fiable. Consultez la projection complète; cette réponse rapide est indisponible.",
+  "solverReason_nominalCapitalBasis": "Ce chiffre exige un prix de base confirmé pour les placements non enregistrés. Inscrivez le prix de base rajusté de votre relevé de courtage; un plan qui vend à perte reste aussi non chiffré, car les règles sur les pertes ne sont pas modélisées. La projection complète ci-dessus s’applique toujours.",
   "solverReason_investmentPropertySale": "Une réponse qui dépend de la vente modélisée d'un immeuble de placement exige un coût de base, des frais de vente et des faits fiscaux vérifiés (répartition terrain/bâtiment et historique d'ACC). Consultez la projection complète; cette réponse rapide est indisponible.",
   "targetPropertySaleUnsupported": "Une cible avec vente d'un immeuble de placement exige un coût nominal, des frais de vente et des faits fiscaux vérifiés. Consultez la projection complète; cette réponse rapide est indisponible.",
   "solver_searchLimit": "La limite de recherche a été atteinte sans réponse vérifiée. Aucun montant FIRE n'est affiché.",
@@ -1619,5 +1619,6 @@
   "estimateSuccess": "Estimation : l’argent dure jusqu’à {{age}} ans.",
   "estimateDepleted": "Estimation : l’argent s’épuise à {{age}} ans.",
   "estimateShortfall": "Premier manque à {{age}} ans : {{shortfall}} des dépenses de cette année ne sont pas couverts.",
-  "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés."
+  "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés.",
+  "fireNumberProjectedBasis": "Estimation : la cible utilise la répartition des comptes et le prix de base non enregistré que votre plan projette à {{age}} ans, ajustés au montant cible."
 }

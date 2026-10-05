@@ -132,7 +132,7 @@ test('guided users may leave the personal target unset and add it from results',
   await expect(page.locator('[data-field="fireTargetAssets"] input')).toHaveValue('900,000')
 })
 
-test('a non-registered cost history withholds a false FIRE number in guided and professional results', async ({ page }) => {
+test('a working plan with non-registered money gets a labelled FIRE-number estimate, never a false one, in both modes', async ({ page }) => {
   test.setTimeout(60_000)
   await completeGuidedQuestionnaire(page, 'no')
   await page.getByRole('button', { name: 'Generate my results' }).click()
@@ -142,14 +142,16 @@ test('a non-registered cost history withholds a false FIRE number in guided and 
   await page.goto('/#/guided/review')
   await page.getByRole('button', { name: 'Generate my results' }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+  // BE-42: the answer, if any, is labelled as priced from the projected
+  // FIRE-year basis and the summary is never styled as a verified success.
   const summary = page.locator('.summary')
-  await expect(summary).toContainText('cannot preserve the verified nominal cost history')
-  await expect(summary).not.toContainText('Your FIRE number:')
+  await expect(summary).not.toHaveClass(/\bok\b/)
+  if (await summary.getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
-  await expect(page.locator('.summary')).toContainText('cannot preserve the verified nominal cost history')
-  await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
+  await expect(page.locator('.summary')).not.toHaveClass(/\bok\b/)
+  if (await page.locator('.summary').getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
   await expect(page.locator('.results-column')).not.toContainText('NaN')
   await expect(page.locator('.results-column')).not.toContainText('Infinity')
 })

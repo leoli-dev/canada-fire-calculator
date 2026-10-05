@@ -416,6 +416,8 @@ export interface YearRow {
   } | null
   /** end-of-year balances (after withdrawals/contributions and growth) */
   balances: Record<AccountType, number>
+  /** BE-42: end-of-year adjusted cost base of the non-registered holdings, today's dollars */
+  nonRegBook?: number
   withdrawals: Record<AccountType, number>
   cpp: number
   /** OAS actually received, after clawback */

@@ -581,7 +581,7 @@
   "solver_infeasible": "按当前输入，即使采用已测试的最低金额也没有可行解。",
   "solver_invalid": "输入无效。请先检查标记的字段，再使用此估算。",
   "solver_unsupported": "此情景超出快速求解器支持的假设范围。请查看完整预测。",
-  "solverReason_nominalCapitalBasis": "FIRE 年的资产门槛无法保留非注册投资或投资房已核实的名义成本历史。成本基础未知或亏损税务处理未经核实也无法得到可靠数字。请查看完整预测；此处不提供快速答案。",
+  "solverReason_nominalCapitalBasis": "这个数字需要已确认的非注册成本基础。请填写券商对账单上的调整后成本基础；会亏损出售的计划也暂不定价，因为亏损规则未建模。上方的完整预测仍然有效。",
   "solverReason_investmentPropertySale": "依赖投资房出售的判断需要核实成本基础、出售费用和房产税务事实（土地/建筑分摊与资本成本补贴历史）。请查看完整预测；此处不提供快速答案。",
   "targetPropertySaleUnsupported": "涉及投资房出售的目标判断需要核实名义成本、出售费用和房产税务事实。请查看完整预测；此处不提供快速目标答案。",
   "solver_searchLimit": "搜索已达到上限，仍未验证出答案，因此不显示 FIRE 金额。",
@@ -1619,5 +1619,6 @@
   "estimateSuccess": "估算：资金可以维持到 {{age}} 岁。",
   "estimateDepleted": "估算：资金在 {{age}} 岁耗尽。",
   "estimateShortfall": "首次缺口在 {{age}} 岁：当年有 {{shortfall}} 的支出没有着落。",
-  "estimateChartsNote": "下面的图表是规划估算：在确认归属和其他未定事实之前，税额按家庭数字估算。"
+  "estimateChartsNote": "下面的图表是规划估算：在确认归属和其他未定事实之前，税额按家庭数字估算。",
+  "fireNumberProjectedBasis": "估算：目标按计划预测的 {{age}} 岁账户构成和非注册成本基础，按目标金额等比例换算。"
 }

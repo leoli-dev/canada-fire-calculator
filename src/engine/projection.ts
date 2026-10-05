@@ -1091,6 +1091,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       propertyValue: prValue + ipTotal,
       fhsaBalance: fhsaBal,
       lockedRetirementBalance: lockedBal,
+      nonRegBook: nonRegBookReal(),
       debtPayment, debtBalance,
       taxablePerPerson, taxBySource, taxableBySource,
       byPersonTax,
