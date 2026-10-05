@@ -71,10 +71,11 @@ export function runMonteCarlo(
       return ret
     })
     const earlyAvg = earlyN > 0 ? earlySum / earlyN : 0
-    // net worth per year, consistent with the deterministic line: debt subtracted
+    // net worth per year, consistent with the deterministic line and final net
+    // worth: FHSA and locked balances included (P11), debt subtracted
     const trialTotals = r.rows.map(
       (row) => row.balances.tfsa + row.balances.rrsp + row.balances.nonReg +
-        row.propertyValue - row.debtBalance,
+        row.fhsaBalance + row.lockedRetirementBalance + row.propertyValue - row.debtBalance,
     )
     if (r.success) {
       successes++

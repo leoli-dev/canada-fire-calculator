@@ -22,7 +22,7 @@ import {
   type BenefitBasis,
 } from './benefits'
 import { inputsCppAnnual, inputsOasAnnual } from './pensionProvenance'
-import { minimumForRrif, rrifMinFactor } from './rrif'
+import { minimumForRrif, rrifMinFactorElected } from './rrif'
 import type { InputsV2 } from './model'
 import { openingSpousalAttributionLedger, type SpousalAttributionLedger } from './spousalAttribution'
 import { personProjectionTax } from './personProjectionTax'
@@ -885,8 +885,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       // spousal age election: RRIF minimums may be computed from the younger
       // spouse's age — always optimal (lower forced withdrawals, more tax
       // deferral), so auto-applied rather than exposed as an input
-      const rrifAge = Math.min(...agesPerPerson)
-      let rrifMin = bal.rrsp * rrifMinFactor(rrifAge)
+      // P05: the pooled RRIF exists once the older person reaches 72; its
+      // minimum is then priced from the younger spouse's age, including the
+      // under-71 formula, instead of falling to zero.
+      let rrifMin = bal.rrsp * rrifMinFactorElected(Math.max(...agesPerPerson), Math.min(...agesPerPerson))
       if (canonical) {
         const registered = canonical.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && account.balance > 0)
         if (registered.length === 1 && registered[0].kind === 'rrif') {

@@ -3,6 +3,7 @@ import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSa
 import { inputsCppAnnual, inputsOasAnnual } from './pensionProvenance'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
+import { allocateContributions } from './funding'
 import type { InputsV2 } from './model'
 import {
   ACCOUNT_TYPES,
@@ -652,15 +653,24 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     }
     bal.nonReg += benefits * (1 - marginal)
     const releasedPayments = releasedMortgagePayment(prMortgage, prSold, yearIdx)
+    // P08: the same allocation the projection uses. The employee DC
+    // contribution comes out of the saving budget (it was added on top
+    // before), and contributions keep arriving after the locked balance
+    // unlocks, landing in the RRSP like the projection's.
+    const allocation = allocateContributions({
+      age, budget: inputs.annualSavings + releasedPayments, fhsa: 0,
+      employee: inputs.lockedRetirement?.employeeContribution ?? 0,
+      employer: inputs.lockedRetirement?.employerContribution ?? 0,
+      split: inputs.savingsSplit,
+    })
+    const lockedAdded = inputs.lockedRetirement ? allocation.employee + allocation.employer : 0
+    if (inputs.lockedRetirement && age >= inputs.lockedRetirement.accessibleAge) bal.rrsp += lockedAdded
+    else lockedBal += lockedAdded
     for (const t of ACCOUNT_TYPES) {
-      bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
+      bal[t] += allocation.voluntary[t]
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
-    if (lockedBal > 0) {
-      lockedBal += inputs.lockedRetirement?.employeeContribution ?? 0
-      lockedBal += inputs.lockedRetirement?.employerContribution ?? 0
-      lockedBal *= 1 + inputs.returns.rrsp - (inputs.fees ?? 0)
-    }
+    if (lockedBal > 0) lockedBal *= 1 + inputs.returns.rrsp - (inputs.fees ?? 0)
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation

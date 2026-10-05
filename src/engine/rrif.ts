@@ -59,6 +59,20 @@ export function minimumForRrif(account: Account, people: Person[], baseYear: num
   return { status: 'ok', amount: openingBalance * factor, factor, agePersonId }
 }
 
+/**
+ * P05: the minimum when the RRIF holder may elect a younger spouse's age.
+ * Ages are the ages reached during the year, as everywhere in this module.
+ * Nothing is forced until the holder's own RRIF exists (the year they reach
+ * 72); the factor then uses the elected age, and below the prescribed table
+ * the CRA formula 1 / (90 - age on January 1) applies.
+ */
+export function rrifMinFactorElected(holderAge: number, electedAge: number): number {
+  if (Math.floor(holderAge) < 72) return 0
+  const elected = Math.floor(electedAge)
+  if (elected >= 72) return rrifMinFactor(elected)
+  return 1 / (90 - (elected - 1))
+}
+
 export function rrifMinFactor(age: number): number {
   // floor: fractional ages from transient input states must not return
   // undefined (a NaN here silently poisons the whole projection)
