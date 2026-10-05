@@ -103,7 +103,7 @@ describe('BE-13 A budget page completeness', () => {
 
   it('sits in the saving category right after the amount it reinterprets', () => {
     const ids = QUESTION_CATALOG.filter((page) => page.categoryId === 'saving').map((page) => page.id)
-    expect(ids).toEqual(['saving.method', 'saving.amount', 'budget.method', 'work.after', 'work.amount', 'work.period'])
+    expect(ids).toEqual(['saving.method', 'saving.amount', 'budget.method', 'saving.earned', 'work.after', 'work.amount', 'work.period'])
   })
 
   it('is pending until the mode and both inclusion facts are answered', () => {

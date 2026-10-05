@@ -22,6 +22,7 @@ import { BudgetMethodPanel } from '../BudgetMethodPanel'
 import { TaxFactsPanel } from '../TaxFactsPanel'
 import { useCanonicalPlan } from '../../forms/canonicalEdit'
 import { AccountOwnershipChecklist, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
+import { EarnedIncomeQuestion, RegisteredTypeQuestion, RrifDetailsQuestion } from './AccountFacts'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
@@ -169,10 +170,11 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   let control: React.ReactNode
   switch (definition.id) {
     case 'income.taxFacts':
-      // FE-43 A: ownership, spouse support and Quebec coverage moved to their
-      // own pages; this page keeps the sections that have not moved yet.
+      // FE-43 A/B: ownership, spouse support, Quebec coverage, employment
+      // income and the account type moved to their own pages; this page keeps
+      // the sections that have not moved yet.
       control = <div>
-        <TaxFactsPanel sections={['earned', 'pensionSplit', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'registered', 'spousal']} />
+        <TaxFactsPanel sections={['pensionSplit', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'spousal']} />
         <ChoiceGroup id={definition.id} value={answer} options={[
           { value: 'reviewed', label: t('be11.reviewed') },
           { value: 'unknown', label: t('be11.unknownStill') },
@@ -187,6 +189,15 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'assets.ownership':
       control = <><p className="question-intro">{t('questionnaire.ownership.accountsIntro')}</p><AccountOwnershipChecklist plan={canonicalPlan} /></>
+      break
+    case 'saving.earned':
+      control = <EarnedIncomeQuestion plan={canonicalPlan} />
+      break
+    case 'account.rrsp.type':
+      control = <><p className="question-intro">{t('questionnaire.accountType.intro')}</p><RegisteredTypeQuestion plan={canonicalPlan} /></>
+      break
+    case 'account.rrif.details':
+      control = <><p className="question-intro">{t('questionnaire.rrif.intro')}</p><RrifDetailsQuestion plan={canonicalPlan} /></>
       break
     case 'housing.ownership':
       control = <><p className="question-intro">{t('questionnaire.ownership.propertiesIntro')}</p><PropertyOwnershipChecklist plan={canonicalPlan} /></>

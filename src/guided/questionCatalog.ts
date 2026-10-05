@@ -1,4 +1,6 @@
 import type { Inputs } from '../engine'
+import type { InputsV2 } from '../engine/model'
+import { hasRecordedRegisteredType } from './accountFacts'
 import type { CategoryDefinition, QuestionAnswers, QuestionDefinition } from './schema'
 
 export const QUESTION_CATEGORIES: readonly CategoryDefinition[] = [
@@ -48,6 +50,9 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   // BE-13 A: what the saving figure means. Placed right after the amount so the
   // basis is decided next to the number it reinterprets.
   page('budget.method', 'saving', ['budgetMode'], ['budget.method', 'budget.debtIncluded', 'budget.taxBenefitIncluded']),
+  // FE-43 B: current employment income per person; optional, it only feeds the
+  // RRSP room preview.
+  page('saving.earned', 'saving', ['earnedIncome'], [], { estimatePolicy: 'none', optional: true }),
   page('work.after', 'saving', ['extraIncome'], ['extraIncome']),
   page('work.amount', 'saving', ['extraIncomeAnnual'], ['extraIncome.annual'], {
     applicableWhen: (_inputs, answers) => answerIs(answers, 'work.after', 'yes'),
@@ -61,6 +66,10 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('assets.identify', 'assets', ['accounts'], ['balances', 'fhsa', 'lockedRetirement']),
   page('account.tfsa.balance', 'assets', ['balance'], ['balances.tfsa'], { applicableWhen: (_i, a) => accountSelected(a, 'tfsa'), prerequisitePageId: 'assets.identify' }),
   page('account.rrsp.balance', 'assets', ['balance'], ['balances.rrsp'], { applicableWhen: (_i, a) => accountSelected(a, 'rrsp'), prerequisitePageId: 'assets.identify' }),
+  // FE-43 B: the account type defaults to a plain RRSP; a RRIF asks its own
+  // minimum-withdrawal facts on the next page.
+  page('account.rrsp.type', 'assets', ['registeredType'], [], { applicableWhen: (_i, a, plan) => accountSelected(a, 'rrsp') || hasRecordedRegisteredType(plan), prerequisitePageId: 'assets.identify', estimatePolicy: 'none', optional: true }),
+  page('account.rrif.details', 'assets', ['rrifOpened', 'rrifCategory'], [], { applicableWhen: (_i, _a, plan) => !!plan?.accounts.some((account) => account.kind === 'rrif'), prerequisitePageId: 'account.rrsp.type', estimatePolicy: 'none', optional: true }),
   page('account.nonReg.balance', 'assets', ['balance', 'nonRegBook'], ['balances.nonReg', 'nonRegBook'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
   page('allocation.tfsa', 'assets', ['allocation'], ['savingsSplit.tfsa', 'savingsSplit.rrsp', 'savingsSplit.nonReg'], { estimatePolicy: 'assumption' }),
   page('fhsa.details', 'assets', ['fhsaBalance', 'fhsaContribution'], ['fhsa.balance', 'fhsa.annualContribution'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
@@ -116,8 +125,8 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('invest.strategy', 'preferences', ['withdrawalStrategy'], ['strategy'], { estimatePolicy: 'assumption' }),
 ]
 
-export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers): QuestionDefinition[] {
-  return QUESTION_CATALOG.filter((definition) => definition.applicableWhen?.(inputs, answers) ?? true)
+export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers, plan?: InputsV2 | null): QuestionDefinition[] {
+  return QUESTION_CATALOG.filter((definition) => definition.applicableWhen?.(inputs, answers, plan) ?? true)
 }
 
 export function questionForField(field: string): QuestionDefinition | undefined {

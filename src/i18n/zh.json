@@ -1222,6 +1222,15 @@
       },
       "housing_ownership": {
         "question": "这些房产分别在谁名下？"
+      },
+      "saving_earned": {
+        "question": "今年的工作收入是多少？"
+      },
+      "account_rrsp_type": {
+        "question": "这个 RRSP 是哪种账户？"
+      },
+      "account_rrif_details": {
+        "question": "RRIF 哪年开户，适用哪种最低提款？"
       }
     },
     "ownership": {
@@ -1241,6 +1250,34 @@
     },
     "qcDrug": {
       "intro": "魁北克通过报税向参加 RAMQ 公共药保的人收取处方药保费；有私人团体保险或已核实豁免的人不用交。请为每个人选择全年的保险状态。"
+    },
+    "earned": {
+      "intro": "每人今年的税前工资或自雇收入。可以不填：它只用于 RRSP 额度预览，不填也不影响计划结果。",
+      "label": "{{person}}：今年的工作收入",
+      "optional": "可选",
+      "recorded": "已记录",
+      "clear": "清除"
+    },
+    "accountType": {
+      "intro": "大多数人是普通 RRSP。只有账单上写明是其他类型时才需要改。",
+      "rrsp": "普通 RRSP",
+      "rrspDetail": "最迟在持有人满 71 岁那年年底转成 RRIF 或年金。",
+      "spousalRrsp": "配偶 RRSP",
+      "spousalRrspDetail": "由一方替另一方供款。供款后三年内取款，可能计入供款人的收入纳税。",
+      "rrif": "已经转成 RRIF",
+      "rrifDetail": "从开户次年起，每年至少要按规定比例取出最低金额。",
+      "lif": "LIF",
+      "lifDetail": "由锁定养老金转来的终身收入基金，每年有最低和最高提款额。"
+    },
+    "rrif": {
+      "intro": "每年的最低提款额取决于下面几项。无法确认的可以先不填，结果会把最低提款额标为受限。",
+      "openedYear": "RRIF 开户年份",
+      "category": "适用哪一类法定提款因子？",
+      "qualifyingDetail": "通常是 1993 年以前开户、1992 年以后没有再转入新资金的 RRIF。",
+      "allOtherDetail": "其余所有 RRIF，包括 1993 年及以后开户的。",
+      "notConfirmed": "暂未确认",
+      "election": "按谁的年龄计算最低提款？",
+      "electedAge": "{{person}}（开户时选定的年龄）"
     }
   },
   "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",

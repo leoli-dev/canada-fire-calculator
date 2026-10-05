@@ -8,7 +8,8 @@ import { previewTfsaRoomYear, tfsaStatement, type TfsaWithdrawalLine } from '../
 import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
 import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
-import { commitCanonicalEdit, useCanonicalPlan } from '../forms/canonicalEdit'
+import { commitCanonicalEdit, commitRegisteredRowEdit, useCanonicalPlan } from '../forms/canonicalEdit'
+import { registeredTypeAccounts } from '../guided/accountFacts'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked', 'legacy:account:fhsa'] as const
 const roundCents = (value: number) => Math.round(value * 100) / 100
@@ -553,7 +554,7 @@ export type TaxFactsSection = 'earned' | 'ownership' | 'spouseSupport' | 'pensio
 export const ALL_TAX_FACTS_SECTIONS: readonly TaxFactsSection[] = ['earned', 'ownership', 'spouseSupport', 'pensionSplit',
   'qcCoverage', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'registered', 'spousal']
 
-const usePersonLabel = () => {
+export const usePersonLabel = () => {
   const { t } = useTranslation()
   return (person: Person | undefined) => person ? t(person.role === 'self' ? 'be11.self' : 'be11.partner') : t('be12.spousalUnassigned')
 }
@@ -870,11 +871,8 @@ export function RegisteredAccountRows({ plan }: { plan: InputsV2 }) {
   const { t } = useTranslation()
   const people = plan.people
   const partner = people.find(person => person.role === 'partner')
-  return <>{plan.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
-    const rowIds = [account.id, derivedAccountId(account.id)]
-    const setRow = (change: (item: Account) => void) => commitCanonicalEdit(draft => {
-      for (const item of draft.accounts) if (rowIds.includes(item.id)) change(item)
-    })
+  return <>{registeredTypeAccounts(plan).map(account => {
+    const setRow = (change: (item: Account) => void) => commitRegisteredRowEdit(account.id, change)
     return <div className="tax-facts-row" key={account.id}>
       <label>{t('be11.registeredType')}
         <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => setRow(item => {

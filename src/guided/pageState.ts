@@ -4,6 +4,7 @@ import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
 import type { QuestionDefinition } from './schema'
 import { accountOwnershipComplete, propertyOwnershipComplete, qcCoverageComplete } from './householdFacts'
+import { earnedIncomeComplete, hasRecordedRegisteredType, rrifDetailsComplete } from './accountFacts'
 
 /** The store slice page completeness actually reads. */
 export interface PageState {
@@ -52,6 +53,10 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
   if (definition.id === 'family.qcDrug') return qcCoverageComplete(householdPlan(state)) || state.questionAnswers['family.qcDrug'] === 'unknown'
   if (definition.id === 'assets.ownership') return accountOwnershipComplete(householdPlan(state))
   if (definition.id === 'housing.ownership') return propertyOwnershipComplete(householdPlan(state))
+  // FE-43 B: optional facts, answered once recorded (or explicitly confirmed).
+  if (definition.id === 'saving.earned') return earnedIncomeComplete(householdPlan(state))
+  if (definition.id === 'account.rrsp.type') return state.questionAnswers['account.rrsp.type'] !== undefined || hasRecordedRegisteredType(householdPlan(state))
+  if (definition.id === 'account.rrif.details') return rrifDetailsComplete(householdPlan(state))
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }

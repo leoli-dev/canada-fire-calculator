@@ -101,7 +101,7 @@ export function GuidedFlow() {
   const { t } = useTranslation()
   const state = useStore()
   const [directoryOpen, setDirectoryOpen] = useState(false)
-  const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers), [state.inputs, state.questionAnswers])
+  const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers, state.canonical), [state.inputs, state.questionAnswers, state.canonical])
   const current = pages.find((page) => page.id === state.activePageId) ?? pages[0]
   const index = Math.max(0, pages.findIndex((page) => page.id === current.id))
   const navigate = (id: string) => { state.setActivePage(id); window.location.hash = `#/guided/${pageById(id)?.categoryId}/${id}`; setDirectoryOpen(false) }
@@ -109,7 +109,7 @@ export function GuidedFlow() {
   useEffect(() => {
     const applyHash = () => {
       const latest = useStore.getState()
-      const latestPages = visibleQuestionPages(latest.inputs, latest.questionAnswers)
+      const latestPages = visibleQuestionPages(latest.inputs, latest.questionAnswers, latest.canonical)
       const hash = window.location.hash
       if (hash === '#/guided/review' || hash.endsWith('/assumptions.review')) {
         latest.setGuidedView('review')

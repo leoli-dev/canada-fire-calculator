@@ -1,4 +1,5 @@
 import type { Inputs } from '../engine'
+import type { InputsV2 } from '../engine/model'
 
 export type CategoryId = 'family' | 'saving' | 'assets' | 'housing' | 'spending' | 'income' | 'preferences'
 export type QuestionAnswer = string | boolean | string[]
@@ -12,7 +13,9 @@ export interface QuestionDefinition {
   questions: readonly string[]
   fieldBindings: readonly string[]
   estimatePolicy: 'none' | 'fact-only' | 'assumption'
-  applicableWhen?: (inputs: Inputs, answers: QuestionAnswers) => boolean
+  /** `plan` is the recorded canonical plan, when there is one: some facts
+   * (an account's registered type) exist only there. */
+  applicableWhen?: (inputs: Inputs, answers: QuestionAnswers, plan?: InputsV2 | null) => boolean
   prerequisitePageId?: string
   /** An optional page never blocks generating results; left unanswered it
    * reads as optional rather than to do, and its facts stay unknown. */

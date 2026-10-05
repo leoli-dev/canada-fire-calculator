@@ -556,13 +556,15 @@ const legacyFhsaAnswer = (page: Page) => page.evaluate(async () => {
   }
 })
 
-/** Edit one unrelated field in the shared tax panel and blur, the reviewer's
- * exact reproduction, and return the plan's answer afterwards. */
-async function editUnrelatedEarned(page: Page) {
+/** Edit one unrelated canonical fact and blur, the reviewer's exact
+ * reproduction, and return the plan's answer afterwards. Guided asks the
+ * employment income on its own page (FE-43 B), through the same transaction. */
+async function editUnrelatedEarned(page: Page, guided: boolean) {
+  if (guided) await page.goto('/#/guided/saving/saving.earned')
   const earned = page.getByTestId('earned-self')
   await earned.fill('90000')
   await earned.blur()
-  await expect(earned).toHaveValue('90000')
+  await expect(earned).toHaveValue(guided ? '90,000' : '90000')
   return legacyFhsaAnswer(page)
 }
 
@@ -578,7 +580,7 @@ for (const guided of [false, true] as const) {
     expect(before.openedYearsAgo).toBe(14)
     expect(before.canonicalOpenedYear).toMatchObject({ status: 'unknown' })
     // The reviewer's probe: 14 must survive an unrelated edit and blur.
-    const after = await editUnrelatedEarned(page)
+    const after = await editUnrelatedEarned(page, guided)
     expect(after.openedYearsAgo).toBe(14)
     expect(after.canonicalOpenedYear).toMatchObject({ status: 'unknown' })
   })
@@ -590,7 +592,7 @@ for (const guided of [false, true] as const) {
     const before = await legacyFhsaAnswer(page)
     expect(before.openedYearsAgo).toBe(15)
     expect(before.validationKeys).toContain('valFhsaExpired')
-    const after = await editUnrelatedEarned(page)
+    const after = await editUnrelatedEarned(page, guided)
     expect(after.openedYearsAgo).toBe(15)
     expect(after.validationKeys).toContain('valFhsaExpired')
   })

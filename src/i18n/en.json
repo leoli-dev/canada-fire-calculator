@@ -1213,6 +1213,15 @@
       },
       "housing_ownership": {
         "question": "Whose name is each property in?"
+      },
+      "saving_earned": {
+        "question": "How much do you earn from work this year?"
+      },
+      "account_rrsp_type": {
+        "question": "What kind of RRSP account is it?"
+      },
+      "account_rrif_details": {
+        "question": "When was the RRIF opened, and which minimum applies?"
       }
     },
     "ownership": {
@@ -1232,6 +1241,34 @@
     },
     "qcDrug": {
       "intro": "Quebec charges a prescription-drug premium on the tax return to people on the public RAMQ plan. People covered by a private group plan, or with a verified exemption, pay nothing. Choose each person's coverage for the whole year."
+    },
+    "earned": {
+      "intro": "Employment or self-employment income before tax, for each person. You can skip it: it only feeds the RRSP room preview, and your plan gives the same result without it.",
+      "label": "{{person}}: income from work this year",
+      "optional": "Optional",
+      "recorded": "Recorded",
+      "clear": "Clear"
+    },
+    "accountType": {
+      "intro": "Most people have a regular RRSP. Pick another type only if your statement says so.",
+      "rrsp": "A regular RRSP",
+      "rrspDetail": "It becomes a RRIF or an annuity by the end of the year the owner turns 71.",
+      "spousalRrsp": "A spousal RRSP",
+      "spousalRrspDetail": "One partner contributed for the other. A withdrawal within three years of a contribution can be taxed to the contributor.",
+      "rrif": "Already converted to a RRIF",
+      "rrifDetail": "A prescribed minimum has to come out every year, starting the year after it was opened.",
+      "lif": "A LIF",
+      "lifDetail": "A life income fund from locked-in pension money, with a yearly minimum and maximum."
+    },
+    "rrif": {
+      "intro": "The yearly minimum depends on these facts. Skip any you cannot confirm; the result then shows the minimum as limited.",
+      "openedYear": "Year the RRIF was opened",
+      "category": "Which prescribed-factor category applies?",
+      "qualifyingDetail": "Generally a RRIF opened before 1993 with no new money added since 1992.",
+      "allOtherDetail": "Every other RRIF, including all RRIFs opened in 1993 or later.",
+      "notConfirmed": "Not confirmed yet",
+      "election": "Whose age sets the minimum?",
+      "electedAge": "{{person}} (age elected when it opened)"
     }
   },
   "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",

@@ -283,6 +283,10 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .owner-choices input { accent-color: #174ea6; margin: 0; }
 .ownership-split, .ownership-row > label { display: grid; gap: 6px; margin-top: 12px; }
 .ownership-row input[type="number"] { max-width: 180px; }
+.ownership-row .question-answer { margin: 8px 0; }
+.choice-group.compact { margin: 8px 0 4px; gap: 8px; }
+.choice-group.compact label { padding: 10px 12px; }
+.question-subhead { margin: 14px 0 0; font-weight: 600; color: #172b3a; }
 /* BE-13 A: the recorded basis of the saving figure. One block in both entry
    modes, so an inclusion answer reads the same wherever it was given. */
 .budget-method { max-width: 620px; margin: 18px 0 22px; }

@@ -1222,6 +1222,15 @@
       },
       "housing_ownership": {
         "question": "Au nom de qui est chaque bien immobilier?"
+      },
+      "saving_earned": {
+        "question": "Combien gagnez-vous en revenus de travail cette année?"
+      },
+      "account_rrsp_type": {
+        "question": "De quel type de REER s’agit-il?"
+      },
+      "account_rrif_details": {
+        "question": "Quand le FERR a-t-il été ouvert et quel minimum s’applique?"
       }
     },
     "ownership": {
@@ -1241,6 +1250,34 @@
     },
     "qcDrug": {
       "intro": "Le Québec perçoit une prime d’assurance médicaments dans la déclaration des personnes couvertes par le régime public de la RAMQ. Une personne couverte par un régime collectif privé, ou exemptée, ne paie rien. Choisissez la couverture de chacun pour toute l’année."
+    },
+    "earned": {
+      "intro": "Revenu d’emploi ou de travail autonome avant impôt, pour chaque personne. Vous pouvez passer cette question : elle ne sert qu’à l’aperçu des droits de cotisation REER, et votre plan donne le même résultat sans elle.",
+      "label": "{{person}} : revenus de travail cette année",
+      "optional": "Facultatif",
+      "recorded": "Enregistré",
+      "clear": "Effacer"
+    },
+    "accountType": {
+      "intro": "La plupart des gens ont un REER ordinaire. Choisissez un autre type seulement si votre relevé l’indique.",
+      "rrsp": "Un REER ordinaire",
+      "rrspDetail": "Il devient un FERR ou une rente au plus tard à la fin de l’année des 71 ans du titulaire.",
+      "spousalRrsp": "Un REER de conjoint",
+      "spousalRrspDetail": "Un conjoint a cotisé pour l’autre. Un retrait dans les trois ans suivant une cotisation peut être imposé au cotisant.",
+      "rrif": "Déjà converti en FERR",
+      "rrifDetail": "Un minimum prescrit doit être retiré chaque année, à partir de l’année suivant l’ouverture.",
+      "lif": "Un FRV",
+      "lifDetail": "Un fonds de revenu viager issu d’une épargne-retraite immobilisée, avec un minimum et un maximum annuels."
+    },
+    "rrif": {
+      "intro": "Le minimum annuel dépend de ces faits. Passez ceux que vous ne pouvez pas confirmer; le résultat indiquera alors un minimum limité.",
+      "openedYear": "Année d’ouverture du FERR",
+      "category": "Quelle catégorie de facteur prescrit s’applique?",
+      "qualifyingDetail": "En général, un FERR ouvert avant 1993 sans nouvel apport depuis 1992.",
+      "allOtherDetail": "Tous les autres FERR, y compris ceux ouverts en 1993 ou après.",
+      "notConfirmed": "Pas encore confirmé",
+      "election": "L’âge de qui sert au calcul du minimum?",
+      "electedAge": "{{person}} (âge choisi à l’ouverture)"
     }
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",

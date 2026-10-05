@@ -1,5 +1,5 @@
-import type { InputsV2 } from '../engine/model'
-import { refreshCanonicalFromLegacy } from '../engine/migration'
+import type { Account, InputsV2 } from '../engine/model'
+import { derivedAccountId, refreshCanonicalFromLegacy } from '../engine/migration'
 import { legacyFhsaMirror } from '../engine/fhsaPlan'
 import { useStore } from '../store'
 
@@ -30,6 +30,13 @@ export function commitCanonicalEdit(change: (draft: InputsV2) => void): void {
   const mirroredFhsa = legacyFhsaMirror(draft, state.inputs.fhsa?.openedYearsAgo)
   const inputs = mirroredFhsa ? { ...state.inputs, fhsa: mirroredFhsa } : state.inputs
   state.commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta, draftByField: state.draftByField })
+}
+
+/** Apply one change to a registered account and its recorded partner half, so
+ * a split account always keeps one type and one set of RRIF facts. */
+export function commitRegisteredRowEdit(accountId: string, change: (item: Account) => void): void {
+  const rowIds = [accountId, derivedAccountId(accountId)]
+  commitCanonicalEdit(draft => { for (const item of draft.accounts) if (rowIds.includes(item.id)) change(item) })
 }
 
 /** The recorded canonical plan, or the one the current form would migrate to. */

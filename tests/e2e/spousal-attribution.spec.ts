@@ -24,7 +24,7 @@ async function seed(page: Page, options: { guided?: boolean; currentAge?: number
     const canonical = refreshCanonicalFromLegacy(null, inputs)
     localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
       inputs, canonical, entryMode: guided ? 'guided' : 'professional', guidedView: guided ? 'results' : 'questionnaire',
-      inputRevision: 0, resultRevision: guided ? 0 : null,
+      inputRevision: 0, resultRevision: guided ? 0 : null, questionAnswers: guided ? { 'assets.identify': ['rrsp'] } : {},
     } }))
   }, options)
   await page.reload()
@@ -118,9 +118,10 @@ test('guided records the premium history and keeps it through reload and a mode 
   // the plan type and its history with the other tax details.
   await page.goto('/#/guided/assets/assets.ownership')
   await page.getByTestId(`owner-choice-${ACCOUNT}-self`).check()
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await page.getByTestId(`registered-type-${ACCOUNT}-spousalRrsp`).check()
   await page.goto('/#/guided/income/income.taxFacts')
   const year = await baseYear(page)
-  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
   await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toBeVisible()
   await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
   await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 5_000 })

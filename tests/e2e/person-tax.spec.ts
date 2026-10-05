@@ -282,11 +282,14 @@ test('RRIF age-71 category is explicit and shared across Professional and Guided
   await category.selectOption('qualifying')
   await expect(page.getByTestId('person-tax-table')).toBeVisible()
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
+  // FE-43 B: guided asks the RRIF facts on their own page, as choice cards.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(category).toHaveValue('qualifying')
+  await page.goto('/#/guided/assets/account.rrif.details')
+  const guidedCategory = page.getByTestId('guided-rrif-category-legacy:account:rrsp-qualifying')
+  await expect(guidedCategory).toBeChecked()
+  await expect(page.getByTestId('guided-rrif-opened-legacy:account:rrsp')).toHaveValue('1990')
   await page.reload()
-  await expect(category).toHaveValue('qualifying')
+  await expect(guidedCategory).toBeChecked()
 })
 
 test('each spouse records their own registered balance; the household total is conserved and results stay honest', async ({ page }) => {
@@ -475,16 +478,17 @@ test('the registered-type control is present in every ownership state in both en
     .filter((account: { id: string }) => ['legacy:account:rrsp', 'legacy:account:rrsp:partner'].includes(account.id))
     .map((account: { kind: string }) => account.kind))
   expect(kinds.sort()).toEqual(['spousalRrsp', 'spousalRrsp'])
-  // Guided mode shows the same controls in every state.
+  // Guided mode shows the same types in every state, on the account-type page.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toBeVisible()
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toHaveValue('spousalRrsp')
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toBeChecked()
+  await expect(page.getByTestId('registered-type-legacy:account:locked-lif')).toBeChecked()
   await page.goto('/#/guided/assets/assets.ownership')
   await page.getByTestId('owner-choice-legacy:account:rrsp-partner').check()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toBeVisible()
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toBeChecked()
   await expect(page.getByTestId('registered-type-legacy:account:locked')).toBeVisible()
+  expect(await page.locator('[data-testid="guided-registered-type"] .ownership-row').count()).toBe(2)
 })
 
 test('an investment property split records both amounts, conserves the value and survives reload', async ({ page }) => {
