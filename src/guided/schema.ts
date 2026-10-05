@@ -1,7 +1,7 @@
 import type { Inputs } from '../engine'
 import type { InputsV2 } from '../engine/model'
 
-export type CategoryId = 'family' | 'saving' | 'assets' | 'housing' | 'spending' | 'income' | 'preferences'
+export type CategoryId = 'family' | 'saving' | 'assets' | 'housing' | 'spending' | 'income' | 'preferences' | 'taxDetails'
 export type QuestionAnswer = string | boolean | string[]
 export type QuestionAnswers = Record<string, QuestionAnswer>
 

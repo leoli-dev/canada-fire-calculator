@@ -464,6 +464,10 @@ test('final review replaces the redundant assumption page without overwriting co
   await page.getByRole('button', { name: '加拿大央行目标 · 2.0%' }).click()
   await page.goto('/#/guided/preferences/invest.strategy')
   await page.getByRole('radio', { name: /RRSP 分段提取/ }).check()
+  // FE-43 C: an optional tax-details category follows; skipping it goes straight to the review.
+  await page.locator('.question-pager button').last().click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'tax.intro')
+  await page.getByTestId('guided-tax-intro-choice-skip').check()
   await page.locator('.question-pager').getByRole('button', { name: '核对答案' }).click()
 
   await expect(page.getByRole('heading', { name: '核对你的答案' })).toBeVisible()

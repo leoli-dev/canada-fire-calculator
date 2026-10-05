@@ -39,8 +39,6 @@
   "be11AuxiliaryEstimate": "The timing, strategy and Monte Carlo tools below still use the earlier single-person approximation; their rankings are estimates.",
   "be11": {
     "title": "Who receives and owns taxable income",
-    "reviewed": "I reviewed these tax facts",
-    "unknownStill": "I cannot confirm them yet; keep results as estimates",
     "personLedger": "Tax by person and year",
     "ledgerLimit": "Annual tax uses the pinned 2026 real-dollar assumptions. Estate tax, other solvers and complex funding events require further person-owned rules.",
     "person": "Person",
@@ -903,7 +901,8 @@
       "housing": "Housing and loans",
       "spending": "Retirement life",
       "income": "Other retirement income",
-      "preferences": "Preferences and assumptions"
+      "preferences": "Preferences and assumptions",
+      "taxDetails": "Tax details (optional)"
     },
     "status": {
       "answered": "answered",
@@ -1016,9 +1015,6 @@
       }
     },
     "pages": {
-      "income_taxFacts": {
-        "question": "Who receives each income and owns the taxable assets?"
-      },
       "family_people": {
         "question": "Is this plan for you alone or for you and a partner?"
       },
@@ -1222,6 +1218,24 @@
       },
       "account_rrif_details": {
         "question": "When was the RRIF opened, and which minimum applies?"
+      },
+      "tax_intro": {
+        "question": "Do you want to add contribution room and other tax details?"
+      },
+      "tax_tfsaRoom": {
+        "question": "How much TFSA room do you have?"
+      },
+      "tax_rrspRoom": {
+        "question": "How much RRSP room do you have?"
+      },
+      "tax_fhsaRoom": {
+        "question": "How much FHSA room do you have this year?"
+      },
+      "tax_pensionSplit": {
+        "question": "Will you split pension income between you?"
+      },
+      "tax_spousalHistory": {
+        "question": "What has been paid into the spousal RRSP?"
       }
     },
     "ownership": {
@@ -1269,6 +1283,36 @@
       "notConfirmed": "Not confirmed yet",
       "election": "Whose age sets the minimum?",
       "electedAge": "{{person}} (age elected when it opened)"
+    },
+    "taxDetails": {
+      "intro": "These figures come from your CRA My Account or your latest notice of assessment. Skipping is fine: your results stay the same, and the plan assumes your planned contributions fit within your room, as an estimate. Entering them adds a room check to each account.",
+      "add": "Add the details",
+      "addDetail": "About five minutes with CRA My Account or your notice of assessment.",
+      "skip": "Skip to the review",
+      "skipDetail": "You can come back to this section at any time.",
+      "tfsaIntro": "Enter the TFSA contribution room CRA shows for January 1 of this year. Leave it blank if you do not have it.",
+      "tfsaRoom": "TFSA room on January 1",
+      "tfsaMore": "Withdrawals this year and the room check",
+      "rrspIntro": "Your notice of assessment shows an RRSP deduction limit and your available contribution room. Enter the available room; the other lines are optional.",
+      "rrspRoom": "Available RRSP contribution room",
+      "rrspMore": "Other statement lines, a planned contribution and the room check",
+      "fhsaIntro": "FHSA room belongs to the account holder. Enter the participation room available this year from CRA My Account.",
+      "fhsaRoom": "FHSA participation room this year",
+      "fhsaMore": "Opening year, past contributions, planned amount and the room check",
+      "fhsaNoHolder": "Say whose FHSA it is on the ownership page first: the room belongs to the holder.",
+      "withinRoom": "This year’s plan puts {{planned}} into this account, within the room you entered.",
+      "overRoom": "This year’s plan puts {{planned}} into this account, {{retained}} more than the room you entered. The projection does not cap contributions yet, so lower the amount or the savings split.",
+      "noPlan": "No contribution to this account is planned this year.",
+      "splitIntro": "Couples can split eligible pension income on their returns with federal form T1032. In Quebec, Schedule Q is a separate choice. Skip this if you have not decided.",
+      "splitNo": "No pension splitting",
+      "splitYes": "Yes, record the election",
+      "splitYesDetail": "Choose who transfers income and the yearly amount.",
+      "spousalIntro": "A spousal RRSP withdrawal can be taxed to the contributor when contributions were made that year or in the two years before. Record whether the history below is complete.",
+      "reviewSkipped": "Skipped",
+      "reviewRecorded": "{{answered}} of {{total}} recorded",
+      "allocationOver": "{{account}} ({{person}}): this year’s split sends {{planned}}, more than the {{room}} of room recorded in Tax details. The projection does not cap contributions yet.",
+      "howCounted": "How this room is counted",
+      "notAttributed": "Your household savings split is not divided between the two of you yet, so this room is not checked against it."
     }
   },
   "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",

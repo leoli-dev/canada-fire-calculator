@@ -69,7 +69,9 @@ const RRSP_STATEMENT_FIELDS = [
 
 /** BE-12 A statement facts and the recomputed room row, shared by both modes.
  * Unknown is a real, visible state and is never coerced to zero. */
-export function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+export function RrspRoomRow({ person, plan, onEdit, guided = false }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void
+  /** Guided pages ask the available room above this row and show the rest as advanced detail. */
+  guided?: boolean }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -113,9 +115,9 @@ export function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: In
   const role = person.role
   return <div role="group" aria-label={t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}
     data-testid={`rrsp-statement-${role}`}>
-    <h5>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</h5>
-    <p className="hint">{t('be12.explanation')}</p>
-    {RRSP_STATEMENT_FIELDS.map(([field, label]) => <label key={field}>{t(label)}
+    {!guided && <h5>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</h5>}
+    {!guided && <p className="hint">{t('be12.explanation')}</p>}
+    {RRSP_STATEMENT_FIELDS.filter(([field]) => !guided || field !== 'rrspAvailableRoom').map(([field, label]) => <label key={field}>{t(label)}
       <input type="number" min="0" step="1" data-testid={`${field === 'rrspDeductionLimit' ? 'rrsp-deduction-limit' :
         field === 'rrspAvailableRoom' ? 'rrsp-available-room' :
         field === 'rrspUnusedUndeducted' ? 'rrsp-unused-undeducted' :
@@ -175,11 +177,13 @@ export function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: In
  * maturity clock is displayed as out of scope rather than as room still
  * available.
  */
-export function FhsaRoomRow({ person, account, plan, onEdit }: {
+export function FhsaRoomRow({ person, account, plan, onEdit, guided = false }: {
   person: Person
   account: Account | undefined
   plan: InputsV2
   onEdit: (change: (draft: InputsV2) => void) => void
+  /** Guided pages ask the participation room above this row. */
+  guided?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
@@ -245,8 +249,8 @@ export function FhsaRoomRow({ person, account, plan, onEdit }: {
   }
   const maturityReached = account?.openedYear.status === 'known' && plan.baseYear - account.openedYear.value >= 15
   return <div role="group" aria-label={t('be36.person', { person: ownerLabel })} data-testid={`fhsa-statement-${role}`}>
-    <h5>{t('be36.person', { person: ownerLabel })}</h5>
-    <p className="hint">{t('be36.explanation')}</p>
+    {!guided && <h5>{t('be36.person', { person: ownerLabel })}</h5>}
+    {!guided && <p className="hint">{t('be36.explanation')}</p>}
     {!account
       ? <p className="hint" role="status" data-testid={`fhsa-no-account-${role}`}>{t('be36.noAccount')}</p>
       : <>
@@ -269,14 +273,14 @@ export function FhsaRoomRow({ person, account, plan, onEdit }: {
             placeholder={t('be12.unknown')}
             onBlur={event => setPriorContributions(event.currentTarget.value)} />
         </label>
-        <label>{t('be36.openingRoom')}
+        {!guided && <><label>{t('be36.openingRoom')}
           <input type="number" min="0" step="1" data-testid={`fhsa-opening-room-${role}`}
             key={`opening:${account.id}:${account.contributionRoom.status === 'known' ? account.contributionRoom.value : 'unknown'}`}
             defaultValue={account.contributionRoom.status === 'known' ? account.contributionRoom.value : ''}
             placeholder={t('be12.unknown')}
             onBlur={event => setOpeningRoom(event.currentTarget.value)} />
         </label>
-        <p className="hint">{t('be36.openingRoomNote')}</p>
+        <p className="hint">{t('be36.openingRoomNote')}</p></>}
         <label>{t('be36.planned')}
           <input type="number" min="0" step="1" data-testid={`fhsa-planned-${role}`}
             key={`planned:${account.id}:${planShare}`}
@@ -318,7 +322,9 @@ export function FhsaRoomRow({ person, account, plan, onEdit }: {
  * withdrawals recorded here are the only thing that restores room, and the row
  * says when that happens instead of implying it happens immediately.
  */
-export function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+export function TfsaRoomRow({ person, plan, onEdit, guided = false }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void
+  /** Guided pages ask the CRA room above this row. */
+  guided?: boolean }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -360,7 +366,7 @@ export function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: In
     writeWithdrawals(rows => rows.map(row => { if (row.id !== id) return row; const next = { ...row }; change(next); return next }))
   const removeWithdrawal = (id: string) => writeWithdrawals(rows => rows.filter(row => row.id !== id))
   return <div role="group" aria-label={t('be27.person', { person: ownerLabel })} data-testid={`tfsa-statement-${role}`}>
-    <h5>{t('be27.person', { person: ownerLabel })}</h5>
+    {!guided && <><h5>{t('be27.person', { person: ownerLabel })}</h5>
     <p className="hint">{t('be27.explanation')}</p>
     <label>{t('be27.availableRoom')}
       <input type="number" min="0" step="1" data-testid={`tfsa-available-room-${role}`}
@@ -369,7 +375,7 @@ export function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: In
         placeholder={t('be12.unknown')}
         onBlur={event => writeRoom(event.currentTarget.value)} />
     </label>
-    <p className="hint">{t('be27.availableRoomNote')}</p>
+    <p className="hint">{t('be27.availableRoomNote')}</p></>}
     <p className="hint">{t('be27.withdrawalsHelp')}</p>
     {withdrawals.map(row => <div key={row.id} data-testid={`tfsa-withdrawal-${row.id}`}>
       <label>{t('be27.withdrawalYear')}

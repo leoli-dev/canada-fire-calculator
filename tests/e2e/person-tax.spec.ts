@@ -70,7 +70,9 @@ test('explicit DB pension election changes the normal person tax ledger in both 
   await expect(table.locator('tbody tr').first()).toContainText('20,000')
   await expect(table.locator('tbody tr').nth(1)).toContainText('20,000')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
+  // FE-43 C: the election is on the optional pension-split page.
+  await page.goto('/#/guided/taxDetails/tax.pensionSplit')
+  await expect(page.getByTestId('guided-pension-split-choice-yes')).toBeChecked()
   await expect(page.getByTestId('split-amount')).toHaveValue('20000')
   await page.reload()
   await expect(page.getByTestId('split-amount')).toHaveValue('20000')
@@ -127,7 +129,8 @@ test('QC spouse coverage is independent and the Quebec election is separate from
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/family/family.qcDrug')
   await expect(page.getByTestId('qc-coverage-all-partner-waived')).toBeChecked()
-  await page.goto('/#/guided/income/income.taxFacts')
+  await page.goto('/#/guided/taxDetails/tax.pensionSplit')
+  await expect(page.getByTestId('split-transferor')).toHaveValue('legacy:person:self')
   await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
 })
 

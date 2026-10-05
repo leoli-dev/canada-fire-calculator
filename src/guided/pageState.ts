@@ -5,6 +5,7 @@ import type { AnswerMeta } from '../store'
 import type { QuestionDefinition } from './schema'
 import { accountOwnershipComplete, propertyOwnershipComplete, qcCoverageComplete } from './householdFacts'
 import { earnedIncomeComplete, hasRecordedRegisteredType, rrifDetailsComplete } from './accountFacts'
+import { fhsaRoomComplete, pensionSplitRecorded, rrspRoomComplete, spousalHistoryComplete, tfsaRoomComplete } from './taxDetails'
 
 /** The store slice page completeness actually reads. */
 export interface PageState {
@@ -60,9 +61,14 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }
-  // Unknown tax facts are a valid saved state: guided users may still see a
-  // labelled legacy preview, while the person-tax capability remains gated.
-  if (definition.id === 'income.taxFacts') return true
+  // FE-43 C: the optional tax-details category. Unknown tax facts stay a valid
+  // saved state; these pages only report whether the facts are recorded.
+  if (definition.id === 'tax.intro') return state.questionAnswers['tax.intro'] !== undefined
+  if (definition.id === 'tax.tfsaRoom') return tfsaRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.rrspRoom') return rrspRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.fhsaRoom') return fhsaRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.pensionSplit') return state.questionAnswers['tax.pensionSplit'] !== undefined || pensionSplitRecorded(householdPlan(state))
+  if (definition.id === 'tax.spousalHistory') return spousalHistoryComplete(householdPlan(state))
   if (definition.id === 'budget.method') {
     const budget = state.canonical?.budget
     // Answering an inclusion fact is itself an answer to the mode question, so

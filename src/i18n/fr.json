@@ -39,8 +39,6 @@
   "be11AuxiliaryEstimate": "Les outils de calendrier, stratégie et Monte Carlo ci-dessous utilisent encore l’ancienne approximation individuelle; leurs classements sont estimatifs.",
   "be11": {
     "title": "Bénéficiaire et propriétaire du revenu imposable",
-    "reviewed": "J’ai vérifié ces données fiscales",
-    "unknownStill": "Je ne peux pas encore les confirmer; garder des estimations",
     "personLedger": "Impôt par personne et par année",
     "ledgerLimit": "L’impôt annuel utilise les hypothèses de 2026 en dollars réels. L’impôt successoral, les autres solveurs et les événements complexes exigent d’autres règles individuelles.",
     "person": "Personne",
@@ -903,7 +901,8 @@
       "housing": "Logement et prêts",
       "spending": "Vie à la retraite",
       "income": "Autres revenus de retraite",
-      "preferences": "Préférences et hypothèses"
+      "preferences": "Préférences et hypothèses",
+      "taxDetails": "Détails fiscaux (facultatif)"
     },
     "status": {
       "answered": "répondu",
@@ -1016,9 +1015,6 @@
       }
     },
     "pages": {
-      "income_taxFacts": {
-        "question": "Qui reçoit chaque revenu et possède les actifs imposables?"
-      },
       "family_people": {
         "question": "Ce plan est-il pour vous seul ou avec un conjoint?"
       },
@@ -1231,6 +1227,24 @@
       },
       "account_rrif_details": {
         "question": "Quand le FERR a-t-il été ouvert et quel minimum s’applique?"
+      },
+      "tax_intro": {
+        "question": "Voulez-vous ajouter vos droits de cotisation et d’autres détails fiscaux?"
+      },
+      "tax_tfsaRoom": {
+        "question": "Combien de droits de cotisation CELI avez-vous?"
+      },
+      "tax_rrspRoom": {
+        "question": "Combien de droits de cotisation REER avez-vous?"
+      },
+      "tax_fhsaRoom": {
+        "question": "Combien de droits de participation CELIAPP avez-vous cette année?"
+      },
+      "tax_pensionSplit": {
+        "question": "Allez-vous fractionner votre revenu de pension?"
+      },
+      "tax_spousalHistory": {
+        "question": "Quelles cotisations ont été versées au REER de conjoint?"
       }
     },
     "ownership": {
@@ -1278,6 +1292,36 @@
       "notConfirmed": "Pas encore confirmé",
       "election": "L’âge de qui sert au calcul du minimum?",
       "electedAge": "{{person}} (âge choisi à l’ouverture)"
+    },
+    "taxDetails": {
+      "intro": "Ces montants viennent de Mon dossier de l’ARC ou de votre dernier avis de cotisation. Vous pouvez passer cette section : vos résultats restent les mêmes, et le plan suppose, à titre d’estimation, que vos cotisations prévues respectent vos droits. Les inscrire ajoute une vérification des droits pour chaque compte.",
+      "add": "Ajouter les détails",
+      "addDetail": "Environ cinq minutes avec Mon dossier ou votre avis de cotisation.",
+      "skip": "Passer à la révision",
+      "skipDetail": "Vous pouvez revenir à cette section quand vous voulez.",
+      "tfsaIntro": "Inscrivez les droits de cotisation CELI que l’ARC indique au 1er janvier de cette année. Laissez vide si vous ne les avez pas.",
+      "tfsaRoom": "Droits CELI au 1er janvier",
+      "tfsaMore": "Retraits de l’année et vérification des droits",
+      "rrspIntro": "Votre avis de cotisation indique un plafond de déduction REER et vos droits de cotisation disponibles. Inscrivez les droits disponibles; les autres lignes sont facultatives.",
+      "rrspRoom": "Droits de cotisation REER disponibles",
+      "rrspMore": "Autres lignes du relevé, cotisation prévue et vérification des droits",
+      "fhsaIntro": "Les droits CELIAPP appartiennent au titulaire du compte. Inscrivez les droits de participation disponibles cette année selon Mon dossier.",
+      "fhsaRoom": "Droits de participation CELIAPP cette année",
+      "fhsaMore": "Année d’ouverture, cotisations passées, montant prévu et vérification des droits",
+      "fhsaNoHolder": "Indiquez d’abord à qui appartient le CELIAPP à la page des propriétaires : les droits appartiennent au titulaire.",
+      "withinRoom": "Le plan de cette année verse {{planned}} dans ce compte, dans les limites des droits inscrits.",
+      "overRoom": "Le plan de cette année verse {{planned}} dans ce compte, soit {{retained}} de plus que les droits inscrits. La projection ne plafonne pas encore les cotisations : réduisez le montant ou la répartition de l’épargne.",
+      "noPlan": "Aucune cotisation à ce compte n’est prévue cette année.",
+      "splitIntro": "Les couples peuvent fractionner leur revenu de pension admissible avec le formulaire fédéral T1032. Au Québec, l’annexe Q est un choix distinct. Passez cette question si vous n’avez pas décidé.",
+      "splitNo": "Aucun fractionnement",
+      "splitYes": "Oui, inscrire le choix",
+      "splitYesDetail": "Choisissez qui transfère le revenu et le montant annuel.",
+      "spousalIntro": "Un retrait d’un REER de conjoint peut être imposé au cotisant si des cotisations ont été versées cette année-là ou les deux années précédentes. Indiquez si l’historique ci-dessous est complet.",
+      "reviewSkipped": "Passé",
+      "reviewRecorded": "{{answered}} sur {{total}} inscrits",
+      "allocationOver": "{{account}} ({{person}}) : la répartition de cette année verse {{planned}}, plus que les {{room}} de droits inscrits dans les détails fiscaux. La projection ne plafonne pas encore les cotisations.",
+      "howCounted": "Comment ces droits sont calculés",
+      "notAttributed": "La répartition de l’épargne du ménage n’est pas encore divisée entre vous deux; ces droits ne sont donc pas comparés à elle."
     }
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",

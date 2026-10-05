@@ -287,6 +287,18 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .choice-group.compact { margin: 8px 0 4px; gap: 8px; }
 .choice-group.compact label { padding: 10px 12px; }
 .question-subhead { margin: 14px 0 0; font-weight: 600; color: #172b3a; }
+/* FE-43 C: advanced statement detail inside a guided page. */
+.guided-advanced { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.guided-advanced > summary { cursor: pointer; color: #174ea6; font-weight: 600; font-size: .92rem; }
+.guided-advanced[open] > summary { margin-bottom: 6px; }
+.guided-advanced label, .guided-advanced-body label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 200px); gap: 6px 16px; align-items: center; margin: 8px 0; color: #172b3a; }
+.guided-advanced label.hint, .guided-advanced-body label.hint { grid-template-columns: minmax(0, 1fr) auto; }
+.guided-advanced input:not([type="checkbox"]), .guided-advanced select, .guided-advanced-body input:not([type="checkbox"]), .guided-advanced-body select { width: 100%; min-width: 0; }
+.guided-advanced p, .guided-advanced-body p { max-width: 620px; }
+.allocation-room-hint { max-width: 620px; margin-top: 12px; }
+@media (max-width: 560px) {
+  .guided-advanced label, .guided-advanced-body label { grid-template-columns: minmax(0, 1fr); }
+}
 /* BE-13 A: the recorded basis of the saving figure. One block in both entry
    modes, so an inclusion answer reads the same wherever it was given. */
 .budget-method { max-width: 620px; margin: 18px 0 22px; }

@@ -19,10 +19,10 @@ import { PensionSourceNote } from '../PensionSourceNote'
 import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
 import { BudgetMethodPanel } from '../BudgetMethodPanel'
-import { TaxFactsPanel } from '../TaxFactsPanel'
 import { useCanonicalPlan } from '../../forms/canonicalEdit'
 import { AccountOwnershipChecklist, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
 import { EarnedIncomeQuestion, RegisteredTypeQuestion, RrifDetailsQuestion } from './AccountFacts'
+import { FhsaRoomQuestion, PensionSplitQuestion, RrspRoomQuestion, SavingsRoomHint, SpousalHistoryQuestion, TaxDetailsIntro, TfsaRoomQuestion } from './TaxDetails'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
@@ -169,17 +169,23 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
 
   let control: React.ReactNode
   switch (definition.id) {
-    case 'income.taxFacts':
-      // FE-43 A/B: ownership, spouse support, Quebec coverage, employment
-      // income and the account type moved to their own pages; this page keeps
-      // the sections that have not moved yet.
-      control = <div>
-        <TaxFactsPanel sections={['pensionSplit', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'spousal']} />
-        <ChoiceGroup id={definition.id} value={answer} options={[
-          { value: 'reviewed', label: t('be11.reviewed') },
-          { value: 'unknown', label: t('be11.unknownStill') },
-        ]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
-      </div>
+    case 'tax.intro':
+      control = <TaxDetailsIntro />
+      break
+    case 'tax.tfsaRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.tfsaIntro')}</p><TfsaRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.rrspRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.rrspIntro')}</p><RrspRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.fhsaRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.fhsaIntro')}</p><FhsaRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.pensionSplit':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.splitIntro')}</p><PensionSplitQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.spousalHistory':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.spousalIntro')}</p><SpousalHistoryQuestion plan={canonicalPlan} /></>
       break
     case 'family.spouseSupport':
       control = <SpouseSupportQuestion plan={canonicalPlan} />
@@ -331,6 +337,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
           <strong>{t('questionnaire.allocationTotal', { total })}</strong>
           <span>{isComplete ? t('questionnaire.allocationComplete') : total < 100 ? t('questionnaire.allocationRemaining', { difference }) : t('questionnaire.allocationOver', { difference })}</span>
         </div>
+        <SavingsRoomHint plan={canonicalPlan} />
       </div>
       break
     }

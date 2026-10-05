@@ -1,6 +1,7 @@
 import type { Inputs } from '../engine'
 import type { InputsV2 } from '../engine/model'
 import { hasRecordedRegisteredType } from './accountFacts'
+import { spousalPlanAccounts, taxDetailsSkipped } from './taxDetails'
 import type { CategoryDefinition, QuestionAnswers, QuestionDefinition } from './schema'
 
 export const QUESTION_CATEGORIES: readonly CategoryDefinition[] = [
@@ -11,6 +12,7 @@ export const QUESTION_CATEGORIES: readonly CategoryDefinition[] = [
   { id: 'spending', contentKey: 'spending' },
   { id: 'income', contentKey: 'income' },
   { id: 'preferences', contentKey: 'preferences' },
+  { id: 'taxDetails', contentKey: 'taxDetails' },
 ]
 
 const page = (
@@ -115,7 +117,6 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('pension.partner', 'income', ['pensionKind'], ['partner.pension'], { applicableWhen: (i) => !!i.partner }),
   page('pension.partner.details', 'income', ['pensionAmount', 'pensionStart'], ['partner.pension.annualAmount', 'partner.pension.startAge'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
   page('pension.partner.indexing', 'income', ['pensionIndexing', 'pensionBridge'], ['partner.pension.indexation', 'partner.pension.bridgeAnnual'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
-  page('income.taxFacts', 'income', ['taxFacts'], [], { estimatePolicy: 'none' }),
 
   page('intent.legacy', 'preferences', ['legacyPreference'], [], { estimatePolicy: 'none' }),
   page('intent.spending', 'preferences', ['spendingPreference'], ['goal'], { estimatePolicy: 'none' }),
@@ -123,6 +124,15 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('invest.fees', 'preferences', ['investmentFees', 'inflation'], ['fees', 'inflation'], { estimatePolicy: 'assumption' }),
   page('invest.tax', 'preferences', ['distributions', 'workingTaxRate'], ['nonRegDistributionYield', 'accumulationMarginalRate'], { estimatePolicy: 'assumption' }),
   page('invest.strategy', 'preferences', ['withdrawalStrategy'], ['strategy'], { estimatePolicy: 'assumption' }),
+
+  // FE-43 C: CRA room figures and the remaining tax elections, in one optional
+  // last category. Skipping it hides the rest of it and never blocks results.
+  page('tax.intro', 'taxDetails', ['taxDetailsChoice'], [], { estimatePolicy: 'none', optional: true }),
+  page('tax.tfsaRoom', 'taxDetails', ['tfsaRoom'], [], { applicableWhen: (_i, a) => !taxDetailsSkipped(a), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.rrspRoom', 'taxDetails', ['rrspRoom'], [], { applicableWhen: (_i, a) => !taxDetailsSkipped(a), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.fhsaRoom', 'taxDetails', ['fhsaRoom'], [], { applicableWhen: (i, a, plan) => !taxDetailsSkipped(a) && (!!i.fhsa || !!plan?.accounts.some((account) => account.kind === 'fhsa')), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.pensionSplit', 'taxDetails', ['pensionSplit'], [], { applicableWhen: (i, a) => !taxDetailsSkipped(a) && !!i.partner, prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.spousalHistory', 'taxDetails', ['spousalHistory'], [], { applicableWhen: (_i, a, plan) => !taxDetailsSkipped(a) && !!plan && spousalPlanAccounts(plan).length > 0, prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
 ]
 
 export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers, plan?: InputsV2 | null): QuestionDefinition[] {
@@ -142,6 +152,8 @@ export function pageById(id: string): QuestionDefinition | undefined {
     'allocation.nonReg': 'allocation.tfsa',
     'intent.confirm': 'intent.spending',
     'assumptions.review': 'invest.strategy',
+    // FE-43 C: the old all-in-one tax page now opens the optional category.
+    'income.taxFacts': 'tax.intro',
   }
   const resolvedId = aliases[id] ?? id
   return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)

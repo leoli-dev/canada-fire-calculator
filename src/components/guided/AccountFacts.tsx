@@ -7,25 +7,9 @@ import { useStore } from '../../store'
 import { useCad } from '../../format'
 import { NumberInput } from '../NumberInput'
 import { accountNameKey, usePersonLabel } from '../TaxFactsPanel'
+import { CardChoices } from './CardChoices'
 
 const LOCKED_ACCOUNT_ID = 'legacy:account:locked'
-
-/** Guided cards in the same look as the ownership checklist. */
-function CardChoices<T extends string>({ name, value, options, testId, onChange }: {
-  name: string
-  value: T | undefined
-  options: { value: T; label: string; detail?: string }[]
-  testId: string
-  onChange: (value: T) => void
-}) {
-  return <div className="choice-group compact" role="radiogroup" data-testid={testId}>
-    {options.map(option => <label key={option.value} className={value === option.value ? 'selected' : ''}>
-      <input type="radio" name={name} value={option.value} checked={value === option.value}
-        data-testid={`${testId}-${option.value}`} onChange={() => onChange(option.value)} />
-      <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
-    </label>)}
-  </div>
-}
 
 /** The household total of one registered row: the base account plus its recorded partner half. */
 function rowTotal(plan: InputsV2, account: Account): number {

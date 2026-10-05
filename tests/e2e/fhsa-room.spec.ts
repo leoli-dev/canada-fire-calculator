@@ -230,7 +230,9 @@ test('professional records an FHSA statement and shows the clipped, retained rem
 
 test('guided mode records the same FHSA facts and keeps explicit generate', async ({ page }) => {
   await seed(page, { guided: true })
-  await page.goto('/#/guided/income/income.taxFacts')
+  // FE-43 C: guided asks the participation room on its own optional page.
+  await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
+  await page.getByTestId('guided-fhsa-more-self').click()
   await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
   await recordStatement(page, 'self', { openedYear: '2026', prior: '0', opening: '0' })
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('8,000')
@@ -572,8 +574,8 @@ for (const guided of [false, true] as const) {
   const mode = guided ? 'guided' : 'professional'
   test(`${mode}: an unrelated panel edit preserves the recorded legacy FHSA opening age`, async ({ page }) => {
     await seedLegacyOpenedYearsAgo(page, 14, { guided })
-    if (guided) await page.goto('/#/guided/income/income.taxFacts')
-    await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
+    if (guided) await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
+    await expect(page.getByTestId('fhsa-opening-room-self')).toBeVisible()
     // Precondition: migration carries the answer in the legacy field and leaves
     // the canonical calendar year explicitly unknown.
     const before = await legacyFhsaAnswer(page)
@@ -587,8 +589,8 @@ for (const guided of [false, true] as const) {
 
   test(`${mode}: an unrelated panel edit does not erase valFhsaExpired`, async ({ page }) => {
     await seedLegacyOpenedYearsAgo(page, 15, { guided })
-    if (guided) await page.goto('/#/guided/income/income.taxFacts')
-    await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
+    if (guided) await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
+    await expect(page.getByTestId('fhsa-opening-room-self')).toBeVisible()
     const before = await legacyFhsaAnswer(page)
     expect(before.openedYearsAgo).toBe(15)
     expect(before.validationKeys).toContain('valFhsaExpired')
@@ -665,9 +667,11 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
   expect(await ownershipState(page)).toMatchObject({
     ownerIds: ['legacy:person:partner'], ownershipNeedsConfirmation: false })
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('fhsa-no-account-self')).toHaveCount(1)
-  await expect(page.getByTestId('fhsa-no-account-partner')).toHaveCount(0)
+  // Guided lists only the holder; the person without an FHSA has no room row.
+  await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
+  await expect(page.getByTestId('guided-fhsa-room').locator('.ownership-row')).toHaveCount(1)
+  await expect(page.getByTestId('fhsa-opening-room-self')).toHaveCount(0)
+  await page.getByTestId('guided-fhsa-more-partner').click()
   await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
   await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('contributions 6,000')
   await page.reload()

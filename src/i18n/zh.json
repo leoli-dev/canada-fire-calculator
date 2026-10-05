@@ -39,8 +39,6 @@
   "be11AuxiliaryEstimate": "下方开领时机、策略和蒙特卡洛工具仍使用旧单人近似，其排名仅供估算。",
   "be11": {
     "title": "应税收入的领取人与归属",
-    "reviewed": "我已核对这些税务事实",
-    "unknownStill": "目前无法确认；结果保持为估算",
     "personLedger": "逐人逐年税务表",
     "ledgerLimit": "年度税额沿用以2026年规则为基准的实际购买力假设。遗产税、其他求解器和复杂资金事件仍需逐人规则。",
     "person": "人员",
@@ -903,7 +901,8 @@
       "housing": "住房与贷款",
       "spending": "退休生活",
       "income": "其他退休收入",
-      "preferences": "偏好与假设"
+      "preferences": "偏好与假设",
+      "taxDetails": "税务细节（可选）"
     },
     "status": {
       "answered": "已回答",
@@ -1016,9 +1015,6 @@
       }
     },
     "pages": {
-      "income_taxFacts": {
-        "question": "每项收入由谁领取，应税资产归谁？"
-      },
       "family_people": {
         "question": "这份计划只看你自己，还是你和伴侣一起？"
       },
@@ -1231,6 +1227,24 @@
       },
       "account_rrif_details": {
         "question": "RRIF 哪年开户，适用哪种最低提款？"
+      },
+      "tax_intro": {
+        "question": "要补充供款额度和其他税务细节吗？"
+      },
+      "tax_tfsaRoom": {
+        "question": "TFSA 还有多少供款额度？"
+      },
+      "tax_rrspRoom": {
+        "question": "RRSP 还有多少供款额度？"
+      },
+      "tax_fhsaRoom": {
+        "question": "FHSA 今年还有多少额度？"
+      },
+      "tax_pensionSplit": {
+        "question": "你们会分拆养老金收入吗？"
+      },
+      "tax_spousalHistory": {
+        "question": "配偶 RRSP 有过哪些供款？"
       }
     },
     "ownership": {
@@ -1278,6 +1292,36 @@
       "notConfirmed": "暂未确认",
       "election": "按谁的年龄计算最低提款？",
       "electedAge": "{{person}}（开户时选定的年龄）"
+    },
+    "taxDetails": {
+      "intro": "这些数字来自 CRA My Account 或最近一次的税单（Notice of Assessment）。可以跳过：结果不会变，计划会按“计划供款在额度内”估算。填写后，每个账户会多一项额度核对。",
+      "add": "补充这些细节",
+      "addDetail": "打开 CRA My Account 或税单，大约五分钟。",
+      "skip": "跳过，直接核对",
+      "skipDetail": "之后随时可以回来填写。",
+      "tfsaIntro": "填写 CRA 显示的今年 1 月 1 日 TFSA 供款额度。没有这个数字可以留空。",
+      "tfsaRoom": "1 月 1 日的 TFSA 额度",
+      "tfsaMore": "今年的取款与额度核对",
+      "rrspIntro": "税单上有 RRSP 扣除上限和可用供款额度两项。填写可用供款额度即可，其他各行可选。",
+      "rrspRoom": "RRSP 可用供款额度",
+      "rrspMore": "税单其他各行、计划供款与额度核对",
+      "fhsaIntro": "FHSA 额度属于账户持有人。按 CRA My Account 填写今年可用的参与额度。",
+      "fhsaRoom": "今年的 FHSA 参与额度",
+      "fhsaMore": "开户年份、过往供款、计划金额与额度核对",
+      "fhsaNoHolder": "请先在归属页说明 FHSA 归谁：额度属于持有人。",
+      "withinRoom": "今年计划向这个账户存入 {{planned}}，在你填写的额度内。",
+      "overRoom": "今年计划向这个账户存入 {{planned}}，比你填写的额度多 {{retained}}。目前的推算还不会按额度截断供款，请调低金额或储蓄分配比例。",
+      "noPlan": "今年没有计划向这个账户供款。",
+      "splitIntro": "夫妻可以用联邦 T1032 表在报税时分拆符合条件的养老金收入。魁省的附表 Q 是另一项单独选择。还没决定可以跳过。",
+      "splitNo": "不分拆养老金",
+      "splitYes": "分拆，记录选择",
+      "splitYesDetail": "选择由谁转出收入，以及每年的金额。",
+      "spousalIntro": "如果当年或前两年向配偶 RRSP 供过款，取款可能计入供款人的收入纳税。请说明下面的供款记录是否完整。",
+      "reviewSkipped": "已跳过",
+      "reviewRecorded": "已记录 {{answered}}/{{total}}",
+      "allocationOver": "{{account}}（{{person}}）：今年的分配会存入 {{planned}}，超过税务细节中记录的 {{room}} 额度。目前的推算还不会按额度截断供款。",
+      "howCounted": "额度如何计算",
+      "notAttributed": "家庭储蓄分配还没有分到你们各自名下，所以这项额度暂不与它核对。"
     }
   },
   "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",
