@@ -124,9 +124,10 @@ export default function App() {
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
-          {precisionBlocked ? <ScenarioCard /> : <>
-          {taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
-          {!taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
+          {/* FE-37: gates withhold precise tax tools, never the charts. */}
+          {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
+          {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}
+          {!precisionBlocked && !taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}
@@ -145,6 +146,7 @@ export default function App() {
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
           {/* BE-26 A: the GIS/Allowance household row is stated, not implied. */}
           <BenefitCategoryPanel inputs={inputs} result={result} />
+          {!precisionBlocked && <>
           {!taxBlocked && canonical && <PersonTaxTable plan={canonical} result={result} />}
           {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
           {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}
@@ -154,8 +156,8 @@ export default function App() {
           {!taxBlocked && oldSingleTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
           }
-          <ScenarioCard />
           </>}
+          <ScenarioCard />
         </section>}
       </main>
 

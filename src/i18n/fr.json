@@ -1615,5 +1615,9 @@
   "resetConfirmTitle": "Effacer tout le plan?",
   "resetConfirmBody": "Cette action supprime votre plan actuel et le scénario A : chaque montant, réponse, feuille de catégories et choix revient à l’exemple. Votre langue et vos réglages d’affichage restent. Elle ne peut pas être annulée.",
   "resetCancel": "Garder mon plan",
-  "resetConfirm": "Tout effacer"
+  "resetConfirm": "Tout effacer",
+  "estimateSuccess": "Estimation : l’argent dure jusqu’à {{age}} ans.",
+  "estimateDepleted": "Estimation : l’argent s’épuise à {{age}} ans.",
+  "estimateShortfall": "Premier manque à {{age}} ans : {{shortfall}} des dépenses de cette année ne sont pas couverts.",
+  "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés."
 }

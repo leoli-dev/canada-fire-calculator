@@ -1615,5 +1615,9 @@
   "resetConfirmTitle": "清空整个计划吗？",
   "resetConfirmBody": "这会删除当前计划和方案 A：所有金额、答案、支出类别和选择都会恢复为示例值。语言和显示设置会保留。此操作无法撤销。",
   "resetCancel": "保留我的计划",
-  "resetConfirm": "全部清空"
+  "resetConfirm": "全部清空",
+  "estimateSuccess": "估算：资金可以维持到 {{age}} 岁。",
+  "estimateDepleted": "估算：资金在 {{age}} 岁耗尽。",
+  "estimateShortfall": "首次缺口在 {{age}} 岁：当年有 {{shortfall}} 的支出没有着落。",
+  "estimateChartsNote": "下面的图表是规划估算：在确认归属和其他未定事实之前，税额按家庭数字估算。"
 }

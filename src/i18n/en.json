@@ -1606,5 +1606,9 @@
   "resetConfirmTitle": "Clear the whole plan?",
   "resetConfirmBody": "This deletes your current plan and Scenario A: every amount, answer, category worksheet and choice goes back to the example. Your language and display settings stay. This cannot be undone.",
   "resetCancel": "Keep my plan",
-  "resetConfirm": "Clear everything"
+  "resetConfirm": "Clear everything",
+  "estimateSuccess": "Estimate: the money lasts to age {{age}}.",
+  "estimateDepleted": "Estimate: the money runs out at age {{age}}.",
+  "estimateShortfall": "First shortfall at age {{age}}: {{shortfall}} of that year's spending is not covered.",
+  "estimateChartsNote": "The charts below are planning estimates: taxes use household figures until ownership and the other open facts are confirmed."
 }

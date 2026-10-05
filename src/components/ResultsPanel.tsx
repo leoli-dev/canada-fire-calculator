@@ -94,15 +94,27 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               fireNumber?.value !== undefined && projectedAtFire! >= fireNumber.value
             : true
 
+  // FE-37: a gate lowers the wording to an estimate; it never withholds
+  // whether the money lasts or where the first shortfall is, so a failing plan
+  // is never reduced to one large final net worth.
+  const firstShortfall = result.rows.find((row) => row.shortfall > 0.5)
+  const estimateVerdict = <>
+    <p className={`verdict${result.success ? '' : ' verdict-bad'}`} data-testid="estimate-verdict">
+      {result.success ? t('estimateSuccess', { age: inputs.lifeExpectancy }) : t('estimateDepleted', { age: result.depletedAge })}</p>
+    {firstShortfall && <p data-testid="estimate-shortfall">{t('estimateShortfall', { age: firstShortfall.age, shortfall: cad(firstShortfall.shortfall) })}</p>}
+  </>
+
   if (props.legacyEstimate) return (
-    <div className="summary uncertain" data-testid="legacy-estimate">
+    <div className={`summary uncertain${result.success ? '' : ' bad'}`} data-testid="legacy-estimate">
+      {estimateVerdict}
       <p className="hint">{t(props.legacyOwnershipPending ? 'migrationLegacySummary'
         : props.budgetBasisExcluded ? 'budget.estimateExcluded' : 'migrationApproximate')}</p>
       <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     </div>
   )
 
-  if (props.taxEstimate) return <div className="summary uncertain" data-testid="person-tax-estimate">
+  if (props.taxEstimate) return <div className={`summary uncertain${result.success ? '' : ' bad'}`} data-testid="person-tax-estimate">
+    {estimateVerdict}
     <p className="hint">{t('be11TaxLimit')}</p>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
   </div>
