@@ -241,9 +241,9 @@ describe('BE-39 A / B3 / BL1: benefit-amount metadata follows the provenance, id
     // while the number and its recorded source are the estimator's
     expect(sourceOf(field)?.source).toBe('estimator')
     // independent literals: `estimateCppAt65(25, 45, 1)` = 9,278 and
-    // `estimateCppAt65(25, 45, 0.8)` = 7,422, `estimateOasAt65(40)` = 9,024
+    // `estimateCppAt65(25, 45, 0.8)` = 7,422, `estimateOasAt65(40)` = 9,150 (762.50 × 12, October-December 2026)
     expect(amountOf(field)).toBe(
-      field === 'cppAnnualAt65' ? 9_278 : field === 'partner.cppAnnualAt65' ? 7_422 : 9_024,
+      field === 'cppAnnualAt65' ? 9_278 : field === 'partner.cppAnnualAt65' ? 7_422 : 9_150,
     )
   })
 
@@ -312,7 +312,7 @@ describe('BE-39 A / B3 / BL1: benefit-amount metadata follows the provenance, id
       // amount stands, stays the estimator's, and the premise is flagged
       expect(guided).toEqual({ status: 'estimated', origin: 'default' })
       expect(professional).toEqual(guided)
-      expect(amountOf(field)).toBe(9_024)
+      expect(amountOf(field)).toBe(9_150)
       const provenance = sourceOf(field)
       // the household retires at 55, so the partner's retirement age is 55 too
       expect(pensionAmountWarning(provenance, 'oas', 55)).toEqual({ kind: 'estimatorNeedsReview' })

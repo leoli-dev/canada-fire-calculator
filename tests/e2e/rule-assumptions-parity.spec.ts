@@ -37,7 +37,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   expect(links[2]).toContain('t4032bc-july')
   expect(links[4]).toContain('/2026/')
   expect(links[6]).toContain('laws-lois.justice.gc.ca')
-  expect(links[7]).toContain('2026-quarterly-july-september')
+  expect(links[7]).toContain('2026-quarterly-october-december')
   expect(links[8]).toContain('table1_gis_for_single')
   expect(links[9]).toContain('allowance/benefit-amount')
   // The paths the pack does not price are named, not buried in a limitation

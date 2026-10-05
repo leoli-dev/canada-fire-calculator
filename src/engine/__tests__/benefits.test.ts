@@ -4,15 +4,30 @@ import type { Inputs } from '../types'
 import { DEVIATION_TOLERANCE } from '../rules'
 import {
   OAS_GIS_ALLOWANCE_2026_Q3,
-  allowanceAnnual,
+  allowanceAnnual as allowanceAnnualAnyQuarter,
   basisAnnualAmount,
-  benefitIncomeBasis,
-  gisAnnual,
-  gisHouseholdCategory,
+  benefitIncomeBasis as benefitIncomeBasisAnyQuarter,
+  gisAnnual as gisAnnualAnyQuarter,
+  gisHouseholdCategory as gisHouseholdCategoryAnyQuarter,
   gisWorkExemption,
   type BenefitIncomeBasis,
   type GisCategoryOptions,
 } from '../benefits'
+
+/**
+ * BE-45: this file pins the July-September 2026 pack against its own
+ * transcribed tables; the engine now defaults to the latest published quarter
+ * (benefitsQ4.test.ts). Every direct call below goes through these wrappers.
+ */
+const Q3 = { gisPack: OAS_GIS_ALLOWANCE_2026_Q3 }
+const benefitIncomeBasis: typeof benefitIncomeBasisAnyQuarter = (oas, ages, income, options = {}) =>
+  benefitIncomeBasisAnyQuarter(oas, ages, income, { ...Q3, ...options })
+const gisAnnual: typeof gisAnnualAnyQuarter = (oas, income, work = 0, options = {}) =>
+  gisAnnualAnyQuarter(oas, income, work, { ...Q3, ...options })
+const allowanceAnnual: typeof allowanceAnnualAnyQuarter = (oas, ages, income, options = {}) =>
+  allowanceAnnualAnyQuarter(oas, ages, income, { ...Q3, ...options })
+const gisHouseholdCategory: typeof gisHouseholdCategoryAnyQuarter = (oas, ages, options = {}) =>
+  gisHouseholdCategoryAnyQuarter(oas, ages, { ...Q3, ...options })
 
 /** The modelled category, or a failed test when the household is unsupported. */
 function categoryOf(result: ReturnType<typeof gisHouseholdCategory>) {
@@ -336,8 +351,10 @@ describe('GIS by household category', () => {
     // One pensioner at 65, the other 60-64 drawing the Allowance: Table 5 row
     // "spouse receives the Allowance" -> 676.09/month, 42,144 income cut-off;
     // the Allowance is 1,428.06/month, same income cut-off.
+    // The projection prices with the latest quarter (October-December 2026):
+    // (685.56 + 1,448.06) × 12 = 25,603.44.
     const r = runProjection(zeroIncomeCouple({ currentAge: 60, oasStartAge: 65 }))
-    expect(rowAt(r, 65).gis).toBeCloseTo(PENSIONER_COUPLE_MAX_EACH + ALLOWANCE_MAX, 2) // 25,249.80
+    expect(rowAt(r, 65).gis).toBeCloseTo(25_603.44, 2)
     expect(basis([true, false], [65, 60], 0).category).toBe('couple-partner-allowance')
     expect(basis([true, false], [65, 60], 0).gis).toBeCloseTo(8113.08, 2)
     expect(basis([true, false], [65, 60], 0).allowance).toBeCloseTo(17136.72, 2)
@@ -668,18 +685,19 @@ describe('GIS work-income exemption', () => {
   })
 })
 
+/** BE-45: the projection prices with the latest published quarter, October-December 2026. */
 describe('runProjection carries the category through to the year rows', () => {
   it('states the household row and its cut-off on each benefit year', () => {
     const r = runProjection(zeroIncomeCouple({ currentAge: 60, oasStartAge: 65 }))
     const at65 = rowAt(r, 65)
     expect(at65.gisCategory).toBe('couple-partner-allowance')
-    expect(at65.gisAnnualCutoff).toBe(42144)
-    expect(at65.allowance).toBeCloseTo(17136.72, 2)
-    expect(at65.gis - at65.allowance).toBeCloseTo(8113.08, 2)
+    expect(at65.gisAnnualCutoff).toBe(42768)
+    expect(at65.allowance).toBeCloseTo(1448.06 * ANNUAL, 2)
+    expect(at65.gis - at65.allowance).toBeCloseTo(685.56 * ANNUAL, 2)
     // Once the spouse turns 65 the row changes with its own cut-off.
     const at70 = rowAt(r, 70)
     expect(at70.gisCategory).toBe('couple-both-pensioners')
-    expect(at70.gisAnnualCutoff).toBe(30096)
+    expect(at70.gisAnnualCutoff).toBe(30528)
     expect(at70.allowance).toBe(0)
   })
 
@@ -688,7 +706,7 @@ describe('runProjection carries the category through to the year rows', () => {
     // The projection starts at 65 here, so every row is past the primary's
     // OAS start age; at 65 the partner is 60 and the household is the
     // allowance row.
-    expect(rowAt(r, 65).gis).toBeCloseTo(25249.8, 2)
+    expect(rowAt(r, 65).gis).toBeCloseTo(25_603.44, 2)
     expect(rowAt(r, 65).oas).toBeCloseTo(9024, 2)
   })
 
@@ -717,8 +735,8 @@ describe('runProjection carries the category through to the year rows', () => {
       nonRegBook: 0, strategy: 'tfsaFirst' as const })
     const at67 = rowAt(r, 67)
     expect(at67.gisCategory).toBe('single')
-    expect(at67.gisAnnualCutoff).toBe(22800)
-    expect(at67.gis).toBeCloseTo(13478.04, 2)
+    expect(at67.gisAnnualCutoff).toBe(23112)
+    expect(at67.gis).toBeCloseTo(1138.90 * ANNUAL, 2)
     expect(at67.allowance).toBe(0)
   })
 })

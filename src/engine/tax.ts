@@ -123,6 +123,22 @@ export function selectPlanTaxRules(request: TaxRuleRequest): TaxRuleContext {
  * resolver's cached copy cannot be mutated by a caller either, so the shared
  * pack can never be re-priced behind `rulePackId`.
  */
+const steadyContexts = new WeakMap<TaxRuleContext, TaxRuleContext>()
+/**
+ * BE-45: the context that prices a calendar year after the pack's own year.
+ * Only a pack that records a different later basic personal amount changes;
+ * every other context is returned as is.
+ */
+export function rulesForCalendarYear(context: TaxRuleContext, calendarYear: number | undefined): TaxRuleContext {
+  const later = context.pack.provincialBpaAfterTaxYear
+  if (later === undefined || calendarYear === undefined || calendarYear <= context.taxYear) return context
+  const cached = steadyContexts.get(context)
+  if (cached) return cached
+  const steady = freezeRuleContext({ ...context, pack: { ...context.pack, provincial: { ...context.pack.provincial, bpa: later } } })
+  steadyContexts.set(context, steady)
+  return steady
+}
+
 const anchorContexts = new Map<string, TaxRuleContext>()
 export function anchorTaxRules(province: string, taxYear = PLAN_TAX_YEAR): TaxRuleContext {
   const key = `${province}:${taxYear}`

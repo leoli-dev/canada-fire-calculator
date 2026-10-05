@@ -8,7 +8,7 @@ import {
   type TaxBySource,
   type YearRow,
 } from './types'
-import { incomeTax, PLAN_TAX_YEAR, probateTax, selectPlanTaxRules, taxRuleProvenance } from './tax'
+import { incomeTax, PLAN_TAX_YEAR, probateTax, rulesForCalendarYear, selectPlanTaxRules, taxRuleProvenance, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
 import {
@@ -62,7 +62,7 @@ function retirementAgeFor(inputs: Inputs, canonical?: InputsV2): (role: 'self' |
 }
 
 /** Annual tax context for a withdrawal whose cash must exist at year start. */
-function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number, canonical?: InputsV2): (taxable: number, rrspGross: number) => number {
+function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number, canonical?: InputsV2, legacyRules?: TaxRuleContext): (taxable: number, rrspGross: number) => number {
   const partnerAge = inputs.partner ? inputs.partner.currentAge + age - inputs.currentAge : null
   const ages = partnerAge === null ? [age] : [age, partnerAge]
   const retirementAge = retirementAgeFor(inputs, canonical)
@@ -88,7 +88,7 @@ function purchaseTaxIncrement(inputs: Inputs, age: number, rent: number, canonic
       return sum + incomeTax(personTaxable + oas, inputs.province, {
         age: personAge,
         pensionIncome: pension / ages.length + (personAge >= 65 ? rrspGross / ages.length : 0),
-      })
+      }, legacyRules)
     }, 0)
   }
   const base = totalTax(0, 0)
@@ -162,6 +162,7 @@ function evaluate(
   canonical?: InputsV2,
   taxYear?: number,
   spousalAttribution?: SpousalAttributionLedger,
+  legacyRules?: TaxRuleContext,
 ): WithdrawalOutcome {
   const w: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
   let remaining = G
@@ -210,7 +211,7 @@ function evaluate(
     }
     const taxableIncome = personTaxable + personOas
     taxPeople.push({ taxableIncome, credits, oasGross: oasGrossPerPerson[i], oasNet: personOas })
-    tax += incomeTax(taxableIncome, inputs.province, credits)
+    tax += incomeTax(taxableIncome, inputs.province, credits, legacyRules)
   }
   // GIS: requires receiving OAS; income test is on combined household income
   // excl. OAS (TFSA withdrawals are invisible to it; work income gets an
@@ -305,10 +306,11 @@ function solveWithdrawals(
   canonical?: InputsV2,
   taxYear?: number,
   spousalAttribution?: SpousalAttributionLedger,
+  legacyRules?: TaxRuleContext,
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution, legacyRules)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -347,6 +349,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   // instead of silently pricing from another jurisdiction's table.
   const rules = selectPlanTaxRules({ jurisdiction: inputs.province, taxYear: PLAN_TAX_YEAR })
   const taxRules = taxRuleProvenance(rules)
+  // BE-45: the calendar year of each projected row, so a pack whose own year
+  // is a part-year blend (NL's 2026 BPA) prices later years at their own value.
+  const baseCalendarYear = canonical?.baseYear ?? PLAN_TAX_YEAR
   // BE-38 B2: one selected, versioned CCB payment-period pack prices every CCB
   // figure in this run. The plan anchor is a published July-June period, so a
   // CCB amount is never silently indexed for a projected year.
@@ -553,7 +558,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         const plan = planPurchaseFunding(plannedPurchase, age, {
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent, canonical),
+          taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent, canonical, rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
           annualSavings: 0, firstYearCost: 0,
         })
         if (plan.gap) yearGaps.push(plan.gap)
@@ -606,7 +611,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         const plan = planAnnualHousingFunding(age, sale.cashNeeded, {
           balances: bal, nonRegBook: nonRegBookReal(), annualSavings: 0,
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
-          taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0, canonical),
+          taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0, canonical, rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
@@ -957,7 +962,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         extraIncome, nUnder6, n6to17, steps, inputs, purchaseTaxPaid, purchaseRrspWithdrawal,
         purchaseNonRegTaxable, saleGainsTaxable,
         canonical, canonical ? canonical.baseYear + yearIdx : undefined,
-        spousalAttribution,
+        spousalAttribution, rulesForCalendarYear(rules, baseCalendarYear + yearIdx),
       )
       // The accepted solve's ledger is the year's post-payment state; the
       // rejected binary-search candidates each started from the same
@@ -1136,7 +1141,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     remainingRegistered: bal.rrsp + lockedBal,
     nonRegisteredGain: nonRegGain,
     investmentPropertyGain: ipGain,
-    rules,
+    rules: rulesForCalendarYear(rules, baseCalendarYear + (inputs.lifeExpectancy - inputs.currentAge)),
   }) : null
   // probate applies to the net value of non-registered holdings and unsold
   // real estate (a registered mortgage against the property reduces the

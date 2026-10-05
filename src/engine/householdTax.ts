@@ -1,5 +1,5 @@
 import type { InputsV2 } from './model'
-import { incomeTax, PLAN_TAX_YEAR, taxRuleProvenance, trySelectPlanTaxRules, type TaxRuleContext, type TaxRuleProvenance } from './tax'
+import { incomeTax, PLAN_TAX_YEAR, rulesForCalendarYear, taxRuleProvenance, trySelectPlanTaxRules, type TaxRuleContext, type TaxRuleProvenance } from './tax'
 import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext, type PersonIncome } from './personIncome'
 import type { SpousalAttributionLedger } from './spousalAttribution'
 import { calculateQuebecTax } from './quebecTax'
@@ -37,7 +37,9 @@ export type HouseholdTaxResult = { status: 'ok'; total: number; byPerson: Record
 export function calculateHouseholdTax(plan: InputsV2, year: number, events: IncomeEvent[], context?: IncomeYearContext): HouseholdTaxResult {
   const selection = trySelectPlanTaxRules({ jurisdiction: plan.province, taxYear: PLAN_TAX_YEAR })
   if (selection.status !== 'ok') return selection
-  const rules: TaxRuleContext = selection.context
+  // BE-45: a later calendar year uses the pack's steady-state amounts where
+  // its own year is a part-year blend; every other pack is unchanged.
+  const rules: TaxRuleContext = rulesForCalendarYear(selection.context, year)
   const provenance = taxRuleProvenance(rules)
   const income = calculatePersonIncome(plan, year, events, context)
   if (income.status !== 'ok') return income

@@ -350,9 +350,10 @@ describe('BE-39 A: statutory reference points', () => {
   // prorated 0-40 scale, not refused, so the copy says so and this pins both the
   // behaviour and the absence of the false refusal clause.
   it('prices sub-minimum residence by the prorated scale, and says so', () => {
-    expect(estimateOasAt65(3)).toBeCloseTo(676.8, 6)
-    expect(estimateOasAt65(9)).toBeCloseTo(2_030.4, 6)
-    expect(estimateOasAt65(40)).toBeCloseTo(9_024, 6)
+    // 762.50 × 12 = 9,150 (October-December 2026), prorated over 40 years.
+    expect(estimateOasAt65(3)).toBeCloseTo(686.25, 6)
+    expect(estimateOasAt65(9)).toBeCloseTo(2_058.75, 6)
+    expect(estimateOasAt65(40)).toBeCloseTo(9_150, 6)
     const reason = CPP_OAS_UNSUPPORTED_PATHS.find(path => path.id === 'oas-residence-eligibility')?.reason ?? ''
     expect(reason).not.toContain('refused')
     expect(reason).toContain('prorated')
