@@ -32,7 +32,7 @@
   },
   "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
   "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
-  "be11QcLimit": "Quebec tax precision is limited for this plan. Unknown or public prescription coverage needs the unpublished 2026 Schedule K; other unsupported events also remain estimates. Tax advice and exact comparisons are withheld.",
+  "be11QcLimit": "Quebec tax here uses simplified Quebec rules. Unknown or public prescription coverage needs the unpublished 2026 Schedule K, and other unsupported events remain estimates, so the tables, rankings and comparisons below are estimates too.",
   "be11ComparisonLimit": "Exact current versus Scenario A comparison requires verified person-level tax for both plans.",
   "be11ComparisonEstimate": "This single-person comparison is an estimate using the prior tax model.",
   "be11TerminalComparisonLimit": "After-tax estate comparison is unavailable because individual terminal tax is not verified for both plans. Final net worth excludes estate tax and is shown only when the comparison is supported.",
@@ -1611,5 +1611,6 @@
   "estimateDepleted": "Estimate: the money runs out at age {{age}}.",
   "estimateShortfall": "First shortfall at age {{age}}: {{shortfall}} of that year's spending is not covered.",
   "estimateChartsNote": "The charts below are planning estimates: taxes use household figures until ownership and the other open facts are confirmed.",
-  "fireNumberProjectedBasis": "Estimate: the target uses the account mix and the non-registered cost base your plan projects for age {{age}}, scaled to the target amount."
+  "fireNumberProjectedBasis": "Estimate: the target uses the account mix and the non-registered cost base your plan projects for age {{age}}, scaled to the target amount.",
+  "terminalQcSimplified": "The estate figure uses simplified Quebec rules for the final return, so treat it and any ranking built on it as an estimate."
 }

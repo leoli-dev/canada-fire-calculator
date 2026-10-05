@@ -177,7 +177,9 @@ test('current and Scenario A each retain their own person-tax capability', async
   await page.reload()
   const comparison = page.getByTestId('scenario-comparison')
   await comparison.locator('summary').click()
-  await expect(comparison).toContainText('After-tax estate comparison is unavailable')
+  // BE-43: a single Quebec plan now has an estimated closing tax, so the
+  // comparison is refused for missing person-level tax rather than estate tax.
+  await expect(comparison).toContainText('requires verified person-level tax for both plans')
   await expect(comparison.getByText('Comparison unavailable')).toHaveCount(2)
   await page.evaluate(async () => {
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
@@ -191,7 +193,7 @@ test('current and Scenario A each retain their own person-tax capability', async
     localStorage.setItem('fire-inputs', JSON.stringify(saved))
   })
   await page.reload()
-  await expect(page.getByTestId('scenario-comparison')).toContainText('After-tax estate comparison is unavailable')
+  await expect(page.getByTestId('scenario-comparison')).toContainText('requires verified person-level tax for both plans')
 })
 
 test('couple terminal tax cannot masquerade as final net worth in Scenario A comparison', async ({ page }) => {

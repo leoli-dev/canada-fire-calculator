@@ -17,16 +17,16 @@ async function seed(page: Page, options: { province: 'ON' | 'QC'; couple?: boole
   await page.reload()
 }
 
-test('a failing Quebec plan still says it fails, where, and shows the charts', async ({ page }) => {
+test('a failing single Quebec plan gets the full results as disclosed estimates', async ({ page }) => {
   await seed(page, { province: 'QC' })
-  const summary = page.getByTestId('person-tax-estimate')
-  await expect(summary).toBeVisible()
-  await expect(page.getByTestId('estimate-verdict')).toContainText('runs out at age')
-  await expect(page.getByTestId('estimate-shortfall')).toContainText('First shortfall at age')
+  // BE-43: one Quebec owner is no longer reduced to an estimate summary.
+  const summary = page.locator('.summary')
+  await expect(summary.locator('.verdict')).toContainText('Money runs out at age')
+  await expect(summary).toHaveClass(/uncertain/)
   await expect(summary).toHaveClass(/bad/)
+  await expect(page.getByTestId('person-tax-limit')).toContainText('simplified Quebec rules')
   await expect(page.locator('.results-column .recharts-wrapper').first()).toBeVisible()
-  // Precise tax tools stay withheld.
-  await expect(page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })).toHaveCount(0)
+  await expect(page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })).toHaveCount(1)
 })
 
 test('a couple with unconfirmed ownership sees an estimate verdict and the charts', async ({ page }) => {

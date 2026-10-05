@@ -1157,9 +1157,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     success: depletedAge === null,
     depletedAge,
     finalNetWorth,
-    // The terminal allocator still calls legacy incomeTax(), whose Quebec
-    // Schedule F/K approximations cannot establish owner-specific closing tax.
-    terminalTaxStatus: terminal && !terminalCapitalUnsupported && rows.at(-1)?.phase !== 'accumulation' && inputs.province !== 'QC' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
+    // The terminal allocator still calls legacy incomeTax(). BE-43: for one
+    // Quebec owner its simplified Quebec rules give a disclosed estimate rather
+    // than nothing; a couple still has no owner-specific closing tax.
+    terminalTaxStatus: terminal && !terminalCapitalUnsupported && rows.at(-1)?.phase !== 'accumulation' && (!canonical || canonical.people.length === 1) ? 'estimated' : 'unsupported',
+    terminalTaxDisclosure: inputs.province === 'QC' ? 'quebecSimplified' : undefined,
     estateTax: terminal?.incrementalTax ?? Number.NaN,
     terminalOasRecovery: terminal?.oasRecoveryIncrement ?? Number.NaN,
     terminalRegisteredIncome: terminal?.registeredIncome ?? Number.NaN,

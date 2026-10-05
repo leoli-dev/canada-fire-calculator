@@ -54,8 +54,10 @@ export default function App() {
   const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
   const precisionBlocked = migrationBlocked
   // Keep the existing single-person planning preview usable while BE-14 B
-  // wires working-year tax. Couples and QC never get a disguised pooled tax.
-  const singleLegacyPreview = !inputs.partner && (!canonical || canonical.people.length === 1) && inputs.province !== 'QC'
+  // wires working-year tax. Couples never get a disguised pooled tax. BE-43:
+  // one Quebec owner gets the same tools as estimates, disclosed as resting on
+  // simplified Quebec rules, instead of nothing.
+  const singleLegacyPreview = !inputs.partner && (!canonical || canonical.people.length === 1)
   const taxBlocked = result?.taxCapability?.status !== 'person' && !singleLegacyPreview
   const taxWarning = result?.taxCapability?.status !== 'person'
   const oldSingleTools = singleLegacyPreview

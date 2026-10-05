@@ -505,6 +505,8 @@ export interface ProjectionResult {
   /** Unsupported when an invalid direct-engine plan ends in accumulation;
    * numeric fields then retain a known-income surrogate for legacy callers. */
   terminalTaxStatus: 'estimated' | 'unsupported'
+  /** BE-43: a closing-tax estimate that rests on simplified Quebec rules, disclosed wherever it is used. */
+  terminalTaxDisclosure?: 'quebecSimplified'
   /**
    * Incremental final-return income tax and OAS recovery from remaining RRSP/RRIF and taxable
    * unrealized gains, added to the year's modeled ordinary income. The

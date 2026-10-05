@@ -435,7 +435,9 @@ export function rankCandidates<T>(
       // funded modeled path is therefore not a verified recommendation.
       if (hasUnverifiedLockedWithdrawals(inputs))
         return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
-      if (result.terminalTaxStatus === 'unsupported')
+      // BE-43: closing tax decides an estate ranking, not the spending a plan
+      // sustains, so a die-with-zero ranking does not wait for it.
+      if (objective !== 'maxSpending' && result.terminalTaxStatus === 'unsupported')
         return { ...common, status: 'unsupported', reason: 'terminalTax' }
       // A recommended strategy or start age is also a positive funding claim,
       // so it needs the same verified disposal tax as the quick answers.

@@ -32,7 +32,7 @@
   },
   "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; le tableau fiscal, les classements de stratégies et les comparaisons précises sont masqués.",
   "be11SingleEstimate": "L’impôt, les graphiques et les outils d’une seule personne utilisent encore l’ancienne estimation pendant l’emploi ou pour les événements non pris en charge.",
-  "be11QcLimit": "La précision fiscale au Québec est limitée pour ce plan. Une couverture médicaments inconnue ou publique attend l’annexe K 2026 non publiée; les autres événements non pris en charge restent aussi estimatifs. Les conseils et comparaisons précis sont masqués.",
+  "be11QcLimit": "L’impôt du Québec utilise ici des règles québécoises simplifiées. Une couverture médicaments inconnue ou publique exige l’annexe K 2026, non publiée, et les autres événements non pris en charge restent des estimations; les tableaux, classements et comparaisons ci-dessous sont donc aussi des estimations.",
   "be11ComparisonLimit": "La comparaison exacte entre le plan actuel et le scénario A exige un impôt individuel vérifié pour les deux plans.",
   "be11ComparisonEstimate": "Cette comparaison d’une seule personne reste une estimation de l’ancien modèle fiscal.",
   "be11TerminalComparisonLimit": "La comparaison des successions après impôt est indisponible : l’impôt final individuel n’est pas vérifié pour les deux plans. La valeur nette finale exclut l’impôt successoral et n’est affichée que si la comparaison est prise en charge.",
@@ -1620,5 +1620,6 @@
   "estimateDepleted": "Estimation : l’argent s’épuise à {{age}} ans.",
   "estimateShortfall": "Premier manque à {{age}} ans : {{shortfall}} des dépenses de cette année ne sont pas couverts.",
   "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés.",
-  "fireNumberProjectedBasis": "Estimation : la cible utilise la répartition des comptes et le prix de base non enregistré que votre plan projette à {{age}} ans, ajustés au montant cible."
+  "fireNumberProjectedBasis": "Estimation : la cible utilise la répartition des comptes et le prix de base non enregistré que votre plan projette à {{age}} ans, ajustés au montant cible.",
+  "terminalQcSimplified": "La valeur successorale utilise des règles québécoises simplifiées pour la déclaration finale; considérez-la, ainsi que tout classement qui en dépend, comme une estimation."
 }

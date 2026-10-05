@@ -129,7 +129,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
 
   return (
     <div className={`summary ${resultUnverified
-      ? 'uncertain' : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
+      // FE-44: an unverified failure still reads as a failure.
+      ? (ok || mode === 'target' && target <= 0 ? 'uncertain' : 'uncertain bad') : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
       <div className="mode-tabs" role="tablist">
         {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
           <button
@@ -183,6 +184,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             probate: cad(result.probateFee),
           })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
           <p className="hint">{t('terminalEstimateNote')}</p>
+          {result.terminalTaxDisclosure === 'quebecSimplified' && <p className="hint" data-testid="terminal-qc-simplified">{t('terminalQcSimplified')}</p>}
           {dwzSpending?.status === 'solved' && dwzSpending.value !== null && (
             <>
               <p>
