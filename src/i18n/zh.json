@@ -115,7 +115,7 @@
   "ruleCoverageUnsupported": "{{jurisdiction}} 数字中未包含的抵免：",
   "ruleCoverageNotModelled": "“未建模”意味着“未做近似替代”：引擎中没有任何逻辑代替上述项目，因此任何结果都不是完整的税表。",
   "ruleCoverageAuthorityChecked": "已于 {{date}} 逐项核对内容：{{figures}}",
-  "ruleCoverageAuthorityListed": "仅列出——内容未经核对",
+  "ruleCoverageAuthorityListed": "仅列出，内容未经核对",
   "ruleCoverageAuthorityBlocked": "对自动化读取者设有限制（{{gate}}）",
   "ruleCoverageCaveat": "本计算器仅建模联邦与省级所得税税阶、基本个人免税额以及本清单中列明的抵免。它不建模 GST/HST 抵免、任何省或地区的现金福利、任何低收入或可退还税额减免、股息税收抵免、加拿大就业抵免额，也不建模各省配偶抵免工作表所用的净收入基数（配偶各行按公布的最高额与门槛计算，并不使用该基数），因此它产生的任何数字都不是完整的税表、完整的税后状况或完整的福利后状况。对于它所适用的按固定值而非按年度切换的抵免（年龄与养老金抵免额、配偶最高额、安省附加税与健康保险费、遗嘱认证费、资本利得计入率、魁省各项缴费），假定的未来年度会沿用 2026 年的固定金额，相关行会说明这一点。",
   "ruleTaxSource": "税阶来源",
@@ -1649,5 +1649,6 @@
   "sideIncomeOther": "不缴社保",
   "sideIncomeOtherDetail": "例如版税，只按普通收入纳税。",
   "hbpUse": "首付需要动用 RRSP 时使用购房计划（HBP）",
-  "hbpUseDetail": "每位买家最多 60,000 免税取出，15 年内还回。"
+  "hbpUseDetail": "每位买家最多 60,000 免税取出，15 年内还回。",
+  "ruleAssumptionsSummary": "{{jurisdiction}} {{year}} 年税务规则，{{quarter}} 福利标准。展开查看来源和这些数字未包含的内容。"
 }

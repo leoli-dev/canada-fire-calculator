@@ -75,3 +75,11 @@ test("BE-47: the Home Buyers' Plan is on for a planned first home and can be tur
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.getByTestId('hbp-use')).not.toBeChecked()
 })
+
+test('FE-41: the rule sources are one collapsed line, so the form starts near the top', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.getByTestId('rule-assumptions-details')).not.toHaveAttribute('open', '')
+  const box = await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').first().boundingBox()
+  expect(box!.y).toBeLessThan(1_200)
+})

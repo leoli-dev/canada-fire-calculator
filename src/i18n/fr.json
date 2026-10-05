@@ -115,7 +115,7 @@
   "ruleCoverageUnsupported": "Crédits non compris dans ces chiffres pour {{jurisdiction}} :",
   "ruleCoverageNotModelled": "« Non modélisé » signifie « non approximé » : rien dans le moteur ne remplace les éléments ci-dessus, et aucun résultat n’est une déclaration de revenus complète.",
   "ruleCoverageAuthorityChecked": "contenu vérifié le {{date}} : {{figures}}",
-  "ruleCoverageAuthorityListed": "seulement citée — contenu non vérifié",
+  "ruleCoverageAuthorityListed": "seulement citée, contenu non vérifié",
   "ruleCoverageAuthorityBlocked": "bloquée pour les lecteurs automatisés ({{gate}})",
   "ruleCoverageCaveat": "Ce calculateur ne modélise que les tranches d’impôt sur le revenu fédérales et provinciales, le montant personnel de base et les crédits nommés dans cette liste. Il ne modélise pas le crédit pour la TPS/TVH, aucune prestation en espèces provinciale ou territoriale, aucune réduction d’impôt pour faible revenu ni réduction remboursable, les crédits d’impôt pour dividendes, le montant pour l’emploi au Canada ni la base de revenu net qu’utilisent les feuillets provinciaux du crédit pour conjoint (les lignes « conjoint » appliquent les maximums et les seuils publiés, pas cette base) : aucun chiffre produit n’est donc une déclaration de revenus complète, une situation après impôt complète ni une situation complète après prestations. Lorsqu’un crédit appliqué est un montant fixe plutôt qu’indexé par année (les montants pour âge et pour revenu de pension, les maximums pour conjoint, la surtaxe et la prime-santé de l’Ontario, les frais d’homologation, le taux d’inclusion des gains en capital, les cotisations du Québec), un exercice futur présumé reporte tel quel ce montant de 2026, et la ligne le précise.",
   "ruleTaxSource": "Source des tranches d’impôt",
@@ -1649,5 +1649,6 @@
   "sideIncomeOther": "Sans cotisations sociales",
   "sideIncomeOtherDetail": "Par exemple des redevances; imposé seulement comme revenu ordinaire.",
   "hbpUse": "Utiliser le RAP pour la part REER de la mise de fonds",
-  "hbpUseDetail": "Jusqu'à 60 000 $ par acheteur sortent libres d'impôt et sont remboursés sur 15 ans."
+  "hbpUseDetail": "Jusqu'à 60 000 $ par acheteur sortent libres d'impôt et sont remboursés sur 15 ans.",
+  "ruleAssumptionsSummary": "Règles fiscales {{jurisdiction}} {{year}}, prestations pour {{quarter}}. Ouvrez pour les sources et ce que ces chiffres excluent."
 }

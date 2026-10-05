@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BLOCKED_SOURCES, coverageFor, rowAuthorities, selectBenefitRules, selectGisRules } from '../engine/rules'
 import { PLAN_BENEFIT_PERIOD, benefitRuleProvenance, trySelectBenefitRules } from '../engine/benefits'
@@ -22,8 +23,12 @@ const coverageLimitationKey = (id: string) => `coverageLimitation.${id}`
  * the panel must report the pack that actually priced the numbers, so a caller
  * cannot make it display a year the computation did not use.
  */
+const RULES_OPEN_KEY = 'rule-assumptions-open'
+
 export function RuleAssumptions({ province, inflation }: { province: Province; inflation: number }) {
   const { t } = useTranslation()
+  // Once opened in this tab it stays open across mode switches (a per-viewer convenience only).
+  const [rulesOpen] = useState(() => { try { return sessionStorage.getItem(RULES_OPEN_KEY) === '1' } catch { return false } })
   const ccb = selectBenefitRules('CCB', PLAN_BENEFIT_PERIOD)
   // BE-26 A: the GIS/Allowance pack is a quarterly published table, so its id
   // and payment period are disclosed next to the tax and CCB ones, together
@@ -55,8 +60,14 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
   const ccbSelection = trySelectBenefitRules({ program: 'CCB', paymentPeriod: PLAN_BENEFIT_PERIOD })
   const ccbProvenance = ccbSelection.status === 'ok' ? benefitRuleProvenance(ccbSelection.context) : null
   const ccbPolicy = ccbProvenance?.projectionPolicy
+  // FE-41: the sources and coverage are reference material. One line says
+  // which rules priced the numbers; the rest opens on request, so the form's
+  // first field and the review's summary are not pushed thousands of pixels down.
   return <div className="rule-assumptions" data-testid="rule-assumptions">
-    <strong>{t('ruleAssumptionsTitle')}</strong>
+    <details className="rule-assumptions-details" data-testid="rule-assumptions-details" open={rulesOpen || undefined}
+      onToggle={(event) => { try { sessionStorage.setItem(RULES_OPEN_KEY, event.currentTarget.open ? '1' : '0') } catch { /* storage unavailable */ } }}>
+    <summary><strong>{t('ruleAssumptionsTitle')}</strong>{' '}
+      <span className="rule-assumptions-summary">{t('ruleAssumptionsSummary', { jurisdiction: province, year: provenance.ruleYear, quarter: gis.paymentPeriod })}</span></summary>
     <p>{t('ruleAssumptionsVersion', { tax: tax.id, ccb: `${ccb.id} (${ccb.paymentPeriod})`, gis: `${gis.id} (${gis.paymentPeriod})` })}</p>
     <p data-testid="rule-tax-pack" data-rule-pack-id={tax.id} data-rule-year={provenance.ruleYear}
       data-rule-assumed={String(provenance.assumedFutureRule)}>
@@ -203,5 +214,6 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
         {index > 0 ? '; ' : ''}{t(`gisUnsupported.${path.id}`)}{' '}
       </span>)}
     </p>
+    </details>
   </div>
 }

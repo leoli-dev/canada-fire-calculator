@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test'
+
+// FE-41: the rule sources are collapsed by default; these checks read them opened.
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => sessionStorage.setItem('rule-assumptions-open', '1')) })
 import { BLOCKED_SOURCES, coverageFor, rowAuthorities } from '../../src/engine/rules/coverageMatrix'
 
 /** Every authority the panel should render for one jurisdiction: the rows'
@@ -151,7 +154,7 @@ test('the credit coverage matrix is visible in both modes and claims no complete
         expect(status, `${id} ${hrefs[index]}`).toContain('content-checked')
         expect(status, `${id} ${hrefs[index]}`).toContain(credit.verifiedAt)
       } else {
-        expect(status, `${id} ${hrefs[index]}`).toContain('listed only — content not checked')
+        expect(status, `${id} ${hrefs[index]}`).toContain('listed only, content not checked')
       }
     })
     await expect(row, id).toHaveAttribute('data-content-checked', String(credit.contentChecked === true))
@@ -282,7 +285,7 @@ test('the two authority states and the gate label render natively in all three l
   expect(en).toContain('$15 for each $1,000')
   const bracketsRow = page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets')
   const bracketsEn = await bracketsRow.innerText()
-  expect(bracketsEn).toContain('listed only — content not checked')
+  expect(bracketsEn).toContain('listed only, content not checked')
   expect(bracketsEn, 'a merely-listed row may not claim checked figures').not.toContain('content-checked')
   // PE's own page is the round-4 blocked authority; a real navigation is the
   // only way to see its gate, and the panel must name it there.
@@ -290,7 +293,7 @@ test('the two authority states and the gate label render natively in all three l
   const peRow = page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets')
   const peEn = await peRow.innerText()
   expect(peEn).toContain('CAPTCHA')
-  expect(peEn).toContain('listed only — content not checked')
+  expect(peEn).toContain('listed only, content not checked')
   expect(peEn).toContain('142,520')
   const peSources = await page.getByTestId('rule-sources').innerText()
   expect(peSources, 'the sources block must name the gate on the PE government link').toContain('CAPTCHA')

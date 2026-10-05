@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test'
 
+// FE-41: the rule sources are collapsed by default; these checks read them opened.
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => sessionStorage.setItem('rule-assumptions-open', '1')) })
+
 /**
  * BE-38 B2: the selected CCB rule pack and its July-June payment period must be
  * visible and identical in both entry modes. A mode switch is a presentation
