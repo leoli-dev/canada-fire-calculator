@@ -16,7 +16,7 @@ const page = (
   categoryId: QuestionDefinition['categoryId'],
   questions: readonly string[],
   fieldBindings: readonly string[],
-  options: Partial<Pick<QuestionDefinition, 'estimatePolicy' | 'applicableWhen' | 'prerequisitePageId'>> = {},
+  options: Partial<Pick<QuestionDefinition, 'estimatePolicy' | 'applicableWhen' | 'prerequisitePageId' | 'optional'>> = {},
 ): QuestionDefinition => ({
   id,
   categoryId,
@@ -35,8 +35,11 @@ const accountSelected = (answers: QuestionAnswers, kind: string) =>
 export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('family.people', 'family', ['household'], ['household']),
   page('family.ages', 'family', ['currentAge', 'partnerAge'], ['currentAge', 'partner.currentAge']),
+  // FE-43 A: household tax facts live where the user is already thinking about them.
+  page('family.spouseSupport', 'family', ['spouseSupport'], [], { applicableWhen: (i) => !!i.partner, estimatePolicy: 'none', optional: true }),
   page('family.children', 'family', ['children'], ['children']),
   page('family.province', 'family', ['province'], ['province']),
+  page('family.qcDrug', 'family', ['qcDrugCoverage'], [], { applicableWhen: (i) => i.province === 'QC', estimatePolicy: 'none', optional: true }),
   page('time.work', 'family', ['workStyle', 'targetAssets'], ['fireAge', 'fireTargetAssets']),
   page('time.horizon', 'family', ['lifeExpectancy'], ['lifeExpectancy']),
 
@@ -65,6 +68,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('locked.balance', 'assets', ['lockedBalance'], ['lockedRetirement.balance'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
   page('locked.access', 'assets', ['lockedAccess', 'lockedOwner'], ['lockedRetirement.accessibleAge', 'lockedRetirement.owner'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
   page('locked.contributions', 'assets', ['lockedEmployee', 'lockedEmployer'], ['lockedRetirement.employeeContribution', 'lockedRetirement.employerContribution'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
+  page('assets.ownership', 'assets', ['accountOwnership'], [], { applicableWhen: (i) => !!i.partner, estimatePolicy: 'none' }),
 
   page('home.situation', 'housing', ['homeSituation'], ['housingMode']),
   page('home.value', 'housing', ['homeValue', 'homeFuture'], ['principalResidence.value', 'principalResidence.sellAtAge'], { applicableWhen: (i) => !!i.principalResidence && i.principalResidence.mode !== 'planned', prerequisitePageId: 'home.situation' }),
@@ -83,6 +87,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('debt.0.type', 'housing', ['debtType'], ['debts.0.kind'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
   page('debt.0.balance', 'housing', ['debtBalance'], ['debts.0.balance'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
   page('debt.0.payment', 'housing', ['debtPayment', 'debtTerm'], ['debts.0.annualPayment', 'debts.0.yearsRemaining'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
+  page('housing.ownership', 'housing', ['propertyOwnership'], [], { applicableWhen: (i) => !!i.partner && (!!i.principalResidence || (i.investmentProperties?.length ?? 0) > 0), estimatePolicy: 'none' }),
 
   page('spending.method', 'spending', ['spendingMethod'], []),
   page('spending.total', 'spending', ['retirementSpending'], ['retirementSpending']),

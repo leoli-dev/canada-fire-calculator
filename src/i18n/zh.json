@@ -77,7 +77,9 @@
     "rrifAllOther": "其他 RRIF",
     "rrifFactorHelp": "选择类别前请核对金融机构的开户、转入和修订记录。仅凭开户年份不能确认资格；保持“未确认”时，精确最低提款额及税务结果会继续受限。",
     "rrifFactorSource": "CRA 法定因子表",
-    "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。"
+    "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。魁省家庭抵免、FSS 和 RAMQ 留待 BE-35。",
+    "homeOwner": "自住房（主要住所）归属",
+    "typeSpousalRrsp": "配偶RRSP"
   },
   "be35": {
     "qcSplitTransferor": "魁省附表Q选择：由谁转出？",
@@ -85,7 +87,7 @@
     "splitHelp": "魁省养老金转移选择与联邦分拆独立。转出人必须至少65岁；只有实际选择附表Q时才填写转移。",
     "coverageTitle": "魁省处方药保险覆盖",
     "coverageHelp": "它只影响每人魁省税行中的魁省处方药保费（TP-1第447行），不涉及其他任何项目。适用对象是魁省居民：参加RAMQ公共药保、持有符合条件的私保，或已核实免缴资格的人。整年不变时只需选一个全年状态；只有年中真的更换保险时才需要逐月填写。只要某年含公共药保月份，在2026年附表K公布前该年魁省税仍是带标签的估算。",
-    "coveragePerson": "{{person}}的覆盖",
+    "coveragePerson": "{{person}}：处方药保险",
     "mixed": "各月不同",
     "unknown": "未确认",
     "private": "私人基本药保",
@@ -905,7 +907,8 @@
     },
     "status": {
       "answered": "已回答",
-      "pending": "待填写"
+      "pending": "待填写",
+      "optional": "可选"
     },
     "accountNames": {
       "tfsa": "TFSA 免税账户",
@@ -1207,7 +1210,37 @@
       },
       "invest_strategy": {
         "question": "退休支出应按什么顺序从账户提款？"
+      },
+      "family_spouseSupport": {
+        "question": "你和伴侣是否同住，并在经济上互相扶养？"
+      },
+      "family_qcDrug": {
+        "question": "在魁北克，你们各自的处方药保险是哪一种？"
+      },
+      "assets_ownership": {
+        "question": "这些账户分别在谁名下？"
+      },
+      "housing_ownership": {
+        "question": "这些房产分别在谁名下？"
       }
+    },
+    "ownership": {
+      "mine": "我的",
+      "partners": "伴侣的",
+      "eachHasOne": "两人各有一个",
+      "joint": "共同持有",
+      "zeroBalance": "目前没有余额。请选择今后新存入的钱归谁。",
+      "home": "自住房",
+      "rental": "出租房 {{n}}",
+      "accountsIntro": "注册账户只能属于一个人。如果两人都有，请选“两人各有一个”并分别填写余额。非注册账户可以共同持有。",
+      "propertiesIntro": "按产权登记选择。共同持有的房产，请填写你的份额。"
+    },
+    "spouseSupport": {
+      "yesDetail": "你们同住，需要时一方会在经济上扶养另一方。",
+      "noDetail": "因工作或健康以外的原因分居，或彼此不扶养。"
+    },
+    "qcDrug": {
+      "intro": "魁北克通过报税向参加 RAMQ 公共药保的人收取处方药保费；有私人团体保险或已核实豁免的人不用交。请为每个人选择全年的保险状态。"
     }
   },
   "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",

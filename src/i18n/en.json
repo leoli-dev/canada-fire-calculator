@@ -77,7 +77,9 @@
     "rrifAllOther": "All other RRIFs",
     "rrifFactorHelp": "Check the provider’s opening, transfer and amendment records before choosing a category. Opening year alone does not prove qualification; leave it unconfirmed to keep the exact minimum and tax result limited.",
     "rrifFactorSource": "CRA prescribed-factor chart",
-    "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35."
+    "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot. Quebec family credits, FSS and RAMQ await BE-35.",
+    "homeOwner": "Home (principal residence) owner",
+    "typeSpousalRrsp": "Spousal RRSP"
   },
   "be35": {
     "qcSplitTransferor": "Quebec Schedule Q election: who transfers?",
@@ -85,7 +87,7 @@
     "splitHelp": "The Quebec election is separate from the federal pension split. The transferor must be at least 65; choose no transfer unless the Schedule Q election is intended.",
     "coverageTitle": "Québec prescription-drug insurance coverage",
     "coverageHelp": "This affects only the Québec prescription-drug premium (TP-1 line 447) in each person’s Québec tax row — nothing else. It applies to Québec residents covered by the public RAMQ plan, an eligible private plan, or a verified exemption. Choose one status for the whole year; the month detail is only needed if coverage actually changed mid-year. A year containing a public month stays a labelled estimate until the 2026 Schedule K is published.",
-    "coveragePerson": "{{person}} coverage",
+    "coveragePerson": "{{person}}: drug coverage",
     "mixed": "Different months",
     "unknown": "Not confirmed",
     "private": "Private basic plan",
@@ -905,7 +907,8 @@
     },
     "status": {
       "answered": "answered",
-      "pending": "to do"
+      "pending": "to do",
+      "optional": "optional"
     },
     "accountNames": {
       "tfsa": "TFSA",
@@ -1198,7 +1201,37 @@
       },
       "invest_strategy": {
         "question": "In what order should retirement accounts fund spending?"
+      },
+      "family_spouseSupport": {
+        "question": "Do you and your partner live together and support each other financially?"
+      },
+      "family_qcDrug": {
+        "question": "How is each of you covered for prescription drugs in Quebec?"
+      },
+      "assets_ownership": {
+        "question": "Whose name is each account in?"
+      },
+      "housing_ownership": {
+        "question": "Whose name is each property in?"
       }
+    },
+    "ownership": {
+      "mine": "Mine",
+      "partners": "My partner's",
+      "eachHasOne": "We each have one",
+      "joint": "Owned jointly",
+      "zeroBalance": "No balance today. Choose who would own new deposits.",
+      "home": "Your home",
+      "rental": "Rental property {{n}}",
+      "accountsIntro": "Registered accounts always belong to one person. If you both have one, choose \"We each have one\" and enter each balance. A non-registered account can be owned jointly.",
+      "propertiesIntro": "Choose who is on title. For a jointly owned property, enter your share of it."
+    },
+    "spouseSupport": {
+      "yesDetail": "You share a home, and one of you supports the other when needed.",
+      "noDetail": "You live apart for reasons other than work or health, or neither supports the other."
+    },
+    "qcDrug": {
+      "intro": "Quebec charges a prescription-drug premium on the tax return to people on the public RAMQ plan. People covered by a private group plan, or with a verified exemption, pay nothing. Choose each person's coverage for the whole year."
     }
   },
   "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",

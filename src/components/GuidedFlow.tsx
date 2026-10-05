@@ -16,10 +16,11 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
   return <nav className="category-navigation" aria-label={t('questionnaire.directory')}>
     {QUESTION_CATEGORIES.map((category) => {
       const categoryPages = pages.filter((page) => page.categoryId === category.id)
-      const answered = categoryPages.filter((page) => pageIsComplete(page, state)).length
+      // An unanswered optional page is not outstanding work.
+      const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
         <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(`questionnaire.pages.${page.contentKey}.question`)}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : t('questionnaire.status.pending')}</small></button>)}</div>
+        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(`questionnaire.pages.${page.contentKey}.question`)}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></button>)}</div>
       </details>
     })}
     <button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</button>
@@ -31,7 +32,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
   const cad = useCad()
   const state = useStore()
   const issues = validateInputs(state.inputs).filter((issue) => issue.severity === 'error')
-  const incomplete = pages.filter((page) => !pageIsComplete(page, state))
+  const incomplete = pages.filter((page) => !page.optional && !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
   const canGenerate = issues.length === 0 && incomplete.length === 0
   const formatNumber = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { maximumFractionDigits: 2 })

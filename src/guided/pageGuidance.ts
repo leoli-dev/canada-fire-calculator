@@ -4,6 +4,10 @@ type Copy = [why: string, find: string, example: string]
 
 const en: Record<string, Copy> = {
   'income.taxFacts': ['Tax depends on the actual recipient and taxable owner, not a household average.', 'Use pay, pension, account and property statements. An unknown answer stays unknown and limits precise tax advice.', 'If one spouse owns a RRIF, its withdrawal belongs to that spouse unless a legal pension split is explicitly elected.'],
+  'family.spouseSupport': ['The spouse amount and some provincial credits depend on living together and supporting each other.', 'Answer for how you live today; a short separation for work or health still counts as living together.', 'Alex and their partner share a home and pool money, so Alex answers yes.'],
+  'family.qcDrug': ['Quebec adds a prescription-drug premium to the tax of people on the public RAMQ plan; private group plans and verified exemptions pay none.', 'Check your benefits booklet or your employer plan; at 65 most people move to RAMQ automatically unless they keep a group plan.', 'Alex keeps a group plan from a former employer (private) while their partner is on RAMQ (public).'],
+  'assets.ownership': ['Tax follows the account holder, so each account needs a named owner before exact per-person tax is possible.', 'The holder’s name is on every statement; a spousal RRSP belongs to the annuitant, not the contributor.', 'Alex has a TFSA of $60,000 and their partner one of $40,000: they choose “We each have one” and enter both balances.'],
+  'housing.ownership': ['Rent and gains are taxed to whoever owns the property, in proportion to their share.', 'Use the land title or the purchase documents; joint tenants usually hold equal shares.', 'A rental bought 50/50 is “Owned jointly” with a 50% share.'],
   'family.people': ['Household size changes taxes, benefits and which incomes the plan includes.', 'Choose based on whose retirement finances you want to model; no document is needed.', 'Alex includes a partner because both people will rely on the same retirement plan.'],
   'family.ages': ['Current ages set the saving period and align each person’s future benefits.', 'Use dates of birth; enter ages today, not ages at retirement.', 'Alex is 40 and their partner is 38.'],
   'family.children': ['Children under 18 may add Canada Child Benefit income during early retirement.', 'Use each child’s current age; do not include planned or adult children.', 'A 7-year-old is included; a 20-year-old is not.'],
@@ -69,6 +73,10 @@ const en: Record<string, Copy> = {
 
 const zh: Record<string, Copy> = {
   'income.taxFacts': ['所得税按实际领取人和应税所有人计算，不按家庭均分。', '参考工资、养老金、账户及房产记录；未知事实保持未知，并限制精确税务建议。', '一方持有的 RRIF 提款归该方，只有明确且合法的养老金分拆选举才改变税基。'],
+  'family.spouseSupport': ['配偶抵免和部分省级抵免，取决于你们是否同住并互相扶养。', '按现在的生活状况回答；因工作或健康短暂分开仍算同住。', 'Alex和伴侣同住、共同管理开支，所以选“是”。'],
+  'family.qcDrug': ['魁北克对参加RAMQ公共药保的人在报税时加收处方药保费；私人团体保险或已核实豁免的人不用交。', '查看福利手册或雇主保险；多数人满65岁会自动转到RAMQ，除非保留团体保险。', 'Alex保留前雇主的团体保险（私人），伴侣参加RAMQ（公共）。'],
+  'assets.ownership': ['所得税跟着账户持有人走，每个账户都要有明确的持有人，才能按人精确计税。', '对账单上写着持有人姓名；配偶RRSP归年金领取人，不归供款人。', 'Alex的TFSA有60,000，伴侣的有40,000：选“两人各有一个”并分别填写余额。'],
+  'housing.ownership': ['租金和增值按产权份额，计入房产所有人的收入。', '查看产权证或购房文件；共同共有通常是均等份额。', '两人各出一半买的出租房，选“共同持有”，份额50%。'],
   'family.people': ['家庭人数会改变税额、福利，以及计划需要纳入哪些收入。', '按“谁会共同依赖这份退休计划”选择，不需要查文件。', 'Alex和伴侣共用退休资金，所以选择夫妻合并。'],
   'family.ages': ['当前年龄决定剩余储蓄年数，并对齐每个人未来领取福利的时间。', '按出生日期填写今天的年龄，不要填退休时年龄。', 'Alex现在40岁，伴侣38岁。'],
   'family.children': ['未满18岁的孩子可能让提前退休阶段获得加拿大儿童福利。', '按孩子生日填写当前年龄；不要纳入计划中的孩子或成年子女。', '7岁孩子需要纳入，20岁子女不纳入。'],
@@ -136,6 +144,10 @@ const zh: Record<string, Copy> = {
 const fr: Record<string, Copy> = Object.fromEntries(Object.entries(en).map(([id, copy]) => [id, copy]))
 Object.assign(fr, {
   'income.taxFacts': ['L’impôt suit le bénéficiaire et le propriétaire imposable, jamais une moyenne familiale.', 'Consultez les relevés de paie, pension, comptes et biens. Une donnée inconnue reste inconnue et limite le conseil fiscal précis.', 'Le retrait d’un FERR appartient à son titulaire, sauf fractionnement légal explicitement choisi.'],
+  'family.spouseSupport': ['Le montant pour conjoint et certains crédits provinciaux dépendent de la vie commune et du soutien mutuel.', 'Répondez selon votre situation actuelle; une courte séparation pour le travail ou la santé compte encore comme vie commune.', 'Alex et son conjoint vivent ensemble et mettent l’argent en commun : Alex répond oui.'],
+  'family.qcDrug': ['Le Québec ajoute une prime d’assurance médicaments à l’impôt des personnes au régime public de la RAMQ; un régime collectif privé ou une exemption vérifiée ne paie rien.', 'Consultez votre brochure d’avantages ou votre régime d’employeur; à 65 ans, la plupart passent à la RAMQ sauf s’ils gardent un régime collectif.', 'Alex garde le régime collectif d’un ancien employeur (privé) et son conjoint est à la RAMQ (public).'],
+  'assets.ownership': ['L’impôt suit le titulaire du compte : chaque compte doit avoir un propriétaire pour calculer l’impôt de chacun.', 'Le nom du titulaire figure sur chaque relevé; un REER de conjoint appartient au rentier, pas au cotisant.', 'Alex a un CELI de 60 000 $ et son conjoint un de 40 000 $ : ils choisissent « Nous en avons chacun un » et inscrivent les deux soldes.'],
+  'housing.ownership': ['Le loyer et les gains sont imposés au propriétaire, selon sa part.', 'Consultez le titre de propriété ou l’acte d’achat; des copropriétaires détiennent souvent des parts égales.', 'Un immeuble locatif acheté à parts égales est « Détenu conjointement » avec une part de 50 %.'],
   'family.people': ['La taille du ménage change l’impôt, les prestations et les revenus inclus.', 'Choisissez les personnes qui dépendront du même plan de retraite; aucun document requis.', 'Alex inclut son conjoint parce que les deux utiliseront le même plan.'],
   'family.ages': ['Les âges fixent la période d’épargne et alignent les prestations de chacun.', 'Utilisez les dates de naissance et l’âge actuel, pas l’âge à la retraite.', 'Alex a 40 ans et son conjoint 38 ans.'],
   'family.children': ['Les enfants de moins de 18 ans peuvent donner droit à l’Allocation canadienne pour enfants.', 'Utilisez l’âge actuel; excluez les enfants projetés ou adultes.', 'Un enfant de 7 ans est inclus; un enfant de 20 ans ne l’est pas.'],

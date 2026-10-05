@@ -14,6 +14,9 @@ export interface QuestionDefinition {
   estimatePolicy: 'none' | 'fact-only' | 'assumption'
   applicableWhen?: (inputs: Inputs, answers: QuestionAnswers) => boolean
   prerequisitePageId?: string
+  /** An optional page never blocks generating results; left unanswered it
+   * reads as optional rather than to do, and its facts stay unknown. */
+  optional?: boolean
 }
 
 export interface CategoryDefinition {

@@ -651,22 +651,27 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   const errors: string[] = []
   page.on('pageerror', error => errors.push(String(error)))
   await seedCoupleFhsa(page, { balance: 0, guided: true })
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('person-tax-facts')).toBeVisible()
-  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('')
-  await attributeHouseholdAccounts(page)
-  await page.getByTestId('owner-legacy:account:fhsa').selectOption('legacy:person:partner')
+  // FE-43 A: the holder is answered on the guided ownership checklist.
+  await page.goto('/#/guided/assets/assets.ownership')
+  await expect(page.getByTestId('guided-ownership-row-legacy:account:fhsa')).toBeVisible()
+  await expect(page.getByTestId('owner-choice-legacy:account:fhsa-partner')).not.toBeChecked()
+  await page.getByTestId('owner-choice-legacy:account:tfsa-self').check()
+  await page.getByTestId('owner-choice-legacy:account:rrsp-partner').check()
+  await page.getByTestId('owner-choice-legacy:account:nonReg-self').check()
+  await page.getByTestId('owner-choice-legacy:account:fhsa-partner').check()
   await page.waitForTimeout(50)
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
   expect(await ownershipState(page)).toMatchObject({
     ownerIds: ['legacy:person:partner'], ownershipNeedsConfirmation: false })
+  await page.goto('/#/guided/income/income.taxFacts')
   await expect(page.getByTestId('fhsa-no-account-self')).toHaveCount(1)
   await expect(page.getByTestId('fhsa-no-account-partner')).toHaveCount(0)
   await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
   await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('contributions 6,000')
   await page.reload()
-  await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:partner')
   await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6000')
+  await page.goto('/#/guided/assets/assets.ownership')
+  await expect(page.getByTestId('owner-choice-legacy:account:fhsa-partner')).toBeChecked()
   // The holder survives the guided/professional switch, which rebuilds the
   // canonical plan from the legacy form.
   await page.getByRole('button', { name: 'Professional', exact: true }).click()

@@ -1,13 +1,23 @@
 import type { Inputs } from '../engine'
+import type { InputsV2 } from '../engine/model'
+import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
 import type { QuestionDefinition } from './schema'
+import { accountOwnershipComplete, propertyOwnershipComplete, qcCoverageComplete } from './householdFacts'
 
 /** The store slice page completeness actually reads. */
 export interface PageState {
   inputs: Inputs
   answerMeta: Record<string, AnswerMeta>
   questionAnswers: Record<string, string | boolean | string[]>
-  canonical: { budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } | null
+  canonical: ({ budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } &
+    Partial<Pick<InputsV2, 'people' | 'accounts' | 'properties' | 'taxProfile'>>) | null
+}
+
+/** The recorded plan the household-fact pages are answered against. */
+function householdPlan(state: PageState): InputsV2 {
+  return state.canonical?.people && state.canonical.accounts && state.canonical.properties
+    ? state.canonical as InputsV2 : refreshCanonicalFromLegacy(null, state.inputs)
 }
 
 function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
@@ -34,6 +44,14 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
       answerIsUsable(state.answerMeta.fireTargetAssets) &&
       (state.inputs.fireTargetAssets ?? 0) > 0
   }
+  // FE-43 A: the household tax facts are answered when the recorded plan holds
+  // them, or when the user explicitly says they are not sure yet.
+  if (definition.id === 'family.spouseSupport') {
+    return householdPlan(state).taxProfile?.spouseSupported.status === 'known' || state.questionAnswers['family.spouseSupport'] === 'unknown'
+  }
+  if (definition.id === 'family.qcDrug') return qcCoverageComplete(householdPlan(state)) || state.questionAnswers['family.qcDrug'] === 'unknown'
+  if (definition.id === 'assets.ownership') return accountOwnershipComplete(householdPlan(state))
+  if (definition.id === 'housing.ownership') return propertyOwnershipComplete(householdPlan(state))
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }

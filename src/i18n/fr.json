@@ -77,7 +77,9 @@
     "rrifAllOther": "Autres FERR",
     "rrifFactorHelp": "Vérifiez les dossiers d’ouverture, de transfert et de modification du fournisseur avant de choisir. L’année d’ouverture ne prouve pas la catégorie; laissez-la non confirmée pour limiter le minimum et l’impôt précis.",
     "rrifFactorSource": "Tableau des facteurs prescrits de l’ARC",
-    "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas. Les crédits familiaux, FSS et RAMQ du Québec attendent BE-35."
+    "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas. Les crédits familiaux, FSS et RAMQ du Québec attendent BE-35.",
+    "homeOwner": "Propriétaire de la résidence principale",
+    "typeSpousalRrsp": "REER de conjoint"
   },
   "be35": {
     "qcSplitTransferor": "Choix québécois de l’annexe Q : qui transfère?",
@@ -85,7 +87,7 @@
     "splitHelp": "Le choix québécois est distinct du fractionnement fédéral. La personne qui transfère doit avoir au moins 65 ans; ne choisissez un transfert que si vous faites le choix de l’annexe Q.",
     "coverageTitle": "Assurance médicaments du Québec",
     "coverageHelp": "Ceci ne touche que la prime d’assurance médicaments du Québec (ligne 447 de la déclaration TP-1), dans la ligne fiscale québécoise de chaque personne — rien d’autre. Cela concerne les résidents du Québec couverts par le régime public de la RAMQ, un régime privé admissible ou une exemption vérifiée. Choisissez un statut pour toute l’année; le détail mensuel ne sert que si la couverture a réellement changé en cours d’année. Une année comportant un mois public demeure une estimation étiquetée jusqu’à la publication de l’annexe K 2026.",
-    "coveragePerson": "Couverture de {{person}}",
+    "coveragePerson": "{{person}} : assurance médicaments",
     "mixed": "Mois différents",
     "unknown": "Non confirmé",
     "private": "Régime privé de base",
@@ -905,7 +907,8 @@
     },
     "status": {
       "answered": "répondu",
-      "pending": "à faire"
+      "pending": "à faire",
+      "optional": "facultatif"
     },
     "accountNames": {
       "tfsa": "CELI",
@@ -1207,7 +1210,37 @@
       },
       "invest_strategy": {
         "question": "Dans quel ordre les comptes devraient-ils financer les dépenses?"
+      },
+      "family_spouseSupport": {
+        "question": "Vivez-vous ensemble et vous soutenez-vous financièrement?"
+      },
+      "family_qcDrug": {
+        "question": "Comment chacun de vous est-il couvert pour les médicaments au Québec?"
+      },
+      "assets_ownership": {
+        "question": "Au nom de qui est chaque compte?"
+      },
+      "housing_ownership": {
+        "question": "Au nom de qui est chaque bien immobilier?"
       }
+    },
+    "ownership": {
+      "mine": "Le mien",
+      "partners": "Celui de mon conjoint",
+      "eachHasOne": "Nous en avons chacun un",
+      "joint": "Détenu conjointement",
+      "zeroBalance": "Aucun solde aujourd’hui. Choisissez qui détiendrait les nouveaux dépôts.",
+      "home": "Votre résidence",
+      "rental": "Immeuble locatif {{n}}",
+      "accountsIntro": "Un compte enregistré appartient toujours à une seule personne. Si vous en avez chacun un, choisissez « Nous en avons chacun un » et inscrivez chaque solde. Un compte non enregistré peut être détenu conjointement.",
+      "propertiesIntro": "Choisissez qui figure sur le titre. Pour un bien détenu conjointement, inscrivez votre part."
+    },
+    "spouseSupport": {
+      "yesDetail": "Vous partagez un logement, et l’un soutient l’autre au besoin.",
+      "noDetail": "Vous vivez séparés pour une raison autre que le travail ou la santé, ou aucun ne soutient l’autre."
+    },
+    "qcDrug": {
+      "intro": "Le Québec perçoit une prime d’assurance médicaments dans la déclaration des personnes couvertes par le régime public de la RAMQ. Une personne couverte par un régime collectif privé, ou exemptée, ne paie rien. Choisissez la couverture de chacun pour toute l’année."
     }
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",

@@ -114,9 +114,14 @@ test('professional records premiums, prices the contributor room and previews th
 
 test('guided records the premium history and keeps it through reload and a mode switch', async ({ page }) => {
   await seed(page, { guided: true })
+  // FE-43 A: guided names the owner on the ownership checklist, then records
+  // the plan type and its history with the other tax details.
+  await page.goto('/#/guided/assets/assets.ownership')
+  await page.getByTestId(`owner-choice-${ACCOUNT}-self`).check()
   await page.goto('/#/guided/income/income.taxFacts')
   const year = await baseYear(page)
-  await makeSpousal(page)
+  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
+  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toBeVisible()
   await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
   await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 5_000 })
   await page.getByTestId('rrsp-available-room-partner').fill('8000')

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine/model'
-import { applyAccountSplit, applyPropertySplit, derivedAccountId, refreshCanonicalFromLegacy, splitAmountsMatch } from '../engine/migration'
+import { applyAccountSplit, applyPropertySplit, derivedAccountId, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
 import { previewTfsaRoomYear, tfsaStatement, type TfsaWithdrawalLine } from '../engine/tfsaRoom'
 import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
-import { fhsaPlanRowId, fhsaScheduledContributions, legacyFhsaMirror, plannedFhsaYearTotal } from '../engine/fhsaPlan'
+import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
-import { useStore } from '../store'
+import { commitCanonicalEdit, useCanonicalPlan } from '../forms/canonicalEdit'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked', 'legacy:account:fhsa'] as const
 const roundCents = (value: number) => Math.round(value * 100) / 100
@@ -16,7 +16,7 @@ const roundCents = (value: number) => Math.round(value * 100) / 100
 /** Two per-person amount inputs for one household total. Shows the live
  * arithmetic and commits only while the two amounts add up to the total; a
  * mismatch stays visible and never writes a partial split. */
-function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTestId, partnerTestId, onCommit }: {
+export function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTestId, partnerTestId, onCommit }: {
   rowId: string
   total: number
   selfAmount: number | undefined
@@ -68,7 +68,7 @@ const RRSP_STATEMENT_FIELDS = [
 
 /** BE-12 A statement facts and the recomputed room row, shared by both modes.
  * Unknown is a real, visible state and is never coerced to zero. */
-function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+export function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -174,7 +174,7 @@ function RrspRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
  * maturity clock is displayed as out of scope rather than as room still
  * available.
  */
-function FhsaRoomRow({ person, account, plan, onEdit }: {
+export function FhsaRoomRow({ person, account, plan, onEdit }: {
   person: Person
   account: Account | undefined
   plan: InputsV2
@@ -317,7 +317,7 @@ function FhsaRoomRow({ person, account, plan, onEdit }: {
  * withdrawals recorded here are the only thing that restores room, and the row
  * says when that happens instead of implying it happens immediately.
  */
-function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+export function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -414,7 +414,7 @@ function TfsaRoomRow({ person, plan, onEdit }: { person: Person; plan: InputsV2;
  * user answer and an unrecorded history never silently becomes zero. Shared by
  * both entry modes because both mount this panel.
  */
-function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
+export function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; plan: InputsV2; onEdit: (change: (draft: InputsV2) => void) => void }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const money = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -547,358 +547,468 @@ function SpousalAttributionRow({ account, plan, onEdit }: { account: Account; pl
   </div>
 }
 
-export function TaxFactsPanel() {
-  const { t, i18n } = useTranslation()
-  const plan = useStore(state => state.canonical)
-  const inputs = useStore(state => state.inputs)
-  const commitPlan = useStore(state => state.commitPlan)
-  const current = plan ?? refreshCanonicalFromLegacy(null, inputs)
-  const people = current.people
-  const self = people.find(person => person.role === 'self')
-  const partner = people.find(person => person.role === 'partner')
-  // Local-only reveal of the month detail; never part of the recorded plan.
-  // A mixed recorded pattern always re-reveals itself so it cannot hide.
-  const [revealMonths, setRevealMonths] = useState<Record<string, boolean>>({})
-  const monthNames = Array.from({ length: 12 }, (_, index) => new Intl.DateTimeFormat(i18n.language, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, index, 1))))
-  const edit = (change: (draft: InputsV2) => void) => {
-    const state = useStore.getState()
-    const draft = structuredClone(state.canonical ?? refreshCanonicalFromLegacy(null, state.inputs))
-    change(draft)
-    draft.migration.ownershipNeedsConfirmation = draft.accounts.some(account => account.kind !== 'nonReg' && !account.ownerId || account.taxableOwnerShares.status === 'unknown') ||
-      draft.properties.some(property => property.taxableOwnerShares.status === 'unknown')
-    // The legacy form is what rebuilds the account list on the next household
-    // edit, so a recorded FHSA has to exist there too; otherwise the next form
-    // edit or mode switch would silently drop the account and its room row.
-    // The legacy field is a mirror of the one recorded plan, never a second
-    // copy of it, and `legacyFhsaMirror` is the whole write: it carries the
-    // household total across every FHSA account and preserves a recorded
-    // years-ago opening answer when the canonical opening year is unknown.
-    const mirroredFhsa = legacyFhsaMirror(draft, state.inputs.fhsa?.openedYearsAgo)
-    const inputs = mirroredFhsa ? { ...state.inputs, fhsa: mirroredFhsa } : state.inputs
-    commitPlan({ inputs, canonical: draft, answerMeta: state.answerMeta,
-      draftByField: state.draftByField })
-  }
+/** The independent editors the shared tax-facts panel is built from. */
+export type TaxFactsSection = 'earned' | 'ownership' | 'spouseSupport' | 'pensionSplit' | 'qcCoverage' |
+  'rrspRoom' | 'fhsaRoom' | 'tfsaRoom' | 'registered' | 'spousal'
+export const ALL_TAX_FACTS_SECTIONS: readonly TaxFactsSection[] = ['earned', 'ownership', 'spouseSupport', 'pensionSplit',
+  'qcCoverage', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'registered', 'spousal']
+
+const usePersonLabel = () => {
+  const { t } = useTranslation()
+  return (person: Person | undefined) => person ? t(person.role === 'self' ? 'be11.self' : 'be11.partner') : t('be12.spousalUnassigned')
+}
+
+/** Each person's current employment income; blank stays unknown, never zero. */
+export function EarnedIncomeFields({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const label = usePersonLabel()
+  return <>{plan.people.map(person => <label key={person.id}>
+    {t('be11.earned', { person: label(person) })}
+    <input data-testid={`earned-${person.role}`} type="number" min="0" step="1"
+      key={`${person.id}:${person.earnedIncome.status === 'known' ? person.earnedIncome.value : 'unknown'}`}
+      defaultValue={person.earnedIncome.status === 'known' ? person.earnedIncome.value : ''}
+      placeholder={t('be11.unknown')}
+      onBlur={event => {
+        const raw = event.currentTarget.value.trim()
+        const next = raw === '' ? null : Number(raw)
+        if (next !== null && (!Number.isFinite(next) || next < 0)) return
+        if (person.earnedIncome.status === 'known' && next === person.earnedIncome.value ||
+            person.earnedIncome.status === 'unknown' && next === null) return
+        commitCanonicalEdit(draft => { draft.people.find(item => item.id === person.id)!.earnedIncome = next === null
+          ? { status: 'unknown', reason: 'employment amount not supplied' } : { status: 'known', value: next } })
+      }} />
+  </label>)}</>
+}
+
+/** The account rows a household total can be recorded against, base and partner halves together. */
+export function ownershipAccountRows(plan: InputsV2): { baseId: string; base: Account | undefined; derived: Account | undefined }[] {
+  return SPLIT_ROW_BASE_IDS.map(baseId => ({
+    baseId,
+    base: plan.accounts.find(account => account.id === baseId),
+    derived: plan.accounts.find(account => account.id === derivedAccountId(baseId)),
+  })).filter(row => !!row.base || !!row.derived)
+}
+
+/** Professional ownership editor: one owner select and two amounts per account. */
+export function AccountOwnershipRows({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const self = plan.people.find(person => person.role === 'self')
+  const partner = plan.people.find(person => person.role === 'partner')
+  if (!self || !partner) return null
   const ownerOptions = <>
     <option value="">{t('be11.unknown')}</option>
     <option value="shared" disabled>{t('be11.shared')}</option>
     <option value="split" disabled>{t('be11.splitOwners')}</option>
-    {people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
+    {plan.people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
   </>
-  const rowAccounts = SPLIT_ROW_BASE_IDS.map((baseId): { baseId: string; base: Account | undefined; derived: Account | undefined } => ({
-    baseId,
-    base: current.accounts.find(account => account.id === baseId),
-    derived: current.accounts.find(account => account.id === derivedAccountId(baseId)),
-  })).filter((row): row is { baseId: string; base: Account | undefined; derived: Account | undefined } => !!row.base || !!row.derived)
-  return <section className="hint" data-testid="person-tax-facts" aria-label={t('be11.title')}>
-    <h3>{t('be11.title')}</h3>
-    <p>{t('be11.explanation')}</p>
-    {people.map(person => <label key={person.id}>
-      {t('be11.earned', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}
-      <input data-testid={`earned-${person.role}`} type="number" min="0" step="1"
-        key={`${person.id}:${person.earnedIncome.status === 'known' ? person.earnedIncome.value : 'unknown'}`}
-        defaultValue={person.earnedIncome.status === 'known' ? person.earnedIncome.value : ''}
-        placeholder={t('be11.unknown')}
-        onBlur={event => {
-          const raw = event.currentTarget.value.trim()
-          const next = raw === '' ? null : Number(raw)
-          if (next !== null && (!Number.isFinite(next) || next < 0)) return
-          if (person.earnedIncome.status === 'known' && next === person.earnedIncome.value ||
-              person.earnedIncome.status === 'unknown' && next === null) return
-          edit(draft => { draft.people.find(item => item.id === person.id)!.earnedIncome = next === null
-            ? { status: 'unknown', reason: 'employment amount not supplied' } : { status: 'known', value: next } })
-        }} />
-    </label>)}
-    {partner && self && <>
-      <h4>{t('be11.ownership')}</h4>
-      <p>{t('be11.splitHelp')}</p>
-      {rowAccounts.map(({ baseId, base, derived }) => {
-        const account = base ?? derived!
-        const total = (base?.balance ?? 0) + (derived?.balance ?? 0)
-        const registered = account.kind !== 'nonReg'
-        const entry = current.ownershipAmounts?.[baseId]
-        let selfAmount: number | undefined
-        let partnerAmount: number | undefined
-        if (registered) {
-          selfAmount = entry ? entry[self.id] : account.ownerId === self.id ? total : account.ownerId === partner.id ? 0 : undefined
-          partnerAmount = entry ? entry[partner.id] : account.ownerId === partner.id ? total : account.ownerId === self.id ? 0 : undefined
-        } else if (account.taxableOwnerShares.status === 'known') {
-          const selfShare = account.taxableOwnerShares.shares[self.id] ?? 0
-          selfAmount = roundCents(selfShare * total)
-          partnerAmount = roundCents(total - selfAmount)
-        }
-        const selectValue = registered
-          ? derived && derived.ownerId && base && base.ownerId && derived.ownerId !== base.ownerId ? 'split' : account.ownerId ?? ''
-          : account.ownerId ?? (account.taxableOwnerShares.status === 'known' ? 'shared' : '')
-        return <div key={`${baseId}:${account.kind}:${total}:${JSON.stringify(entry ?? null)}:${base?.ownerId ?? ''}:${derived?.ownerId ?? ''}:${JSON.stringify(account.taxableOwnerShares)}`}
-          data-testid={`ownership-row-${baseId}`}>
-          <label>{account.kind} — {total.toLocaleString()} CAD
-            <select data-testid={`owner-${baseId}`} value={selectValue} onChange={event => edit(draft => {
-              const value = event.target.value
-              if (!registered) {
-                const item = draft.accounts.find(candidate => candidate.id === baseId)!
-                item.ownerId = value || null
-                item.taxableOwnerShares = item.ownerId ? { status: 'known', shares: { [item.ownerId]: 1 } }
-                  : { status: 'unknown', reason: 'account owner not assigned' }
-                return
-              }
-              if (!value) {
-                for (const item of draft.accounts) if (item.id === baseId || item.id === derivedAccountId(baseId)) {
-                  item.ownerId = null
-                  item.taxableOwnerShares = { status: 'unknown', reason: 'account owner not assigned' }
-                }
-                if (draft.ownershipAmounts?.[baseId]) {
-                  const { [baseId]: _dropped, ...rest } = draft.ownershipAmounts
-                  draft.ownershipAmounts = Object.keys(rest).length ? rest : undefined
-                }
-                return
-              }
-              if (value === self.id) applyAccountSplit(draft, baseId, total, 0, { zeroOwnerId: self.id })
-              else if (value === partner.id) applyAccountSplit(draft, baseId, 0, total, { zeroOwnerId: partner.id })
-            })}>{ownerOptions}</select>
-          </label>
-          <SplitAmounts rowId={baseId} total={total} selfAmount={selfAmount} partnerAmount={partnerAmount}
-            selfTestId={`account-self-amount-${baseId}`} partnerTestId={`account-partner-amount-${baseId}`}
-            onCommit={(selfAmt, partnerAmt) => edit(draft => applyAccountSplit(draft, baseId, selfAmt, partnerAmt))} />
-          {baseId === 'legacy:account:locked' && <p className="hint">{t('be11.lockedOwnerResetHelp')}</p>}
-          {!registered && <label>{t('be11.selfTaxShare')}
-            <input type="number" min="0" max="100" step="1" data-testid={`account-self-share-${baseId}`}
-              key={`share:${baseId}:${account.taxableOwnerShares.status === 'known' ? account.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
-              defaultValue={account.taxableOwnerShares.status === 'known' ? (account.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
-              onBlur={event => {
-                const raw = event.currentTarget.value.trim()
-                if (!raw) return
-                const pct = Number(raw)
-                if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
-                if (account.taxableOwnerShares.status === 'known' && Math.abs((account.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
-                edit(draft => {
-                  const item = draft.accounts.find(candidate => candidate.id === baseId)!
-                  item.taxableOwnerShares = { status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 } }
-                  item.ownerId = pct === 100 ? self.id : pct === 0 ? partner.id : null
-                })
-              }} />%
-          </label>}
-        </div>
-      })}
-      {current.properties.filter(property => property.kind === 'investment').map(property => {
-        const selfAmount = property.taxableOwnerShares.status === 'known'
-          ? roundCents((property.taxableOwnerShares.shares[self.id] ?? 0) * property.value) : undefined
-        const partnerAmount = property.taxableOwnerShares.status === 'known' && selfAmount !== undefined
-          ? roundCents(property.value - selfAmount) : undefined
-        return <div key={`${property.id}:${property.value}:${JSON.stringify(property.taxableOwnerShares)}`}
-          data-testid={`ownership-row-${property.id}`}>
-          <label>{t('be11.propertyOwner')}
-            <select data-testid={`property-owner-${property.id}`}
-              value={property.taxableOwnerShares.status === 'known' ? Object.keys(property.taxableOwnerShares.shares).find(id => property.taxableOwnerShares.status === 'known' && property.taxableOwnerShares.shares[id] === 1) ?? 'shared' : ''}
-              onChange={event => edit(draft => {
-                const item = draft.properties.find(candidate => candidate.id === property.id)!
-                item.taxableOwnerShares = event.target.value ? { status: 'known', shares: { [event.target.value]: 1 } }
-                  : { status: 'unknown', reason: 'property taxable owner not assigned' }
-              })}>{ownerOptions}</select>
-          </label>
-          <SplitAmounts rowId={property.id} total={property.value} selfAmount={selfAmount} partnerAmount={partnerAmount}
-            selfTestId={`property-self-amount-${property.id}`} partnerTestId={`property-partner-amount-${property.id}`}
-            onCommit={(selfAmt, partnerAmt) => edit(draft => applyPropertySplit(draft, property.id, selfAmt, partnerAmt))} />
-          <label>{t('be11.selfTaxShare')}
-            <input type="number" min="0" max="100" step="1" data-testid={`property-self-share-${property.id}`}
-              key={`share:${property.id}:${property.taxableOwnerShares.status === 'known' ? property.taxableOwnerShares.shares[self.id] ?? 0 : 'unknown'}`}
-              defaultValue={property.taxableOwnerShares.status === 'known' ? (property.taxableOwnerShares.shares[self.id] ?? 0) * 100 : ''}
-              onBlur={event => {
-                const raw = event.currentTarget.value.trim()
-                if (!raw) return
-                const pct = Number(raw)
-                if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
-                if (property.taxableOwnerShares.status === 'known' && Math.abs((property.taxableOwnerShares.shares[self.id] ?? 0) * 100 - pct) < 1e-8) return
-                edit(draft => { draft.properties.find(item => item.id === property.id)!.taxableOwnerShares = {
-                  status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 },
-                } })
-              }} />%
-          </label>
-        </div>
-      })}
-      <label>{t('be11.spouseSupport')}
-        <select data-testid="spouse-support" value={current.taxProfile?.spouseSupported.status === 'known' ? String(current.taxProfile.spouseSupported.value) : 'unknown'}
-          onChange={event => edit(draft => {
-            draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
-            draft.taxProfile.spouseSupported = event.target.value === 'unknown' ? { status: 'unknown', reason: 'not confirmed' }
-              : { status: 'known', value: event.target.value === 'true' }
-          })}>
-          <option value="unknown">{t('be11.unknown')}</option><option value="true">{t('be11.yes')}</option><option value="false">{t('be11.no')}</option>
-        </select>
+  return <>{ownershipAccountRows(plan).map(({ baseId, base, derived }) => {
+    const account = base ?? derived!
+    const total = (base?.balance ?? 0) + (derived?.balance ?? 0)
+    const registered = account.kind !== 'nonReg'
+    const entry = plan.ownershipAmounts?.[baseId]
+    let selfAmount: number | undefined
+    let partnerAmount: number | undefined
+    if (registered) {
+      selfAmount = entry ? entry[self.id] : account.ownerId === self.id ? total : account.ownerId === partner.id ? 0 : undefined
+      partnerAmount = entry ? entry[partner.id] : account.ownerId === partner.id ? total : account.ownerId === self.id ? 0 : undefined
+    } else if (account.taxableOwnerShares.status === 'known') {
+      const selfShare = account.taxableOwnerShares.shares[self.id] ?? 0
+      selfAmount = roundCents(selfShare * total)
+      partnerAmount = roundCents(total - selfAmount)
+    }
+    const selectValue = registered
+      ? derived && derived.ownerId && base && base.ownerId && derived.ownerId !== base.ownerId ? 'split' : account.ownerId ?? ''
+      : account.ownerId ?? (account.taxableOwnerShares.status === 'known' ? 'shared' : '')
+    return <div className="tax-facts-row" key={`${baseId}:${account.kind}:${total}:${JSON.stringify(entry ?? null)}:${base?.ownerId ?? ''}:${derived?.ownerId ?? ''}:${JSON.stringify(account.taxableOwnerShares)}`}
+      data-testid={`ownership-row-${baseId}`}>
+      <label>{t(`questionnaire.accountNames.${accountNameKey(account.kind)}`)} — {total.toLocaleString()} CAD
+        <select data-testid={`owner-${baseId}`} value={selectValue} onChange={event => commitCanonicalEdit(draft => {
+          const value = event.target.value
+          if (!registered) {
+            const item = draft.accounts.find(candidate => candidate.id === baseId)!
+            item.ownerId = value || null
+            item.taxableOwnerShares = item.ownerId ? { status: 'known', shares: { [item.ownerId]: 1 } }
+              : { status: 'unknown', reason: 'account owner not assigned' }
+            return
+          }
+          if (!value) {
+            for (const item of draft.accounts) if (item.id === baseId || item.id === derivedAccountId(baseId)) {
+              item.ownerId = null
+              item.taxableOwnerShares = { status: 'unknown', reason: 'account owner not assigned' }
+            }
+            if (draft.ownershipAmounts?.[baseId]) {
+              const { [baseId]: _dropped, ...rest } = draft.ownershipAmounts
+              draft.ownershipAmounts = Object.keys(rest).length ? rest : undefined
+            }
+            return
+          }
+          if (value === self.id) applyAccountSplit(draft, baseId, total, 0, { zeroOwnerId: self.id })
+          else if (value === partner.id) applyAccountSplit(draft, baseId, 0, total, { zeroOwnerId: partner.id })
+        })}>{ownerOptions}</select>
       </label>
-      <label>{t('be11.splitTransferor')}
-        <select data-testid="split-transferor" value={current.taxProfile?.pensionSplit?.transferorId ?? ''}
-          onChange={event => edit(draft => {
+      <SplitAmounts rowId={baseId} total={total} selfAmount={selfAmount} partnerAmount={partnerAmount}
+        selfTestId={`account-self-amount-${baseId}`} partnerTestId={`account-partner-amount-${baseId}`}
+        onCommit={(selfAmt, partnerAmt) => commitCanonicalEdit(draft => applyAccountSplit(draft, baseId, selfAmt, partnerAmt))} />
+      {baseId === 'legacy:account:locked' && <p className="hint">{t('be11.lockedOwnerResetHelp')}</p>}
+      {!registered && <ShareInput testId={`account-self-share-${baseId}`} shares={account.taxableOwnerShares} selfId={self.id}
+        onShare={pct => commitCanonicalEdit(draft => {
+          const item = draft.accounts.find(candidate => candidate.id === baseId)!
+          item.taxableOwnerShares = { status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 } }
+          item.ownerId = pct === 100 ? self.id : pct === 0 ? partner.id : null
+        })} />}
+    </div>
+  })}</>
+}
+
+/** The question-catalogue key that names one account kind in all three languages. */
+export function accountNameKey(kind: Account['kind']): string {
+  return kind === 'nonReg' ? 'nonReg' : kind === 'tfsa' ? 'tfsa' : kind === 'fhsa' ? 'fhsa'
+    : kind === 'lira' || kind === 'lif' ? 'locked' : 'rrsp'
+}
+
+/** One person's taxable share of a jointly held asset, as a percentage. */
+export function ShareInput({ testId, shares, selfId, onShare }: { testId: string; shares: Account['taxableOwnerShares']; selfId: string; onShare: (pct: number) => void }) {
+  const { t } = useTranslation()
+  return <label>{t('be11.selfTaxShare')}
+    <input type="number" min="0" max="100" step="1" data-testid={testId}
+      key={`share:${testId}:${shares.status === 'known' ? shares.shares[selfId] ?? 0 : 'unknown'}`}
+      defaultValue={shares.status === 'known' ? (shares.shares[selfId] ?? 0) * 100 : ''}
+      onBlur={event => {
+        const raw = event.currentTarget.value.trim()
+        if (!raw) return
+        const pct = Number(raw)
+        if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
+        if (shares.status === 'known' && Math.abs((shares.shares[selfId] ?? 0) * 100 - pct) < 1e-8) return
+        onShare(pct)
+      }} />%
+  </label>
+}
+
+/** Professional property-ownership editor. The home is listed too: the
+ * precision gate needs every property's taxable owner, so a couple's principal
+ * residence has to be answerable somewhere. */
+export function PropertyOwnershipRows({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const self = plan.people.find(person => person.role === 'self')
+  const partner = plan.people.find(person => person.role === 'partner')
+  if (!self || !partner) return null
+  const ownerOptions = <>
+    <option value="">{t('be11.unknown')}</option>
+    <option value="shared" disabled>{t('be11.shared')}</option>
+    {plan.people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
+  </>
+  return <>{plan.properties.map(property => {
+    const selfAmount = property.taxableOwnerShares.status === 'known'
+      ? roundCents((property.taxableOwnerShares.shares[self.id] ?? 0) * property.value) : undefined
+    const partnerAmount = property.taxableOwnerShares.status === 'known' && selfAmount !== undefined
+      ? roundCents(property.value - selfAmount) : undefined
+    return <div className="tax-facts-row" key={`${property.id}:${property.value}:${JSON.stringify(property.taxableOwnerShares)}`}
+      data-testid={`ownership-row-${property.id}`}>
+      <label>{t(property.kind === 'principal' ? 'be11.homeOwner' : 'be11.propertyOwner')}
+        <select data-testid={`property-owner-${property.id}`}
+          value={property.taxableOwnerShares.status === 'known' ? Object.keys(property.taxableOwnerShares.shares).find(id => property.taxableOwnerShares.status === 'known' && property.taxableOwnerShares.shares[id] === 1) ?? 'shared' : ''}
+          onChange={event => commitCanonicalEdit(draft => {
+            const item = draft.properties.find(candidate => candidate.id === property.id)!
+            item.taxableOwnerShares = event.target.value ? { status: 'known', shares: { [event.target.value]: 1 } }
+              : { status: 'unknown', reason: 'property taxable owner not assigned' }
+          })}>{ownerOptions}</select>
+      </label>
+      <SplitAmounts rowId={property.id} total={property.value} selfAmount={selfAmount} partnerAmount={partnerAmount}
+        selfTestId={`property-self-amount-${property.id}`} partnerTestId={`property-partner-amount-${property.id}`}
+        onCommit={(selfAmt, partnerAmt) => commitCanonicalEdit(draft => applyPropertySplit(draft, property.id, selfAmt, partnerAmt))} />
+      <ShareInput testId={`property-self-share-${property.id}`} shares={property.taxableOwnerShares} selfId={self.id}
+        onShare={pct => commitCanonicalEdit(draft => { draft.properties.find(item => item.id === property.id)!.taxableOwnerShares = {
+          status: 'known', shares: { [self.id]: pct / 100, [partner.id]: 1 - pct / 100 },
+        } })} />
+    </div>
+  })}</>
+}
+
+/** Whether the spouses live together and one supports the other (spouse amount). */
+export function SpouseSupportSelect({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  return <label>{t('be11.spouseSupport')}
+    <select data-testid="spouse-support" value={plan.taxProfile?.spouseSupported.status === 'known' ? String(plan.taxProfile.spouseSupported.value) : 'unknown'}
+      onChange={event => commitCanonicalEdit(draft => setSpouseSupport(draft, event.target.value === 'unknown' ? null : event.target.value === 'true'))}>
+      <option value="unknown">{t('be11.unknown')}</option><option value="true">{t('be11.yes')}</option><option value="false">{t('be11.no')}</option>
+    </select>
+  </label>
+}
+
+/** Record the spouse-support fact, or clear it back to an explicit unknown. */
+export function setSpouseSupport(draft: InputsV2, value: boolean | null): void {
+  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+  draft.taxProfile.spouseSupported = value === null ? { status: 'unknown', reason: 'not confirmed' } : { status: 'known', value }
+}
+
+/** The explicit federal (T1032) and, in Quebec, Schedule Q pension-split elections. */
+export function PensionSplitFields({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const people = plan.people
+  return <>
+    <label>{t('be11.splitTransferor')}
+      <select data-testid="split-transferor" value={plan.taxProfile?.pensionSplit?.transferorId ?? ''}
+        onChange={event => commitCanonicalEdit(draft => {
+          draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+          const transferorId = event.target.value
+          const recipientId = draft.people.find(item => item.id !== transferorId)?.id
+          draft.taxProfile.pensionSplit = transferorId && recipientId ? { transferorId, recipientId, amount: 0 } : null
+        })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
+    </label>
+    {plan.taxProfile?.pensionSplit && <label>{t('be11.splitAmount')}
+      <input type="number" min="0" step="1" data-testid="split-amount"
+        key={`split:${plan.taxProfile.pensionSplit.transferorId}:${plan.taxProfile.pensionSplit.amount}`}
+        defaultValue={plan.taxProfile.pensionSplit.amount}
+        onBlur={event => {
+          const amount = Number(event.currentTarget.value)
+          if (!Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.pensionSplit?.amount) return
+          commitCanonicalEdit(draft => { if (draft.taxProfile?.pensionSplit) draft.taxProfile.pensionSplit.amount = amount })
+        }} />
+    </label>}
+    {plan.province === 'QC' && <>
+      <label>{t('be35.qcSplitTransferor')}
+        <select data-testid="qc-split-transferor" value={plan.taxProfile?.qcPensionSplit?.transferorId ?? ''}
+          onChange={event => commitCanonicalEdit(draft => {
             draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
             const transferorId = event.target.value
             const recipientId = draft.people.find(item => item.id !== transferorId)?.id
-            draft.taxProfile.pensionSplit = transferorId && recipientId ? { transferorId, recipientId, amount: 0 } : null
+            draft.taxProfile.qcPensionSplit = transferorId && recipientId ? { transferorId, recipientId, amount: 0 } : null
           })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
       </label>
-      {current.taxProfile?.pensionSplit && <label>{t('be11.splitAmount')}
-        <input type="number" min="0" step="1" data-testid="split-amount"
-          key={`split:${current.taxProfile.pensionSplit.transferorId}:${current.taxProfile.pensionSplit.amount}`}
-          defaultValue={current.taxProfile.pensionSplit.amount}
+      {plan.taxProfile?.qcPensionSplit && <label>{t('be35.qcSplitAmount')}
+        <input type="number" min="0" step="1" data-testid="qc-split-amount"
+          key={`qc-split:${plan.taxProfile.qcPensionSplit.transferorId}:${plan.taxProfile.qcPensionSplit.amount}`}
+          defaultValue={plan.taxProfile.qcPensionSplit.amount}
           onBlur={event => {
             const amount = Number(event.currentTarget.value)
-            if (!Number.isFinite(amount) || amount < 0 || amount === current.taxProfile?.pensionSplit?.amount) return
-            edit(draft => { if (draft.taxProfile?.pensionSplit) draft.taxProfile.pensionSplit.amount = amount })
+            if (!Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.qcPensionSplit?.amount) return
+            commitCanonicalEdit(draft => { if (draft.taxProfile?.qcPensionSplit) draft.taxProfile.qcPensionSplit.amount = amount })
           }} />
       </label>}
-      {current.province === 'QC' && <>
-        <label>{t('be35.qcSplitTransferor')}
-          <select data-testid="qc-split-transferor" value={current.taxProfile?.qcPensionSplit?.transferorId ?? ''}
-            onChange={event => edit(draft => {
-              draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
-              const transferorId = event.target.value
-              const recipientId = draft.people.find(item => item.id !== transferorId)?.id
-              draft.taxProfile.qcPensionSplit = transferorId && recipientId ? { transferorId, recipientId, amount: 0 } : null
-            })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
-        </label>
-        {current.taxProfile?.qcPensionSplit && <label>{t('be35.qcSplitAmount')}
-          <input type="number" min="0" step="1" data-testid="qc-split-amount"
-            key={`qc-split:${current.taxProfile.qcPensionSplit.transferorId}:${current.taxProfile.qcPensionSplit.amount}`}
-            defaultValue={current.taxProfile.qcPensionSplit.amount}
-            onBlur={event => {
-              const amount = Number(event.currentTarget.value)
-              if (!Number.isFinite(amount) || amount < 0 || amount === current.taxProfile?.qcPensionSplit?.amount) return
-              edit(draft => { if (draft.taxProfile?.qcPensionSplit) draft.taxProfile.qcPensionSplit.amount = amount })
-            }} />
-        </label>}
-        <p className="hint">{t('be35.splitHelp')}</p>
-      </>}
+      <p className="hint">{t('be35.splitHelp')}</p>
     </>}
-    {current.province === 'QC' && <div data-testid="qc-drug-coverage">
-      <h4>{t('be35.coverageTitle')}</h4>
-      <p>{t('be35.coverageHelp')}</p>
-      {people.map(person => {
-        const label = t(person.role === 'self' ? 'be11.self' : 'be11.partner')
-        const months = current.taxProfile?.qcDrugCoverage?.[person.id] ?? qcCoverageUniform('unknown')
-        const annual = qcCoverageAnnualStatus(months)
-        const mixed = annual === 'mixed'
-        const revealed = mixed || !!revealMonths[person.id]
-        return <fieldset key={person.id}>
-          <legend>{t('be35.coveragePerson', { person: label })}</legend>
-          <label>{t('be35.annualStatus')}
-            <select data-testid={`qc-coverage-all-${person.role}`} value={annual}
-              onChange={event => {
-                const value = event.target.value
-                if (value === 'mixed') return
-                // An explicit annual pick is the one action that flattens a
-                // mixed pattern; it also closes the month detail.
-                setRevealMonths(previous => { const { [person.id]: _dropped, ...rest } = previous; return rest })
-                edit(draft => {
-                  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
-                  draft.taxProfile.qcDrugCoverage = applyQcAnnualCoverage(draft.taxProfile.qcDrugCoverage, person.id, value as QcDrugCoverage)
-                })
-              }}>
-              <option value="mixed" disabled>{t('be35.mixed')}</option>
-              {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
-            </select>
-          </label>
-          <label className="qc-change-toggle">
-            <input type="checkbox" data-testid={`qc-coverage-changed-${person.role}`}
-              checked={revealed}
-              onChange={event => setRevealMonths(previous => ({ ...previous, [person.id]: event.target.checked }))} />
-            {t('be35.changedDuringYear')}
-          </label>
-          {revealed && <>
-            <div className="qc-month-grid">{months.map((status, index) => <label key={index}>{monthNames[index]}
-              <select data-testid={`qc-coverage-${person.role}-${index + 1}`} value={status}
-                onChange={event => edit(draft => {
-                  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
-                  draft.taxProfile.qcDrugCoverage ??= {}
-                  const next = [...(draft.taxProfile.qcDrugCoverage[person.id] ?? qcCoverageUniform('unknown'))]
-                  next[index] = event.target.value as QcDrugCoverage
-                  draft.taxProfile.qcDrugCoverage[person.id] = next
-                })}>
-                {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
-              </select>
-            </label>)}</div>
-            <p className="hint">{t('be35.monthDetailHelp')}</p>
-          </>}
-        </fieldset>
-      })}
-      <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>
-    </div>}
-    <h4>{t('be12.title')}</h4>
-    {people.map(person => <RrspRoomRow key={person.id} person={person} plan={current} onEdit={edit} />)}
+  </>
+}
+
+/** Each person's Quebec prescription-drug coverage: one annual status, with the
+ * month detail only when coverage actually changed during the year. Guided
+ * pages show the annual status as choice cards; professional keeps a select. */
+export function QcDrugCoverageEditor({ plan, variant = 'select' }: { plan: InputsV2; variant?: 'select' | 'cards' }) {
+  const { t, i18n } = useTranslation()
+  const label = usePersonLabel()
+  // Local-only reveal of the month detail; never part of the recorded plan.
+  // A mixed recorded pattern always re-reveals itself so it cannot hide.
+  const [revealMonths, setRevealMonths] = useState<Record<string, boolean>>({})
+  const monthNames = Array.from({ length: 12 }, (_, index) => new Intl.DateTimeFormat(i18n.language, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, index, 1))))
+  return <>{plan.people.map(person => {
+    const months = plan.taxProfile?.qcDrugCoverage?.[person.id] ?? qcCoverageUniform('unknown')
+    const annual = qcCoverageAnnualStatus(months)
+    const mixed = annual === 'mixed'
+    const revealed = mixed || !!revealMonths[person.id]
+    // An explicit annual pick is the one action that flattens a mixed pattern;
+    // it also closes the month detail.
+    const chooseAnnual = (value: QcDrugCoverage) => {
+      setRevealMonths(previous => { const { [person.id]: _dropped, ...rest } = previous; return rest })
+      commitCanonicalEdit(draft => setQcAnnualCoverage(draft, person.id, value))
+    }
+    return <fieldset key={person.id} className={variant === 'cards' ? 'qc-coverage-person' : undefined}>
+      <legend>{t('be35.coveragePerson', { person: label(person) })}</legend>
+      {variant === 'cards' ? <div className="owner-choices" role="radiogroup" aria-label={t('be35.annualStatus')} data-testid={`qc-coverage-all-${person.role}`}>
+        {(['public', 'private', 'waived'] as const).map(value => <label key={value} className={annual === value && !revealed ? 'selected' : ''}>
+          <input type="radio" name={`qc-coverage-${person.id}`} value={value} checked={annual === value && !revealed}
+            data-testid={`qc-coverage-all-${person.role}-${value}`} onChange={() => chooseAnnual(value)} />
+          <span>{t(`be35.${value}`)}</span>
+        </label>)}
+        <label className={revealed ? 'selected' : ''}>
+          <input type="radio" name={`qc-coverage-${person.id}`} value="mixed" checked={revealed}
+            data-testid={`qc-coverage-changed-${person.role}`} onChange={() => setRevealMonths(previous => ({ ...previous, [person.id]: true }))} />
+          <span>{t('be35.changedDuringYear')}</span>
+        </label>
+      </div> : <><label>{t('be35.annualStatus')}
+        <select data-testid={`qc-coverage-all-${person.role}`} value={annual}
+          onChange={event => {
+            const value = event.target.value
+            if (value !== 'mixed') chooseAnnual(value as QcDrugCoverage)
+          }}>
+          <option value="mixed" disabled>{t('be35.mixed')}</option>
+          {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
+        </select>
+      </label>
+      <label className="qc-change-toggle">
+        <input type="checkbox" data-testid={`qc-coverage-changed-${person.role}`}
+          checked={revealed}
+          onChange={event => setRevealMonths(previous => ({ ...previous, [person.id]: event.target.checked }))} />
+        {t('be35.changedDuringYear')}
+      </label></>}
+      {revealed && <>
+        <div className="qc-month-grid">{months.map((status, index) => <label key={index}>{monthNames[index]}
+          <select data-testid={`qc-coverage-${person.role}-${index + 1}`} value={status}
+            onChange={event => commitCanonicalEdit(draft => {
+              draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+              draft.taxProfile.qcDrugCoverage ??= {}
+              const next = [...(draft.taxProfile.qcDrugCoverage[person.id] ?? qcCoverageUniform('unknown'))]
+              next[index] = event.target.value as QcDrugCoverage
+              draft.taxProfile.qcDrugCoverage[person.id] = next
+            })}>
+            {(['unknown', 'private', 'public', 'waived'] as const).map(value => <option key={value} value={value}>{t(`be35.${value}`)}</option>)}
+          </select>
+        </label>)}</div>
+        <p className="hint">{t('be35.monthDetailHelp')}</p>
+      </>}
+    </fieldset>
+  })}</>
+}
+
+/** Record one whole-year coverage status for one person. */
+export function setQcAnnualCoverage(draft: InputsV2, personId: string, status: QcDrugCoverage): void {
+  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+  draft.taxProfile.qcDrugCoverage = applyQcAnnualCoverage(draft.taxProfile.qcDrugCoverage, personId, status)
+}
+
+/** Registered-account type and, for a RRIF, the facts its minimum needs. */
+export function RegisteredAccountRows({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const people = plan.people
+  const partner = people.find(person => person.role === 'partner')
+  return <>{plan.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
+    const rowIds = [account.id, derivedAccountId(account.id)]
+    const setRow = (change: (item: Account) => void) => commitCanonicalEdit(draft => {
+      for (const item of draft.accounts) if (rowIds.includes(item.id)) change(item)
+    })
+    return <div className="tax-facts-row" key={account.id}>
+      <label>{t('be11.registeredType')}
+        <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => setRow(item => {
+          item.kind = event.target.value as 'rrsp' | 'spousalRrsp' | 'rrif' | 'lif'
+        })}><option value="rrsp">RRSP</option><option value="spousalRrsp">{t('be11.typeSpousalRrsp')}</option><option value="rrif">RRIF</option><option value="lif">LIF</option></select>
+      </label>
+      {account.kind === 'rrif' && <>
+        <label>{t('be11.rrifOpenedYear')}
+          <input type="number" min="1950" max="2200" step="1" data-testid="rrif-opened-year"
+            key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
+            defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
+            onBlur={event => {
+              const raw = event.currentTarget.value.trim()
+              const year = Number(raw)
+              if (raw && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
+              if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && !raw) return
+              setRow(item => { item.openedYear = raw
+                ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
+            }} />
+        </label>
+        <label>{t('be11.rrifFactorCategory')}
+          <select data-testid={`rrif-factor-category-${account.id}`}
+            value={account.rrifFactorCategory?.status === 'known' ? account.rrifFactorCategory.value : 'unknown'}
+            onChange={event => setRow(item => { item.rrifFactorCategory =
+              event.target.value === 'unknown' ? { status: 'unknown', reason: 'RRIF factor qualification not confirmed' }
+                : { status: 'known', value: event.target.value as 'qualifying' | 'allOther' } })}>
+            <option value="unknown">{t('be11.unknown')}</option>
+            <option value="qualifying">{t('be11.rrifQualifying')}</option>
+            <option value="allOther">{t('be11.rrifAllOther')}</option>
+          </select>
+        </label>
+        <p className="hint">{t('be11.rrifFactorHelp')}{' '}
+          <a href="https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/chart-prescribed-factors.html"
+            target="_blank" rel="noopener noreferrer">{t('be11.rrifFactorSource')}</a>
+        </p>
+        {partner && <label>{t('be11.rrifAgeElection')}
+          <select data-testid="rrif-age-election" value={account.rrifAgeElection?.personId ?? ''}
+            onChange={event => setRow(item => { item.rrifAgeElection = event.target.value
+              ? { personId: event.target.value, electedAtOpening: true } : null })}>
+            <option value="">{t('be11.noElection')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
+          </select>
+        </label>}
+      </>}
+    </div>
+  })}</>
+}
+
+/** The spousal-plan premium histories that drive T2205 attribution. */
+export function SpousalHistoryRows({ plan }: { plan: InputsV2 }) {
+  return <>{plan.accounts.filter(account =>
+    ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) &&
+    (account.kind === 'spousalRrsp' || plan.spousalHistory?.[account.id] !== undefined)).map(account =>
+    <SpousalAttributionRow key={account.id} account={account} plan={plan} onEdit={commitCanonicalEdit} />)}</>
+}
+
+/** RRSP room rows for every person, with the statement source. */
+export function RrspRoomSection({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  return <>
+    {plan.people.map(person => <RrspRoomRow key={person.id} person={person} plan={plan} onEdit={commitCanonicalEdit} />)}
     <p className="hint">{t('be12.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/t4040/rrsps-other-registered-plans-retirement.html" target="_blank" rel="noopener noreferrer">{t('be12.source')}</a></p>
-    <h4>{t('be36.title')}</h4>
-    {people.map(person => {
-      const resolved = ownFhsaAccount(current, person.id)
-      return <FhsaRoomRow key={person.id} person={person} plan={current} onEdit={edit}
-        account={resolved.accountId ? current.accounts.find(item => item.id === resolved.accountId) : undefined} />
+  </>
+}
+
+/** FHSA room rows: one per account holder, never a household bucket. */
+export function FhsaRoomSection({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  return <>
+    {plan.people.map(person => {
+      const resolved = ownFhsaAccount(plan, person.id)
+      return <FhsaRoomRow key={person.id} person={person} plan={plan} onEdit={commitCanonicalEdit}
+        account={resolved.accountId ? plan.accounts.find(item => item.id === resolved.accountId) : undefined} />
     })}
-    {people.some(person => ownFhsaAccount(current, person.id).ambiguous) && <p className="hint" role="status" data-testid="fhsa-ambiguous">
+    {plan.people.some(person => ownFhsaAccount(plan, person.id).ambiguous) && <p className="hint" role="status" data-testid="fhsa-ambiguous">
       {t('be36.ambiguousAccount')}</p>}
     {/* BE-36 A prices one active FHSA per plan, so the couple rows above are
         offered while the projection refuses the year. Say so where the user
         records the accounts instead of only inside the kernel. */}
-    {activeFhsaAccounts(current, current.baseYear, id => current.accounts.find(item => item.id === id)?.balance ?? 0).length > 1 &&
+    {activeFhsaAccounts(plan, plan.baseYear, id => plan.accounts.find(item => item.id === id)?.balance ?? 0).length > 1 &&
       <p className="hint" role="status" data-testid="fhsa-multiple-active">{t('be36.multipleActive')}</p>}
     <p className="hint">{t('be36.scope')}</p>
-    {/* BE-27 A: TFSA room is per person too, and this row is the only place the
-        CRA room figure and the withdrawal history that restores it are recorded.
-        Both entry modes mount this panel, so the two never diverge. */}
-    <h4>{t('be27.title')}</h4>
-    {people.map(person => <TfsaRoomRow key={person.id} person={person} plan={current} onEdit={edit} />)}
+  </>
+}
+
+/** TFSA room rows: room belongs to the person, not an account. */
+export function TfsaRoomSection({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  return <>
+    {plan.people.map(person => <TfsaRoomRow key={person.id} person={person} plan={plan} onEdit={commitCanonicalEdit} />)}
     <p className="hint">{t('be27.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/tax-free-savings-account/contributions.html"
       target="_blank" rel="noopener noreferrer">{t('be27.source')}</a></p>
     <p className="hint" data-testid="tfsa-scope">{t('be27.scope')}</p>
-    {current.accounts.filter(account => ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && !account.id.endsWith(':partner')).map(account => {
-      const rowIds = [account.id, derivedAccountId(account.id)]
-      const setRow = (change: (item: Account) => void) => edit(draft => {
-        for (const item of draft.accounts) if (rowIds.includes(item.id)) change(item)
-      })
-      return <div key={account.id}>
-        <label>{t('be11.registeredType')}
-          <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => setRow(item => {
-            item.kind = event.target.value as 'rrsp' | 'spousalRrsp' | 'rrif' | 'lif'
-          })}><option value="rrsp">RRSP</option><option value="spousalRrsp">Spousal RRSP</option><option value="rrif">RRIF</option><option value="lif">LIF</option></select>
-        </label>
-        {account.kind === 'rrif' && <>
-          <label>{t('be11.rrifOpenedYear')}
-            <input type="number" min="1950" max="2200" step="1" data-testid="rrif-opened-year"
-              key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
-              defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
-              onBlur={event => {
-                const raw = event.currentTarget.value.trim()
-                const year = Number(raw)
-                if (raw && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
-                if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && !raw) return
-                setRow(item => { item.openedYear = raw
-                  ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
-              }} />
-          </label>
-          <label>{t('be11.rrifFactorCategory')}
-            <select data-testid={`rrif-factor-category-${account.id}`}
-              value={account.rrifFactorCategory?.status === 'known' ? account.rrifFactorCategory.value : 'unknown'}
-              onChange={event => setRow(item => { item.rrifFactorCategory =
-                event.target.value === 'unknown' ? { status: 'unknown', reason: 'RRIF factor qualification not confirmed' }
-                  : { status: 'known', value: event.target.value as 'qualifying' | 'allOther' } })}>
-              <option value="unknown">{t('be11.unknown')}</option>
-              <option value="qualifying">{t('be11.rrifQualifying')}</option>
-              <option value="allOther">{t('be11.rrifAllOther')}</option>
-            </select>
-          </label>
-          <p className="hint">{t('be11.rrifFactorHelp')}{' '}
-            <a href="https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/chart-prescribed-factors.html"
-              target="_blank" rel="noopener noreferrer">{t('be11.rrifFactorSource')}</a>
-          </p>
-          {partner && <label>{t('be11.rrifAgeElection')}
-            <select data-testid="rrif-age-election" value={account.rrifAgeElection?.personId ?? ''}
-              onChange={event => setRow(item => { item.rrifAgeElection = event.target.value
-                ? { personId: event.target.value, electedAtOpening: true } : null })}>
-              <option value="">{t('be11.noElection')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
-            </select>
-          </label>}
-        </>}
-      </div>
-    })}
-    {current.accounts.filter(account =>
-      ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) &&
-      (account.kind === 'spousalRrsp' || current.spousalHistory?.[account.id] !== undefined)).map(account =>
-      <SpousalAttributionRow key={account.id} account={account} plan={current} onEdit={edit} />)}
-    <p>{t(current.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
+  </>
+}
+
+/**
+ * The shared tax-facts panel. Professional mode shows every section; a guided
+ * page can mount just the sections it asks about, so the two modes always edit
+ * the same recorded facts through the same transactions.
+ */
+export function TaxFactsPanel({ sections = ALL_TAX_FACTS_SECTIONS }: { sections?: readonly TaxFactsSection[] }) {
+  const { t } = useTranslation()
+  const plan = useCanonicalPlan()
+  const self = plan.people.find(person => person.role === 'self')
+  const partner = plan.people.find(person => person.role === 'partner')
+  const show = (section: TaxFactsSection) => sections.includes(section)
+  return <section className="hint tax-facts-panel" data-testid="person-tax-facts" aria-label={t('be11.title')}>
+    <h3>{t('be11.title')}</h3>
+    <p>{t('be11.explanation')}</p>
+    {show('earned') && <EarnedIncomeFields plan={plan} />}
+    {partner && self && <>
+      {show('ownership') && <>
+        <h4>{t('be11.ownership')}</h4>
+        <p>{t('be11.splitHelp')}</p>
+        <AccountOwnershipRows plan={plan} />
+        <PropertyOwnershipRows plan={plan} />
+      </>}
+      {show('spouseSupport') && <SpouseSupportSelect plan={plan} />}
+      {show('pensionSplit') && <PensionSplitFields plan={plan} />}
+    </>}
+    {show('qcCoverage') && plan.province === 'QC' && <div data-testid="qc-drug-coverage">
+      <h4>{t('be35.coverageTitle')}</h4>
+      <p>{t('be35.coverageHelp')}</p>
+      <QcDrugCoverageEditor plan={plan} />
+      <p className="hint">{t('be35.publicLimit')}{' '}<a href="https://www.ramq.gouv.qc.ca/en/citizens/prescription-drug-insurance/rates-effect" target="_blank" rel="noopener noreferrer">{t('be35.ramqSource')}</a></p>
+    </div>}
+    {show('rrspRoom') && <><h4>{t('be12.title')}</h4><RrspRoomSection plan={plan} /></>}
+    {show('fhsaRoom') && <><h4>{t('be36.title')}</h4><FhsaRoomSection plan={plan} /></>}
+    {/* BE-27 A: TFSA room is per person too, and this row is the only place the
+        CRA room figure and the withdrawal history that restores it are recorded.
+        Both entry modes mount this panel, so the two never diverge. */}
+    {show('tfsaRoom') && <><h4>{t('be27.title')}</h4><TfsaRoomSection plan={plan} /></>}
+    {show('registered') && <RegisteredAccountRows plan={plan} />}
+    {show('spousal') && <SpousalHistoryRows plan={plan} />}
+    <p>{t(plan.province === 'QC' ? 'be35.limit' : 'be11.limit')}</p>
   </section>
 }

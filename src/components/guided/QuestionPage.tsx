@@ -20,6 +20,8 @@ import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
 import { BudgetMethodPanel } from '../BudgetMethodPanel'
 import { TaxFactsPanel } from '../TaxFactsPanel'
+import { useCanonicalPlan } from '../../forms/canonicalEdit'
+import { AccountOwnershipChecklist, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
@@ -146,6 +148,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     inputs, set, answerMeta, markAnswers, questionAnswers, setQuestionAnswer,
     planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence,
   } = useStore()
+  const canonicalPlan = useCanonicalPlan()
   const key = definition.contentKey
   const answer = questionAnswers[definition.id] as string | undefined
   const markChoice = (field: string, value: string, status: 'confirmed' | 'notApplicable' = 'confirmed') => {
@@ -166,13 +169,27 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   let control: React.ReactNode
   switch (definition.id) {
     case 'income.taxFacts':
+      // FE-43 A: ownership, spouse support and Quebec coverage moved to their
+      // own pages; this page keeps the sections that have not moved yet.
       control = <div>
-        <TaxFactsPanel />
+        <TaxFactsPanel sections={['earned', 'pensionSplit', 'rrspRoom', 'fhsaRoom', 'tfsaRoom', 'registered', 'spousal']} />
         <ChoiceGroup id={definition.id} value={answer} options={[
           { value: 'reviewed', label: t('be11.reviewed') },
           { value: 'unknown', label: t('be11.unknownStill') },
         ]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
       </div>
+      break
+    case 'family.spouseSupport':
+      control = <SpouseSupportQuestion plan={canonicalPlan} />
+      break
+    case 'family.qcDrug':
+      control = <QcDrugCoverageQuestion plan={canonicalPlan} />
+      break
+    case 'assets.ownership':
+      control = <><p className="question-intro">{t('questionnaire.ownership.accountsIntro')}</p><AccountOwnershipChecklist plan={canonicalPlan} /></>
+      break
+    case 'housing.ownership':
+      control = <><p className="question-intro">{t('questionnaire.ownership.propertiesIntro')}</p><PropertyOwnershipChecklist plan={canonicalPlan} /></>
       break
     case 'family.people':
       control = <ChoiceGroup id={definition.id} value={inputs.partner ? 'couple' : answer} options={[

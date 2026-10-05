@@ -271,6 +271,18 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .choice-group input, .check-group input { margin-top: 4px; accent-color: #174ea6; }
 .choice-group span, .check-group span { display: grid; gap: 3px; }
 .choice-group small, .check-group small { color: #526579; font-weight: 400; line-height: 1.45; }
+/* FE-43 A: guided ownership checklist and household fact pages */
+.question-intro { max-width: 620px; color: #526579; line-height: 1.55; margin: 6px 0 16px; }
+.ownership-checklist { display: grid; gap: 12px; max-width: 620px; margin: 8px 0 20px; }
+.ownership-row { border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; padding: 12px 14px; }
+.ownership-row-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; }
+.ownership-row-head span { color: #526579; font-variant-numeric: tabular-nums; }
+.owner-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.owner-choices label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 12px; cursor: pointer; background: #fff; }
+.owner-choices label.selected { border-color: #174ea6; background: #eef3fb; color: #174ea6; }
+.owner-choices input { accent-color: #174ea6; margin: 0; }
+.ownership-split, .ownership-row > label { display: grid; gap: 6px; margin-top: 12px; }
+.ownership-row input[type="number"] { max-width: 180px; }
 /* BE-13 A: the recorded basis of the saving figure. One block in both entry
    modes, so an inclusion answer reads the same wherever it was given. */
 .budget-method { max-width: 620px; margin: 18px 0 22px; }
@@ -687,6 +699,8 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .qc-month-grid label { min-width: 0; }
 .qc-month-grid select { width: 100%; min-width: 0; }
 .qc-change-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.qc-coverage-person { max-width: 620px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; padding: 12px 14px; margin: 0 0 12px; }
+.qc-coverage-person legend { padding: 0 4px; font-weight: 600; }
 
 /* BE-38 B3: the coverage matrix wraps its credit ids at any character, so a
    long identifier cannot widen the 320px layout. */

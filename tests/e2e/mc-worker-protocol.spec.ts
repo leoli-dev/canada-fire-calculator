@@ -182,6 +182,12 @@ async function generateGuidedThroughUi(page: Page, options: {
       await expect(owner).toHaveValue('')
       if (options.ownerChoice) await owner.selectOption(options.ownerChoice)
     }
+    else if (id === 'assets.ownership') {
+      // FE-43 A: every unanswered account row is named as the user's own.
+      for (const group of await page.locator('.ownership-row .owner-choices').all()) {
+        if (await group.locator('input:checked').count() === 0) await group.locator('input[value="self"]').check()
+      }
+    }
     else if (id === 'home.situation') await page.getByRole('radio', { name: 'Rent' }).check()
     else if (id === 'housing.other') {
       await page.getByRole('radio', { name: 'No rental property' }).check()
