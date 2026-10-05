@@ -1656,5 +1656,8 @@
   "chartSummary": "Net worth is {{start}} at age {{startAge}}, {{atFire}} at FIRE age {{fireAge}}, and {{end}} at age {{endAge}}.",
   "incomeChartSummary": "From age {{startAge}} to {{endAge}}, income and withdrawals cover the yearly need in {{covered}} of {{years}} years.",
   "incomeChartSummaryGap": "The largest shortfall is {{gap}} at age {{age}}.",
-  "taxChartSummary": "Tax from age {{startAge}} to {{endAge}} adds up to {{total}}. The highest year is {{peak}} at age {{peakAge}}."
+  "taxChartSummary": "Tax from age {{startAge}} to {{endAge}} adds up to {{total}}. The highest year is {{peak}} at age {{peakAge}}.",
+  "analysisPending": "Comparing the options…",
+  "analysisUpdating": "Updating for your latest change…",
+  "analysisFailed": "This comparison could not be calculated. Change a value to try again."
 }

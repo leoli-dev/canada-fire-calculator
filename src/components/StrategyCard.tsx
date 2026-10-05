@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { compareStrategies, rankCandidates, type Inputs } from '../engine'
+import type { Inputs } from '../engine'
+import { useAnalysis, useCardOpen } from '../analysis/useAnalysis'
+import type { AnalysisResult } from '../analysis/compute'
+import { AnalysisBody } from './AnalysisBody'
 import { useCad } from '../format'
 import { useStore } from '../store'
 import { track } from '../analytics'
@@ -8,23 +10,30 @@ import { Jargon } from './Jargon'
 
 export function StrategyCard(props: { inputs: Inputs }) {
   const { t } = useTranslation()
+  // FE-47: computed off the main thread, only while the card is open.
+  const [open, setOpen] = useCardOpen('strategy')
+  const analysis = useAnalysis('strategy', props.inputs, open)
+  return (
+    <details className="chart-card collapsible" open={open}
+      onToggle={(e) => {
+        setOpen(e.currentTarget.open)
+        if (e.currentTarget.open && !open) track('panel_open', { panel: 'strategy_comparison' })
+      }}>
+      <summary><h3>{t('strategyTitle')}</h3></summary>
+      {open && <AnalysisBody analysis={analysis}>{(scan, stale) => <StrategyBody inputs={props.inputs} scan={scan} stale={stale} />}</AnalysisBody>}
+    </details>
+  )
+}
+
+function StrategyBody(props: { inputs: Inputs; scan: AnalysisResult<'strategy'>; stale: boolean }) {
+  const { t } = useTranslation()
   const cad = useCad()
   const set = useStore((s) => s.set)
   const dwz = (props.inputs.goal ?? 'legacy') === 'dieWithZero'
-  const { rows, ranking } = useMemo(
-    () => {
-      const rows = compareStrategies(props.inputs, { maxSpending: dwz })
-      return { rows, ranking: rankCandidates(rows.map((row) => ({
-        value: row.strategy, inputs: { ...props.inputs, strategy: row.strategy }, result: row.result, solver: row.maxSpending,
-      })), dwz ? 'maxSpending' : 'estate') }
-    },
-    [props.inputs, dwz],
-  )
+  const { rows, ranking } = props.scan
 
   return (
-    <details className="chart-card collapsible"
-      onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'strategy_comparison' })}>
-      <summary><h3>{t('strategyTitle')}</h3></summary>
+    <>
       <div className="table-scroll">
       <table className="compare-table">
         <thead>
@@ -66,6 +75,7 @@ export function StrategyCard(props: { inputs: Inputs }) {
                     <button
                       type="button"
                       className="use-strategy"
+                      disabled={props.stale}
                       onClick={() => {
                         set({ strategy: r.strategy })
                         track('strategy_change', { strategy: r.strategy, source: 'comparison_table' })
@@ -85,6 +95,6 @@ export function StrategyCard(props: { inputs: Inputs }) {
       {ranking.status === 'unrankedObjective' && <p className="hint">{ranking.candidates.some((row) => row.reason === 'lockedWithdrawalLimits')
         ? t('lockedRecommendationUnranked') : t('unrankedObjective')}</p>}
       <p className="hint"><Jargon text={dwz ? t('strategyNoteDwz') : t('strategyNote')} /></p>
-    </details>
+    </>
   )
 }
