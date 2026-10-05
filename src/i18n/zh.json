@@ -1660,5 +1660,10 @@
     "rent": "租金收入",
     "self": "你",
     "partner": "伴侣"
-  }
+  },
+  "modeTabsLabel": "结果问题",
+  "chartSummary": "净资产在 {{startAge}} 岁时为 {{start}}，在 FIRE 年龄 {{fireAge}} 岁时为 {{atFire}}，到 {{endAge}} 岁时为 {{end}}。",
+  "incomeChartSummary": "从 {{startAge}} 岁到 {{endAge}} 岁，收入和提款在 {{years}} 年中有 {{covered}} 年能覆盖当年所需。",
+  "incomeChartSummaryGap": "最大缺口为 {{gap}}，出现在 {{age}} 岁。",
+  "taxChartSummary": "从 {{startAge}} 岁到 {{endAge}} 岁的税款合计 {{total}}；最高的一年为 {{peak}}，在 {{peakAge}} 岁。"
 }

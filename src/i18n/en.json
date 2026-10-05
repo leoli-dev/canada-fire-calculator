@@ -1651,5 +1651,10 @@
     "rent": "Rental income",
     "self": "You",
     "partner": "Partner"
-  }
+  },
+  "modeTabsLabel": "Result question",
+  "chartSummary": "Net worth is {{start}} at age {{startAge}}, {{atFire}} at FIRE age {{fireAge}}, and {{end}} at age {{endAge}}.",
+  "incomeChartSummary": "From age {{startAge}} to {{endAge}}, income and withdrawals cover the yearly need in {{covered}} of {{years}} years.",
+  "incomeChartSummaryGap": "The largest shortfall is {{gap}} at age {{age}}.",
+  "taxChartSummary": "Tax from age {{startAge}} to {{endAge}} adds up to {{total}}. The highest year is {{peak}} at age {{peakAge}}."
 }

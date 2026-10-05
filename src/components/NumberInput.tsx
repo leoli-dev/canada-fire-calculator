@@ -63,6 +63,9 @@ export function NumberInput(props: {
   testId?: string
   /** False for a calendar year: no thousands separator. */
   grouping?: boolean
+  /** Ids of the status or error text that describes this input. */
+  describedBy?: string
+  invalid?: boolean
 }) {
   const { i18n } = useTranslation()
   const lang = i18n.language
@@ -113,6 +116,8 @@ export function NumberInput(props: {
       ref={ref}
       id={props.id}
       data-testid={props.testId}
+      aria-describedby={props.describedBy}
+      aria-invalid={props.invalid || undefined}
       type="text"
       inputMode="decimal"
       autoComplete="off"

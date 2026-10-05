@@ -646,6 +646,7 @@ footer .credit a:hover { text-decoration: underline; }
   border-bottom: 1px dashed var(--blue); color: var(--blue);
 }
 .term:hover { background: #eef4fb; }
+.term:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* inside card titles a term reads as a plain link, not a boxed chip */
 h3 .term, h4 .term, legend .term {
@@ -775,3 +776,9 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 /* FE-41: rule sources collapse to one line. */
 .rule-assumptions-details > summary { cursor: pointer; }
 .rule-assumptions-summary { color: var(--ink-soft); font-size: .85rem; }
+
+/* FE-45: read by assistive tech, not shown. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}

@@ -53,7 +53,9 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
     : undefined
   return <div className="question-answer" data-field={props.field}>
     <label htmlFor={`q-${props.field}`}>{props.label}</label>
-    <NumberInput id={`q-${props.field}`} value={props.value} draft={draft} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
+    <NumberInput id={`q-${props.field}`} value={props.value} draft={draft}
+      describedBy={[`q-${props.field}-status`, ...(issue || missingMortgage ? [`q-${props.field}-issue`] : [])].join(' ')}
+      invalid={!!issue || missingMortgage} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
       onDraftChange={isSharedField(props.field) ? (raw) => {
         if (parseField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit).status !== 'draft') return false
         editSharedField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit)
@@ -66,11 +68,11 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
         markAnswers([props.field], 'confirmed')
       }} className="question-number" />
     <div className="answer-actions">
-      <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</small>
+      <small id={`q-${props.field}-status`}>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</small>
       <button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
     </div>
-    {issue && <em className="field-issue error">{t(issue.key, issue.params)}</em>}
-    {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
+    {issue && <em className="field-issue error" id={`q-${props.field}-issue`}>{t(issue.key, issue.params)}</em>}
+    {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error" id={issue ? undefined : `q-${props.field}-issue`}>{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
   </div>
 }
 

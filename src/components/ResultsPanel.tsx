@@ -17,6 +17,7 @@ import { NumberInput } from './NumberInput'
 import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
+const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
 
 export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
@@ -132,16 +133,30 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
     <div className={`summary ${resultUnverified
       // FE-44: an unverified failure still reads as a failure.
       ? (ok || mode === 'target' && target <= 0 ? 'uncertain' : 'uncertain bad') : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
-      <div className="mode-tabs" role="tablist">
-        {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
+      {/* FE-45: tabs with roving focus, arrow keys, and one labelled panel. */}
+      <div className="mode-tabs" role="tablist" aria-label={t('modeTabsLabel')}>
+        {MODES.map((m, index) => (
           <button
             key={m}
+            id={`mode-tab-${m}`}
+            type="button"
             role="tab"
             aria-selected={mode === m}
+            aria-controls="mode-panel"
+            tabIndex={mode === m ? 0 : -1}
             className={mode === m ? 'active' : ''}
             onClick={() => {
               setMode(m)
               track('question_mode_change', { mode: m })
+            }}
+            onKeyDown={(e) => {
+              const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+              const next = e.key === 'Home' ? MODES[0] : e.key === 'End' ? MODES[MODES.length - 1]
+                : step ? MODES[(index + step + MODES.length) % MODES.length] : null
+              if (!next) return
+              e.preventDefault()
+              setMode(next)
+              document.getElementById(`mode-tab-${next}`)?.focus()
             }}
           >
             {t(`mode_${m}`)}
@@ -149,6 +164,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
         ))}
       </div>
 
+      <div role="tabpanel" id="mode-panel" aria-labelledby={`mode-tab-${mode}`}>
       {mode === 'last' && (
         <>
           <p className="verdict">
@@ -325,6 +341,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           <p className="hint"><Jargon text={t('targetHint')} /></p>
         </>
       )}
+      </div>
     </div>
   )
 }

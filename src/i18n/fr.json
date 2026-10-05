@@ -1660,5 +1660,10 @@
     "rent": "Revenu locatif",
     "self": "Vous",
     "partner": "Conjoint"
-  }
+  },
+  "modeTabsLabel": "Question sur le résultat",
+  "chartSummary": "La valeur nette est de {{start}} à {{startAge}} ans, de {{atFire}} à l’âge FIRE de {{fireAge}} ans et de {{end}} à {{endAge}} ans.",
+  "incomeChartSummary": "De {{startAge}} à {{endAge}} ans, les revenus et les retraits couvrent le besoin annuel pendant {{covered}} années sur {{years}}.",
+  "incomeChartSummaryGap": "Le plus grand manque est de {{gap}} à {{age}} ans.",
+  "taxChartSummary": "L’impôt de {{startAge}} à {{endAge}} ans totalise {{total}}. L’année la plus élevée atteint {{peak}} à {{peakAge}} ans."
 }

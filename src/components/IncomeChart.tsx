@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Area,
@@ -33,6 +34,7 @@ export function IncomeChart(props: {
   scale?: (age: number) => number
 }) {
   const { t } = useTranslation()
+  const id = useId()
   const cad = useCad()
   const cadTick = useCadCompact()
   const k = props.scale ?? (() => 1)
@@ -70,9 +72,18 @@ export function IncomeChart(props: {
 
   if (data.length === 0) return null
 
+  const gap = data.reduce((worst, d) => (d.shortfall > worst.shortfall ? d : worst), data[0])
+  const summary = t('incomeChartSummary', {
+    startAge: data[0].age, endAge: data[data.length - 1].age,
+    covered: data.filter((d) => d.shortfall <= 0).length, years: data.length,
+  }) + (hasShortfall ? ' ' + t('incomeChartSummaryGap', { gap: cad(gap.shortfall), age: gap.age }) : '')
+
   return (
     <div className="chart-card">
-      <h3>{t('incomeChartTitle')}</h3>
+      <h3 id={`${id}-title`}>{t('incomeChartTitle')}</h3>
+      {/* FE-45: the chart is one image to assistive tech, described in words. */}
+      <p className="sr-only" id={`${id}-summary`}>{summary}</p>
+      <div role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-summary`}>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
@@ -111,6 +122,7 @@ export function IncomeChart(props: {
           <Line dataKey="tax" name={t('taxLabel')} stroke="#37474f" strokeWidth={2} strokeDasharray="5 3" dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
       <p className="hint"><Jargon text={t('incomeChartNote')} /></p>
     </div>
   )
