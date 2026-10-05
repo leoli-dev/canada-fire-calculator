@@ -1602,5 +1602,7 @@
   "coverageLimitation.quebecProvincialPensionIncomeAmount": "2026 年固定数值；退休收入金额仅在 65 岁以上的合并抵免中计价，并与年龄金额共用同一附表 B 的按人近似。",
   "coverageLimitation.quebecRamqPremium": "所计数值为旧版预览，而非已公布的 2026 年费率表：所引指南印的是 2025 年表格（5,000 加元区间按 7.84%/11.76%、392 加元基数、755 加元上限、单身门槛 19,890 加元），由于魁北克税务局尚未公布 2026 纳税年度的附表 K，本构建将其按 2% 指数化为 20,288 加元与 770 加元。因此所引文件本身并未印出这些所计数值。",
   "coverageLimitation.yukonBpaPhaseOut": "与联邦增强型基本个人免税额的递减一致，属于固定数值而非图表行。",
-  "coverageLimitation.quebecFederalAbatement": "法定固定份额，不按纳税年度选择。CRA 尚未发布 2026 年表格，因此所引表格是印有 16.5% 税率的最新版本；财政部报告载明了 2026 年的该税率。"
+  "coverageLimitation.quebecFederalAbatement": "法定固定份额，不按纳税年度选择。CRA 尚未发布 2026 年表格，因此所引表格是印有 16.5% 税率的最新版本；财政部报告载明了 2026 年的该税率。",
+  "migrationSettleSingle": "这是单人计划：全部归我",
+  "migrationSettleSingleHelp": "伴侣已从计划中移除。确认所有账户和房产都归你，并删除原伴侣的收入。如果想保留伴侣的资料，请重新选择“我和伴侣一起规划”。"
 }
