@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   findEarliestFireAge,
   maxSustainableSpending,
@@ -18,6 +19,19 @@ import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
+
+/**
+ * The "will my money last" sentence, shared by the results summary and the
+ * mobile peek above the form (FE-48), so the two can never disagree.
+ */
+export function headlineVerdict(t: TFunction, inputs: Inputs, result: ProjectionResult,
+  flags: { estimate?: boolean; personTax?: boolean; taxWarning?: boolean }): { text: string; tone: 'ok' | 'bad' | 'uncertain' } {
+  if (flags.estimate) return { text: result.success ? t('estimateSuccess', { age: inputs.lifeExpectancy }) : t('estimateDepleted', { age: result.depletedAge }), tone: result.success ? 'uncertain' : 'bad' }
+  if (flags.personTax) return { text: result.success ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }) : t('stratDepleted', { age: result.depletedAge }), tone: result.success ? 'uncertain' : 'bad' }
+  if (!result.success) return { text: t('depleted', { age: result.depletedAge }), tone: 'bad' }
+  const unverified = flags.taxWarning || hasUnverifiedLockedWithdrawals(inputs) || result.terminalTaxStatus === 'unsupported'
+  return unverified ? { text: t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }), tone: 'uncertain' } : { text: t('success', { age: inputs.lifeExpectancy }), tone: 'ok' }
+}
 
 export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
@@ -104,7 +118,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const firstShortfall = result.rows.find((row) => row.shortfall > 0.5)
   const estimateVerdict = <>
     <p className={`verdict${result.success ? '' : ' verdict-bad'}`} data-testid="estimate-verdict">
-      {result.success ? t('estimateSuccess', { age: inputs.lifeExpectancy }) : t('estimateDepleted', { age: result.depletedAge })}</p>
+      {headlineVerdict(t, inputs, result, { estimate: true }).text}</p>
     {firstShortfall && <p data-testid="estimate-shortfall">{t('estimateShortfall', { age: firstShortfall.age, shortfall: cad(firstShortfall.shortfall) })}</p>}
   </>
 
@@ -124,7 +138,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   </div>
 
   if (props.personTax) return <div className="summary uncertain" data-testid="person-tax-summary">
-    <p className="verdict">{result.success ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }) : t('stratDepleted', { age: result.depletedAge })}</p>
+    <p className="verdict">{headlineVerdict(t, inputs, result, { personTax: true }).text}</p>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     <p className="hint">{t('be11.ledgerLimit')}</p>
   </div>
@@ -168,10 +182,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       {mode === 'last' && (
         <>
           <p className="verdict">
-            {result.success
-              ? lastResultUnverified ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy })
-                : t('success', { age: inputs.lifeExpectancy })
-              : t('depleted', { age: result.depletedAge })}
+            {headlineVerdict(t, inputs, result, { taxWarning: props.taxWarning }).text}
           </p>
           {lockedWithdrawalUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
           {result.success && lastResultUnverified && <ul className="needs-checks" data-testid="needs-checks">

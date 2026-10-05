@@ -226,8 +226,16 @@ function migratedBasisMeta(raw: unknown, prior?: Record<string, AnswerMeta>): Re
 }
 let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
 export const getStorageReadOnlyReason = () => storageReadOnlyReason
+// FE-48: with site data blocked, even reading localStorage throws. The plan
+// then works for the session and says it is not being saved, instead of the
+// page failing to start.
+let storageUnavailable = false
+export const isStorageUnavailable = () => storageUnavailable
+function readStorage(name: string): string | null {
+  try { return localStorage.getItem(name) } catch { storageUnavailable = true; return null }
+}
 export function downloadStoredPlan() {
-  const original = localStorage.getItem('fire-inputs') ?? localStorage.getItem('fire-inputs:pre-v11-backup')
+  const original = readStorage('fire-inputs') ?? readStorage('fire-inputs:pre-v11-backup')
   if (original === null) return
   const url = URL.createObjectURL(new Blob([original], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -238,7 +246,7 @@ export function downloadStoredPlan() {
 }
 const planStorage: PersistStorage<Store> = {
   getItem(name) {
-    const original = localStorage.getItem(name)
+    const original = readStorage(name)
     if (original === null) return null
     try {
       const parsed = JSON.parse(original) as StorageValue<Store>
@@ -279,11 +287,14 @@ const planStorage: PersistStorage<Store> = {
     }
   },
   setItem(name, value) {
-    if (storageReadOnlyReason) return
+    if (storageReadOnlyReason || storageUnavailable) return
     try { localStorage.setItem(name, JSON.stringify(value)) }
     catch { storageReadOnlyReason = 'migrationFailed' }
   },
-  removeItem(name) { if (!storageReadOnlyReason) localStorage.removeItem(name) },
+  removeItem(name) {
+    if (storageReadOnlyReason || storageUnavailable) return
+    try { localStorage.removeItem(name) } catch { storageUnavailable = true }
+  },
 }
 
 function reconcileLegacyInputs(state: Store, inputs: Inputs) {

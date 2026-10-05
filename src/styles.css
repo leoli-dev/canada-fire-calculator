@@ -718,9 +718,7 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
   .summary { padding: 12px 14px 14px; }
   .summary .verdict { font-size: 1rem; }
 
-  .mode-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .mode-tabs button { white-space: nowrap; padding: 6px 10px; font-size: 0.78rem; }
-
+  
   .chart-card { padding: 12px 10px 10px; }
   .compare-table { font-size: 0.78rem; }
   .compare-table td, .compare-table th { padding: 6px 6px; }
@@ -732,8 +730,11 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 
 /* tables always scroll inside their card, never widen the page */
 .table-scroll { -webkit-overflow-scrolling: touch; }
-.table-scroll .compare-table { min-width: max-content; }
-.table-scroll .compare-table td, .table-scroll .compare-table th { white-space: nowrap; }
+/* FE-48: text cells wrap within a readable width and numbers stay on one
+   line, so a comparison is not several screens wide on a phone. */
+.table-scroll .compare-table td.num { white-space: nowrap; }
+.table-scroll .compare-table th { white-space: normal; vertical-align: bottom; }
+.table-scroll .compare-table td:not(.num) { white-space: normal; min-width: 6.5rem; max-width: 16rem; }
 
 .qc-month-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin: 10px 0; }
 .qc-month-grid label { min-width: 0; }
@@ -785,3 +786,48 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 
 /* FE-47: an older comparison stays readable while the new one computes. */
 .analysis-stale .compare-table { opacity: 0.55; transition: opacity 0.15s; }
+
+/* FE-48: the headline above the professional form on narrow screens. */
+.result-peek { display: none; }
+@media (max-width: 900px) {
+  .result-peek {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
+    margin: 0 0 14px; padding: 10px 12px; border-radius: var(--radius);
+    border: 1px solid var(--line); border-left: 4px solid var(--line-strong); background: var(--card);
+  }
+  .result-peek p { margin: 0; font-weight: 600; }
+  .result-peek.ok { border-left-color: #2e7d32; }
+  .result-peek.bad { border-left-color: #c62828; }
+  .result-peek.uncertain { border-left-color: #b26a00; }
+}
+.results-column:focus { outline: none; }
+
+/* FE-48: when the results column is narrow (phones, and the two-column
+   layout just above 900px) the four questions sit in a 2 x 2 grid, so none
+   hides off screen. */
+.summary { container-type: inline-size; }
+@container (max-width: 600px) {
+  .mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .mode-tabs button { padding: 7px 8px; font-size: 0.78rem; border-left-width: 1px; border-radius: 0; }
+  .mode-tabs button:nth-child(odd) { border-right-width: 0; }
+  .mode-tabs button:nth-child(n + 3) { border-top-width: 0; }
+  .mode-tabs button:first-child { border-radius: 8px 0 0 0; }
+  .mode-tabs button:nth-child(2) { border-radius: 0 8px 0 0; }
+  .mode-tabs button:nth-child(3) { border-radius: 0 0 0 8px; }
+  .mode-tabs button:last-child { border-radius: 0 0 8px 0; }
+}
+
+/* FE-48: the one-time usage statistics question, in the page flow. */
+.analytics-prompt {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); font-size: 0.84rem; color: var(--ink-soft);
+}
+.analytics-prompt p { margin: 0; flex: 1 1 320px; }
+.analytics-prompt div { display: flex; gap: 8px; }
+.analytics-prompt button {
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--card);
+  padding: 5px 12px; cursor: pointer; font: inherit; color: var(--ink);
+}
+.analytics-prompt button:first-child { background: var(--navy); border-color: var(--navy); color: #fff; }
+footer .text-action { font-size: inherit; }

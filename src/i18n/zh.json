@@ -544,7 +544,7 @@
   "mcFailWhy": "失败组 FIRE 后前 5 年的平均年收益是 {{failed}}%，而成功组是 {{succeeded}}%——倒霉的方式几乎总是同一种：刚退休就撞上熊市，被迫在低点卖资产维持支出，本金受损后再也翻不了身（收益顺序风险）。后期的熊市反而伤不到什么。",
   "mcNoFail": "{{n}} 次模拟全部撑到预期寿命，没有失败剧本。",
   "createdBy": "作者：",
-  "privacyNote": "所有财务输入都只保存在你的浏览器里，绝不会上传。我们通过 Google Analytics 收集匿名使用统计（页面访问、功能点击）。",
+  "privacyNote": "所有财务输入都只保存在你的浏览器里，绝不会上传。",
   "valBanner": "有 {{count}} 处输入错误——修正前下方结果不可信",
   "valAgeRange": "须在 {{min}}–{{max}} 之间",
   "valFireBeforeCurrent": "FIRE 年龄不能小于当前年龄",
@@ -1668,5 +1668,16 @@
   "taxChartSummary": "从 {{startAge}} 岁到 {{endAge}} 岁的税款合计 {{total}}；最高的一年为 {{peak}}，在 {{peakAge}} 岁。",
   "analysisPending": "正在比较各个选项…",
   "analysisUpdating": "正在按你最新的修改更新…",
-  "analysisFailed": "无法计算这项比较。修改任一数值后会重试。"
+  "analysisFailed": "无法计算这项比较。修改任一数值后会重试。",
+  "resultPeekJump": "查看完整结果",
+  "analyticsPromptLabel": "使用统计",
+  "analyticsPrompt": "允许匿名使用统计（Google Analytics）来帮助改进计算器吗？你输入的金额永远不会发送。",
+  "analyticsAllow": "同意",
+  "analyticsDecline": "不用了",
+  "analyticsOn": "匿名使用统计已开启。",
+  "analyticsOff": "匿名使用统计已关闭。",
+  "analyticsTurnOff": "关闭",
+  "analyticsTurnOn": "开启",
+  "analyticsSignal": "你的浏览器要求网站不要跟踪你，因此使用统计保持关闭。",
+  "storageUnavailable": "此浏览器阻止了网站存储，你的计划不会被保存，关闭页面后就会消失。"
 }

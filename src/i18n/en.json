@@ -544,7 +544,7 @@
   "mcFailWhy": "Failed runs averaged {{failed}}%/yr over the first 5 post-FIRE years, versus {{succeeded}}% for successful runs - the unlucky script is almost always the same one: a bear market right after retiring forces selling at the bottom to fund spending, and the damaged principal never recovers (sequence-of-returns risk). Late bear markets barely hurt.",
   "mcNoFail": "All {{n}} runs lasted to life expectancy - no failing scripts.",
   "createdBy": "Created by",
-  "privacyNote": "All financial inputs stay in your browser and are never uploaded. Anonymous usage statistics (page views, feature clicks) are collected via Google Analytics.",
+  "privacyNote": "All financial inputs stay in your browser and are never uploaded.",
   "valBanner": "{{count}} input error(s) — results below can’t be trusted until fixed",
   "valAgeRange": "Must be between {{min}} and {{max}}",
   "valFireBeforeCurrent": "FIRE age can’t be below your current age",
@@ -1659,5 +1659,16 @@
   "taxChartSummary": "Tax from age {{startAge}} to {{endAge}} adds up to {{total}}. The highest year is {{peak}} at age {{peakAge}}.",
   "analysisPending": "Comparing the options…",
   "analysisUpdating": "Updating for your latest change…",
-  "analysisFailed": "This comparison could not be calculated. Change a value to try again."
+  "analysisFailed": "This comparison could not be calculated. Change a value to try again.",
+  "resultPeekJump": "See the full results",
+  "analyticsPromptLabel": "Usage statistics",
+  "analyticsPrompt": "Allow anonymous usage statistics (Google Analytics) to help improve the calculator? Amounts you enter are never sent.",
+  "analyticsAllow": "Allow",
+  "analyticsDecline": "No thanks",
+  "analyticsOn": "Anonymous usage statistics are on.",
+  "analyticsOff": "Anonymous usage statistics are off.",
+  "analyticsTurnOff": "Turn them off",
+  "analyticsTurnOn": "Allow them",
+  "analyticsSignal": "Your browser asks sites not to track you, so usage statistics stay off.",
+  "storageUnavailable": "This browser is blocking site storage, so your plan is not being saved and will be gone when you close the page."
 }

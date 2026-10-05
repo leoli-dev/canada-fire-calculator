@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
-import { downloadStoredPlan, getStorageReadOnlyReason, useStore } from './store'
+import { downloadStoredPlan, getStorageReadOnlyReason, isStorageUnavailable, useStore } from './store'
+import { AnalyticsFooter, AnalyticsPrompt } from './components/AnalyticsConsent'
 import { precisionGate } from './engine/model'
 import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
@@ -14,6 +15,7 @@ import { IncomeChart } from './components/IncomeChart'
 import { TaxChart } from './components/TaxChart'
 import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
+import { ResultPeek } from './components/ResultPeek'
 import { MonteCarloCard } from './components/MonteCarloCard'
 import { MC_RULE_VERSION } from './mcProtocol'
 import { StrategyCard } from './components/StrategyCard'
@@ -104,6 +106,8 @@ export default function App() {
         </nav>
       </header>
 
+      <AnalyticsPrompt />
+      {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
         <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
@@ -120,9 +124,11 @@ export default function App() {
               {t('professionalMode')}
             </button>
           </div>
+          {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
+            estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
-        {result && !hasBlockingIssues && <section className="results-column">
+        {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
@@ -170,7 +176,7 @@ export default function App() {
             Leo Li
           </a>
         </p>
-        <p className="privacy-note">{t('privacyNote')}</p>
+        <AnalyticsFooter />
       </footer>
       <GlossaryDrawer />
     </div>

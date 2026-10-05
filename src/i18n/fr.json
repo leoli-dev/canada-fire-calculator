@@ -544,7 +544,7 @@
   "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis - le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
   "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie - aucun scénario d'échec.",
   "createdBy": "Créé par",
-  "privacyNote": "Toutes vos données financières restent dans votre navigateur et ne sont jamais téléversées. Des statistiques d'utilisation anonymes (pages vues, clics sur les fonctionnalités) sont recueillies via Google Analytics.",
+  "privacyNote": "Toutes vos données financières restent dans votre navigateur et ne sont jamais téléversées.",
   "valBanner": "{{count}} erreur(s) de saisie — les résultats ci-dessous ne sont pas fiables avant correction",
   "valAgeRange": "Doit être entre {{min}} et {{max}}",
   "valFireBeforeCurrent": "L’âge FIRE ne peut pas être inférieur à l’âge actuel",
@@ -1668,5 +1668,16 @@
   "taxChartSummary": "L’impôt de {{startAge}} à {{endAge}} ans totalise {{total}}. L’année la plus élevée atteint {{peak}} à {{peakAge}} ans.",
   "analysisPending": "Comparaison des options…",
   "analysisUpdating": "Mise à jour selon votre dernière modification…",
-  "analysisFailed": "Cette comparaison n’a pas pu être calculée. Modifiez une valeur pour réessayer."
+  "analysisFailed": "Cette comparaison n’a pas pu être calculée. Modifiez une valeur pour réessayer.",
+  "resultPeekJump": "Voir tous les résultats",
+  "analyticsPromptLabel": "Statistiques d’utilisation",
+  "analyticsPrompt": "Autoriser des statistiques d’utilisation anonymes (Google Analytics) pour améliorer le calculateur? Les montants saisis ne sont jamais envoyés.",
+  "analyticsAllow": "Autoriser",
+  "analyticsDecline": "Non merci",
+  "analyticsOn": "Les statistiques d’utilisation anonymes sont activées.",
+  "analyticsOff": "Les statistiques d’utilisation anonymes sont désactivées.",
+  "analyticsTurnOff": "Les désactiver",
+  "analyticsTurnOn": "Les autoriser",
+  "analyticsSignal": "Votre navigateur demande aux sites de ne pas vous suivre; les statistiques restent donc désactivées.",
+  "storageUnavailable": "Ce navigateur bloque le stockage du site : votre plan n’est pas enregistré et disparaîtra à la fermeture de la page."
 }
