@@ -1612,5 +1612,15 @@
   "estimateShortfall": "First shortfall at age {{age}}: {{shortfall}} of that year's spending is not covered.",
   "estimateChartsNote": "The charts below are planning estimates: taxes use household figures until ownership and the other open facts are confirmed.",
   "fireNumberProjectedBasis": "Estimate: the target uses the account mix and the non-registered cost base your plan projects for age {{age}}, scaled to the target amount.",
-  "terminalQcSimplified": "The estate figure uses simplified Quebec rules for the final return, so treat it and any ranking built on it as an estimate."
+  "terminalQcSimplified": "The estate figure uses simplified Quebec rules for the final return, so treat it and any ranking built on it as an estimate.",
+  "incomeNeed": "Needed (spending plus tax)",
+  "incomeShortfall": "Not covered",
+  "checkPersonTax": "Tax is a household estimate until each person's income and ownership are confirmed.",
+  "checkLockedLimits": "Locked-in (LIF) withdrawal limits are not verified for this account.",
+  "checkClosingTax": "The tax on the final return is not estimated for this plan.",
+  "nextStepsTitle": "What could make it work",
+  "nextStepEarliest": "See the earliest age this plan works",
+  "nextStepSustainable": "Find the spending this plan sustains",
+  "nextStepSustainableAnswer": "About {{amount}} a year lasts to age {{age}} with everything else unchanged.",
+  "terminalEstimateNoteSingle": "This after-tax estate value adds remaining registered balances and taxable unrealized gains to the final year's modeled income. It does not model beneficiary designations, so it is not a complete final return."
 }

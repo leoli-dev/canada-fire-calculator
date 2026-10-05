@@ -22,6 +22,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
+  const [sustainable, setSustainable] = useState<ReturnType<typeof maxSustainableSpending> | null>(null)
   const { inputs, result } = props
   const canonical = useStore((s) => s.canonical)
 
@@ -157,6 +158,19 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               : t('depleted', { age: result.depletedAge })}
           </p>
           {lockedWithdrawalUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
+          {result.success && lastResultUnverified && <ul className="needs-checks" data-testid="needs-checks">
+            {props.taxWarning && <li>{t('checkPersonTax')}</li>}
+            {lockedWithdrawalUnverified && <li>{t('checkLockedLimits')}</li>}
+            {result.terminalTaxStatus === 'unsupported' && <li>{t('checkClosingTax')}</li>}
+          </ul>}
+          {/* FE-44: a failing plan gets a next step, not just a final net worth. */}
+          {!result.success && <div className="next-steps" data-testid="next-steps">
+            <p><strong>{t('nextStepsTitle')}</strong></p>
+            <button type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</button>
+            <button type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainable(maxSustainableSpending(inputs, canonical))}>{t('nextStepSustainable')}</button>
+            {sustainable?.status === 'solved' && sustainable.value !== null && <p data-testid="next-step-sustainable-answer">{t('nextStepSustainableAnswer', { amount: cad(sustainable.value), age: inputs.lifeExpectancy })}</p>}
+            {sustainable && sustainable.status !== 'solved' && <p className="hint">{t(`solver_${sustainable.status}`)}</p>}
+          </div>}
           {result.unfundedObligations.length > 0 && <ul className="funding-gaps">
             {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
               {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
@@ -183,7 +197,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             oas: cad(result.terminalOasRecovery),
             probate: cad(result.probateFee),
           })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
-          <p className="hint">{t('terminalEstimateNote')}</p>
+          <p className="hint">{t(inputs.partner ? 'terminalEstimateNote' : 'terminalEstimateNoteSingle')}</p>
           {result.terminalTaxDisclosure === 'quebecSimplified' && <p className="hint" data-testid="terminal-qc-simplified">{t('terminalQcSimplified')}</p>}
           {dwzSpending?.status === 'solved' && dwzSpending.value !== null && (
             <>

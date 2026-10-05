@@ -51,6 +51,9 @@ export function IncomeChart(props: {
       extraIncome: Math.round(r.extraIncome * k(r.age)),
       pension: Math.round(r.pension * k(r.age)),
       tax: Math.round(r.tax * k(r.age)),
+      // FE-44: what the year needed before tax, and the part nothing covered.
+      need: Math.round((r.netCash + r.shortfall + r.tax) * k(r.age)),
+      shortfall: Math.round(r.shortfall * k(r.age)),
       total: Math.round(
         (r.withdrawals.tfsa + r.withdrawals.rrsp + r.withdrawals.nonReg +
           r.cpp + r.oas + r.gis + r.ccb + r.rent + r.extraIncome + r.pension) *
@@ -63,6 +66,7 @@ export function IncomeChart(props: {
   const hasRent = data.some((d) => d.rent > 0)
   const hasExtra = data.some((d) => d.extraIncome > 0)
   const hasPension = data.some((d) => d.pension > 0)
+  const hasShortfall = data.some((d) => d.shortfall > 0)
 
   if (data.length === 0) return null
 
@@ -100,6 +104,10 @@ export function IncomeChart(props: {
           {hasExtra && (
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
           )}
+          {hasShortfall && (
+            <Area dataKey="shortfall" stackId="1" name={t('incomeShortfall')} stroke="#c62828" fill="#c62828" fillOpacity={0.35} />
+          )}
+          <Line dataKey="need" name={t('incomeNeed')} stroke="#c62828" strokeWidth={2} strokeDasharray="2 3" dot={false} />
           <Line dataKey="tax" name={t('taxLabel')} stroke="#37474f" strokeWidth={2} strokeDasharray="5 3" dot={false} />
         </ComposedChart>
       </ResponsiveContainer>

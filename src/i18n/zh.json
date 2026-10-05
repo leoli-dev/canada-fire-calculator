@@ -1621,5 +1621,15 @@
   "estimateShortfall": "首次缺口在 {{age}} 岁：当年有 {{shortfall}} 的支出没有着落。",
   "estimateChartsNote": "下面的图表是规划估算：在确认归属和其他未定事实之前，税额按家庭数字估算。",
   "fireNumberProjectedBasis": "估算：目标按计划预测的 {{age}} 岁账户构成和非注册成本基础，按目标金额等比例换算。",
-  "terminalQcSimplified": "遗产数字的最终申报按简化的魁省规则计算，请把它以及基于它的任何排名都视为估算。"
+  "terminalQcSimplified": "遗产数字的最终申报按简化的魁省规则计算，请把它以及基于它的任何排名都视为估算。",
+  "incomeNeed": "所需（支出加税）",
+  "incomeShortfall": "未覆盖",
+  "checkPersonTax": "在确认每个人的收入和归属之前，税额是家庭估算。",
+  "checkLockedLimits": "这个账户的锁定账户（LIF）提款限额尚未核实。",
+  "checkClosingTax": "这个计划的最终申报税额没有估算。",
+  "nextStepsTitle": "怎样可能可行",
+  "nextStepEarliest": "查看这个计划最早可行的年龄",
+  "nextStepSustainable": "计算这个计划能支撑的支出",
+  "nextStepSustainableAnswer": "其他条件不变时，每年约 {{amount}} 可以维持到 {{age}} 岁。",
+  "terminalEstimateNoteSingle": "这个税后遗产值把剩余注册账户余额和应税未实现收益加到最后一年的模拟收入中。它不模拟受益人指定，因此不是完整的最终申报。"
 }

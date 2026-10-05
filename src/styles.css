@@ -763,3 +763,8 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .reset-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .reset-confirm-actions button { border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; }
 .reset-confirm-actions .danger { border-color: #b42318; background: #b42318; color: #fff; }
+/* FE-44: pending checks and next steps under the verdict. */
+.needs-checks { margin: 4px 0 8px; padding-left: 18px; font-size: .88rem; color: var(--ink-soft); }
+.next-steps { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; }
+.next-steps p { margin: 0 0 6px; }
+.next-steps .text-action { display: block; margin: 4px 0; text-align: left; }

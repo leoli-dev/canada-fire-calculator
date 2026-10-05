@@ -1621,5 +1621,15 @@
   "estimateShortfall": "Premier manque à {{age}} ans : {{shortfall}} des dépenses de cette année ne sont pas couverts.",
   "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés.",
   "fireNumberProjectedBasis": "Estimation : la cible utilise la répartition des comptes et le prix de base non enregistré que votre plan projette à {{age}} ans, ajustés au montant cible.",
-  "terminalQcSimplified": "La valeur successorale utilise des règles québécoises simplifiées pour la déclaration finale; considérez-la, ainsi que tout classement qui en dépend, comme une estimation."
+  "terminalQcSimplified": "La valeur successorale utilise des règles québécoises simplifiées pour la déclaration finale; considérez-la, ainsi que tout classement qui en dépend, comme une estimation.",
+  "incomeNeed": "Besoin (dépenses plus impôt)",
+  "incomeShortfall": "Non couvert",
+  "checkPersonTax": "L’impôt est une estimation du ménage tant que le revenu et la propriété de chaque personne ne sont pas confirmés.",
+  "checkLockedLimits": "Les limites de retrait du FRV ne sont pas vérifiées pour ce compte.",
+  "checkClosingTax": "L’impôt de la déclaration finale n’est pas estimé pour ce plan.",
+  "nextStepsTitle": "Ce qui pourrait fonctionner",
+  "nextStepEarliest": "Voir l’âge le plus tôt où ce plan fonctionne",
+  "nextStepSustainable": "Trouver les dépenses que ce plan soutient",
+  "nextStepSustainableAnswer": "Environ {{amount}} par année durent jusqu’à {{age}} ans, tout le reste inchangé.",
+  "terminalEstimateNoteSingle": "Cette valeur successorale après impôt ajoute les soldes enregistrés restants et les gains latents imposables au revenu modélisé de la dernière année. Elle ne modélise pas les désignations de bénéficiaires; ce n’est donc pas une déclaration finale complète."
 }

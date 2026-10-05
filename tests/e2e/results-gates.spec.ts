@@ -36,3 +36,20 @@ test('a couple with unconfirmed ownership sees an estimate verdict and the chart
   await expect(page.getByTestId('estimate-charts-note')).toBeVisible()
   await expect(page.locator('.results-column .recharts-wrapper').first()).toBeVisible()
 })
+
+/** FE-44: a failure is prominent and comes with next steps. */
+test('a failing plan offers next steps and shades the uncovered spending', async ({ page }) => {
+  await seed(page, { province: 'ON' })
+  const summary = page.locator('.summary')
+  await expect(summary).toHaveClass(/bad/)
+  const next = page.getByTestId('next-steps')
+  await expect(next).toBeVisible()
+  await page.getByTestId('next-step-sustainable').click()
+  await expect(page.getByTestId('next-step-sustainable-answer')).toContainText('CA$')
+  await expect(page.locator('.results-column')).toContainText('Not covered')
+  await expect(page.locator('.results-column')).toContainText('Needed (spending plus tax)')
+  // A single plan never sees the note about which partner dies first.
+  await expect(summary).not.toContainText('which partner dies first')
+  await next.getByRole('button', { name: 'See the earliest age this plan works' }).click()
+  await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveAttribute('aria-selected', 'true')
+})
