@@ -65,7 +65,7 @@ test('a couple clears the ownership gate with one choice per row, shared with pr
   await expect(page.getByTestId('person-tax-facts')).toBeVisible()
   await expect(page.getByTestId('owner-legacy:account:rrsp')).toHaveValue('legacy:person:partner')
   await expect(page.getByTestId('account-self-share-legacy:account:nonReg')).toHaveValue('50')
-  await expect(page.getByTestId('property-self-amount-legacy:property:principal')).toHaveValue('400000')
+  await expect(page.getByTestId('property-self-amount-legacy:property:principal')).toHaveValue('400,000')
   await expect(page.getByTestId('property-owner-legacy:property:investment:0')).toHaveValue('legacy:person:self')
 })
 

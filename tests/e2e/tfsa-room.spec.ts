@@ -48,12 +48,15 @@ test('professional mode prices the stated room, clips the plan and retains the r
   await expect(page.getByTestId('tfsa-ledger-self')).toContainText('5,000')
   await expect(page.getByTestId('tfsa-savings-share-self')).toContainText('8,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
-  await expect(page.getByTestId('tfsa-retained-self')).toContainText('non-registered')
+  // FE-43 D: the panel no longer claims the excess moves to the non-registered
+  // account; the projection does not apply the room check yet, and it says so.
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('does not apply this room check yet')
+  await expect(page.getByTestId('tfsa-retained-self')).not.toContainText('non-registered')
   const person = (await storedPlan(page)).people.find((item: { role: string }) => item.role === 'self')
   expect(person.tfsaAvailableRoom).toEqual({ status: 'known', value: 5000 })
   // Reload keeps the recorded room and the priced row.
   await page.reload()
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // The same recorded fact prices identically in guided mode.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
@@ -98,7 +101,7 @@ test('guided mode records the room and a withdrawal, and both survive a mode swi
   await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   expect(await inViewport(page)).toBe(true)
 })

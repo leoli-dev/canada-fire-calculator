@@ -82,7 +82,7 @@ test('employment income is optional, per person, and clearable', async ({ page }
     { status: 'known', value: 92_000 }, { status: 'known', value: 55_000 },
   ])
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId('earned-self')).toHaveValue('92000')
+  await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/saving/saving.earned')
   await page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first().click()

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine/model'
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, splitAmountsMatch } from '../engine/migration'
@@ -10,6 +10,8 @@ import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from 
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { commitCanonicalEdit, commitRegisteredRowEdit, useCanonicalPlan } from '../forms/canonicalEdit'
 import { registeredTypeAccounts } from '../guided/accountFacts'
+import { CommitNumberInput, NumberInput } from './NumberInput'
+import { useCad } from '../format'
 
 const SPLIT_ROW_BASE_IDS = ['legacy:account:tfsa', 'legacy:account:rrsp', 'legacy:account:nonReg', 'legacy:account:locked', 'legacy:account:fhsa'] as const
 const roundCents = (value: number) => Math.round(value * 100) / 100
@@ -27,30 +29,30 @@ export function SplitAmounts({ rowId, total, selfAmount, partnerAmount, selfTest
   onCommit: (selfAmount: number, partnerAmount: number) => void
 }) {
   const { t, i18n } = useTranslation()
-  const [selfRaw, setSelfRaw] = useState(selfAmount === undefined ? '' : String(roundCents(selfAmount)))
-  const [partnerRaw, setPartnerRaw] = useState(partnerAmount === undefined ? '' : String(roundCents(partnerAmount)))
-  const parse = (raw: string): number | null => {
-    const text = raw.trim()
-    if (!text) return null
-    const value = Number(text)
-    return Number.isFinite(value) && value >= 0 ? value : null
-  }
-  const selfValue = parse(selfRaw)
-  const partnerValue = parse(partnerRaw)
-  const sum = selfValue !== null && partnerValue !== null ? selfValue + partnerValue : null
+  const [selfValue, setSelfValue] = useState<number | null>(selfAmount === undefined ? null : roundCents(selfAmount))
+  const [partnerValue, setPartnerValue] = useState<number | null>(partnerAmount === undefined ? null : roundCents(partnerAmount))
+  // The pair as last typed. Focus leaving a field is reported before React
+  // re-renders with the new state, so the check reads this ref.
+  const latest = useRef({ self: selfValue, partner: partnerValue })
+  const usable = (value: number | null): value is number => value !== null && Number.isFinite(value) && value >= 0
+  const sum = usable(selfValue) && usable(partnerValue) ? selfValue + partnerValue : null
   const matches = sum !== null && splitAmountsMatch(selfValue!, partnerValue!, total)
-  const unchanged = sum !== null && selfAmount !== undefined && partnerAmount !== undefined &&
-    Math.abs(selfValue! - selfAmount) <= 1e-8 && Math.abs(partnerValue! - partnerAmount) <= 1e-8
   const locale = i18n.language
-  const confirm = () => { if (matches && !unchanged) onCommit(selfValue!, partnerValue!) }
+  const confirm = () => {
+    const { self, partner } = latest.current
+    if (!usable(self) || !usable(partner) || !splitAmountsMatch(self, partner, total)) return
+    const unchanged = selfAmount !== undefined && partnerAmount !== undefined &&
+      Math.abs(self - selfAmount) <= 1e-8 && Math.abs(partner - partnerAmount) <= 1e-8
+    if (!unchanged) onCommit(self, partner)
+  }
   return <>
     <label>{t('be11.selfAmount')}
-      <input type="number" min="0" step="0.01" data-testid={selfTestId} value={selfRaw}
-        onChange={event => setSelfRaw(event.target.value)} onBlur={confirm} /></label>
+      <span className="commit-number" onBlur={confirm}><NumberInput testId={selfTestId} value={selfValue}
+        onChange={value => { latest.current = { ...latest.current, self: value }; setSelfValue(value) }} /></span></label>
     <label>{t('be11.partnerAmount')}
-      <input type="number" min="0" step="0.01" data-testid={partnerTestId} value={partnerRaw}
-        onChange={event => setPartnerRaw(event.target.value)} onBlur={confirm} /></label>
-    <p data-testid={`ownership-sum-${rowId}`}>{t('be11.splitSum', {
+      <span className="commit-number" onBlur={confirm}><NumberInput testId={partnerTestId} value={partnerValue}
+        onChange={value => { latest.current = { ...latest.current, partner: value }; setPartnerValue(value) }} /></span></label>
+    <p className="tax-facts-sum" data-testid={`ownership-sum-${rowId}`}>{t('be11.splitSum', {
       sum: sum === null ? '—' : sum.toLocaleString(locale), total: total.toLocaleString(locale) })}</p>
     {!matches && <p className="hint" role="status" data-testid={`ownership-mismatch-${rowId}`}>{t('be11.splitMismatch', { total: total.toLocaleString(locale) })}</p>}
   </>
@@ -118,14 +120,13 @@ export function RrspRoomRow({ person, plan, onEdit, guided = false }: { person: 
     {!guided && <h5>{t('be12.person', { person: t(person.role === 'self' ? 'be11.self' : 'be11.partner') })}</h5>}
     {!guided && <p className="hint">{t('be12.explanation')}</p>}
     {RRSP_STATEMENT_FIELDS.filter(([field]) => !guided || field !== 'rrspAvailableRoom').map(([field, label]) => <label key={field}>{t(label)}
-      <input type="number" min="0" step="1" data-testid={`${field === 'rrspDeductionLimit' ? 'rrsp-deduction-limit' :
+      <CommitNumberInput testId={`${field === 'rrspDeductionLimit' ? 'rrsp-deduction-limit' :
         field === 'rrspAvailableRoom' ? 'rrsp-available-room' :
         field === 'rrspUnusedUndeducted' ? 'rrsp-unused-undeducted' :
         field === 'rrspPensionAdjustment' ? 'rrsp-pa' : field === 'rrspPspa' ? 'rrsp-pspa' : 'rrsp-par'}-${role}`}
-        key={`${field}:${person.id}:${person[field].status === 'known' ? person[field].value : 'unknown'}`}
-        defaultValue={person[field].status === 'known' ? person[field].value : ''}
+        value={person[field].status === 'known' ? person[field].value : null}
         placeholder={t('be12.unknown')}
-        onBlur={event => commit(field, event.currentTarget.value)} />
+        onCommit={value => commit(field, value === null ? '' : String(value))} />
     </label>)}
     <p className="hint">{t('be12.adjustmentNote')}</p>
     {opening.mismatch && <p className="hint" role="status" data-testid={`rrsp-mismatch-${role}`}>{t('be12.mismatch')}</p>}
@@ -136,13 +137,9 @@ export function RrspRoomRow({ person, plan, onEdit, guided = false }: { person: 
       : resolved.accountId
         ? <>
           <label>{t('be12.planned')}
-            <input type="number" min="0" step="1" data-testid={`rrsp-planned-${role}`}
-              key={`planned:${person.id}:${planned?.amount ?? 'none'}`}
-              defaultValue={planned?.amount ?? ''}
+            <CommitNumberInput testId={`rrsp-planned-${role}`} value={planned?.amount ?? null}
               placeholder={t('be12.zero')}
-              onBlur={event => {
-                const text = event.currentTarget.value.trim()
-                const amount = text === '' ? null : Number(text)
+              onCommit={amount => {
                 if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return
                 writePlanned(amount, planned?.deductionYear !== null && planned?.deductionYear !== undefined)
               }} />
@@ -255,40 +252,31 @@ export function FhsaRoomRow({ person, account, plan, onEdit, guided = false }: {
       ? <p className="hint" role="status" data-testid={`fhsa-no-account-${role}`}>{t('be36.noAccount')}</p>
       : <>
         <label>{t('be36.openedYear')}
-          <input type="number" min="1900" max="2200" step="1" data-testid={`fhsa-opened-year-${role}`}
-            key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
-            defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
+          <CommitNumberInput testId={`fhsa-opened-year-${role}`} grouping={false}
+            value={account.openedYear.status === 'known' ? account.openedYear.value : null}
             placeholder={t('be12.unknown')}
-            onBlur={event => {
-              const raw = event.currentTarget.value.trim()
-              const year = Number(raw)
-              if (raw && (!Number.isInteger(year) || year < 1900 || year > 2200)) return
-              setOpenedYear(raw)
+            onCommit={year => {
+              if (year !== null && (!Number.isInteger(year) || year < 1900 || year > 2200)) return
+              setOpenedYear(year === null ? '' : String(year))
             }} />
         </label>
         <label>{t('be36.priorContributions')}
-          <input type="number" min="0" step="1" data-testid={`fhsa-prior-contributions-${role}`}
-            key={`prior:${account.id}:${statement?.cumulativePriorContributions.status === 'known' ? statement.cumulativePriorContributions.value : 'unknown'}`}
-            defaultValue={statement?.cumulativePriorContributions.status === 'known' ? statement.cumulativePriorContributions.value : ''}
+          <CommitNumberInput testId={`fhsa-prior-contributions-${role}`}
+            value={statement?.cumulativePriorContributions.status === 'known' ? statement.cumulativePriorContributions.value : null}
             placeholder={t('be12.unknown')}
-            onBlur={event => setPriorContributions(event.currentTarget.value)} />
+            onCommit={value => setPriorContributions(value === null ? '' : String(value))} />
         </label>
         {!guided && <><label>{t('be36.openingRoom')}
-          <input type="number" min="0" step="1" data-testid={`fhsa-opening-room-${role}`}
-            key={`opening:${account.id}:${account.contributionRoom.status === 'known' ? account.contributionRoom.value : 'unknown'}`}
-            defaultValue={account.contributionRoom.status === 'known' ? account.contributionRoom.value : ''}
+          <CommitNumberInput testId={`fhsa-opening-room-${role}`}
+            value={account.contributionRoom.status === 'known' ? account.contributionRoom.value : null}
             placeholder={t('be12.unknown')}
-            onBlur={event => setOpeningRoom(event.currentTarget.value)} />
+            onCommit={value => setOpeningRoom(value === null ? '' : String(value))} />
         </label>
         <p className="hint">{t('be36.openingRoomNote')}</p></>}
         <label>{t('be36.planned')}
-          <input type="number" min="0" step="1" data-testid={`fhsa-planned-${role}`}
-            key={`planned:${account.id}:${planShare}`}
-            defaultValue={planShare > 0 ? planShare : ''}
+          <CommitNumberInput testId={`fhsa-planned-${role}`} value={planShare > 0 ? planShare : null}
             placeholder={t('be12.zero')}
-            onBlur={event => {
-              const raw = event.currentTarget.value.trim()
-              const amount = raw === '' ? null : Number(raw)
+            onCommit={amount => {
               if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return
               writePlanned(amount)
             }} />
@@ -369,30 +357,25 @@ export function TfsaRoomRow({ person, plan, onEdit, guided = false }: { person: 
     {!guided && <><h5>{t('be27.person', { person: ownerLabel })}</h5>
     <p className="hint">{t('be27.explanation')}</p>
     <label>{t('be27.availableRoom')}
-      <input type="number" min="0" step="1" data-testid={`tfsa-available-room-${role}`}
-        key={`room:${person.id}:${person.tfsaAvailableRoom.status === 'known' ? person.tfsaAvailableRoom.value : 'unknown'}`}
-        defaultValue={person.tfsaAvailableRoom.status === 'known' ? person.tfsaAvailableRoom.value : ''}
+      <CommitNumberInput testId={`tfsa-available-room-${role}`}
+        value={person.tfsaAvailableRoom.status === 'known' ? person.tfsaAvailableRoom.value : null}
         placeholder={t('be12.unknown')}
-        onBlur={event => writeRoom(event.currentTarget.value)} />
+        onCommit={value => writeRoom(value === null ? '' : String(value))} />
     </label>
     <p className="hint">{t('be27.availableRoomNote')}</p></>}
     <p className="hint">{t('be27.withdrawalsHelp')}</p>
     {withdrawals.map(row => <div key={row.id} data-testid={`tfsa-withdrawal-${row.id}`}>
       <label>{t('be27.withdrawalYear')}
-        <input type="number" min="1900" max="2200" step="1" data-testid={`tfsa-withdrawal-year-${row.id}`}
-          key={`wyear:${row.id}:${row.calendarYear}`} defaultValue={row.calendarYear}
-          onBlur={event => {
-            const year = Number(event.currentTarget.value)
-            if (!Number.isInteger(year) || year < 1900 || year > 2200 || year === row.calendarYear) return
+        <CommitNumberInput testId={`tfsa-withdrawal-year-${row.id}`} grouping={false} value={row.calendarYear}
+          onCommit={year => {
+            if (year === null || !Number.isInteger(year) || year < 1900 || year > 2200 || year === row.calendarYear) return
             setWithdrawal(row.id, item => { item.calendarYear = year })
           }} />
       </label>
       <label>{t('be27.withdrawalAmount')}
-        <input type="number" min="0" step="1" data-testid={`tfsa-withdrawal-amount-${row.id}`}
-          key={`wamount:${row.id}:${row.amount}`} defaultValue={row.amount}
-          onBlur={event => {
-            const amount = Number(event.currentTarget.value)
-            if (!Number.isFinite(amount) || amount < 0 || amount === row.amount) return
+        <CommitNumberInput testId={`tfsa-withdrawal-amount-${row.id}`} value={row.amount}
+          onCommit={amount => {
+            if (amount === null || !Number.isFinite(amount) || amount < 0 || amount === row.amount) return
             setWithdrawal(row.id, item => { item.amount = amount })
           }} />
       </label>
@@ -487,11 +470,9 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
     </label>
     {rows.map(row => <div key={row.id} data-testid={`spousal-row-${row.id}`}>
       <label>{t('be12.spousalYear')}
-        <input type="number" min="1950" max="2200" step="1" data-testid={`spousal-year-${row.id}`}
-          key={`year:${row.id}:${row.calendarYear}`} defaultValue={row.calendarYear}
-          onBlur={event => {
-            const year = Number(event.currentTarget.value)
-            if (!Number.isInteger(year) || year < 1950 || year > 2200 || year === row.calendarYear) return
+        <CommitNumberInput testId={`spousal-year-${row.id}`} grouping={false} value={row.calendarYear}
+          onCommit={year => {
+            if (year === null || !Number.isInteger(year) || year < 1950 || year > 2200 || year === row.calendarYear) return
             setRow(row.id, contribution => {
               contribution.calendarYear = year
               // The deferral is relative to the contribution year, so moving the
@@ -509,11 +490,9 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
         </select>
       </label>
       <label>{t('be12.spousalAmount')}
-        <input type="number" min="0" step="1" data-testid={`spousal-amount-${row.id}`}
-          key={`amount:${row.id}:${row.amount}`} defaultValue={row.amount}
-          onBlur={event => {
-            const amount = Number(event.currentTarget.value)
-            if (!Number.isFinite(amount) || amount < 0 || amount === row.amount) return
+        <CommitNumberInput testId={`spousal-amount-${row.id}`} value={row.amount}
+          onCommit={amount => {
+            if (amount === null || !Number.isFinite(amount) || amount < 0 || amount === row.amount) return
             setRow(row.id, contribution => { contribution.amount = amount })
           }} />
       </label>
@@ -536,8 +515,8 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
       {t('be12.spousalBaseYearNote', { baseYear: plan.baseYear })}</p>
     {!complete && <p className="hint" role="status" data-testid={`spousal-unknown-${account.id}`}>{t('be12.spousalNoHistory')}</p>}
     {complete && <label>{t('be12.spousalPaymentTest')}
-      <input type="number" min="0" step="1" data-testid={`spousal-payment-${account.id}`}
-        value={paymentRaw} onChange={event => setPaymentRaw(event.target.value)} />
+      <NumberInput testId={`spousal-payment-${account.id}`} value={paymentRaw === '' ? null : Number(paymentRaw)}
+        onChange={value => setPaymentRaw(value === null ? '' : String(value))} />
     </label>}
     {blocker && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
       {t('be12.spousalUnsupported', { reason: blocker })}</p>}
@@ -571,13 +550,10 @@ export function EarnedIncomeFields({ plan }: { plan: InputsV2 }) {
   const label = usePersonLabel()
   return <>{plan.people.map(person => <label key={person.id}>
     {t('be11.earned', { person: label(person) })}
-    <input data-testid={`earned-${person.role}`} type="number" min="0" step="1"
-      key={`${person.id}:${person.earnedIncome.status === 'known' ? person.earnedIncome.value : 'unknown'}`}
-      defaultValue={person.earnedIncome.status === 'known' ? person.earnedIncome.value : ''}
+    <CommitNumberInput testId={`earned-${person.role}`}
+      value={person.earnedIncome.status === 'known' ? person.earnedIncome.value : null}
       placeholder={t('be11.unknown')}
-      onBlur={event => {
-        const raw = event.currentTarget.value.trim()
-        const next = raw === '' ? null : Number(raw)
+      onCommit={next => {
         if (next !== null && (!Number.isFinite(next) || next < 0)) return
         if (person.earnedIncome.status === 'known' && next === person.earnedIncome.value ||
             person.earnedIncome.status === 'unknown' && next === null) return
@@ -599,6 +575,7 @@ export function ownershipAccountRows(plan: InputsV2): { baseId: string; base: Ac
 /** Professional ownership editor: one owner select and two amounts per account. */
 export function AccountOwnershipRows({ plan }: { plan: InputsV2 }) {
   const { t } = useTranslation()
+  const cad = useCad()
   const self = plan.people.find(person => person.role === 'self')
   const partner = plan.people.find(person => person.role === 'partner')
   if (!self || !partner) return null
@@ -628,7 +605,11 @@ export function AccountOwnershipRows({ plan }: { plan: InputsV2 }) {
       : account.ownerId ?? (account.taxableOwnerShares.status === 'known' ? 'shared' : '')
     return <div className="tax-facts-row" key={`${baseId}:${account.kind}:${total}:${JSON.stringify(entry ?? null)}:${base?.ownerId ?? ''}:${derived?.ownerId ?? ''}:${JSON.stringify(account.taxableOwnerShares)}`}
       data-testid={`ownership-row-${baseId}`}>
-      <label>{t(`questionnaire.accountNames.${accountNameKey(account.kind)}`)} — {total.toLocaleString()} CAD
+      <div className="tax-facts-row-head">
+        <strong>{t(`questionnaire.accountNames.${accountNameKey(account.kind)}`)}</strong>
+        <span>{cad(total)}</span>
+      </div>
+      <label>{t('be11.accountOwner')}
         <select data-testid={`owner-${baseId}`} value={selectValue} onChange={event => commitCanonicalEdit(draft => {
           const value = event.target.value
           if (!registered) {
@@ -677,17 +658,13 @@ export function accountNameKey(kind: Account['kind']): string {
 export function ShareInput({ testId, shares, selfId, onShare }: { testId: string; shares: Account['taxableOwnerShares']; selfId: string; onShare: (pct: number) => void }) {
   const { t } = useTranslation()
   return <label>{t('be11.selfTaxShare')}
-    <input type="number" min="0" max="100" step="1" data-testid={testId}
-      key={`share:${testId}:${shares.status === 'known' ? shares.shares[selfId] ?? 0 : 'unknown'}`}
-      defaultValue={shares.status === 'known' ? (shares.shares[selfId] ?? 0) * 100 : ''}
-      onBlur={event => {
-        const raw = event.currentTarget.value.trim()
-        if (!raw) return
-        const pct = Number(raw)
-        if (!Number.isFinite(pct) || pct < 0 || pct > 100) return
+    <CommitNumberInput testId={testId} grouping={false}
+      value={shares.status === 'known' ? (shares.shares[selfId] ?? 0) * 100 : null}
+      onCommit={pct => {
+        if (pct === null || !Number.isFinite(pct) || pct < 0 || pct > 100) return
         if (shares.status === 'known' && Math.abs((shares.shares[selfId] ?? 0) * 100 - pct) < 1e-8) return
         onShare(pct)
-      }} />%
+      }} />
   </label>
 }
 
@@ -696,6 +673,7 @@ export function ShareInput({ testId, shares, selfId, onShare }: { testId: string
  * residence has to be answerable somewhere. */
 export function PropertyOwnershipRows({ plan }: { plan: InputsV2 }) {
   const { t } = useTranslation()
+  const cad = useCad()
   const self = plan.people.find(person => person.role === 'self')
   const partner = plan.people.find(person => person.role === 'partner')
   if (!self || !partner) return null
@@ -704,13 +682,19 @@ export function PropertyOwnershipRows({ plan }: { plan: InputsV2 }) {
     <option value="shared" disabled>{t('be11.shared')}</option>
     {plan.people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}
   </>
+  let rental = 0
   return <>{plan.properties.map(property => {
+    if (property.kind === 'investment') rental += 1
     const selfAmount = property.taxableOwnerShares.status === 'known'
       ? roundCents((property.taxableOwnerShares.shares[self.id] ?? 0) * property.value) : undefined
     const partnerAmount = property.taxableOwnerShares.status === 'known' && selfAmount !== undefined
       ? roundCents(property.value - selfAmount) : undefined
     return <div className="tax-facts-row" key={`${property.id}:${property.value}:${JSON.stringify(property.taxableOwnerShares)}`}
       data-testid={`ownership-row-${property.id}`}>
+      <div className="tax-facts-row-head">
+        <strong>{property.kind === 'principal' ? t('questionnaire.ownership.home') : t('questionnaire.ownership.rental', { n: rental })}</strong>
+        <span>{cad(property.value)}</span>
+      </div>
       <label>{t(property.kind === 'principal' ? 'be11.homeOwner' : 'be11.propertyOwner')}
         <select data-testid={`property-owner-${property.id}`}
           value={property.taxableOwnerShares.status === 'known' ? Object.keys(property.taxableOwnerShares.shares).find(id => property.taxableOwnerShares.status === 'known' && property.taxableOwnerShares.shares[id] === 1) ?? 'shared' : ''}
@@ -763,12 +747,9 @@ export function PensionSplitFields({ plan }: { plan: InputsV2 }) {
         })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
     </label>
     {plan.taxProfile?.pensionSplit && <label>{t('be11.splitAmount')}
-      <input type="number" min="0" step="1" data-testid="split-amount"
-        key={`split:${plan.taxProfile.pensionSplit.transferorId}:${plan.taxProfile.pensionSplit.amount}`}
-        defaultValue={plan.taxProfile.pensionSplit.amount}
-        onBlur={event => {
-          const amount = Number(event.currentTarget.value)
-          if (!Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.pensionSplit?.amount) return
+      <CommitNumberInput testId="split-amount" value={plan.taxProfile.pensionSplit.amount}
+        onCommit={amount => {
+          if (amount === null || !Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.pensionSplit?.amount) return
           commitCanonicalEdit(draft => { if (draft.taxProfile?.pensionSplit) draft.taxProfile.pensionSplit.amount = amount })
         }} />
     </label>}
@@ -783,12 +764,9 @@ export function PensionSplitFields({ plan }: { plan: InputsV2 }) {
           })}><option value="">{t('be11.noSplit')}</option>{people.map(person => <option key={person.id} value={person.id}>{t(person.role === 'self' ? 'be11.self' : 'be11.partner')}</option>)}</select>
       </label>
       {plan.taxProfile?.qcPensionSplit && <label>{t('be35.qcSplitAmount')}
-        <input type="number" min="0" step="1" data-testid="qc-split-amount"
-          key={`qc-split:${plan.taxProfile.qcPensionSplit.transferorId}:${plan.taxProfile.qcPensionSplit.amount}`}
-          defaultValue={plan.taxProfile.qcPensionSplit.amount}
-          onBlur={event => {
-            const amount = Number(event.currentTarget.value)
-            if (!Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.qcPensionSplit?.amount) return
+        <CommitNumberInput testId="qc-split-amount" value={plan.taxProfile.qcPensionSplit.amount}
+          onCommit={amount => {
+            if (amount === null || !Number.isFinite(amount) || amount < 0 || amount === plan.taxProfile?.qcPensionSplit?.amount) return
             commitCanonicalEdit(draft => { if (draft.taxProfile?.qcPensionSplit) draft.taxProfile.qcPensionSplit.amount = amount })
           }} />
       </label>}
@@ -887,15 +865,12 @@ export function RegisteredAccountRows({ plan }: { plan: InputsV2 }) {
       </label>
       {account.kind === 'rrif' && <>
         <label>{t('be11.rrifOpenedYear')}
-          <input type="number" min="1950" max="2200" step="1" data-testid="rrif-opened-year"
-            key={`opened:${account.id}:${account.openedYear.status === 'known' ? account.openedYear.value : 'unknown'}`}
-            defaultValue={account.openedYear.status === 'known' ? account.openedYear.value : ''}
-            onBlur={event => {
-              const raw = event.currentTarget.value.trim()
-              const year = Number(raw)
-              if (raw && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
-              if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && !raw) return
-              setRow(item => { item.openedYear = raw
+          <CommitNumberInput testId="rrif-opened-year" grouping={false}
+            value={account.openedYear.status === 'known' ? account.openedYear.value : null}
+            onCommit={year => {
+              if (year !== null && (!Number.isInteger(year) || year < 1950 || year > 2200)) return
+              if (account.openedYear.status === 'known' && year === account.openedYear.value || account.openedYear.status === 'unknown' && year === null) return
+              setRow(item => { item.openedYear = year !== null
                 ? { status: 'known', value: year } : { status: 'unknown', reason: 'RRIF opening year not supplied' } })
             }} />
         </label>
@@ -985,7 +960,7 @@ export function TaxFactsPanel({ sections = ALL_TAX_FACTS_SECTIONS }: { sections?
   const self = plan.people.find(person => person.role === 'self')
   const partner = plan.people.find(person => person.role === 'partner')
   const show = (section: TaxFactsSection) => sections.includes(section)
-  return <section className="hint tax-facts-panel" data-testid="person-tax-facts" aria-label={t('be11.title')}>
+  return <section className="tax-facts-panel" data-testid="person-tax-facts" aria-label={t('be11.title')}>
     <h3>{t('be11.title')}</h3>
     <p>{t('be11.explanation')}</p>
     {show('earned') && <EarnedIncomeFields plan={plan} />}

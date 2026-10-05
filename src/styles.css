@@ -282,7 +282,28 @@ main.guided-results { grid-template-columns: minmax(0, 1fr); }
 .owner-choices label.selected { border-color: #174ea6; background: #eef3fb; color: #174ea6; }
 .owner-choices input { accent-color: #174ea6; margin: 0; }
 .ownership-split, .ownership-row > label { display: grid; gap: 6px; margin-top: 12px; }
-.ownership-row input[type="number"] { max-width: 180px; }
+.ownership-row .commit-number input { max-width: 180px; }
+.commit-number { display: block; min-width: 0; }
+.commit-number input { width: 100%; }
+/* FE-43 D: the shared tax-facts panel reads as a form, not as fine print. */
+.tax-facts-panel { color: var(--ink); font-size: .9rem; line-height: 1.5; container-type: inline-size; }
+.tax-facts-panel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.tax-facts-panel h4 { margin: 22px 0 6px; font-size: .98rem; }
+.tax-facts-panel h5 { margin: 0 0 6px; font-size: .92rem; }
+.tax-facts-panel > p { color: var(--ink-soft); }
+.tax-facts-panel label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 200px); gap: 6px 16px; align-items: center; margin: 8px 0; }
+.tax-facts-panel label > select, .tax-facts-panel label > input:not([type="checkbox"]) { width: 100%; min-width: 0; }
+.tax-facts-panel label:has(> input[type="checkbox"]) { grid-template-columns: minmax(0, 1fr) auto; }
+.tax-facts-panel .qc-change-toggle { display: flex; }
+.tax-facts-panel .tax-facts-row, .tax-facts-panel [role="group"], .tax-facts-panel fieldset, .tax-facts-panel [data-testid^="spousal-attribution-"] {
+  border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px 12px; margin: 10px 0; }
+.tax-facts-row-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.tax-facts-row-head span, .tax-facts-sum { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.tax-facts-panel [data-testid^="tfsa-withdrawal-be27"], .tax-facts-panel [data-testid^="spousal-row-"] { border-top: 1px dashed var(--line); padding-top: 6px; }
+/* The professional form column can be narrow even on a wide screen. */
+@container (max-width: 460px) {
+  .tax-facts-panel label { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
 .ownership-row .question-answer { margin: 8px 0; }
 .choice-group.compact { margin: 8px 0 4px; gap: 8px; }
 .choice-group.compact label { padding: 10px 12px; }

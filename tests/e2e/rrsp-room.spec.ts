@@ -60,16 +60,16 @@ test('professional mode prices a stated 20k/5k statement and retains the clipped
   expect(saved.canonical.contributions[0]).toMatchObject({ calendarYear: saved.canonical.baseYear, amount: 16000, contributorId: person.id, deductionYear: null })
   // Reload keeps the statement facts.
   await page.reload()
-  await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20000')
-  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
+  await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20,000')
+  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   // The same recorded facts show in guided mode; guided keeps explicit generate.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   // FE-43 C: guided asks RRSP room on its own optional page; the recorded
   // statement lines open the advanced detail by themselves.
   await page.goto('/#/guided/taxDetails/tax.rrspRoom')
-  await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20000')
-  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
+  await expect(page.getByTestId('rrsp-deduction-limit-self')).toHaveValue('20,000')
+  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   const guidedState = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(guidedState.resultRevision).toBeNull()
@@ -91,10 +91,10 @@ test('guided mode records the statement and keeps it through reload and a mode s
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   await page.reload()
   await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15,000')
-  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16000')
+  await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15000')
+  await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15,000')
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   expect(await inViewport(page)).toBe(true)

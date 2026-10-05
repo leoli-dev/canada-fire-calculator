@@ -94,7 +94,7 @@ test('professional records premiums, prices the contributor room and previews th
   await page.reload()
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
   await expect(page.getByTestId(`spousal-year-${ROW0}`)).toHaveValue(String(year - 2))
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6000')
+  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
   await expect(page.getByTestId(`spousal-contributor-${ROW0}`)).toHaveValue(PARTNER)
   await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('6,000')
   await previewPayment(page, 12_000)
@@ -104,8 +104,8 @@ test('professional records premiums, prices the contributor room and previews th
   // FE-43 C: the premium history is on the optional spousal-history page.
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('4000')
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('4,000')
+  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
   await previewPayment(page, 12_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
@@ -137,9 +137,9 @@ test('guided records the premium history and keeps it through reload and a mode 
   await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('5,000')
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
   await previewPayment(page, 7_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,000')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
@@ -200,7 +200,7 @@ test('a recorded spousal history stays visible and attributed after the type swi
   await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('rrif')
   await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40,000')
   // The seeded account reaches age 72 during the year, i.e. January 1 age 71,
   // so the post-1986 factor category is required. `allOther` is 0.0528, and
   // 100,000 * 0.0528 = a 5,280 minimum.

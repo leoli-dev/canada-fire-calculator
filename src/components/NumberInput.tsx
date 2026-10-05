@@ -152,3 +152,36 @@ export function NumberInput(props: {
     />
   )
 }
+
+/**
+ * The same text input, but it records only when the field is left, the way a
+ * statement line or a split amount should: typing 15000 never records 1, 15,
+ * 150 and 1500 on the way. Leaving it empty records `null` (unknown, never 0);
+ * leaving it untouched records nothing.
+ */
+export function CommitNumberInput(props: {
+  value: number | null
+  onCommit: (v: number | null) => void
+  testId?: string
+  id?: string
+  className?: string
+  placeholder?: string
+  grouping?: boolean
+  step?: number
+  ariaLabel?: string
+}) {
+  // A ref, not state: the input's own blur handler reports an emptied field in
+  // the same event that bubbles up to the wrapper, before React re-renders.
+  const pending = useRef<{ value: number | null } | null>(null)
+  const [shown, setShown] = useState<number | null | undefined>(undefined)
+  return <span className="commit-number" onBlur={() => {
+    const next = pending.current
+    pending.current = null
+    setShown(undefined)
+    if (next && next.value !== props.value) props.onCommit(next.value)
+  }}>
+    <NumberInput id={props.id} testId={props.testId} className={props.className} placeholder={props.placeholder}
+      grouping={props.grouping} step={props.step} value={shown === undefined ? props.value : shown}
+      onChange={value => { pending.current = { value }; setShown(value) }} />
+  </span>
+}

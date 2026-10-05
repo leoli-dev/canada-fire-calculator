@@ -203,11 +203,11 @@ test('professional records an FHSA statement and shows the clipped, retained rem
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('Opening room 0')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText("this year's room 8,000")
   await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('40,000 remaining')
-  await expect(page.getByTestId('fhsa-retained-self')).toContainText('Retained and not contributed: 0')
+  await expect(page.getByTestId('fhsa-retained-self')).toContainText('Above this room: 0')
   await expect(page.getByTestId('fhsa-room-unknown-self')).toHaveCount(0)
   // Now plan 22,000 by hand: 8,000 executes and 14,000 is retained, not deleted.
   await recordStatement(page, 'self', { planned: '22000' })
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('22000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('22,000')
   await expect(page.getByTestId('fhsa-retained-self')).toContainText('14,000')
   // The executed 8,000 is the only amount that consumes lifetime room.
   await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('8,000 used')
@@ -223,7 +223,7 @@ test('professional records an FHSA statement and shows the clipped, retained rem
   await page.reload()
   await expect(page.getByTestId('fhsa-opened-year-self')).toHaveValue('2026')
   await expect(page.getByTestId('fhsa-prior-contributions-self')).toHaveValue('0')
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('22000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('22,000')
   await expect(page.getByTestId('fhsa-retained-self')).toContainText('14,000')
   expect(await inViewport(page)).toBe(true)
 })
@@ -348,7 +348,7 @@ test('two people with different FHSA facts get independent room rows', async ({ 
 test('a scheduled FHSA row is priced by participation room, never by the RRSP ledger', async ({ page }) => {
   await seedScheduledFhsa(page, { history: true })
   // The panel box shows the whole year's plan, which is what the ledger prices.
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8,000')
   await expect(page.getByTestId('fhsa-scheduled-self')).toBeVisible()
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 8,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('closing room 0')
@@ -369,7 +369,7 @@ test('a scheduled FHSA row is priced by participation room, never by the RRSP le
   const planned = page.getByTestId('fhsa-planned-self')
   await planned.fill('3000')
   await planned.blur()
-  await expect(planned).toHaveValue('3000')
+  await expect(planned).toHaveValue('3,000')
   await expect(page.getByTestId('fhsa-scheduled-self')).toHaveCount(0)
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 3,000')
   const edited = await kernelStatus(page)
@@ -412,7 +412,7 @@ test('the FHSA room block explains itself in EN, FR and ZH', async ({ page }) =>
  */
 test('the panel and the kernel price the same default legacy plan', async ({ page }) => {
   await seedLegacyPlan(page, 8000)
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('8,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 8,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('closing room 0')
   await expect(page.getByTestId('fhsa-lifetime-self')).toContainText('8,000 used')
@@ -429,7 +429,7 @@ test('recording a planned amount replaces the plan instead of adding to it', asy
   const planned = page.getByTestId('fhsa-planned-self')
   await planned.fill('6000')
   await planned.blur()
-  await expect(planned).toHaveValue('6000')
+  await expect(planned).toHaveValue('6,000')
   const state = await fhsaPlanState(page)
   // One row, mirrored once, priced once: 8,000 + 6,000 must never appear.
   expect(state.rowIds).toEqual([`be36:fhsa:${state.accountId}`])
@@ -447,14 +447,14 @@ test('a recorded plan survives an unrelated shared-field edit and a reload', asy
   const planned = page.getByTestId('fhsa-planned-self')
   await planned.fill('6000')
   await planned.blur()
-  await expect(planned).toHaveValue('6000')
+  await expect(planned).toHaveValue('6,000')
   // The reviewer's exact reproduction: edit only annualSavings through the
   // app's own shared-field command.
   await page.evaluate(async () => {
     const { useStore } = await import('/src/store.ts')
     useStore.getState().editSharedField('annualSavings', '41000')
   })
-  await expect(planned).toHaveValue('6000')
+  await expect(planned).toHaveValue('6,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
   const edited = await fhsaPlanState(page)
   expect(edited.rowIds).toEqual([`be36:fhsa:${edited.accountId}`])
@@ -463,7 +463,7 @@ test('a recorded plan survives an unrelated shared-field edit and a reload', asy
   expect(edited.kernelLines).toBe(6000)
   // A reload must not drop the recorded row either.
   await page.reload()
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6,000')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 6,000')
   const reloaded = await fhsaPlanState(page)
   expect(reloaded.rowIds).toEqual([`be36:fhsa:${reloaded.accountId}`])
@@ -566,7 +566,7 @@ async function editUnrelatedEarned(page: Page, guided: boolean) {
   const earned = page.getByTestId('earned-self')
   await earned.fill('90000')
   await earned.blur()
-  await expect(earned).toHaveValue(guided ? '90,000' : '90000')
+  await expect(earned).toHaveValue('90,000')
   return legacyFhsaAnswer(page)
 }
 
@@ -645,7 +645,7 @@ test('professional records a couple FHSA holder and can then enter its statement
   // The holder and the recorded fact survive reload.
   await page.reload()
   await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:self')
-  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-planned-self')).toHaveValue('6,000')
   expect(await ownershipState(page)).toMatchObject({ ownerIds: ['legacy:person:self'] })
   expect(errors).toEqual([])
   expect(await inViewport(page)).toBe(true)
@@ -675,14 +675,14 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
   await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('contributions 6,000')
   await page.reload()
-  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6,000')
   await page.goto('/#/guided/assets/assets.ownership')
   await expect(page.getByTestId('owner-choice-legacy:account:fhsa-partner')).toBeChecked()
   // The holder survives the guided/professional switch, which rebuilds the
   // canonical plan from the legacy form.
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:partner')
-  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6000')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6,000')
   expect(await ownershipState(page)).toMatchObject({
     ownerIds: ['legacy:person:partner'], ownershipNeedsConfirmation: false })
   expect(errors).toEqual([])
@@ -731,7 +731,7 @@ test('a two-way FHSA split keeps both balances and the partner plan across a leg
   // field: the legacy form can mirror only one FHSA, so the partner row must be
   // carried across the rebuild instead of silently disappearing.
   await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '3000' })
-  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3,000')
   await page.evaluate(async () => {
     const { useStore } = await import('/src/store.ts')
     useStore.getState().editSharedField('annualSavings', '41000')
@@ -739,10 +739,10 @@ test('a two-way FHSA split keeps both balances and the partner plan across a leg
   const edited = await ownershipState(page)
   expect(edited.total).toBe(12000)
   expect(edited.ownerIds).toEqual(['legacy:person:partner', 'legacy:person:self'])
-  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3,000')
   await page.reload()
   expect((await ownershipState(page)).total).toBe(12000)
-  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3000')
+  await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('3,000')
   expect(errors).toEqual([])
   expect(await inViewport(page)).toBe(true)
 })
