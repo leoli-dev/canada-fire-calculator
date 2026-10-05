@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_CHILD,
@@ -119,8 +119,11 @@ function OptionalAge(props: {
   )
 }
 
+const INFLATION_PRESETS = ['0.015', '0.021', '0.03']
+
 export function InputForm() {
   const { t } = useTranslation()
+  const [customInflation, setCustomInflation] = useState(false)
   const cad = useCad()
   const setGoalFromProfessional = useStore((s) => s.setGoalFromProfessional)
   const {
@@ -217,11 +220,15 @@ export function InputForm() {
         {(inputs.goal ?? 'legacy') === 'dieWithZero' && (
           <p className="hint"><Jargon text={t('dwzGoalNote')} /></p>
         )}
+        {/* FE-46: any guided inflation rate is shown and editable here, not
+            snapped to the nearest preset label. */}
         <label className="field">
           <span>{t('inflationLabel')}</span>
           <select
-            value={String(inputs.inflation ?? 0.021)}
+            value={INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021)) && !customInflation ? String(inputs.inflation ?? 0.021) : 'custom'}
             onChange={(e) => {
+              if (e.target.value === 'custom') { setCustomInflation(true); return }
+              setCustomInflation(false)
               set({ inflation: Number(e.target.value) })
               track('inflation_change', { value: e.target.value })
             }}
@@ -229,8 +236,14 @@ export function InputForm() {
             <option value="0.015">{t('infl_low')}</option>
             <option value="0.021">{t('infl_mid')}</option>
             <option value="0.03">{t('infl_high')}</option>
+            <option value="custom">{t('infl_custom', { value: Number(((inputs.inflation ?? 0.021) * 100).toFixed(2)) })}</option>
           </select>
         </label>
+        {(customInflation || !INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021))) && <label className="field">
+          <span>{t('infl_customLabel')}</span>
+          <NumberInput value={Number(((inputs.inflation ?? 0.021) * 100).toFixed(4))} step={0.1}
+            onChange={(v) => { if (v !== null && v >= 0 && v <= 15) set({ inflation: v / 100 }) }} />
+        </label>}
         <label className="field">
           <span>{t('displayModeLabel')}</span>
           <select

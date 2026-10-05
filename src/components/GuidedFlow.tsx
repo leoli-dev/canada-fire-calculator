@@ -108,6 +108,9 @@ export function GuidedFlow() {
   const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers, state.canonical), [state.inputs, state.questionAnswers, state.canonical])
   const current = pages.find((page) => page.id === state.activePageId) ?? pages[0]
   const index = Math.max(0, pages.findIndex((page) => page.id === current.id))
+  // FE-46: progress within the current category; the overall count grows as
+  // answers open branches, which read as going backwards.
+  const categoryPages = pages.filter((page) => page.categoryId === current.categoryId)
   const navigate = (id: string) => { state.setActivePage(id); window.location.hash = `#/guided/${pageById(id)?.categoryId}/${id}`; setDirectoryOpen(false) }
 
   useEffect(() => {
@@ -152,6 +155,6 @@ export function GuidedFlow() {
   return <div className="questionnaire-layout">
     <button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</button>
     <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span data-testid="guided-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
   </div>
 }

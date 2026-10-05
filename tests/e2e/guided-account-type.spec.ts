@@ -19,7 +19,8 @@ async function seed(page: Page, options: { couple?: boolean } = {}) {
 }
 
 const canonical = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
-const pageCount = async (page: Page) => Number((await page.locator('.question-pager').innerText()).match(/\/\s*(\d+)/)![1])
+// The pager shows progress within a category, so count the directory's pages.
+const pageCount = (page: Page) => page.locator('.category-navigation details > div > button').count()
 
 test('choosing RRIF adds its own page; the facts are shared with professional mode', async ({ page }) => {
   await seed(page)

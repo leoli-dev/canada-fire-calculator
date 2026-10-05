@@ -90,8 +90,8 @@ test('a migrated v10 plan presents its legacy figure for review instead of reint
   // Keeping the legacy approximation records the old meaning explicitly and
   // leaves the figure untouched. Review fix B1: the click must record what its
   // own sentence says, so assert the copy and the recorded flags together.
-  await expect(page.getByTestId('budget-method')).toContainText('already net of the listed loan payments')
-  await expect(page.getByTestId('budget-method')).toContainText('without the tax difference')
+  await expect(page.getByTestId('budget-method')).toContainText('already net of your loan payments')
+  await expect(page.getByTestId('budget-method')).toContainText('without the RRSP tax refund')
   await page.getByTestId('budget-basis-legacy').check()
   await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
   await expect(page.getByTestId('budget-tax-no')).toBeChecked()

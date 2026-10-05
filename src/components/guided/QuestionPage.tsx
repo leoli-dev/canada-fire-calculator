@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
+import { marginalRate as engineMarginalRate, blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -81,6 +81,14 @@ function ChoiceGroup(props: { id: string; value?: string; label?: string; option
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
     </label>)}
   </div>
+}
+
+/** FE-46: where the locked account just created gets its balance. */
+function LockedAccountNote() {
+  const { t } = useTranslation()
+  const setActivePage = useStore((s) => s.setActivePage)
+  return <p className="answer-feedback" data-testid="guided-locked-created">{t('questionnaire.lockedCreated')}{' '}
+    <button type="button" className="text-action" onClick={() => { setActivePage('locked.balance'); window.location.hash = '#/guided/assets/locked.balance' }}>{t('questionnaire.lockedGoToBalance')}</button></p>
 }
 
 /**
@@ -187,6 +195,17 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence, editSharedField,
   } = useStore()
   const canonicalPlan = useCanonicalPlan()
+  // FE-46: a DC pension or LIRA balance is a locked account. Choosing it
+  // creates that account (owned by whoever has the pension) instead of only
+  // telling the user to find the section themselves.
+  const addLockedAccount = (owner: 'self' | 'partner') => {
+    if (inputs.lockedRetirement) return
+    set({ lockedRetirement: { ...DEFAULT_LOCKED_RETIREMENT, owner } })
+    const selected = (questionAnswers['assets.identify'] as string[] | undefined) ?? []
+    setQuestionAnswer('assets.identify', [...new Set([...selected, 'locked'])])
+    markAnswers(['lockedRetirement'], 'estimated')
+    markAnswers(['lockedRetirement.owner'], 'confirmed', 'user')
+  }
   const key = definition.contentKey
   const answer = questionAnswers[definition.id] as string | undefined
   const markChoice = (field: string, value: string, status: 'confirmed' | 'notApplicable' = 'confirmed') => {
@@ -312,12 +331,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'time.horizon':
       control = <FactNumber field="lifeExpectancy" label={t('lifeExpectancy')} value={inputs.lifeExpectancy} onValue={(lifeExpectancy) => set({ lifeExpectancy })} />
       break
-    case 'saving.method':
-      control = <ChoiceGroup id={definition.id} value={answer} options={[{ value: 'monthly', label: t('questionnaire.choice.monthly') }, { value: 'annual', label: t('questionnaire.choice.annual') }]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
-      break
     case 'saving.amount': {
       const monthly = questionAnswers['saving.method'] !== 'annual'
-      control = <><FactNumber field="annualSavings" unit={monthly ? 'monthly' : 'canonical'} label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
+      control = <>
+        <div className="unit-toggle"><ChoiceGroup id="saving.method" value={monthly ? 'monthly' : 'annual'} options={[{ value: 'monthly', label: t('questionnaire.choice.monthly') }, { value: 'annual', label: t('questionnaire.choice.annual') }]} onChange={(value) => setQuestionAnswer('saving.method', value)} /></div><FactNumber field="annualSavings" unit={monthly ? 'monthly' : 'canonical'} label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
         <p className="answer-feedback">{t('questionnaire.savingFeedback', { monthly: cad(inputs.annualSavings / 12), annual: cad(inputs.annualSavings) })}</p></>
       break
     }
@@ -616,7 +633,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       </>
       break
     case 'pension.self':
-      control = <ChoiceGroup id={definition.id} value={inputs.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ pension: value === 'db' ? (inputs.pension ?? DEFAULT_PENSION) : null }); markAnswers(['pension'], value === 'db' ? 'estimated' : 'notApplicable') }} />
+      control = <><ChoiceGroup id={definition.id} value={inputs.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ pension: value === 'db' ? (inputs.pension ?? DEFAULT_PENSION) : null }); markAnswers(['pension'], value === 'db' ? 'estimated' : 'notApplicable'); if (value === 'dc') addLockedAccount('self') }} />{answer === 'dc' && <LockedAccountNote />}</>
       break
     case 'pension.self.details':
       control = <div className="question-pair"><FactNumber field="pension.annualAmount" label={t('pensionAnnual')} value={inputs.pension!.annualAmount} onValue={(annualAmount) => set({ pension: { ...inputs.pension!, annualAmount } })} /><FactNumber field="pension.startAge" label={t('pensionStartAge')} value={inputs.pension!.startAge} onValue={(startAge) => set({ pension: { ...inputs.pension!, startAge } })} /></div>
@@ -625,7 +642,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <PensionIndexing prefix="pension" pension={inputs.pension!} answer={answer} setAnswer={setQuestionAnswer} setPension={(pension) => set({ pension })} />
       break
     case 'pension.partner':
-      control = <ChoiceGroup id={definition.id} value={inputs.partner!.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ partner: { ...inputs.partner!, pension: value === 'db' ? (inputs.partner!.pension ?? DEFAULT_PENSION) : null } }); markAnswers(['partner.pension'], value === 'db' ? 'estimated' : 'notApplicable') }} />
+      control = <><ChoiceGroup id={definition.id} value={inputs.partner!.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ partner: { ...inputs.partner!, pension: value === 'db' ? (inputs.partner!.pension ?? DEFAULT_PENSION) : null } }); markAnswers(['partner.pension'], value === 'db' ? 'estimated' : 'notApplicable'); if (value === 'dc') addLockedAccount('partner') }} />{answer === 'dc' && <LockedAccountNote />}</>
       break
     case 'pension.partner.details':
       control = <div className="question-pair"><FactNumber field="partner.pension.annualAmount" label={t('pensionAnnual')} value={inputs.partner!.pension!.annualAmount} onValue={(annualAmount) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, annualAmount } } })} /><FactNumber field="partner.pension.startAge" label={t('pensionStartAge')} value={inputs.partner!.pension!.startAge} onValue={(startAge) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, startAge } } })} /></div>
@@ -676,6 +693,15 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         </div>
         <div className="tax-assumption-field">
           <FactNumber field="accumulationMarginalRate" label={t('questionnaire.taxRateLabel')} value={marginalRate * 100} step={1} onValue={(value) => set({ accumulationMarginalRate: value / 100 })} />
+          {/* FE-46: when employment income is recorded, offer the statutory rate
+              it implies instead of sending the user to look it up. */}
+          {(() => {
+            const earned = canonicalPlan.people.find((person) => person.role === 'self')?.earnedIncome
+            if (earned?.status !== 'known' || earned.value <= 0) return null
+            const suggested = Math.round(engineMarginalRate(earned.value, inputs.province) * 1000) / 10
+            return <p className="answer-feedback" data-testid="guided-rate-suggestion">{t('questionnaire.taxRateFromIncome', { income: cad(earned.value), rate: suggested })}{' '}
+              {Math.abs(suggested - marginalRate * 100) >= 0.05 && <button type="button" className="text-action" onClick={() => { set({ accumulationMarginalRate: suggested / 100 }); markAnswers(['accumulationMarginalRate'], 'confirmed') }}>{t('questionnaire.taxRateUse', { rate: suggested })}</button>}</p>
+          })()}
           <p>{t('questionnaire.taxRateMeaning')}</p>
           <p>{t('questionnaire.taxRateFind')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.taxRateSource')}</a></p>
         </div>

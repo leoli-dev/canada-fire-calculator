@@ -95,7 +95,7 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
       !(state.canonical.migration.budgetReconciliation?.answered ?? false)
     return basisAnswerable && !migratedPending
   }
-  const choicePages = ['family.people', 'family.children', 'saving.method', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
+  const choicePages = ['family.people', 'family.children', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
   if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined
   const fields = requiredFields(definition, !!state.inputs.partner)
   if (!fields.length) return true

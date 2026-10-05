@@ -41,7 +41,7 @@ header h1 {
 }
 .tagline { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
 .header-disclaimer { margin: 8px 0 0; font-size: 0.76rem; color: var(--ink-soft); }
-.simplifications-note { margin: 2px 0 0; font-size: 0.76rem; color: var(--ink-faint); }
+.header-disclaimer .term { font-size: inherit; white-space: normal; text-align: left; }
 
 /* Reserve the fixed 64px GitHub corner plus 8px; centered app gutters take over on wide screens. */
 .langs { display: flex; margin-right: clamp(0px, calc(668px - 50vw), 48px); }
@@ -749,3 +749,8 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .worksheet-summary { max-width: 620px; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; }
 .worksheet-summary p { margin: 0 0 8px; }
 .sale-plan .choice-group { margin: 8px 0 12px; }
+.unit-toggle .choice-group { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 8px 0 4px; }
+@media (max-width: 420px) { .unit-toggle .choice-group { grid-template-columns: minmax(0, 1fr); } }
+/* FE-46: the category progress label wraps instead of widening the pager. */
+.question-pager { grid-template-columns: auto minmax(0, 1fr) auto; }
+.question-pager > span { min-width: 0; text-align: center; overflow-wrap: anywhere; font-size: .85rem; }

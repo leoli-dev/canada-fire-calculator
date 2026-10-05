@@ -47,7 +47,6 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('time.work', 'family', ['workStyle', 'targetAssets'], ['fireAge', 'fireTargetAssets']),
   page('time.horizon', 'family', ['lifeExpectancy'], ['lifeExpectancy']),
 
-  page('saving.method', 'saving', ['savingUnit'], []),
   page('saving.amount', 'saving', ['annualSavings'], ['annualSavings']),
   // BE-13 A: what the saving figure means. Placed right after the amount so the
   // basis is decided next to the number it reinterprets.
@@ -156,6 +155,8 @@ export function pageById(id: string): QuestionDefinition | undefined {
     'assumptions.review': 'invest.strategy',
     // FE-43 C: the old all-in-one tax page now opens the optional category.
     'income.taxFacts': 'tax.intro',
+    // FE-46: the monthly/yearly unit is a toggle on the amount page.
+    'saving.method': 'saving.amount',
   }
   const resolvedId = aliases[id] ?? id
   return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)

@@ -80,11 +80,10 @@ export default function App() {
         <div>
           <h1>{t('title')}</h1>
           <p className="tagline">{t('tagline')}</p>
+          {/* FE-46: one disclaimer line, with the simplifications behind a link,
+              instead of two sentences saying the same thing. */}
           <p className="header-disclaimer">
-            <strong>{t('disclaimer')}</strong>
-          </p>
-          <p className="simplifications-note">
-            {t('simplificationsNote')}{' '}
+            <strong>{t('disclaimer')}</strong>{' '}
             <button type="button" className="term" onClick={() => openGlossary('simplifications')}>
               {t('simplificationsLink')}
             </button>
