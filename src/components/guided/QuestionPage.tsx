@@ -354,7 +354,14 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       }} />
       break
     case 'work.amount':
-      control = <FactNumber field="extraIncome.annual" label={t('extraIncomeAnnual')} value={inputs.extraIncome!.annual} onValue={(annual) => set({ extraIncome: { ...inputs.extraIncome!, annual } })} />
+      // BE-46: how the work is paid decides the CPP/QPP, EI and QPIP withheld.
+      control = <><FactNumber field="extraIncome.annual" label={t('extraIncomeAnnual')} value={inputs.extraIncome!.annual} onValue={(annual) => set({ extraIncome: { ...inputs.extraIncome!, annual } })} />
+        <p className="question-subhead">{t('sideIncomeKind')}</p>
+        <ChoiceGroup id="work.kind" label={t('sideIncomeKind')} value={inputs.extraIncome!.kind ?? 'employment'} options={[
+          { value: 'employment', label: t('sideIncomeEmployment'), detail: t('sideIncomeEmploymentDetail') },
+          { value: 'selfEmployment', label: t('sideIncomeSelf'), detail: t('sideIncomeSelfDetail') },
+          { value: 'other', label: t('sideIncomeOther'), detail: t('sideIncomeOtherDetail') },
+        ]} onChange={(kind) => set({ extraIncome: { ...inputs.extraIncome!, kind: kind as 'employment' | 'selfEmployment' | 'other' } })} /></>
       break
     case 'work.period':
       control = <div className="question-pair"><FactNumber field="extraIncome.fromAge" label={t('extraIncomeFrom')} value={inputs.extraIncome!.fromAge} onValue={(fromAge) => set({ extraIncome: { ...inputs.extraIncome!, fromAge } })} /><FactNumber field="extraIncome.toAge" label={t('extraIncomeTo')} value={inputs.extraIncome!.toAge} onValue={(toAge) => set({ extraIncome: { ...inputs.extraIncome!, toAge } })} /></div>

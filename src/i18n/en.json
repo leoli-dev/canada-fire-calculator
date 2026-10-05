@@ -1631,5 +1631,12 @@
     "intro": "Québec gives a tax credit to a person who lived alone all year in their own home, or only with dependent children. It is reduced with the age and retirement income amounts once family income passes 42,955.",
     "yesDetail": "Adds the 2,172 living-alone amount to your Québec credits.",
     "noDetail": "You shared your home with another adult."
-  }
+  },
+  "sideIncomeKind": "How is this work paid?",
+  "sideIncomeEmployment": "As an employee",
+  "sideIncomeEmploymentDetail": "CPP or QPP, EI (and QPIP in Québec) come off the pay; you get the Canada employment amount.",
+  "sideIncomeSelf": "Self-employed",
+  "sideIncomeSelfDetail": "You pay both halves of CPP or QPP, and QPIP in Québec; no EI.",
+  "sideIncomeOther": "No payroll contributions",
+  "sideIncomeOtherDetail": "For example royalties; taxed as ordinary income only."
 }

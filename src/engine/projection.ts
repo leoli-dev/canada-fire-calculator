@@ -8,6 +8,7 @@ import {
   type TaxBySource,
   type YearRow,
 } from './types'
+import { sideIncomeDeductions } from './payroll'
 import { incomeTax, PLAN_TAX_YEAR, probateTax, rulesForCalendarYear, selectPlanTaxRules, taxRuleProvenance, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
@@ -196,8 +197,11 @@ function evaluate(
   let oasNet = 0
   let tax = 0
   const taxPeople: TerminalTaxPerson[] = []
+  // BE-46: side income carries its payroll contributions: cash withheld, the
+  // enhanced/second contributions deducted and the base ones credited.
+  const payroll = sideIncomeDeductions(extraIncome, inputs.extraIncome?.kind ?? 'employment', inputs.province)
   for (let i = 0; i < persons; i++) {
-    const personExtra = i === 0 ? extraIncome : 0
+    const personExtra = i === 0 ? extraIncome - payroll.taxDeduction : 0
     const personTaxable = share + personExtra
     const personOas = oasAfterClawback(oasGrossPerPerson[i], personTaxable)
     oasNet += personOas
@@ -208,6 +212,7 @@ function evaluate(
     const credits = {
       age: agesPerPerson[i],
       pensionIncome,
+      ...(i === 0 && extraIncome > 0 ? { payrollCredit: payroll.creditAmount, employmentAmount: payroll.employmentAmount } : {}),
     }
     const taxableIncome = personTaxable + personOas
     taxPeople.push({ taxableIncome, credits, oasGross: oasGrossPerPerson[i], oasNet: personOas })
@@ -228,7 +233,7 @@ function evaluate(
   // non-modelled outcome here is `none` (nobody draws OAS, so neither the GIS
   // nor the Allowance is payable) — a real zero, via `basisAnnualAmount`.
   const legacyBasis = benefitIncomeBasis(receivingOas, agesPerPerson, gisIncome, {
-    workIncome: extraIncome,
+    workIncome: [extraIncome],
   })
   const gis = basisAnnualAmount(legacyBasis)
   // CCB's AFNI approximation, unlike GIS, includes OAS
@@ -237,7 +242,7 @@ function evaluate(
   // (`anchorBenefitRules()`), not from a literal in benefits.ts.
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable, anchorBenefitRules())
   let netCash =
-    cpp + pension + oasNet + gis + ccb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
+    cpp + pension + oasNet + gis + ccb + rent + extraIncome - payroll.contributions + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
   let rrspTax = totalTaxable > 0 ? tax * (w.rrsp / totalTaxable) : 0
   let taxablePerPerson = totalTaxable / persons
   if (canonical && taxYear !== undefined) {
@@ -267,7 +272,8 @@ function evaluate(
         { workIncome: person.earnedWork })
       const personGis = basisAnnualAmount(personBasis)
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable, anchorBenefitRules())
-      netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
+      // The person-level ledger does not settle payroll yet; the cash is still withheld.
+      netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome - payroll.contributions + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, gisBasis: personBasis.status === 'modeled' ? personBasis : undefined, ccb: personCcb,
         netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson,
         spousalAttribution: person.spousalAttribution }

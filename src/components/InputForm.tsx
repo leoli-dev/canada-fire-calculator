@@ -296,6 +296,15 @@ export function InputForm() {
             <Num label={t('extraIncomeAnnual')} value={inputs.extraIncome.annual} step={1000}
               issue={issueFor('extraIncome.annual')}
               onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, annual: v } })} />
+            <label className="field">
+              <span>{t('sideIncomeKind')}</span>
+              <select data-testid="side-income-kind" value={inputs.extraIncome.kind ?? 'employment'}
+                onChange={(e) => set({ extraIncome: { ...inputs.extraIncome!, kind: e.target.value as 'employment' | 'selfEmployment' | 'other' } })}>
+                <option value="employment">{t('sideIncomeEmployment')}</option>
+                <option value="selfEmployment">{t('sideIncomeSelf')}</option>
+                <option value="other">{t('sideIncomeOther')}</option>
+              </select>
+            </label>
             <Num label={t('extraIncomeFrom')} value={inputs.extraIncome.fromAge}
               issue={issueFor('extraIncome.fromAge')}
               onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, fromAge: v } })} />

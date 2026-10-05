@@ -1,3 +1,4 @@
+import { sideIncomeDeductions } from '../payroll'
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { incomeTax } from '../tax'
@@ -478,7 +479,15 @@ describe('runProjection', () => {
     }
     const r = runProjection(couple)
     const row = r.rows.find((x) => x.age === base.fireAge)!
-    const expectedTax = incomeTax(60000, base.province, { age: base.fireAge })
+    // BE-46: employment side income carries its payroll: 60,000 has 56,500 of
+    // pensionable earnings, so 1% (565) is deducted and 4.95% (2,796.75) plus
+    // EI (978) is credited, with the 1,501 Canada employment amount.
+    const payroll = sideIncomeDeductions(60000, 'employment', base.province)
+    expect(payroll.contributions).toBeCloseTo(3361.75 + 978, 6)
+    expect(payroll.taxDeduction).toBeCloseTo(565, 6)
+    expect(payroll.creditAmount).toBeCloseTo(2796.75 + 978, 6)
+    expect(payroll.employmentAmount).toBe(1501)
+    const expectedTax = incomeTax(60000 - 565, base.province, { age: base.fireAge, payrollCredit: 3774.75, employmentAmount: 1501 })
     expect(row.tax).toBeCloseTo(expectedTax, 0)
     // progressive brackets: taxing it all on one person costs more than an
     // (incorrect) even split would have

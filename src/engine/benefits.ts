@@ -416,10 +416,12 @@ export function benefitIncomeBasis(
   receivingOas: boolean[],
   agesPerPerson: number[],
   grossIncome: number,
-  options: GisCategoryOptions & { workIncome?: number } = {},
+  options: GisCategoryOptions & { workIncome?: number | number[] } = {},
 ): BenefitBasis {
-  const workIncome = options.workIncome ?? 0
-  const workExemption = gisWorkExemption(workIncome)
+  // BE-46: the work exemption belongs to each earner (5,000 plus half of the
+  // next 10,000, not transferable), so a list of earnings is exempted per person.
+  const earnings = Array.isArray(options.workIncome) ? options.workIncome : [options.workIncome ?? 0]
+  const workExemption = earnings.reduce((sum, amount) => sum + gisWorkExemption(amount), 0)
   const countableIncome = Math.max(0, grossIncome - workExemption)
   const classification = gisHouseholdCategory(receivingOas, agesPerPerson, { ...options, grossIncome: countableIncome })
   if (classification.status !== 'modeled') return classification

@@ -53,3 +53,13 @@ test('the savings amount page carries its own monthly or yearly choice', async (
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).inputs.annualSavings).toBe(30_000)
   await expect(page.getByTestId('guided-progress')).toContainText('1 of')
 })
+
+test('BE-46: how side income is paid is one fact in both modes', async ({ page }) => {
+  await page.goto('/#/guided/saving/work.after')
+  await page.getByRole('radio', { name: /I expect some work income/ }).check()
+  await page.goto('/#/guided/saving/work.amount')
+  await page.getByRole('radio', { name: /Self-employed/ }).check()
+  expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).inputs.extraIncome.kind).toBe('selfEmployment')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.getByTestId('side-income-kind')).toHaveValue('selfEmployment')
+})

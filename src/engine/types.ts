@@ -97,6 +97,8 @@ export interface PensionAmountProvenance {
 export interface ExtraIncome {
   /** net annual amount, today's dollars */
   annual: number
+  /** BE-46: employment (CPP/QPP, EI, QPIP withheld; employment amount) or self-employment (both CPP/QPP halves). Employment when omitted. */
+  kind?: 'employment' | 'selfEmployment' | 'other'
   /** clamped to no earlier than fireAge */
   fromAge: number
   toAge: number

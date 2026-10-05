@@ -1640,5 +1640,12 @@
     "intro": "Le Québec accorde un crédit d’impôt à la personne qui a vécu seule toute l’année dans son propre logement, ou seulement avec des enfants à charge. Il est réduit avec les montants pour âge et pour revenus de retraite dès que le revenu familial dépasse 42 955 $.",
     "yesDetail": "Ajoute le montant de 2 172 $ pour personne vivant seule à vos crédits du Québec.",
     "noDetail": "Vous avez partagé votre logement avec un autre adulte."
-  }
+  },
+  "sideIncomeKind": "Comment ce travail est-il payé?",
+  "sideIncomeEmployment": "Comme salarié",
+  "sideIncomeEmploymentDetail": "Le RPC ou le RRQ, l’AE (et le RQAP au Québec) sont retenus sur la paie; vous avez droit au montant canadien pour emploi.",
+  "sideIncomeSelf": "Travailleur autonome",
+  "sideIncomeSelfDetail": "Vous payez les deux parts du RPC ou du RRQ, et le RQAP au Québec; pas d’AE.",
+  "sideIncomeOther": "Sans cotisations sociales",
+  "sideIncomeOtherDetail": "Par exemple des redevances; imposé seulement comme revenu ordinaire."
 }

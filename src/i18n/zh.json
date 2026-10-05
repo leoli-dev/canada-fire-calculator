@@ -1640,5 +1640,12 @@
     "intro": "魁省对全年独自住在自己住所（或只和受抚养子女同住）的人给予税收抵免。家庭收入超过 42,955 后，它会和年龄金额、退休收入金额一起递减。",
     "yesDetail": "在魁省抵免中加入 2,172 的独居金额。",
     "noDetail": "你和另一位成年人同住。"
-  }
+  },
+  "sideIncomeKind": "这份工作怎么领钱？",
+  "sideIncomeEmployment": "受雇",
+  "sideIncomeEmploymentDetail": "工资里扣 CPP 或 QPP、EI（魁省另扣 QPIP），并可享受加拿大就业金额。",
+  "sideIncomeSelf": "自雇",
+  "sideIncomeSelfDetail": "自己缴纳 CPP 或 QPP 的两份（魁省另缴 QPIP），不缴 EI。",
+  "sideIncomeOther": "不缴社保",
+  "sideIncomeOtherDetail": "例如版税，只按普通收入纳税。"
 }

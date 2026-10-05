@@ -178,6 +178,10 @@ export interface PersonCredits {
    * senior credit, so under-65 RPP income gets the federal amount only.)
    */
   pensionIncome?: number
+  /** BE-46: base CPP/QPP contributions and EI/QPIP premiums, credited federally and provincially. */
+  payrollCredit?: number
+  /** BE-46: the Canada employment amount, a federal credit only. */
+  employmentAmount?: number
   /** Provincial eligibility can differ from the federal pension amount. */
   provincialPensionIncome?: number
   /** Only supplied after the claimant confirms support/cohabitation. */
@@ -270,6 +274,7 @@ export function incomeTax(
   // the pension income amount has no age test of its own — eligibility by
   // income type is the caller's job (see PersonCredits.pensionIncome)
   fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * federal.brackets[0].rate
+  fedCredit += ((credits?.payrollCredit ?? 0) + (credits?.employmentAmount ?? 0)) * federal.brackets[0].rate
   if (credits?.spouseNetIncome !== undefined)
     fedCredit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if (senior) {
@@ -290,7 +295,7 @@ export function incomeTax(
     const phase = Math.min(1, Math.max(0, (taxable - from) / (to - from)))
     provBpa = p.bpa - (p.bpa - min) * phase
   }
-  let provCredit = provBpa * lowRate
+  let provCredit = provBpa * lowRate + (credits?.payrollCredit ?? 0) * lowRate
   if (credits?.spouseNetIncome !== undefined && province !== 'QC')
     provCredit += (provincialSpouseAmount2026(province, credits.spouseNetIncome) ?? 0) * lowRate
   // provincial pension amounts (outside QC) have no age test either; QC's
