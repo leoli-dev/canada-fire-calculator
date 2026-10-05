@@ -1235,6 +1235,9 @@
       },
       "tax_spousalHistory": {
         "question": "What has been paid into the spousal RRSP?"
+      },
+      "family_livesAlone": {
+        "question": "Did you live alone all year?"
       }
     },
     "ownership": {
@@ -1622,5 +1625,11 @@
   "nextStepEarliest": "See the earliest age this plan works",
   "nextStepSustainable": "Find the spending this plan sustains",
   "nextStepSustainableAnswer": "About {{amount}} a year lasts to age {{age}} with everything else unchanged.",
-  "terminalEstimateNoteSingle": "This after-tax estate value adds remaining registered balances and taxable unrealized gains to the final year's modeled income. It does not model beneficiary designations, so it is not a complete final return."
+  "terminalEstimateNoteSingle": "This after-tax estate value adds remaining registered balances and taxable unrealized gains to the final year's modeled income. It does not model beneficiary designations, so it is not a complete final return.",
+  "be44": {
+    "livesAlone": "Lived alone all year (Québec amount for a person living alone)",
+    "intro": "Québec gives a tax credit to a person who lived alone all year in their own home, or only with dependent children. It is reduced with the age and retirement income amounts once family income passes 42,955.",
+    "yesDetail": "Adds the 2,172 living-alone amount to your Québec credits.",
+    "noDetail": "You shared your home with another adult."
+  }
 }

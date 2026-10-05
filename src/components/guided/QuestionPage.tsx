@@ -21,7 +21,7 @@ import { FieldContentFacts } from '../FieldContentHelp'
 import { BudgetMethodPanel } from '../BudgetMethodPanel'
 import { useCanonicalPlan } from '../../forms/canonicalEdit'
 import { worksheetTotal } from '../../guided/spending'
-import { AccountOwnershipChecklist, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
+import { AccountOwnershipChecklist, LivesAloneQuestion, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
 import { EarnedIncomeQuestion, RegisteredTypeQuestion, RrifDetailsQuestion } from './AccountFacts'
 import { FhsaRoomQuestion, PensionSplitQuestion, RrspRoomQuestion, SavingsRoomHint, SpousalHistoryQuestion, TaxDetailsIntro, TfsaRoomQuestion } from './TaxDetails'
 
@@ -245,6 +245,9 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'family.spouseSupport':
       control = <SpouseSupportQuestion plan={canonicalPlan} />
+      break
+    case 'family.livesAlone':
+      control = <LivesAloneQuestion plan={canonicalPlan} />
       break
     case 'family.qcDrug':
       control = <QcDrugCoverageQuestion plan={canonicalPlan} />

@@ -1244,6 +1244,9 @@
       },
       "tax_spousalHistory": {
         "question": "配偶 RRSP 有过哪些供款？"
+      },
+      "family_livesAlone": {
+        "question": "你全年独居吗？"
       }
     },
     "ownership": {
@@ -1631,5 +1634,11 @@
   "nextStepEarliest": "查看这个计划最早可行的年龄",
   "nextStepSustainable": "计算这个计划能支撑的支出",
   "nextStepSustainableAnswer": "其他条件不变时，每年约 {{amount}} 可以维持到 {{age}} 岁。",
-  "terminalEstimateNoteSingle": "这个税后遗产值把剩余注册账户余额和应税未实现收益加到最后一年的模拟收入中。它不模拟受益人指定，因此不是完整的最终申报。"
+  "terminalEstimateNoteSingle": "这个税后遗产值把剩余注册账户余额和应税未实现收益加到最后一年的模拟收入中。它不模拟受益人指定，因此不是完整的最终申报。",
+  "be44": {
+    "livesAlone": "全年独居（魁省独居金额）",
+    "intro": "魁省对全年独自住在自己住所（或只和受抚养子女同住）的人给予税收抵免。家庭收入超过 42,955 后，它会和年龄金额、退休收入金额一起递减。",
+    "yesDetail": "在魁省抵免中加入 2,172 的独居金额。",
+    "noDetail": "你和另一位成年人同住。"
+  }
 }

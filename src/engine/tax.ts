@@ -205,6 +205,15 @@ export function federalIncomeTax(taxable: number, rules: TaxRuleContext, credits
   return quebecAbatement ? amount * (1 - QC_ABATEMENT) : amount
 }
 
+/** BE-44: the part of a person's Québec basic personal credit their own tax
+ * cannot use, which TP-1 line 431 lets a spouse claim. */
+export function unusedQuebecBasicCredit(taxable: number, rules: TaxRuleContext): number {
+  if (rules.pack.jurisdiction !== 'QC')
+    throw new Error(`Quebec credit transfer needs a QC rule pack, got ${rules.pack.id}`)
+  const qc = rules.pack.provincial
+  return Math.max(0, qc.bpa * qc.brackets[0].rate - bracketTax(Math.max(0, taxable), qc.brackets))
+}
+
 export function ordinaryQuebecIncomeTax(taxable: number, rules: TaxRuleContext): number {
   if (taxable <= 0) return 0
   if (rules.pack.jurisdiction !== 'QC')

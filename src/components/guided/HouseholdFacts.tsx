@@ -6,7 +6,8 @@ import { commitCanonicalEdit } from '../../forms/canonicalEdit'
 import { qcCoverageComplete } from '../../guided/householdFacts'
 import { useStore } from '../../store'
 import { useCad } from '../../format'
-import { QcDrugCoverageEditor, SplitAmounts, ShareInput, accountNameKey, ownershipAccountRows, setSpouseSupport } from '../TaxFactsPanel'
+import { QcDrugCoverageEditor, SplitAmounts, ShareInput, accountNameKey, ownershipAccountRows, setLivesAlone, setSpouseSupport } from '../TaxFactsPanel'
+import { CardChoices } from './CardChoices'
 
 type OwnerChoice = 'self' | 'partner' | 'split'
 
@@ -176,6 +177,26 @@ export function SpouseSupportQuestion({ plan }: { plan: InputsV2 }) {
         }} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
     </label>)}
+  </div>
+}
+
+/** BE-44: guided living-alone question for a one-person Québec plan. */
+export function LivesAloneQuestion({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const answer = useStore(state => state.questionAnswers['family.livesAlone'])
+  const setQuestionAnswer = useStore(state => state.setQuestionAnswer)
+  const fact = plan.taxProfile?.livesAlone
+  const value = fact?.status === 'known' ? (fact.value ? 'yes' : 'no') : answer === 'unknown' ? 'unknown' : undefined
+  return <div data-testid="guided-lives-alone">
+    <p className="question-intro">{t('be44.intro')}</p>
+    <CardChoices name="family.livesAlone" testId="guided-lives-alone-choice" value={value} options={[
+      { value: 'yes', label: t('questionnaire.choice.yes'), detail: t('be44.yesDetail') },
+      { value: 'no', label: t('questionnaire.choice.no'), detail: t('be44.noDetail') },
+      { value: 'unknown', label: t('questionnaire.choice.unknown') },
+    ]} onChange={next => {
+      setQuestionAnswer('family.livesAlone', next)
+      commitCanonicalEdit(draft => setLivesAlone(draft, next === 'unknown' ? null : next === 'yes'))
+    }} />
   </div>
 }
 

@@ -44,6 +44,8 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('family.children', 'family', ['children'], ['children']),
   page('family.province', 'family', ['province'], ['province']),
   page('family.qcDrug', 'family', ['qcDrugCoverage'], [], { applicableWhen: (i) => i.province === 'QC', estimatePolicy: 'none', optional: true }),
+  // BE-44: the Québec amount for a person living alone.
+  page('family.livesAlone', 'family', ['livesAlone'], [], { applicableWhen: (i) => i.province === 'QC' && !i.partner, estimatePolicy: 'none', optional: true }),
   page('time.work', 'family', ['workStyle', 'targetAssets'], ['fireAge', 'fireTargetAssets']),
   page('time.horizon', 'family', ['lifeExpectancy'], ['lifeExpectancy']),
 

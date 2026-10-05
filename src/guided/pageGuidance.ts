@@ -4,6 +4,7 @@ type Copy = [why: string, find: string, example: string]
 
 const en: Record<string, Copy> = {
   'family.spouseSupport': ['The spouse amount and some provincial credits depend on living together and supporting each other.', 'Answer for how you live today; a short separation for work or health still counts as living together.', 'Alex and their partner share a home and pool money, so Alex answers yes.'],
+  'family.livesAlone': ['Living alone adds a Québec credit that shares the same income test as the age amount.', 'Answer for the whole tax year; a roommate or adult child at home means no, a minor child alone with you still counts.', 'Alex, 68, lives alone in a condo, so Alex answers yes.'],
   'family.qcDrug': ['Quebec adds a prescription-drug premium to the tax of people on the public RAMQ plan; private group plans and verified exemptions pay none.', 'Check your benefits booklet or your employer plan; at 65 most people move to RAMQ automatically unless they keep a group plan.', 'Alex keeps a group plan from a former employer (private) while their partner is on RAMQ (public).'],
   'assets.ownership': ['Tax follows the account holder, so each account needs a named owner before exact per-person tax is possible.', 'The holder’s name is on every statement; a spousal RRSP belongs to the annuitant, not the contributor.', 'Alex has a TFSA of $60,000 and their partner one of $40,000: they choose “We each have one” and enter both balances.'],
   'housing.ownership': ['Rent and gains are taxed to whoever owns the property, in proportion to their share.', 'Use the land title or the purchase documents; joint tenants usually hold equal shares.', 'A rental bought 50/50 is “Owned jointly” with a 50% share.'],
@@ -81,6 +82,7 @@ const en: Record<string, Copy> = {
 
 const zh: Record<string, Copy> = {
   'family.spouseSupport': ['配偶抵免和部分省级抵免，取决于你们是否同住并互相扶养。', '按现在的生活状况回答；因工作或健康短暂分开仍算同住。', 'Alex和伴侣同住、共同管理开支，所以选“是”。'],
+  'family.livesAlone': ['独居会增加一项魁省抵免，和年龄金额共用同一个收入递减。', '按整个税年回答；有室友或成年子女同住就选否，只和未成年子女同住仍算独居。', 'Alex今年68岁，独自住在公寓里，所以选“是”。'],
   'family.qcDrug': ['魁北克对参加RAMQ公共药保的人在报税时加收处方药保费；私人团体保险或已核实豁免的人不用交。', '查看福利手册或雇主保险；多数人满65岁会自动转到RAMQ，除非保留团体保险。', 'Alex保留前雇主的团体保险（私人），伴侣参加RAMQ（公共）。'],
   'assets.ownership': ['所得税跟着账户持有人走，每个账户都要有明确的持有人，才能按人精确计税。', '对账单上写着持有人姓名；配偶RRSP归年金领取人，不归供款人。', 'Alex的TFSA有60,000，伴侣的有40,000：选“两人各有一个”并分别填写余额。'],
   'housing.ownership': ['租金和增值按产权份额，计入房产所有人的收入。', '查看产权证或购房文件；共同共有通常是均等份额。', '两人各出一半买的出租房，选“共同持有”，份额50%。'],
@@ -160,6 +162,7 @@ const zh: Record<string, Copy> = {
 const fr: Record<string, Copy> = Object.fromEntries(Object.entries(en).map(([id, copy]) => [id, copy]))
 Object.assign(fr, {
   'family.spouseSupport': ['Le montant pour conjoint et certains crédits provinciaux dépendent de la vie commune et du soutien mutuel.', 'Répondez selon votre situation actuelle; une courte séparation pour le travail ou la santé compte encore comme vie commune.', 'Alex et son conjoint vivent ensemble et mettent l’argent en commun : Alex répond oui.'],
+  'family.livesAlone': ['Vivre seul ajoute un crédit du Québec soumis au même critère de revenu que le montant pour âge.', 'Répondez pour toute l’année; un colocataire ou un enfant adulte à la maison veut dire non, un enfant mineur seul avec vous compte encore.', 'Alex, 68 ans, vit seul en condo : Alex répond oui.'],
   'family.qcDrug': ['Le Québec ajoute une prime d’assurance médicaments à l’impôt des personnes au régime public de la RAMQ; un régime collectif privé ou une exemption vérifiée ne paie rien.', 'Consultez votre brochure d’avantages ou votre régime d’employeur; à 65 ans, la plupart passent à la RAMQ sauf s’ils gardent un régime collectif.', 'Alex garde le régime collectif d’un ancien employeur (privé) et son conjoint est à la RAMQ (public).'],
   'assets.ownership': ['L’impôt suit le titulaire du compte : chaque compte doit avoir un propriétaire pour calculer l’impôt de chacun.', 'Le nom du titulaire figure sur chaque relevé; un REER de conjoint appartient au rentier, pas au cotisant.', 'Alex a un CELI de 60 000 $ et son conjoint un de 40 000 $ : ils choisissent « Nous en avons chacun un » et inscrivent les deux soldes.'],
   'housing.ownership': ['Le loyer et les gains sont imposés au propriétaire, selon sa part.', 'Consultez le titre de propriété ou l’acte d’achat; des copropriétaires détiennent souvent des parts égales.', 'Un immeuble locatif acheté à parts égales est « Détenu conjointement » avec une part de 50 %.'],

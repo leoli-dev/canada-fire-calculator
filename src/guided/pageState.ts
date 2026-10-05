@@ -54,6 +54,7 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
   if (definition.id === 'family.spouseSupport') {
     return householdPlan(state).taxProfile?.spouseSupported.status === 'known' || state.questionAnswers['family.spouseSupport'] === 'unknown'
   }
+  if (definition.id === 'family.livesAlone') return householdPlan(state).taxProfile?.livesAlone?.status === 'known' || state.questionAnswers['family.livesAlone'] === 'unknown'
   if (definition.id === 'family.qcDrug') return qcCoverageComplete(householdPlan(state)) || state.questionAnswers['family.qcDrug'] === 'unknown'
   if (definition.id === 'assets.ownership') return accountOwnershipComplete(householdPlan(state))
   if (definition.id === 'housing.ownership') return propertyOwnershipComplete(householdPlan(state))

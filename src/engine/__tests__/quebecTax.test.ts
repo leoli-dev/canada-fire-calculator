@@ -180,3 +180,50 @@ describe('BE-35 Quebec source-owned household schedules', () => {
     expect(expanded.taxProfile?.qcPensionSplit).toBeNull()
   })
 })
+
+describe('BE-44 Quebec Schedule B living-alone amount and line 431 transfer', () => {
+  it('adds 2,172 for a person living alone inside the single family-income reduction (review R4)', () => {
+    // 70 years old, 30,000 of net income, no retirement income: age 3,986 plus
+    // living alone 2,172 = 6,158 before reduction; 30,000 is under 42,955.
+    const single70 = { p: { personId: 'p', age: 70, netIncome: 30_000, taxableIncome: 30_000, provincialPensionEligible: 0 } } as never
+    expect(scheduleB2026(single70, 0.14).availableAmount).toBe(3_986)
+    const alone = scheduleB2026(single70, 0.14, { livesAlone: true })
+    expect(alone.availableAmount).toBe(6_158)
+    expect(alone.credit).toBeCloseTo(6_158 * 0.14, 6)
+    // The same reduction applies once: at 60,000 the combined amount loses (60,000 - 42,955) × 18.75%.
+    const richer = { p: { personId: 'p', age: 70, netIncome: 60_000, taxableIncome: 60_000, provincialPensionEligible: 0 } } as never
+    expect(scheduleB2026(richer, 0.14, { livesAlone: true }).availableAmount).toBeCloseTo(6_158 - 17_045 * 0.1875, 6)
+    // No living-alone amount for a couple, whatever is passed.
+    const couple = { a: { personId: 'a', age: 70, netIncome: 30_000, taxableIncome: 30_000, provincialPensionEligible: 0 },
+      b: { personId: 'b', age: 70, netIncome: 0, taxableIncome: 0, provincialPensionEligible: 0 } } as never
+    expect(scheduleB2026(couple, 0.14, { livesAlone: true }).availableAmount).toBe(3_986 * 2)
+  })
+
+  it('uses the recorded living-alone fact in the household calculation', () => {
+    const p = plan({ ...base, partner: undefined, currentAge: 70, fireAge: 70, lifeExpectancy: 71 })
+    const events: IncomeEvent[] = [{ id: 'db', kind: 'dbPension', personId: p.people[0].id, amount: 30_000 }]
+    p.people[0].pension = { annualAmount: 30_000, startAge: 60, indexation: 1, bridgeAnnual: 0 }
+    const before = calculateHouseholdTax(p, 2026, events)
+    p.taxProfile = { ...p.taxProfile!, livesAlone: { status: 'known', value: true } }
+    const after = calculateHouseholdTax(p, 2026, events)
+    expect(before.status).toBe('ok'); expect(after.status).toBe('ok')
+    if (before.status !== 'ok' || after.status !== 'ok') return
+    const id = p.people[0].id
+    expect(after.byPerson[id].qc!.scheduleBCredit - before.byPerson[id].qc!.scheduleBCredit).toBeCloseTo(2_172 * 0.14, 6)
+  })
+
+  it('transfers a zero-income spouse’s unused basic credit to the other spouse (TP-1 line 431)', () => {
+    const p = plan()
+    const [earner, other] = p.people
+    earner.pension = { annualAmount: 60_000, startAge: 60, indexation: 1, bridgeAnnual: 0 }
+    other.pension = null
+    const events: IncomeEvent[] = [{ id: 'db', kind: 'dbPension', personId: earner.id, amount: 60_000 }]
+    const tax = calculateHouseholdTax(p, 2026, events)
+    expect(tax.status).toBe('ok')
+    if (tax.status !== 'ok') return
+    // The whole 18,952 × 14% basic credit of the spouse with no income moves over.
+    expect(tax.byPerson[earner.id].qc!.spouseCreditTransfer).toBeCloseTo(18_952 * 0.14, 6)
+    expect(tax.byPerson[other.id].qc!.spouseCreditTransfer).toBe(0)
+    expect(tax.byPerson[other.id].qc!.provincialIncomeTax).toBe(0)
+  })
+})

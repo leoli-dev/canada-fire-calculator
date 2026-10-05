@@ -726,6 +726,24 @@ export function SpouseSupportSelect({ plan }: { plan: InputsV2 }) {
   </label>
 }
 
+/** BE-44: record whether a one-person Québec household lived alone all year. */
+export function setLivesAlone(draft: InputsV2, value: boolean | null): void {
+  draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
+  draft.taxProfile.livesAlone = value === null ? { status: 'unknown', reason: 'living arrangement not confirmed' } : { status: 'known', value }
+}
+
+/** BE-44: professional field for the Québec living-alone amount. */
+export function LivesAloneSelect({ plan }: { plan: InputsV2 }) {
+  const { t } = useTranslation()
+  const fact = plan.taxProfile?.livesAlone
+  return <label>{t('be44.livesAlone')}
+    <select data-testid="lives-alone" value={fact?.status === 'known' ? String(fact.value) : 'unknown'}
+      onChange={event => commitCanonicalEdit(draft => setLivesAlone(draft, event.target.value === 'unknown' ? null : event.target.value === 'true'))}>
+      <option value="unknown">{t('be11.unknown')}</option><option value="true">{t('be11.yes')}</option><option value="false">{t('be11.no')}</option>
+    </select>
+  </label>
+}
+
 /** Record the spouse-support fact, or clear it back to an explicit unknown. */
 export function setSpouseSupport(draft: InputsV2, value: boolean | null): void {
   draft.taxProfile ??= { spouseSupported: { status: 'unknown', reason: 'not supplied' }, pensionSplit: null }
@@ -974,6 +992,7 @@ export function TaxFactsPanel({ sections = ALL_TAX_FACTS_SECTIONS }: { sections?
       {show('spouseSupport') && <SpouseSupportSelect plan={plan} />}
       {show('pensionSplit') && <PensionSplitFields plan={plan} />}
     </>}
+    {show('qcCoverage') && plan.province === 'QC' && plan.people.length === 1 && <LivesAloneSelect plan={plan} />}
     {show('qcCoverage') && plan.province === 'QC' && <div data-testid="qc-drug-coverage">
       <h4>{t('be35.coverageTitle')}</h4>
       <p>{t('be35.coverageHelp')}</p>
