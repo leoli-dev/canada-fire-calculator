@@ -754,3 +754,10 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 /* FE-46: the category progress label wraps instead of widening the pager. */
 .question-pager { grid-template-columns: auto minmax(0, 1fr) auto; }
 .question-pager > span { min-width: 0; text-align: center; overflow-wrap: anywhere; font-size: .85rem; }
+/* FE-21: reset confirmation. */
+.reset-plan { margin: 12px 0; }
+.reset-confirm { max-width: 520px; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--red, #b42318); border-radius: 8px; background: #fff7f6; }
+.reset-confirm p { margin: 6px 0 10px; line-height: 1.5; }
+.reset-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reset-confirm-actions button { border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; }
+.reset-confirm-actions .danger { border-color: #b42318; background: #b42318; color: #fff; }

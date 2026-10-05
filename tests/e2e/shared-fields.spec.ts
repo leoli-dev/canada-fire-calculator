@@ -158,7 +158,8 @@ test('guided monthly no-edit blur preserves exact annual amount and estimate', a
 test('reset after professional goal edit resets guided intent to the default goal', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
-  await page.getByRole('button', { name: 'Reset inputs' }).click()
+  await page.getByTestId('reset-plan').click()
+  await page.getByTestId('reset-confirm').click()
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(saved.inputs.goal).toBe('legacy')
   expect(saved.planningIntent.spendingPreference).toBe('undecided')

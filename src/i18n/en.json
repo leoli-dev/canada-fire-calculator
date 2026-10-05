@@ -308,7 +308,6 @@
   "scenarioA": "Scenario A",
   "scenarioCurrent": "Current",
   "scenarioHint": "Save a snapshot, then change inputs (retire later, spend less…) to compare.",
-  "reset": "Reset inputs",
   "disclaimer": "Educational estimate only, today's dollars, simplified tax rules - not financial advice.",
   "simplificationsLink": "See what's simplified",
   "saleLabel": "Sale",
@@ -1602,5 +1601,10 @@
   "migrationSettleSingleHelp": "Your partner was removed from the plan. Confirm that every account and property is yours and drop your former partner's income. To keep their details instead, choose \"Plan with my partner\" again.",
   "pensionSourceStatementOas": "Service Canada statement",
   "infl_custom": "Custom ({{value}}%)",
-  "infl_customLabel": "Inflation (% per year)"
+  "infl_customLabel": "Inflation (% per year)",
+  "resetAll": "Reset all data…",
+  "resetConfirmTitle": "Clear the whole plan?",
+  "resetConfirmBody": "This deletes your current plan and Scenario A: every amount, answer, category worksheet and choice goes back to the example. Your language and display settings stay. This cannot be undone.",
+  "resetCancel": "Keep my plan",
+  "resetConfirm": "Clear everything"
 }

@@ -30,6 +30,7 @@ import { CppEstimator, OasEstimator } from './BenefitEstimators'
 import { PensionSourceNote } from './PensionSourceNote'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
+import { ResetPlan } from './ResetPlan'
 import { parseField, type SharedFieldId } from '../forms/fieldRegistry'
 import { BudgetMethodPanel } from './BudgetMethodPanel'
 import { RuleAssumptions } from './RuleAssumptions'
@@ -127,7 +128,7 @@ export function InputForm() {
   const cad = useCad()
   const setGoalFromProfessional = useStore((s) => s.setGoalFromProfessional)
   const {
-    inputs, set, reset,
+    inputs, set,
     mixPresets, applyMixPreset,
     worksheet, setWorksheet,
     displayMode, setDisplayMode,
@@ -945,7 +946,7 @@ export function InputForm() {
       </fieldset>
       <TaxFactsPanel />
 
-      <button type="button" className="reset" onClick={reset}>{t('reset')}</button>
+      <ResetPlan />
     </form>
   )
 }

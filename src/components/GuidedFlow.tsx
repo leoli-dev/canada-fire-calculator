@@ -9,6 +9,7 @@ import { useStore } from '../store'
 import { useCad } from '../format'
 import { QuestionPage } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
+import { ResetPlan } from './ResetPlan'
 
 function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
   const { t } = useTranslation()
@@ -98,6 +99,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
       {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
     </ul></div>}
     <button type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</button>
+    <ResetPlan onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
   </section>
 }
 

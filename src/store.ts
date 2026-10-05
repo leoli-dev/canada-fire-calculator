@@ -529,11 +529,19 @@ export const useStore = create<Store>()(
         track('scenario_clear')
         set({ scenarioA: null, scenarioACanonical: null, scenarioAAnswerMeta: null })
       },
+      // FE-21: one reset for both entry modes, run only after the user confirms.
+      // It clears every financial input (Scenario A included) and the pre-v11
+      // backup, and moves the revision forward so no earlier result or worker
+      // reply can be shown for the blank plan. Language, entry mode and the
+      // display unit are preferences, not plan data, so they stay.
       reset: () => {
         track('reset_inputs')
-        set({
+        try { localStorage.removeItem(BACKUP_KEY) } catch { /* storage unavailable */ }
+        set((s) => ({
           inputs: DEFAULT_INPUTS,
           canonical: null,
+          scenarioA: null,
+          scenarioAAnswerMeta: null,
           scenarioACanonical: null,
           draftByField: {},
           worksheet: DEFAULT_WORKSHEET,
@@ -544,10 +552,10 @@ export const useStore = create<Store>()(
           guidedView: 'questionnaire',
           questionAnswers: {},
           planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
-          inputRevision: 0,
+          inputRevision: s.inputRevision + 1,
           resultRevision: null,
           answerMeta: {},
-        })
+        }))
       },
     }),
     {

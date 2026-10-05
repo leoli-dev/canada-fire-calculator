@@ -308,7 +308,6 @@
   "scenarioA": "场景 A",
   "scenarioCurrent": "当前",
   "scenarioHint": "先保存快照，再改参数（晚两年退、少花 10%…）进行对比。",
-  "reset": "重置输入",
   "disclaimer": "仅供教育参考，按今日金额与简化税规估算，不构成理财建议。",
   "simplificationsLink": "查看具体简化了哪些",
   "saleLabel": "卖房",
@@ -1611,5 +1610,10 @@
   "migrationSettleSingleHelp": "伴侣已从计划中移除。确认所有账户和房产都归你，并删除原伴侣的收入。如果想保留伴侣的资料，请重新选择“我和伴侣一起规划”。",
   "pensionSourceStatementOas": "Service Canada 对账单",
   "infl_custom": "自定义（{{value}}%）",
-  "infl_customLabel": "通胀率（每年 %）"
+  "infl_customLabel": "通胀率（每年 %）",
+  "resetAll": "重置全部数据…",
+  "resetConfirmTitle": "清空整个计划吗？",
+  "resetConfirmBody": "这会删除当前计划和方案 A：所有金额、答案、支出类别和选择都会恢复为示例值。语言和显示设置会保留。此操作无法撤销。",
+  "resetCancel": "保留我的计划",
+  "resetConfirm": "全部清空"
 }

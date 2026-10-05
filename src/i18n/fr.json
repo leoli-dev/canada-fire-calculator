@@ -308,7 +308,6 @@
   "scenarioA": "Scénario A",
   "scenarioCurrent": "Actuel",
   "scenarioHint": "Sauvegardez un instantané, puis modifiez les paramètres pour comparer.",
-  "reset": "Réinitialiser",
   "disclaimer": "Estimation éducative seulement, en dollars d'aujourd'hui, règles fiscales simplifiées - pas un conseil financier.",
   "simplificationsLink": "Voir ce qui est simplifié",
   "saleLabel": "Vente",
@@ -1611,5 +1610,10 @@
   "migrationSettleSingleHelp": "Votre conjoint a été retiré du plan. Confirmez que chaque compte et chaque bien vous appartiennent et retirez les revenus de votre ancien conjoint. Pour garder ses renseignements, choisissez de nouveau « Planifier avec mon conjoint ».",
   "pensionSourceStatementOas": "Relevé de Service Canada",
   "infl_custom": "Personnalisé ({{value}} %)",
-  "infl_customLabel": "Inflation (% par année)"
+  "infl_customLabel": "Inflation (% par année)",
+  "resetAll": "Réinitialiser toutes les données…",
+  "resetConfirmTitle": "Effacer tout le plan?",
+  "resetConfirmBody": "Cette action supprime votre plan actuel et le scénario A : chaque montant, réponse, feuille de catégories et choix revient à l’exemple. Votre langue et vos réglages d’affichage restent. Elle ne peut pas être annulée.",
+  "resetCancel": "Garder mon plan",
+  "resetConfirm": "Tout effacer"
 }
