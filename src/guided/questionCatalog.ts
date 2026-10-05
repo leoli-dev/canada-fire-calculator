@@ -101,11 +101,13 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('housing.ownership', 'housing', ['propertyOwnership'], [], { applicableWhen: (i) => !!i.partner && (!!i.principalResidence || (i.investmentProperties?.length ?? 0) > 0), estimatePolicy: 'none' }),
 
   page('spending.method', 'spending', ['spendingMethod'], []),
-  page('spending.total', 'spending', ['retirementSpending'], ['retirementSpending']),
   page('spending.homeFood', 'spending', ['wsHousing', 'wsGroceries'], ['worksheet.wsHousing', 'worksheet.wsGroceries'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.travelHealth', 'spending', ['wsTravel', 'wsHealth'], ['worksheet.wsTravel', 'worksheet.wsHealth'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.utilitiesTransport', 'spending', ['wsUtilities', 'wsTransport'], ['worksheet.wsUtilities', 'worksheet.wsTransport'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.funOther', 'spending', ['wsEntertainment', 'wsOther'], ['worksheet.wsEntertainment', 'worksheet.wsOther'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
+  // FE-39: the total comes after the categories, so the category path ends on
+  // the sum it applies instead of asking for a total first.
+  page('spending.total', 'spending', ['retirementSpending'], ['retirementSpending']),
 
   page('cpp.self', 'income', ['cppAmount', 'cppClaim'], ['cppAnnualAt65', 'cppStartAge']),
   page('oas.self', 'income', ['oasAmount', 'oasClaim'], ['oasAnnualAt65', 'oasStartAge']),

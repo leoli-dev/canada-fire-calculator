@@ -745,3 +745,7 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .rule-coverage ul { margin: 4px 0; padding-left: 18px; }
 .rule-coverage li { overflow-wrap: anywhere; }
 .rule-coverage p { margin: 4px 0; }
+/* FE-39/40: category total summary and the keep-or-sell choice. */
+.worksheet-summary { max-width: 620px; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; }
+.worksheet-summary p { margin: 0 0 8px; }
+.sale-plan .choice-group { margin: 8px 0 12px; }

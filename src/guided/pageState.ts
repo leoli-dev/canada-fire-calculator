@@ -6,12 +6,15 @@ import type { QuestionDefinition } from './schema'
 import { accountOwnershipComplete, propertyOwnershipComplete, qcCoverageComplete } from './householdFacts'
 import { earnedIncomeComplete, hasRecordedRegisteredType, rrifDetailsComplete } from './accountFacts'
 import { fhsaRoomComplete, pensionSplitRecorded, rrspRoomComplete, spousalHistoryComplete, tfsaRoomComplete } from './taxDetails'
+import { worksheetTotal } from './spending'
 
 /** The store slice page completeness actually reads. */
 export interface PageState {
   inputs: Inputs
   answerMeta: Record<string, AnswerMeta>
   questionAnswers: Record<string, string | boolean | string[]>
+  /** The retirement-spending categories, when the store has them. */
+  worksheet?: Record<string, number>
   canonical: ({ budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } &
     Partial<Pick<InputsV2, 'people' | 'accounts' | 'properties' | 'taxProfile'>>) | null
 }
@@ -58,6 +61,12 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
   if (definition.id === 'saving.earned') return earnedIncomeComplete(householdPlan(state))
   if (definition.id === 'account.rrsp.type') return state.questionAnswers['account.rrsp.type'] !== undefined || hasRecordedRegisteredType(householdPlan(state))
   if (definition.id === 'account.rrif.details') return rrifDetailsComplete(householdPlan(state))
+  // FE-39: on the category path the total is answered once the categories'
+  // sum is the recorded retirement spending.
+  if (definition.id === 'spending.total' && state.questionAnswers['spending.method'] === 'estimate') {
+    const total = worksheetTotal(state.worksheet)
+    return answerIsUsable(state.answerMeta.retirementSpending) && total > 0 && Math.abs(total - state.inputs.retirementSpending) < 0.5
+  }
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }

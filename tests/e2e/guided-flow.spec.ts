@@ -220,11 +220,12 @@ test('future savings allocation is one page with a live 100 percent total', asyn
   await expect(page.locator('.allocation-total')).toContainText('合计 100%')
   await expect(page.locator('.allocation-total')).toContainText('三个比例合计为100%')
 
-  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('10')
+  // The example split is 15/45/40 (FE-40: the example TFSA stays under the 2026 limit).
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('30')
   await expect(page.locator('.allocation-total')).toContainText('合计 90%')
   await expect(page.locator('.allocation-total')).toContainText('还需要分配 10 个百分点')
 
-  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('20')
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('40')
   await expect(page.locator('.allocation-total')).toHaveClass(/complete/)
 })
 

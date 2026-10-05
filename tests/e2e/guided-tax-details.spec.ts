@@ -51,7 +51,8 @@ test('a room page asks one number and says whether this year’s plan fits', asy
   await expect(page.getByTestId('guided-tfsa-feedback-self')).toContainText('within the room')
   await page.getByTestId('tfsa-available-room-self').fill('5000')
   await page.getByTestId('tfsa-available-room-self').blur()
-  await expect(page.getByTestId('guided-tfsa-feedback-self')).toContainText('7,000 more than the room')
+  // The example split sends 15% of 40,000 = 6,000 to the TFSA.
+  await expect(page.getByTestId('guided-tfsa-feedback-self')).toContainText('1,000 more than the room')
 })
 
 test('a couple records room per person and can answer pension splitting', async ({ page }) => {
@@ -84,13 +85,13 @@ test('a couple records room per person and can answer pension splitting', async 
 test('the savings-split page warns softly when a split exceeds recorded room', async ({ page }) => {
   await seed(page, { tfsaRoom: 5_000 })
   await page.goto('/#/guided/assets/allocation.tfsa')
-  // The example split sends 30% of 40,000 to the TFSA, more than 5,000 of room.
+  // The example split sends 15% of 40,000 = 6,000 to the TFSA, more than 5,000 of room.
   const hint = page.getByTestId('guided-allocation-room-hint')
-  await expect(hint).toContainText('12,000')
+  await expect(hint).toContainText('6,000')
   await expect(hint).toContainText('5,000')
   const tfsa = page.locator('[data-field="savingsSplit.tfsa"] input')
   await tfsa.fill('10')
-  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('40')
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('45')
   await expect(hint).toHaveCount(0)
 })
 

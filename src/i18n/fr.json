@@ -1323,7 +1323,15 @@
       "allocationOver": "{{account}} ({{person}}) : la répartition de cette année verse {{planned}}, plus que les {{room}} de droits inscrits dans les détails fiscaux. La projection ne plafonne pas encore les cotisations.",
       "howCounted": "Comment ces droits sont calculés",
       "notAttributed": "La répartition de l’épargne du ménage n’est pas encore divisée entre vous deux; ces droits ne sont donc pas comparés à elle."
-    }
+    },
+    "chooseProvince": "Choisissez votre province ou territoire",
+    "salePlan": "Prévoyez-vous de le vendre?",
+    "saleKeep": "Le garder, aucune vente prévue",
+    "saleSell": "Le vendre à un âge précis",
+    "saleAge": "Âge à la vente",
+    "worksheetTotal": "Vos catégories totalisent {{total}} par année.",
+    "useWorksheetTotal": "Utiliser {{total}} comme dépenses à la retraite",
+    "worksheetApplied": "Le plan utilise le total de vos catégories."
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",
   "unrankedObjective": "Au moins une option finance les dépenses prévues, mais le résultat du calcul rapide ne permet pas de classer cet objectif. Aucune recommandation ne peut être appliquée.",

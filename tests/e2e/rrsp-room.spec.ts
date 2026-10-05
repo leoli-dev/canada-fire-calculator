@@ -10,8 +10,10 @@ async function seed(page: import('@playwright/test').Page, options: { guided?: b
     localStorage.clear()
     const { DEFAULT_INPUTS } = await import('/src/store.ts')
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    // The hand-calculated ledgers below use a 50% RRSP share of savings, the
+    // split these vectors were reviewed with (the app's example split changed).
     const inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 90,
-      annualSavings: 40_000, retirementSpending: 40_000,
+      annualSavings: 40_000, retirementSpending: 40_000, savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
       balances: { tfsa: 0, rrsp: 0, nonReg: 0 }, nonRegBook: 0,
       cppAnnualAt65: 0, oasAnnualAt65: 0, partner: null }
     const canonical = refreshCanonicalFromLegacy(null, inputs)

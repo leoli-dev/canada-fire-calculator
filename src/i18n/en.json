@@ -1314,7 +1314,15 @@
       "allocationOver": "{{account}} ({{person}}): this year’s split sends {{planned}}, more than the {{room}} of room recorded in Tax details. The projection does not cap contributions yet.",
       "howCounted": "How this room is counted",
       "notAttributed": "Your household savings split is not divided between the two of you yet, so this room is not checked against it."
-    }
+    },
+    "chooseProvince": "Choose your province or territory",
+    "salePlan": "Do you plan to sell it?",
+    "saleKeep": "Keep it, no sale planned",
+    "saleSell": "Sell it at a certain age",
+    "saleAge": "Age at the sale",
+    "worksheetTotal": "Your categories add up to {{total}} a year.",
+    "useWorksheetTotal": "Use {{total}} as my retirement spending",
+    "worksheetApplied": "The plan uses your category total."
   },
   "noFeasibleCandidate": "No valid, funded candidate. Review the failures and any shortfalls below; no recommendation can be applied.",
   "unrankedObjective": "At least one candidate funds the planned spending, but this objective cannot be ranked with the available quick-solver result. No recommendation can be applied.",

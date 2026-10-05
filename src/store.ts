@@ -41,7 +41,7 @@ export const DEFAULT_INPUTS: Inputs = {
   // BE-13 A: an unrecorded working-period spending is `null`, not a guess from
   // the retirement figure.
   budgetWorkingSpending: null,
-  savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+  savingsSplit: { tfsa: 0.15, rrsp: 0.45, nonReg: 0.4 },
   retirementSpending: 50000,
   returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
   fees: 0.002,

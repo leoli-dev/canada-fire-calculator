@@ -1323,7 +1323,15 @@
       "allocationOver": "{{account}}（{{person}}）：今年的分配会存入 {{planned}}，超过税务细节中记录的 {{room}} 额度。目前的推算还不会按额度截断供款。",
       "howCounted": "额度如何计算",
       "notAttributed": "家庭储蓄分配还没有分到你们各自名下，所以这项额度暂不与它核对。"
-    }
+    },
+    "chooseProvince": "请选择省份或地区",
+    "salePlan": "打算出售吗？",
+    "saleKeep": "保留，不打算出售",
+    "saleSell": "在某个年龄出售",
+    "saleAge": "出售时的年龄",
+    "worksheetTotal": "各类别合计每年 {{total}}。",
+    "useWorksheetTotal": "用 {{total}} 作为退休支出",
+    "worksheetApplied": "计划已使用各类别合计。"
   },
   "noFeasibleCandidate": "没有有效且资金充足的候选。请查看下方失败原因及资金缺口；目前没有可应用的推荐。",
   "unrankedObjective": "至少有一个候选能支付计划支出，但当前快算结果无法按此目标排序，因此没有可应用的推荐。",

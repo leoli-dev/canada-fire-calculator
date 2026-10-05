@@ -11,12 +11,13 @@ import { annualStep, initializeState, type AnnualProviders } from '../annualStat
  * it with `annualStep`'s `rrspLedger` pins the parity the review found broken.
  */
 
-/** The project's own default plan. `DEFAULT_INPUTS.savingsSplit` is
- * `{ tfsa: .3, rrsp: .5, nonReg: .2 }` with 40,000 of net savings, so the
- * default voluntary split sends 24,000 * .5 = 12,000 to the RRSP on top of any
- * recorded contribution. */
+/** The project's default plan with the split this hand calculation was
+ * reviewed with, `{ tfsa: .3, rrsp: .5, nonReg: .2 }`, pinned here because the
+ * app's example split changed (FE-40) to stay inside the 2026 TFSA limit. With
+ * 40,000 of net savings the voluntary split sends 24,000 * .5 = 12,000 to the
+ * RRSP on top of any recorded contribution. */
 function defaultPlan(): InputsV2 {
-  const plan = migratePersistedPlan({ inputs: DEFAULT_INPUTS }, 10, 2026)
+  const plan = migratePersistedPlan({ inputs: { ...DEFAULT_INPUTS, savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 } } }, 10, 2026)
   plan.migration = { sourcePersistVersion: 11, ownershipNeedsConfirmation: false, ageBasisNeedsConfirmation: false, savingsBasisNeedsConfirmation: false }
   plan.budget = { kind: 'savingsBudget', annualNetSavings: DEFAULT_INPUTS.annualSavings, retirementSpending: DEFAULT_INPUTS.retirementSpending,
     debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } }

@@ -12,6 +12,8 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
   await page.goto('/#/guided/housing/home.value')
   await page.locator('[data-field="principalResidence.value"] input').fill('500000')
   const guidedSale = page.locator('[data-field="principalResidence.sellAtAge"] input')
+  // FE-40: keeping the home is an explicit answer; a sale age follows "sell".
+  await page.getByRole('radio', { name: 'Sell it at a certain age' }).check()
   await guidedSale.fill('35')
   await page.goto('/#/guided/housing/home.mortgage')
   await page.getByRole('radio', { name: 'Yes' }).check()

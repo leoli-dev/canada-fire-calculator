@@ -20,6 +20,7 @@ import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
 import { BudgetMethodPanel } from '../BudgetMethodPanel'
 import { useCanonicalPlan } from '../../forms/canonicalEdit'
+import { worksheetTotal } from '../../guided/spending'
 import { AccountOwnershipChecklist, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
 import { EarnedIncomeQuestion, RegisteredTypeQuestion, RrifDetailsQuestion } from './AccountFacts'
 import { FhsaRoomQuestion, PensionSplitQuestion, RrspRoomQuestion, SavingsRoomHint, SpousalHistoryQuestion, TaxDetailsIntro, TfsaRoomQuestion } from './TaxDetails'
@@ -65,7 +66,7 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
         markAnswers([props.field], 'confirmed')
       }} className="question-number" />
     <div className="answer-actions">
-      <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : (meta?.status ?? 'example')}`)}</small>
+      <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</small>
       <button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
     </div>
     {issue && <em className="field-issue error">{t(issue.key, issue.params)}</em>}
@@ -79,6 +80,42 @@ function ChoiceGroup(props: { id: string; value?: string; label?: string; option
       <input type="radio" name={props.id} value={option.value} checked={props.value === option.value} onChange={() => props.onChange(option.value)} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
     </label>)}
+  </div>
+}
+
+/**
+ * FE-40: keeping a property is an answer. "Keep it" records no sale (and
+ * makes sale costs not applicable); "sell" asks the age, starting from an
+ * example that is not an answer until the user enters it.
+ */
+function SalePlan(props: { field: string; sellAtAge: number | null; defaultAge: number; expensesField?: string; onChange: (sellAtAge: number | null) => void }) {
+  const { t } = useTranslation()
+  const meta = useStore((s) => s.answerMeta[props.field])
+  const choiceId = `${props.field}.plan`
+  const choice = useStore((s) => s.questionAnswers[choiceId])
+  const setQuestionAnswer = useStore((s) => s.setQuestionAnswer)
+  const markAnswers = useStore((s) => s.markAnswers)
+  const answered = !!meta && meta.status !== 'unknown' && meta.origin !== 'example'
+  const value = props.sellAtAge !== null || choice === 'sell' ? 'sell' : answered || choice === 'keep' ? 'keep' : undefined
+  return <div className="sale-plan" data-field-plan={props.field}>
+    <p className="question-subhead">{t('questionnaire.salePlan')}</p>
+    <ChoiceGroup id={choiceId} label={t('questionnaire.salePlan')} value={value} options={[
+      { value: 'keep', label: t('questionnaire.saleKeep') },
+      { value: 'sell', label: t('questionnaire.saleSell') },
+    ]} onChange={(next) => {
+      setQuestionAnswer(choiceId, next)
+      if (next === 'keep') {
+        props.onChange(null)
+        markAnswers([props.field], 'confirmed')
+        if (props.expensesField) markAnswers([props.expensesField], 'notApplicable')
+      } else if (props.sellAtAge === null) {
+        props.onChange(props.defaultAge)
+        markAnswers([props.field], 'estimated', 'example')
+        if (props.expensesField) markAnswers([props.expensesField], 'estimated', 'example')
+      }
+    }} />
+    {value === 'sell' && <FactNumber field={props.field} label={t('questionnaire.saleAge')} value={props.sellAtAge ?? props.defaultAge}
+      onValue={(age) => props.onChange(age > 0 ? age : null)} />}
   </div>
 }
 
@@ -147,7 +184,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   const cad = useCad()
   const {
     inputs, set, answerMeta, markAnswers, questionAnswers, setQuestionAnswer,
-    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence,
+    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence, editSharedField,
   } = useStore()
   const canonicalPlan = useCanonicalPlan()
   const key = definition.contentKey
@@ -235,9 +272,17 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       }} />)}</>
       break
     }
-    case 'family.province':
-      control = <label className="question-select"><span>{t('province')}</span><select value={inputs.province} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>{PROVINCES.map((p) => <option key={p}>{p}</option>)}</select></label>
+    case 'family.province': {
+      // FE-40: the example province is not an answer, so the list starts on a
+      // prompt and choosing Ontario is a real change that records it.
+      const provinceMeta = answerMeta.province
+      const provinceConfirmed = !!provinceMeta && provinceMeta.status === 'confirmed' && provinceMeta.origin !== 'example'
+      control = <label className="question-select"><span>{t('province')}</span><select value={provinceConfirmed ? inputs.province : ''} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>
+        {!provinceConfirmed && <option value="" disabled>{t('questionnaire.chooseProvince')}</option>}
+        {PROVINCES.map((p) => <option key={p} value={p}>{t(`prov_${p}`)} ({p})</option>)}
+      </select></label>
       break
+    }
     case 'time.work':
       control = <>
         <FactNumber field="fireAge" label={t('fireAge')} value={inputs.fireAge} onValue={(fireAge) => set({ fireAge })} />
@@ -384,7 +429,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'home.value': {
       const home = inputs.principalResidence!
       if (home.mode === 'planned') break
-      control = <><div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /><FactNumber field="principalResidence.sellAtAge" label={t('propSellAt')} value={home.sellAtAge ?? 0} onValue={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge: sellAtAge || null } })} /></div>{home.mortgage && home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
+      control = <><div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /></div>
+        <SalePlan field="principalResidence.sellAtAge" sellAtAge={home.sellAtAge} defaultAge={Math.min(inputs.lifeExpectancy - 1, inputs.fireAge + 10)}
+          onChange={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge } })} />
+        {home.mortgage && home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'home.mortgage': {
@@ -431,7 +479,11 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'rental.0.income': {
       const property = inputs.investmentProperties![0]
-      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.saleExpenses" label={t('propSaleExpenses')} value={property.saleExpenses ?? 0} onValue={(saleExpenses) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, saleExpenses }; set({ investmentProperties: next }) }} /></div>{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
+      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /></div>
+        <SalePlan field="investmentProperties.0.sellAtAge" expensesField="investmentProperties.0.saleExpenses" sellAtAge={property.sellAtAge}
+          defaultAge={Math.min(inputs.lifeExpectancy - 1, inputs.fireAge + 10)}
+          onChange={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge }; set({ investmentProperties: next }) }} />
+        {property.sellAtAge !== null && <div className="question-pair"><FactNumber field="investmentProperties.0.saleExpenses" label={t('propSaleExpenses')} value={property.saleExpenses ?? 0} onValue={(saleExpenses) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, saleExpenses }; set({ investmentProperties: next }) }} /></div>}{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'rental.0.mortgage': {
@@ -467,9 +519,22 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'spending.method':
       control = <ChoiceGroup id={definition.id} value={answer} options={[{ value: 'known', label: t('questionnaire.choice.knowBudget') }, { value: 'estimate', label: t('questionnaire.choice.estimateBudget') }, { value: 'unknown', label: t('questionnaire.choice.unknown') }]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
       break
-    case 'spending.total':
-      control = <><FactNumber field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} onValue={(retirementSpending) => set({ retirementSpending })} /><p className="answer-feedback">{t('questionnaire.spendingFeedback', { monthly: cad(inputs.retirementSpending / 12), annual: cad(inputs.retirementSpending) })}</p></>
+    case 'spending.total': {
+      // FE-39: on the category path the total is the categories' sum, applied
+      // explicitly, and the page stays pending while the two disagree.
+      const estimating = questionAnswers['spending.method'] === 'estimate'
+      const categoryTotal = worksheetTotal(worksheet)
+      const applied = Math.abs(categoryTotal - inputs.retirementSpending) < 0.5
+      control = <>
+        {estimating && <div className="worksheet-summary" data-testid="guided-worksheet-summary">
+          <p>{t('questionnaire.worksheetTotal', { total: cad(categoryTotal) })}</p>
+          {categoryTotal > 0 && !applied && <button type="button" className="primary-action" data-testid="guided-worksheet-apply"
+            onClick={() => editSharedField('retirementSpending', String(categoryTotal))}>{t('questionnaire.useWorksheetTotal', { total: cad(categoryTotal) })}</button>}
+          {categoryTotal > 0 && applied && <p className="answer-feedback">{t('questionnaire.worksheetApplied')}</p>}
+        </div>}
+        <FactNumber field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} onValue={(retirementSpending) => set({ retirementSpending })} /><p className="answer-feedback">{t('questionnaire.spendingFeedback', { monthly: cad(inputs.retirementSpending / 12), annual: cad(inputs.retirementSpending) })}</p></>
       break
+    }
     case 'spending.homeFood':
       control = <div className="question-pair"><FactNumber field="worksheet.wsHousing" label={t('wsHousing')} value={worksheet.wsHousing} onValue={(value) => setWorksheet('wsHousing', value)} /><FactNumber field="worksheet.wsGroceries" label={t('wsGroceries')} value={worksheet.wsGroceries} onValue={(value) => setWorksheet('wsGroceries', value)} /></div>
       break
