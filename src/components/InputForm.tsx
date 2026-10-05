@@ -579,6 +579,11 @@ export function InputForm() {
                   issue={issueFor('principalResidence.downPayment')}
                   onChange={(v) => set({ principalResidence: { ...pr, downPayment: v } })} />
                 <p className="hint"><Jargon text={t('prFundingOrderHint')} /></p>
+                <label className="field checkbox-field">
+                  <input type="checkbox" data-testid="hbp-use" checked={pr.hbp !== false}
+                    onChange={(e) => set({ principalResidence: { ...pr, hbp: e.target.checked } })} />
+                  <span>{t('hbpUse')}</span>
+                </label>
                 <Num label={t('propAppreciation')} value={pr.appreciation * 100} step={0.5}
                   onChange={(v) => set({ principalResidence: { ...pr, appreciation: v / 100 } })} />
                 <Num field="principalResidence.annualMortgagePayment" label={t('debtPaymentLabel')} value={pr.annualMortgagePayment ?? 0} step={1000}

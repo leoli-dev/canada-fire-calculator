@@ -768,3 +768,7 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 .next-steps { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: #fff; }
 .next-steps p { margin: 0 0 6px; }
 .next-steps .text-action { display: block; margin: 4px 0; text-align: left; }
+/* BE-47: the Home Buyers' Plan opt-out sits under the down payment. */
+.check-inline { display: flex; align-items: flex-start; gap: 8px; max-width: 620px; margin: 10px 0; }
+.check-inline small { display: block; }
+.checkbox-field { display: flex; align-items: center; gap: 8px; }

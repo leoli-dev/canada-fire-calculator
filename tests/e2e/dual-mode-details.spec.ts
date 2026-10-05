@@ -63,3 +63,15 @@ test('BE-46: how side income is paid is one fact in both modes', async ({ page }
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.getByTestId('side-income-kind')).toHaveValue('selfEmployment')
 })
+
+test("BE-47: the Home Buyers' Plan is on for a planned first home and can be turned off in either mode", async ({ page }) => {
+  await page.goto('/#/guided/housing/home.situation')
+  await page.getByRole('radio', { name: 'Planned purchase' }).check()
+  await page.goto('/#/guided/housing/purchase.price')
+  const guided = page.getByTestId('guided-hbp-use')
+  await expect(guided).toBeChecked()
+  await guided.uncheck()
+  expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).inputs.principalResidence.hbp).toBe(false)
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await expect(page.getByTestId('hbp-use')).not.toBeChecked()
+})

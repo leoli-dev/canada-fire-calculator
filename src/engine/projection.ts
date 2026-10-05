@@ -9,6 +9,7 @@ import {
   type YearRow,
 } from './types'
 import { sideIncomeDeductions } from './payroll'
+import { HBP_LIMIT_PER_BUYER } from './funding'
 import { incomeTax, PLAN_TAX_YEAR, probateTax, rulesForCalendarYear, selectPlanTaxRules, taxRuleProvenance, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
@@ -394,6 +395,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
 
   const pr = inputs.principalResidence
   const plannedPurchase = pr && pr.mode === 'planned' ? pr : null
+  // BE-47: the Home Buyers' Plan. A first-home purchase may take up to 60,000
+  // per buyer from RRSPs tax-free (CRA, withdrawals after April 16, 2024), and
+  // repays 1/15 a year from the second year after the withdrawal; an unpaid
+  // instalment is included in income that year.
+  const hbpLimit = plannedPurchase && plannedPurchase.hbp !== false ? HBP_LIMIT_PER_BUYER * (inputs.partner ? 2 : 1) : 0
+  let hbpBalance = 0
+  let hbpInstalment = 0
+  let hbpFirstRepayIdx = Infinity
   // clamp for safety; validation flags a buy age before currentAge
   const buyYearIdx = plannedPurchase
     ? Math.max(0, plannedPurchase.buyAtAge - inputs.currentAge)
@@ -483,6 +492,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let taxBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let taxableBySource: TaxBySource = { rrsp: 0, nonReg: 0, cpp: 0, oas: 0, property: 0, extraIncome: 0, pension: 0 }
     let dpAccumTax = 0
+    let hbpUnpaidTax = 0
     let purchaseTaxable = 0
     let purchaseTaxPaid = 0
     let purchaseNonRegTaxable = 0
@@ -491,6 +501,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let housingFunding: YearRow['housingFunding'] = null
     const yearGaps: FundingGap[] = []
     const yearIdx = age - inputs.currentAge
+    const hbpDue = yearIdx >= hbpFirstRepayIdx && hbpBalance > 0 ? Math.min(hbpInstalment, hbpBalance) : 0
+    hbpBalance -= hbpDue
     const factor = nominalFactor(inflation, yearIdx)
     const nonRegBookReal = () => toReal(nonRegBook, factor)
     // A purchase or housing-funding disposal can realize an unverified loss in
@@ -536,6 +548,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           annualSavings: inputs.annualSavings,
           firstYearCost: (prMortgage?.payment[yearIdx] ?? 0) + plannedPurchase.netHoldingCostChange,
+          hbpLimit,
         })
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
@@ -558,6 +571,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
+          if (plan.allocation.hbpWithdrawal > 0) {
+            hbpBalance = plan.allocation.hbpWithdrawal
+            hbpInstalment = plan.allocation.hbpWithdrawal / 15
+            hbpFirstRepayIdx = yearIdx + 2
+          }
         }
       } else {
         const purchaseYearRent = ips.reduce((sum, p) => sum + (p.value > 0 ? p.rent : 0), 0)
@@ -565,7 +583,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
           marginalRate: inputs.accumulationMarginalRate ?? 0.35,
           taxOnWithdrawal: purchaseTaxIncrement(inputs, age, purchaseYearRent, canonical, rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
-          annualSavings: 0, firstYearCost: 0,
+          annualSavings: 0, firstYearCost: 0, hbpLimit,
         })
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
@@ -588,6 +606,11 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
+          if (plan.allocation.hbpWithdrawal > 0) {
+            hbpBalance = plan.allocation.hbpWithdrawal
+            hbpInstalment = plan.allocation.hbpWithdrawal / 15
+            hbpFirstRepayIdx = yearIdx + 2
+          }
         }
       }
     }
@@ -819,7 +842,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           debtBalance += unpaidMortgage
         }
       }
-      const budget = Math.max(0, savingsAfterSaleTax - housingCost)
+      const savingsBudget = Math.max(0, savingsAfterSaleTax - housingCost)
+      // BE-47: an HBP instalment is repaid into the RRSP from this year's
+      // savings first; what savings cannot cover is taxed as income.
+      const hbpRepaid = Math.min(hbpDue, savingsBudget)
+      bal.rrsp += hbpRepaid
+      hbpUnpaidTax = (hbpDue - hbpRepaid) * (inputs.accumulationMarginalRate ?? 0.35)
+      bal.nonReg -= hbpUnpaidTax
+      const budget = savingsBudget - hbpRepaid
       const allocation = allocateContributions({
         age, budget,
         fhsa: fhsaActive && inputs.fhsa ? inputs.fhsa.annualContribution : 0,
@@ -865,7 +895,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       bal.nonReg += benefitBase - benefitTax
       nonRegBook += toNominal(benefitBase - benefitTax, factor)
       oas = oasGross
-      tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax
+      tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax + hbpUnpaidTax
       const marginalPurchaseTax = inputs.accumulationMarginalRate ?? 0.35
       const rrspWithdrawalTax = purchaseRrspWithdrawal * marginalPurchaseTax
       const nonRegWithdrawalTax = purchaseNonRegTaxable * marginalPurchaseTax
@@ -891,7 +921,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         credits: { age: personAge, pensionIncome: pension / agesPerPerson.length },
       }))
     } else {
-      extraTaxable += dist + purchaseTaxable
+      // An HBP instalment due in retirement is included in income (BE-47).
+      extraTaxable += dist + purchaseTaxable + hbpDue
 
       // spousal age election: RRIF minimums may be computed from the younger
       // spouse's age — always optimal (lower forced withdrawals, more tax

@@ -210,6 +210,8 @@ export interface PlannedResidence {
   netHoldingCostChange: number
   /** tax-free sale at the opening of this age, after purchase; null = never sell */
   sellAtAge: number | null
+  /** BE-47: use the Home Buyers' Plan for any RRSP part of the down payment (default true). */
+  hbp?: boolean
 }
 
 export type PrincipalResidence = OwnedResidence | PlannedResidence

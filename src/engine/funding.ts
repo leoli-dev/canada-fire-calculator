@@ -4,6 +4,9 @@ import { ageReachedInYear } from './model'
 import { plannedFhsaYearTotal } from './fhsaPlan'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 
+/** BE-47: Home Buyers' Plan withdrawal limit per buyer (CRA, withdrawals after April 16, 2024). */
+export const HBP_LIMIT_PER_BUYER = 60_000
+
 export interface FundingGap {
   eventId: string
   field: string
@@ -20,6 +23,8 @@ export interface PurchaseFunds {
   taxOnWithdrawal?: (taxable: number, rrspGross: number) => number
   annualSavings: number
   firstYearCost: number
+  /** BE-47: RRSP dollars the Home Buyers' Plan lets this purchase withdraw tax-free. */
+  hbpLimit?: number
 }
 
 export interface PurchaseAllocation {
@@ -36,6 +41,8 @@ export interface PurchaseAllocation {
   downPaymentFromAccounts: number
   /** A non-registered disposal realized a loss whose tax treatment is unmodeled. */
   nonRegLossRealized: boolean
+  /** BE-47: RRSP withdrawn tax-free under the Home Buyers' Plan, to be repaid over 15 years. */
+  hbpWithdrawal: number
 }
 
 /** Validate the consideration identity before any home or loan is booked. */
@@ -72,6 +79,8 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   let rrspWithdrawal = 0
   let nonRegLossRealized = false
   const grossWithdrawals: Record<AccountType, number> = { tfsa: 0, nonReg: 0, rrsp: 0 }
+  let hbpRemaining = Math.max(0, funds.hbpLimit ?? 0)
+  let hbpWithdrawal = 0
   const tax = funds.taxOnWithdrawal ?? ((taxable: number) => taxable * funds.marginalRate)
   const takeTaxable = (capacity: number, taxablePerGross: number, need: number, isRrsp: boolean) => {
     const net = (gross: number) => gross - (tax(
@@ -89,7 +98,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     }
     return hi
   }
-  const drawNet = (need: number) => {
+  const drawNet = (need: number, allowHbp = false) => {
     let remaining = Math.max(0, need)
     const tfsa = Math.min(remaining, Math.max(0, balances.tfsa))
     balances.tfsa -= tfsa
@@ -113,7 +122,17 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     remaining -= nonReg - nonRegTax
     taxableWithdrawal += nonRegGain
     nonRegTaxable += nonRegGain
-    const rrsp = takeTaxable(balances.rrsp, 1, Math.max(0, remaining), true)
+    // BE-47: the down payment may take RRSP money tax-free under the Home
+    // Buyers' Plan first; only the rest is a taxable withdrawal.
+    if (allowHbp && remaining > 0 && hbpRemaining > 0) {
+      const hbp = Math.min(remaining, hbpRemaining, Math.max(0, balances.rrsp))
+      balances.rrsp -= hbp
+      grossWithdrawals.rrsp += hbp
+      hbpRemaining -= hbp
+      hbpWithdrawal += hbp
+      remaining -= hbp
+    }
+    const rrsp = remaining > 1e-9 ? takeTaxable(balances.rrsp, 1, remaining, true) : 0
     const rrspTax = tax(taxableWithdrawal + rrsp, rrspWithdrawal + rrsp) - tax(taxableWithdrawal, rrspWithdrawal)
     balances.rrsp -= rrsp
     grossWithdrawals.rrsp += rrsp
@@ -124,7 +143,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   }
   const downPaymentFromFhsa = Math.min(home.downPayment, funds.fhsaBalance)
   const downPaymentFromAccounts = home.downPayment - downPaymentFromFhsa
-  const remaining = drawNet(downPaymentFromAccounts)
+  const remaining = drawNet(downPaymentFromAccounts, true)
   if (remaining > 0.01) return {
     mortgagePrincipal: principal, allocation: null,
     gap: { eventId: `purchase:${age}`, field: 'principalResidence.downPayment',
@@ -143,7 +162,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
       balances, grossWithdrawals, nonRegBook: book, taxableWithdrawal, nonRegTaxable, rrspWithdrawal,
       withdrawalTax: tax(taxableWithdrawal, rrspWithdrawal),
       firstYearCostFromSavings, firstYearCostFromOpening: firstYearCostFromOpening - unpaidCost,
-      downPaymentFromFhsa, downPaymentFromAccounts, nonRegLossRealized,
+      downPaymentFromFhsa, downPaymentFromAccounts, nonRegLossRealized, hbpWithdrawal,
     },
   }
 }
