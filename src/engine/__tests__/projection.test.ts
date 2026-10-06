@@ -1,3 +1,4 @@
+import { sideIncomeDeductions } from '../payroll'
 import { describe, expect, it } from 'vitest'
 import { runProjection } from '../projection'
 import { incomeTax } from '../tax'
@@ -259,7 +260,7 @@ describe('runProjection', () => {
     const at64 = tfsaLiving.rows.find((r) => r.age === 64)!
     const at70 = tfsaLiving.rows.find((r) => r.age === 70)!
     expect(at64.gis).toBe(0) // GIS requires OAS
-    expect(at70.gis).toBeCloseTo(13478, -1) // zero taxable income -> full single GIS
+    expect(at70.gis).toBeCloseTo(1138.90 * 12, -1) // zero taxable income -> full single GIS (October-December 2026)
 
     const rrspLiving = runProjection({
       ...base,
@@ -478,7 +479,15 @@ describe('runProjection', () => {
     }
     const r = runProjection(couple)
     const row = r.rows.find((x) => x.age === base.fireAge)!
-    const expectedTax = incomeTax(60000, base.province, { age: base.fireAge })
+    // BE-46: employment side income carries its payroll: 60,000 has 56,500 of
+    // pensionable earnings, so 1% (565) is deducted and 4.95% (2,796.75) plus
+    // EI (978) is credited, with the 1,501 Canada employment amount.
+    const payroll = sideIncomeDeductions(60000, 'employment', base.province)
+    expect(payroll.contributions).toBeCloseTo(3361.75 + 978, 6)
+    expect(payroll.taxDeduction).toBeCloseTo(565, 6)
+    expect(payroll.creditAmount).toBeCloseTo(2796.75 + 978, 6)
+    expect(payroll.employmentAmount).toBe(1501)
+    const expectedTax = incomeTax(60000 - 565, base.province, { age: base.fireAge, payrollCredit: 3774.75, employmentAmount: 1501 })
     expect(row.tax).toBeCloseTo(expectedTax, 0)
     // progressive brackets: taxing it all on one person costs more than an
     // (incorrect) even split would have
@@ -581,12 +590,12 @@ describe('runProjection', () => {
 
 describe('allowanceAnnual', () => {
   it('pays the 60-64 spouse of a GIS recipient, income-tested to zero at the cutoff', () => {
-    // 42,144 is the published July-September 2026 Allowance cut-off; the old
-    // 41,616 was a superseded figure and its family linkage was wrong (BE-26 A,
-    // see benefits.test.ts for the per-category vectors).
-    expect(allowanceAnnual([true, false], [67, 62], 0)).toBeCloseTo(17136.72, 2)
-    expect(allowanceAnnual([true, false], [67, 62], 42143)).toBeGreaterThan(0)
-    expect(allowanceAnnual([true, false], [67, 62], 42144)).toBe(0)
+    // 42,768 is the published October-December 2026 Allowance cut-off and
+    // 1,448.06 its monthly maximum (BE-45; per-category vectors in
+    // benefitsQ4.test.ts, the July-September ones in benefits.test.ts).
+    expect(allowanceAnnual([true, false], [67, 62], 0)).toBeCloseTo(1448.06 * 12, 2)
+    expect(allowanceAnnual([true, false], [67, 62], 42767)).toBeGreaterThan(0)
+    expect(allowanceAnnual([true, false], [67, 62], 42768)).toBe(0)
     expect(allowanceAnnual([true, false], [67, 62], 100000)).toBe(0)
   })
 

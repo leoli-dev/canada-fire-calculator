@@ -46,8 +46,12 @@ test('shared tax ownership survives Guided/Professional switch and refresh witho
   expect(shares['legacy:person:partner']).toBeCloseTo(.2, 12)
   expect(saved.resultRevision).toBeNull()
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('person-tax-facts')).toBeVisible()
+  // FE-43 A: guided asks ownership on its own checklist page.
+  await page.goto('/#/guided/assets/assets.ownership')
+  await expect(page.getByTestId('guided-ownership-row-legacy:account:nonReg')).toBeVisible()
+  await expect(page.getByTestId('owner-choice-legacy:account:tfsa-self')).toBeChecked()
+  await expect(page.getByTestId('owner-choice-legacy:account:rrsp-partner')).toBeChecked()
+  await expect(page.getByTestId('owner-choice-legacy:account:nonReg-split')).toBeChecked()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   await expect(page.getByTestId('account-self-share-legacy:account:nonReg')).toHaveValue('80')
   await page.reload()
@@ -66,10 +70,12 @@ test('explicit DB pension election changes the normal person tax ledger in both 
   await expect(table.locator('tbody tr').first()).toContainText('20,000')
   await expect(table.locator('tbody tr').nth(1)).toContainText('20,000')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('split-amount')).toHaveValue('20000')
+  // FE-43 C: the election is on the optional pension-split page.
+  await page.goto('/#/guided/taxDetails/tax.pensionSplit')
+  await expect(page.getByTestId('guided-pension-split-choice-yes')).toBeChecked()
+  await expect(page.getByTestId('split-amount')).toHaveValue('20,000')
   await page.reload()
-  await expect(page.getByTestId('split-amount')).toHaveValue('20000')
+  await expect(page.getByTestId('split-amount')).toHaveValue('20,000')
 })
 
 test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private facts work in both modes', async ({ page }) => {
@@ -94,8 +100,8 @@ test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private
   await expect(page.getByTestId('person-tax-table')).toContainText('FSS缴费')
   await page.getByRole('button', { name: 'EN', exact: true }).click()
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('private')
+  await page.goto('/#/guided/family/family.qcDrug')
+  await expect(page.getByTestId('qc-coverage-all-self-private')).toBeChecked()
   // A mid-year change first reveals the month detail, then edits one month.
   await page.getByTestId('qc-coverage-changed-self').check()
   await page.getByTestId('qc-coverage-self-7').selectOption('public')
@@ -121,8 +127,10 @@ test('QC spouse coverage is independent and the Quebec election is separate from
   await page.getByTestId('split-amount').blur()
   await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('qc-coverage-all-partner')).toHaveValue('waived')
+  await page.goto('/#/guided/family/family.qcDrug')
+  await expect(page.getByTestId('qc-coverage-all-partner-waived')).toBeChecked()
+  await page.goto('/#/guided/taxDetails/tax.pensionSplit')
+  await expect(page.getByTestId('split-transferor')).toHaveValue('legacy:person:self')
   await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
 })
 
@@ -169,7 +177,9 @@ test('current and Scenario A each retain their own person-tax capability', async
   await page.reload()
   const comparison = page.getByTestId('scenario-comparison')
   await comparison.locator('summary').click()
-  await expect(comparison).toContainText('After-tax estate comparison is unavailable')
+  // BE-43: a single Quebec plan now has an estimated closing tax, so the
+  // comparison is refused for missing person-level tax rather than estate tax.
+  await expect(comparison).toContainText('requires verified person-level tax for both plans')
   await expect(comparison.getByText('Comparison unavailable')).toHaveCount(2)
   await page.evaluate(async () => {
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
@@ -183,7 +193,7 @@ test('current and Scenario A each retain their own person-tax capability', async
     localStorage.setItem('fire-inputs', JSON.stringify(saved))
   })
   await page.reload()
-  await expect(page.getByTestId('scenario-comparison')).toContainText('After-tax estate comparison is unavailable')
+  await expect(page.getByTestId('scenario-comparison')).toContainText('requires verified person-level tax for both plans')
 })
 
 test('couple terminal tax cannot masquerade as final net worth in Scenario A comparison', async ({ page }) => {
@@ -277,11 +287,14 @@ test('RRIF age-71 category is explicit and shared across Professional and Guided
   await category.selectOption('qualifying')
   await expect(page.getByTestId('person-tax-table')).toBeVisible()
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
+  // FE-43 B: guided asks the RRIF facts on their own page, as choice cards.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(category).toHaveValue('qualifying')
+  await page.goto('/#/guided/assets/account.rrif.details')
+  const guidedCategory = page.getByTestId('guided-rrif-category-legacy:account:rrsp-qualifying')
+  await expect(guidedCategory).toBeChecked()
+  await expect(page.getByTestId('guided-rrif-opened-legacy:account:rrsp')).toHaveValue('1990')
   await page.reload()
-  await expect(category).toHaveValue('qualifying')
+  await expect(guidedCategory).toBeChecked()
 })
 
 test('each spouse records their own registered balance; the household total is conserved and results stay honest', async ({ page }) => {
@@ -348,15 +361,16 @@ test('each spouse records their own registered balance; the household total is c
   await page.getByTestId('owner-legacy:account:tfsa').selectOption('legacy:person:partner')
   await page.reload()
   await expect(page.getByTestId('person-tax-limit')).toBeVisible()
-  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200000')
-  await expect(page.getByTestId('account-self-amount-legacy:account:nonReg')).toHaveValue('150000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:nonReg')).toHaveValue('50000')
-  // guided mode shows the same recorded facts
+  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200,000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:nonReg')).toHaveValue('150,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:nonReg')).toHaveValue('50,000')
+  // guided mode shows the same recorded facts on its ownership checklist
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200000')
+  await page.goto('/#/guided/assets/assets.ownership')
+  await expect(page.getByTestId('owner-choice-legacy:account:rrsp-split')).toBeChecked()
+  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200,000')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
 
@@ -416,14 +430,14 @@ test('a recorded locked split survives partner removal and re-add instead of bei
   expect(lockedAccounts[0]).toMatchObject({ id: 'legacy:account:locked', balance: 400000, ownerId: null })
   expect(lockedAccounts[0].taxableOwnerShares.status).toBe('unknown')
   expect(saved.canonical.migration.ownershipNeedsConfirmation).toBe(true)
-  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:locked')).toHaveValue('150000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:locked')).toHaveValue('150,000')
   await expect(page.getByTestId('owner-legacy:account:locked')).toHaveValue('')
   await expect(page.getByTestId('ownership-mismatch-legacy:account:locked')).toHaveCount(0)
   // Reload is clean and the scenario save works.
   await page.reload()
   await expect(page.getByText('could not be read safely')).toHaveCount(0)
-  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250,000')
   const comparison = page.getByTestId('scenario-comparison')
   await comparison.locator('summary').click()
   await page.getByRole('button', { name: 'Save current as A' }).click()
@@ -469,14 +483,17 @@ test('the registered-type control is present in every ownership state in both en
     .filter((account: { id: string }) => ['legacy:account:rrsp', 'legacy:account:rrsp:partner'].includes(account.id))
     .map((account: { kind: string }) => account.kind))
   expect(kinds.sort()).toEqual(['spousalRrsp', 'spousalRrsp'])
-  // Guided mode shows the same controls in every state.
+  // Guided mode shows the same types in every state, on the account-type page.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toBeVisible()
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toHaveValue('spousalRrsp')
-  await page.getByTestId('owner-legacy:account:rrsp').selectOption('legacy:person:partner')
-  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toBeVisible()
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toBeChecked()
+  await expect(page.getByTestId('registered-type-legacy:account:locked-lif')).toBeChecked()
+  await page.goto('/#/guided/assets/assets.ownership')
+  await page.getByTestId('owner-choice-legacy:account:rrsp-partner').check()
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toBeChecked()
   await expect(page.getByTestId('registered-type-legacy:account:locked')).toBeVisible()
+  expect(await page.locator('[data-testid="guided-registered-type"] .ownership-row').count()).toBe(2)
 })
 
 test('an investment property split records both amounts, conserves the value and survives reload', async ({ page }) => {
@@ -502,12 +519,13 @@ test('an investment property split records both amounts, conserves the value and
   await expect(page.getByTestId('ownership-mismatch-legacy:property:investment:0')).toHaveCount(0)
   // The recorded amounts survive a reload and appear in guided mode too.
   await page.reload()
-  await expect(page.getByTestId('property-self-amount-legacy:property:investment:0')).toHaveValue('250000')
-  await expect(page.getByTestId('property-partner-amount-legacy:property:investment:0')).toHaveValue('150000')
+  await expect(page.getByTestId('property-self-amount-legacy:property:investment:0')).toHaveValue('250,000')
+  await expect(page.getByTestId('property-partner-amount-legacy:property:investment:0')).toHaveValue('150,000')
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('property-self-amount-legacy:property:investment:0')).toHaveValue('250000')
-  await expect(page.getByTestId('property-partner-amount-legacy:property:investment:0')).toHaveValue('150000')
+  // FE-43 A: guided records a jointly held property as one share.
+  await page.goto('/#/guided/housing/housing.ownership')
+  await expect(page.getByTestId('owner-choice-legacy:property:investment:0-split')).toBeChecked()
+  await expect(page.getByTestId('property-self-share-legacy:property:investment:0')).toHaveValue('62.5')
 })
 
 test('every ownership row keeps its recorded facts through partner removal and re-add', async ({ page }) => {
@@ -560,12 +578,12 @@ test('every ownership row keeps its recorded facts through partner removal and r
   // Reload is clean and the amounts the UI shows match the recorded facts.
   await page.reload()
   await expect(page.getByText('could not be read safely')).toHaveCount(0)
-  await expect(page.getByTestId('account-self-amount-legacy:account:tfsa')).toHaveValue('60000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:tfsa')).toHaveValue('40000')
-  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200000')
-  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250000')
-  await expect(page.getByTestId('account-partner-amount-legacy:account:locked')).toHaveValue('150000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:tfsa')).toHaveValue('60,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:tfsa')).toHaveValue('40,000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:rrsp')).toHaveValue('200,000')
+  await expect(page.getByTestId('account-self-amount-legacy:account:locked')).toHaveValue('250,000')
+  await expect(page.getByTestId('account-partner-amount-legacy:account:locked')).toHaveValue('150,000')
   await expect(page.getByTestId('owner-legacy:account:tfsa')).toHaveValue('')
   await expect(page.getByTestId('owner-legacy:account:rrsp')).toHaveValue('')
   await expect(page.getByTestId('account-self-amount-legacy:account:nonReg')).toHaveValue('')

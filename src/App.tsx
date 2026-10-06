@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
-import { downloadStoredPlan, getStorageReadOnlyReason, useStore } from './store'
+import { downloadStoredPlan, getStorageReadOnlyReason, isStorageUnavailable, useStore } from './store'
+import { AnalyticsFooter, AnalyticsPrompt } from './components/AnalyticsConsent'
 import { precisionGate } from './engine/model'
 import { InputForm } from './components/InputForm'
 import { GuidedFlow } from './components/GuidedFlow'
@@ -14,6 +15,7 @@ import { IncomeChart } from './components/IncomeChart'
 import { TaxChart } from './components/TaxChart'
 import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
+import { ResultPeek } from './components/ResultPeek'
 import { MonteCarloCard } from './components/MonteCarloCard'
 import { MC_RULE_VERSION } from './mcProtocol'
 import { StrategyCard } from './components/StrategyCard'
@@ -54,8 +56,10 @@ export default function App() {
   const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
   const precisionBlocked = migrationBlocked
   // Keep the existing single-person planning preview usable while BE-14 B
-  // wires working-year tax. Couples and QC never get a disguised pooled tax.
-  const singleLegacyPreview = !inputs.partner && (!canonical || canonical.people.length === 1) && inputs.province !== 'QC'
+  // wires working-year tax. Couples never get a disguised pooled tax. BE-43:
+  // one Quebec owner gets the same tools as estimates, disclosed as resting on
+  // simplified Quebec rules, instead of nothing.
+  const singleLegacyPreview = !inputs.partner && (!canonical || canonical.people.length === 1)
   const taxBlocked = result?.taxCapability?.status !== 'person' && !singleLegacyPreview
   const taxWarning = result?.taxCapability?.status !== 'person'
   const oldSingleTools = singleLegacyPreview
@@ -80,11 +84,10 @@ export default function App() {
         <div>
           <h1>{t('title')}</h1>
           <p className="tagline">{t('tagline')}</p>
+          {/* FE-46: one disclaimer line, with the simplifications behind a link,
+              instead of two sentences saying the same thing. */}
           <p className="header-disclaimer">
-            <strong>{t('disclaimer')}</strong>
-          </p>
-          <p className="simplifications-note">
-            {t('simplificationsNote')}{' '}
+            <strong>{t('disclaimer')}</strong>{' '}
             <button type="button" className="term" onClick={() => openGlossary('simplifications')}>
               {t('simplificationsLink')}
             </button>
@@ -103,6 +106,8 @@ export default function App() {
         </nav>
       </header>
 
+      <AnalyticsPrompt />
+      {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
         <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
@@ -119,15 +124,18 @@ export default function App() {
               {t('professionalMode')}
             </button>
           </div>
+          {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
+            estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
-        {result && !hasBlockingIssues && <section className="results-column">
+        {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
-          {precisionBlocked ? <ScenarioCard /> : <>
-          {taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
-          {!taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
+          {/* FE-37: gates withhold precise tax tools, never the charts. */}
+          {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
+          {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}
+          {!precisionBlocked && !taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}
@@ -146,6 +154,7 @@ export default function App() {
           <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
           {/* BE-26 A: the GIS/Allowance household row is stated, not implied. */}
           <BenefitCategoryPanel inputs={inputs} result={result} />
+          {!precisionBlocked && <>
           {!taxBlocked && canonical && <PersonTaxTable plan={canonical} result={result} />}
           {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
           {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}
@@ -155,8 +164,8 @@ export default function App() {
           {!taxBlocked && oldSingleTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
             inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
           }
-          <ScenarioCard />
           </>}
+          <ScenarioCard />
         </section>}
       </main>
 
@@ -167,7 +176,7 @@ export default function App() {
             Leo Li
           </a>
         </p>
-        <p className="privacy-note">{t('privacyNote')}</p>
+        <AnalyticsFooter />
       </footer>
       <GlossaryDrawer />
     </div>

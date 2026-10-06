@@ -1,12 +1,14 @@
 import type { EntityId, InputsV2, QcDrugCoverage } from './model'
 import type { PersonIncome } from './personIncome'
-import { federalIncomeTax, ordinaryQuebecIncomeTax, PLAN_TAX_YEAR, trySelectPlanTaxRules, type TaxRuleContext } from './tax'
+import { federalIncomeTax, ordinaryQuebecIncomeTax, PLAN_TAX_YEAR, trySelectPlanTaxRules, unusedQuebecBasicCredit, type TaxRuleContext } from './tax'
 import { PROV_AGE_PENSION, QC_FSS } from './taxData'
 
 export interface QuebecTaxRow {
   federalTax: number
   provincialIncomeTax: number
   scheduleBCredit: number
+  /** BE-44: unused basic credit received from the spouse (TP-1 line 431). */
+  spouseCreditTransfer: number
   fss: number
   ramq: number
   qcTaxableIncome: number
@@ -150,11 +152,15 @@ function provincialPeople(plan: InputsV2, original: Record<string, PersonIncome>
  * rate, which the caller passes in rather than this module holding a literal.
  * Source form mechanics: https://www.revenuquebec.ca/documents/en/formulaires/tp/2025-12/TP-1.D.B-V%282025-12%29.pdf
  * 2026 amounts/threshold: Québec Finance 2026 Table 3. */
-export function scheduleB2026(people: Record<string, PersonIncome>, lowestProvincialRate: number): { availableAmount: number; credit: number; familyIncome: number } {
+export function scheduleB2026(people: Record<string, PersonIncome>, lowestProvincialRate: number,
+  options: { livesAlone?: boolean } = {}): { availableAmount: number; credit: number; familyIncome: number } {
   const rows = Object.values(people)
   const p = PROV_AGE_PENSION.QC
   const familyIncome = rows.reduce((sum, row) => sum + row.netIncome, 0)
-  const beforeReduction = rows.reduce((sum, row) => sum + (row.age >= 65 ? p.ageMax : 0) +
+  // BE-44: the living-alone amount (one-person household only) joins the age
+  // and retirement amounts before the single family-income reduction.
+  const livingAlone = options.livesAlone && rows.length === 1 ? p.livingAlone ?? 0 : 0
+  const beforeReduction = livingAlone + rows.reduce((sum, row) => sum + (row.age >= 65 ? p.ageMax : 0) +
     Math.min(p.pension, row.provincialPensionEligible * 1.25), 0)
   const availableAmount = Math.max(0, beforeReduction - p.ageRate * Math.max(0, familyIncome - p.ageThreshold))
   return { availableAmount, credit: availableAmount * lowestProvincialRate, familyIncome }
@@ -180,13 +186,23 @@ export function calculateQuebecTax(plan: InputsV2, original: Record<string, Pers
     ? ids.reduce((a, b) => federalPeople[a].netIncome >= federalPeople[b].netIncome ? a : b) : null
   // Credit belongs to the household once; assign it to the highest-tax
   // claimant, then pass any unusable remainder to the spouse (Schedule B 33).
-  const b = scheduleB2026(people, rules.pack.provincial.brackets[0].rate)
+  const livesAlone = plan.taxProfile?.livesAlone
+  const b = scheduleB2026(people, rules.pack.provincial.brackets[0].rate,
+    { livesAlone: ids.length === 1 && livesAlone?.status === 'known' && livesAlone.value })
   const ordinary = Object.fromEntries(ids.map(id => [id, ordinaryQuebecIncomeTax(people[id].taxableIncome, rules)]))
   const claims: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]))
   let remaining = b.credit
   for (const id of [...ids].sort((a, z) => ordinary[z] - ordinary[a])) {
     claims[id] = Math.min(ordinary[id], remaining)
     remaining -= claims[id]
+  }
+  // BE-44: TP-1 line 431. A spouse whose income is too low to use their own
+  // basic personal credit transfers the unused part to the other spouse.
+  const transferred: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]))
+  if (ids.length === 2) for (const from of ids) {
+    const to = ids.find(other => other !== from)!
+    const unused = unusedQuebecBasicCredit(people[from].taxableIncome, rules)
+    transferred[to] = Math.min(unused, Math.max(0, ordinary[to] - claims[to]))
   }
   const byPerson: Record<string, QuebecTaxRow> = {}
   for (const id of ids) {
@@ -199,7 +215,8 @@ export function calculateQuebecTax(plan: InputsV2, original: Record<string, Pers
     byPerson[id] = { federalTax: federalIncomeTax(federal.taxableIncome, rules, {
       age: federal.age, pensionIncome: federal.federalPensionEligible,
       spouseNetIncome: claimant === id ? federalPeople[ids.find(other => other !== id)!].netIncome : undefined,
-    }, true), provincialIncomeTax: ordinary[id] - claims[id], scheduleBCredit: claims[id],
+      payrollCredit: federal.payrollCredit, employmentAmount: federal.employmentAmount,
+    }, true), provincialIncomeTax: ordinary[id] - claims[id] - transferred[id], scheduleBCredit: claims[id], spouseCreditTransfer: transferred[id],
     fss: fss.contribution, ramq: ramq.premium, qcTaxableIncome: source.taxableIncome,
     qcRetirementEligible: source.provincialPensionEligible, qcFssBase: fss.base }
   }

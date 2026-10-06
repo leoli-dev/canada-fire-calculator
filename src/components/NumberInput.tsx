@@ -26,14 +26,15 @@ function sanitize(text: string, lang: string): string {
   return (neg ? '-' : '') + s
 }
 
-/** "-1234.5" -> "-1,234.5" / "-1 234,5" depending on locale. No rounding. */
-function formatRaw(raw: string, lang: string): string {
+/** "-1234.5" -> "-1,234.5" / "-1 234,5" depending on locale. No rounding.
+ * `grouping: false` keeps a calendar year as "2024". */
+function formatRaw(raw: string, lang: string, grouping = true): string {
   if (raw === '' || raw === '-') return raw
   if (/[a-z]/i.test(raw)) return raw
   const { group, decimal } = seps(lang)
   const neg = raw.startsWith('-')
   const [int, frac] = (neg ? raw.slice(1) : raw).split('.')
-  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, group)
+  const grouped = grouping ? int.replace(/\B(?=(\d{3})+(?!\d))/g, group) : int
   return (neg ? '-' : '') + grouped + (frac !== undefined ? decimal + frac : '')
 }
 
@@ -59,6 +60,12 @@ export function NumberInput(props: {
   className?: string
   placeholder?: string
   id?: string
+  testId?: string
+  /** False for a calendar year: no thousands separator. */
+  grouping?: boolean
+  /** Ids of the status or error text that describes this input. */
+  describedBy?: string
+  invalid?: boolean
 }) {
   const { i18n } = useTranslation()
   const lang = i18n.language
@@ -68,13 +75,14 @@ export function NumberInput(props: {
   const [text, setText] = useState('')
   const caretUnits = useRef<number | null>(null)
 
+  const grouping = props.grouping ?? true
   const display = focused
-    ? formatRaw(text, lang)
+    ? formatRaw(text, lang, grouping)
     : props.draft !== undefined
-      ? formatRaw(props.draft, lang)
+      ? formatRaw(props.draft, lang, grouping)
       : props.value === null
       ? ''
-      : formatRaw(toRaw(props.value), lang)
+      : formatRaw(toRaw(props.value), lang, grouping)
 
   // After formatting inserts/removes separators, restore the caret to sit
   // after the same count of significant characters it was at before.
@@ -107,6 +115,9 @@ export function NumberInput(props: {
     <input
       ref={ref}
       id={props.id}
+      data-testid={props.testId}
+      aria-describedby={props.describedBy}
+      aria-invalid={props.invalid || undefined}
       type="text"
       inputMode="decimal"
       autoComplete="off"
@@ -145,4 +156,37 @@ export function NumberInput(props: {
       }}
     />
   )
+}
+
+/**
+ * The same text input, but it records only when the field is left, the way a
+ * statement line or a split amount should: typing 15000 never records 1, 15,
+ * 150 and 1500 on the way. Leaving it empty records `null` (unknown, never 0);
+ * leaving it untouched records nothing.
+ */
+export function CommitNumberInput(props: {
+  value: number | null
+  onCommit: (v: number | null) => void
+  testId?: string
+  id?: string
+  className?: string
+  placeholder?: string
+  grouping?: boolean
+  step?: number
+  ariaLabel?: string
+}) {
+  // A ref, not state: the input's own blur handler reports an emptied field in
+  // the same event that bubbles up to the wrapper, before React re-renders.
+  const pending = useRef<{ value: number | null } | null>(null)
+  const [shown, setShown] = useState<number | null | undefined>(undefined)
+  return <span className="commit-number" onBlur={() => {
+    const next = pending.current
+    pending.current = null
+    setShown(undefined)
+    if (next && next.value !== props.value) props.onCommit(next.value)
+  }}>
+    <NumberInput id={props.id} testId={props.testId} className={props.className} placeholder={props.placeholder}
+      grouping={props.grouping} step={props.step} value={shown === undefined ? props.value : shown}
+      onChange={value => { pending.current = { value }; setShown(value) }} />
+  </span>
 }

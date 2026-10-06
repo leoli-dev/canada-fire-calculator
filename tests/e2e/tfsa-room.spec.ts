@@ -48,17 +48,23 @@ test('professional mode prices the stated room, clips the plan and retains the r
   await expect(page.getByTestId('tfsa-ledger-self')).toContainText('5,000')
   await expect(page.getByTestId('tfsa-savings-share-self')).toContainText('8,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
-  await expect(page.getByTestId('tfsa-retained-self')).toContainText('non-registered')
+  // FE-43 D: the panel no longer claims the excess moves to the non-registered
+  // account; the projection does not apply the room check yet, and it says so.
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('does not apply this room check yet')
+  await expect(page.getByTestId('tfsa-retained-self')).not.toContainText('non-registered')
   const person = (await storedPlan(page)).people.find((item: { role: string }) => item.role === 'self')
   expect(person.tfsaAvailableRoom).toEqual({ status: 'known', value: 5000 })
   // Reload keeps the recorded room and the priced row.
   await page.reload()
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // The same recorded fact prices identically in guided mode.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  // FE-43 C: guided asks TFSA room on its own optional page.
+  await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
+  await expect(page.getByTestId('guided-tfsa-feedback-self')).toContainText('3,000')
+  await page.getByTestId('guided-tfsa-more-self').click()
   await expect(page.getByTestId('tfsa-ledger-self')).toContainText('5,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   expect(await inViewport(page)).toBe(true)
@@ -66,10 +72,11 @@ test('professional mode prices the stated room, clips the plan and retains the r
 
 test('guided mode records the room and a withdrawal, and both survive a mode switch', async ({ page }) => {
   await seed(page, { guided: true })
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('tfsa-statement-self')).toBeVisible()
+  await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
   await page.getByTestId('tfsa-available-room-self').fill('5000')
   await page.getByTestId('tfsa-available-room-self').blur()
+  await page.getByTestId('guided-tfsa-more-self').click()
+  await expect(page.getByTestId('tfsa-statement-self')).toBeVisible()
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // A withdrawal made this year does not restore room this year: the row says
   // when it will, so the rule is visible rather than implied.
@@ -90,10 +97,11 @@ test('guided mode records the room and a withdrawal, and both survive a mode swi
   expect(saved.tfsaStatement[person.id].withdrawals).toHaveLength(1)
   expect(saved.tfsaStatement[person.id].withdrawals[0]).toMatchObject({ calendarYear: saved.baseYear, amount: 10000 })
   await page.reload()
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  // A recorded withdrawal opens the advanced detail by itself.
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   expect(await inViewport(page)).toBe(true)
 })

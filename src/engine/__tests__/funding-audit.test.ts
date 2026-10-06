@@ -148,7 +148,8 @@ describe('BE-30 independently derived funding identities', () => {
     const result = runProjection({
       ...base, fireAge: 51, lifeExpectancy: 50,
       balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
-      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+      // These identities price a taxable RRSP withdrawal, so the Home Buyers' Plan is off (BE-47).
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000, hbp: false },
     } as Inputs)
     const row = result.rows[0]
     expect(row.purchaseFunding?.grossWithdrawals.rrsp).toBeCloseTo(50_000 / 0.65, 2)
@@ -165,7 +166,8 @@ describe('BE-30 independently derived funding identities', () => {
     const result = runProjection({
       ...base, fireAge: 51, lifeExpectancy: 50,
       balances: { tfsa: 0, rrsp: 0, nonReg: 100_000 }, nonRegBook: 0,
-      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+      // These identities price a taxable RRSP withdrawal, so the Home Buyers' Plan is off (BE-47).
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000, hbp: false },
     } as Inputs)
     const row = result.rows[0]
     const gross = 50_000 / (1 - 0.5 * 0.35)
@@ -196,7 +198,8 @@ describe('BE-30 independently derived funding identities', () => {
     const result = runProjection({
       ...base,
       balances: { tfsa: 0, rrsp: 0, nonReg: 0 },
-      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000 },
+      // These identities price a taxable RRSP withdrawal, so the Home Buyers' Plan is off (BE-47).
+      principalResidence: { ...base.principalResidence!, price: 50_000, downPayment: 50_000, hbp: false },
       pension: { annualAmount: 100_000, startAge: 50, indexation: 1, bridgeAnnual: 0 },
     } as Inputs)
     expect(result.success).toBe(false)
@@ -211,7 +214,7 @@ describe('BE-30 independently derived funding identities', () => {
     const result = runProjection({
       ...base, currentAge: age, fireAge: age, lifeExpectancy: age,
       balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
-      principalResidence: { ...base.principalResidence!, buyAtAge: age, price: 50_000, downPayment: 50_000 },
+      principalResidence: { ...base.principalResidence!, buyAtAge: age, price: 50_000, downPayment: 50_000, hbp: false },
     } as Inputs)
     const row = result.rows[0]
     const funding = row.purchaseFunding!
@@ -343,7 +346,7 @@ describe('BE-30 independently derived funding identities', () => {
 
   it('grosses up an RRSP-funded retirement purchase for tax, and does not acquire when tax cash is missing', () => {
     const base = fixture('P02')
-    const home = { ...base.principalResidence!, price: 50_000, downPayment: 50_000 }
+    const home = { ...base.principalResidence!, price: 50_000, downPayment: 50_000, hbp: false }
     const insufficient = runProjection({
       ...base, balances: { tfsa: 0, rrsp: 50_000, nonReg: 0 }, principalResidence: home,
     } as Inputs)

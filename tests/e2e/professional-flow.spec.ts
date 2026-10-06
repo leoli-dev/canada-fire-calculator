@@ -16,7 +16,7 @@ test('professional mode completes a representative household plan and scenario r
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
   await expect(page.locator('.results-column')).toBeVisible()
-  await expect(page.locator('.results-column')).toContainText('shared projected endpoint')
+  await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
 
   await field(page, 'Current age').fill('36')
   await field(page, 'Target FIRE age').fill('46')
@@ -82,7 +82,7 @@ test('timing comparison preserves unsupported spending-solver status for a funde
   await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })
 
-test('French solver boundary keeps the checked age and explains unavailable nominal basis', async ({ page }) => {
+test('French solver boundary keeps the checked age and reports the FIRE-number search limit', async ({ page }) => {
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await field(page, 'Life expectancy').first().fill('61')
   await field(page, 'Desired after-tax annual spending in retirement').first().fill('20000000')
@@ -90,8 +90,10 @@ test('French solver boundary keeps the checked age and explains unavailable nomi
   await page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }).click()
   await expect(page.locator('.summary')).toContainText("jusqu'à 60 ans")
   await page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }).click()
-  await expect(page.locator('.summary')).toContainText("ne peut pas conserver l'historique vérifié")
-  await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
+  // BE-42: the working plan is now priced from its projected basis; at 20M a
+  // year the search runs out, and the French copy says no amount is shown.
+  await expect(page.locator('.summary')).toContainText('La limite de recherche a été atteinte')
+  await expect(page.locator('.summary')).toContainText("Aucun montant FIRE n'est affiché")
 })
 
 test('timing comparison keeps search-limit status in rows and combined result', async ({ page }) => {

@@ -41,7 +41,7 @@ export const DEFAULT_INPUTS: Inputs = {
   // BE-13 A: an unrecorded working-period spending is `null`, not a guess from
   // the retirement figure.
   budgetWorkingSpending: null,
-  savingsSplit: { tfsa: 0.3, rrsp: 0.5, nonReg: 0.2 },
+  savingsSplit: { tfsa: 0.15, rrsp: 0.45, nonReg: 0.4 },
   retirementSpending: 50000,
   returns: { tfsa: 0.043, rrsp: 0.043, nonReg: 0.043 },
   fees: 0.002,
@@ -226,8 +226,16 @@ function migratedBasisMeta(raw: unknown, prior?: Record<string, AnswerMeta>): Re
 }
 let storageReadOnlyReason: 'futureVersion' | 'corrupt' | 'migrationFailed' | null = null
 export const getStorageReadOnlyReason = () => storageReadOnlyReason
+// FE-48: with site data blocked, even reading localStorage throws. The plan
+// then works for the session and says it is not being saved, instead of the
+// page failing to start.
+let storageUnavailable = false
+export const isStorageUnavailable = () => storageUnavailable
+function readStorage(name: string): string | null {
+  try { return localStorage.getItem(name) } catch { storageUnavailable = true; return null }
+}
 export function downloadStoredPlan() {
-  const original = localStorage.getItem('fire-inputs') ?? localStorage.getItem('fire-inputs:pre-v11-backup')
+  const original = readStorage('fire-inputs') ?? readStorage('fire-inputs:pre-v11-backup')
   if (original === null) return
   const url = URL.createObjectURL(new Blob([original], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -238,7 +246,7 @@ export function downloadStoredPlan() {
 }
 const planStorage: PersistStorage<Store> = {
   getItem(name) {
-    const original = localStorage.getItem(name)
+    const original = readStorage(name)
     if (original === null) return null
     try {
       const parsed = JSON.parse(original) as StorageValue<Store>
@@ -279,11 +287,14 @@ const planStorage: PersistStorage<Store> = {
     }
   },
   setItem(name, value) {
-    if (storageReadOnlyReason) return
+    if (storageReadOnlyReason || storageUnavailable) return
     try { localStorage.setItem(name, JSON.stringify(value)) }
     catch { storageReadOnlyReason = 'migrationFailed' }
   },
-  removeItem(name) { if (!storageReadOnlyReason) localStorage.removeItem(name) },
+  removeItem(name) {
+    if (storageReadOnlyReason || storageUnavailable) return
+    try { localStorage.removeItem(name) } catch { storageUnavailable = true }
+  },
 }
 
 function reconcileLegacyInputs(state: Store, inputs: Inputs) {
@@ -529,11 +540,19 @@ export const useStore = create<Store>()(
         track('scenario_clear')
         set({ scenarioA: null, scenarioACanonical: null, scenarioAAnswerMeta: null })
       },
+      // FE-21: one reset for both entry modes, run only after the user confirms.
+      // It clears every financial input (Scenario A included) and the pre-v11
+      // backup, and moves the revision forward so no earlier result or worker
+      // reply can be shown for the blank plan. Language, entry mode and the
+      // display unit are preferences, not plan data, so they stay.
       reset: () => {
         track('reset_inputs')
-        set({
+        try { localStorage.removeItem(BACKUP_KEY) } catch { /* storage unavailable */ }
+        set((s) => ({
           inputs: DEFAULT_INPUTS,
           canonical: null,
+          scenarioA: null,
+          scenarioAAnswerMeta: null,
           scenarioACanonical: null,
           draftByField: {},
           worksheet: DEFAULT_WORKSHEET,
@@ -544,10 +563,10 @@ export const useStore = create<Store>()(
           guidedView: 'questionnaire',
           questionAnswers: {},
           planningIntent: structuredClone(DEFAULT_PLANNING_INTENT),
-          inputRevision: 0,
+          inputRevision: s.inputRevision + 1,
           resultRevision: null,
           answerMeta: {},
-        })
+        }))
       },
     }),
     {

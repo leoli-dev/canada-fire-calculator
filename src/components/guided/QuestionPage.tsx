@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
+import { marginalRate as engineMarginalRate, blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
   DEFAULT_FHSA,
   DEFAULT_INVESTMENT_PROPERTY,
@@ -19,7 +19,11 @@ import { PensionSourceNote } from '../PensionSourceNote'
 import { contentForPage, contentGuidance } from '../../content/fieldContent'
 import { FieldContentFacts } from '../FieldContentHelp'
 import { BudgetMethodPanel } from '../BudgetMethodPanel'
-import { TaxFactsPanel } from '../TaxFactsPanel'
+import { useCanonicalPlan } from '../../forms/canonicalEdit'
+import { worksheetTotal } from '../../guided/spending'
+import { AccountOwnershipChecklist, LivesAloneQuestion, PropertyOwnershipChecklist, QcDrugCoverageQuestion, SpouseSupportQuestion } from './HouseholdFacts'
+import { EarnedIncomeQuestion, RegisteredTypeQuestion, RrifDetailsQuestion } from './AccountFacts'
+import { FhsaRoomQuestion, PensionSplitQuestion, RrspRoomQuestion, SavingsRoomHint, SpousalHistoryQuestion, TaxDetailsIntro, TfsaRoomQuestion } from './TaxDetails'
 
 const PROVINCES: Province[] = ['ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'PE', 'NL', 'YT', 'NT', 'NU']
 
@@ -49,7 +53,9 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
     : undefined
   return <div className="question-answer" data-field={props.field}>
     <label htmlFor={`q-${props.field}`}>{props.label}</label>
-    <NumberInput id={`q-${props.field}`} value={props.value} draft={draft} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
+    <NumberInput id={`q-${props.field}`} value={props.value} draft={draft}
+      describedBy={[`q-${props.field}-status`, ...(issue || missingMortgage ? [`q-${props.field}-issue`] : [])].join(' ')}
+      invalid={!!issue || missingMortgage} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
       onDraftChange={isSharedField(props.field) ? (raw) => {
         if (parseField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit).status !== 'draft') return false
         editSharedField(props.field as import('../../forms/fieldRegistry').SharedFieldId, raw, props.unit)
@@ -62,11 +68,11 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
         markAnswers([props.field], 'confirmed')
       }} className="question-number" />
     <div className="answer-actions">
-      <small>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : (meta?.status ?? 'example')}`)}</small>
+      <small id={`q-${props.field}-status`}>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</small>
       <button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
     </div>
-    {issue && <em className="field-issue error">{t(issue.key, issue.params)}</em>}
-    {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
+    {issue && <em className="field-issue error" id={`q-${props.field}-issue`}>{t(issue.key, issue.params)}</em>}
+    {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error" id={issue ? undefined : `q-${props.field}-issue`}>{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
   </div>
 }
 
@@ -76,6 +82,50 @@ function ChoiceGroup(props: { id: string; value?: string; label?: string; option
       <input type="radio" name={props.id} value={option.value} checked={props.value === option.value} onChange={() => props.onChange(option.value)} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
     </label>)}
+  </div>
+}
+
+/** FE-46: where the locked account just created gets its balance. */
+function LockedAccountNote() {
+  const { t } = useTranslation()
+  const setActivePage = useStore((s) => s.setActivePage)
+  return <p className="answer-feedback" data-testid="guided-locked-created">{t('questionnaire.lockedCreated')}{' '}
+    <button type="button" className="text-action" onClick={() => { setActivePage('locked.balance'); window.location.hash = '#/guided/assets/locked.balance' }}>{t('questionnaire.lockedGoToBalance')}</button></p>
+}
+
+/**
+ * FE-40: keeping a property is an answer. "Keep it" records no sale (and
+ * makes sale costs not applicable); "sell" asks the age, starting from an
+ * example that is not an answer until the user enters it.
+ */
+function SalePlan(props: { field: string; sellAtAge: number | null; defaultAge: number; expensesField?: string; onChange: (sellAtAge: number | null) => void }) {
+  const { t } = useTranslation()
+  const meta = useStore((s) => s.answerMeta[props.field])
+  const choiceId = `${props.field}.plan`
+  const choice = useStore((s) => s.questionAnswers[choiceId])
+  const setQuestionAnswer = useStore((s) => s.setQuestionAnswer)
+  const markAnswers = useStore((s) => s.markAnswers)
+  const answered = !!meta && meta.status !== 'unknown' && meta.origin !== 'example'
+  const value = props.sellAtAge !== null || choice === 'sell' ? 'sell' : answered || choice === 'keep' ? 'keep' : undefined
+  return <div className="sale-plan" data-field-plan={props.field}>
+    <p className="question-subhead">{t('questionnaire.salePlan')}</p>
+    <ChoiceGroup id={choiceId} label={t('questionnaire.salePlan')} value={value} options={[
+      { value: 'keep', label: t('questionnaire.saleKeep') },
+      { value: 'sell', label: t('questionnaire.saleSell') },
+    ]} onChange={(next) => {
+      setQuestionAnswer(choiceId, next)
+      if (next === 'keep') {
+        props.onChange(null)
+        markAnswers([props.field], 'confirmed')
+        if (props.expensesField) markAnswers([props.expensesField], 'notApplicable')
+      } else if (props.sellAtAge === null) {
+        props.onChange(props.defaultAge)
+        markAnswers([props.field], 'estimated', 'example')
+        if (props.expensesField) markAnswers([props.expensesField], 'estimated', 'example')
+      }
+    }} />
+    {value === 'sell' && <FactNumber field={props.field} label={t('questionnaire.saleAge')} value={props.sellAtAge ?? props.defaultAge}
+      onValue={(age) => props.onChange(age > 0 ? age : null)} />}
   </div>
 }
 
@@ -144,8 +194,20 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   const cad = useCad()
   const {
     inputs, set, answerMeta, markAnswers, questionAnswers, setQuestionAnswer,
-    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence,
+    planningIntent, setPlanningIntent, worksheet, setWorksheet, applyMixPreset, setAccountPresence, editSharedField,
   } = useStore()
+  const canonicalPlan = useCanonicalPlan()
+  // FE-46: a DC pension or LIRA balance is a locked account. Choosing it
+  // creates that account (owned by whoever has the pension) instead of only
+  // telling the user to find the section themselves.
+  const addLockedAccount = (owner: 'self' | 'partner') => {
+    if (inputs.lockedRetirement) return
+    set({ lockedRetirement: { ...DEFAULT_LOCKED_RETIREMENT, owner } })
+    const selected = (questionAnswers['assets.identify'] as string[] | undefined) ?? []
+    setQuestionAnswer('assets.identify', [...new Set([...selected, 'locked'])])
+    markAnswers(['lockedRetirement'], 'estimated')
+    markAnswers(['lockedRetirement.owner'], 'confirmed', 'user')
+  }
   const key = definition.contentKey
   const answer = questionAnswers[definition.id] as string | undefined
   const markChoice = (field: string, value: string, status: 'confirmed' | 'notApplicable' = 'confirmed') => {
@@ -165,14 +227,47 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
 
   let control: React.ReactNode
   switch (definition.id) {
-    case 'income.taxFacts':
-      control = <div>
-        <TaxFactsPanel />
-        <ChoiceGroup id={definition.id} value={answer} options={[
-          { value: 'reviewed', label: t('be11.reviewed') },
-          { value: 'unknown', label: t('be11.unknownStill') },
-        ]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
-      </div>
+    case 'tax.intro':
+      control = <TaxDetailsIntro />
+      break
+    case 'tax.tfsaRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.tfsaIntro')}</p><TfsaRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.rrspRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.rrspIntro')}</p><RrspRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.fhsaRoom':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.fhsaIntro')}</p><FhsaRoomQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.pensionSplit':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.splitIntro')}</p><PensionSplitQuestion plan={canonicalPlan} /></>
+      break
+    case 'tax.spousalHistory':
+      control = <><p className="question-intro">{t('questionnaire.taxDetails.spousalIntro')}</p><SpousalHistoryQuestion plan={canonicalPlan} /></>
+      break
+    case 'family.spouseSupport':
+      control = <SpouseSupportQuestion plan={canonicalPlan} />
+      break
+    case 'family.livesAlone':
+      control = <LivesAloneQuestion plan={canonicalPlan} />
+      break
+    case 'family.qcDrug':
+      control = <QcDrugCoverageQuestion plan={canonicalPlan} />
+      break
+    case 'assets.ownership':
+      control = <><p className="question-intro">{t('questionnaire.ownership.accountsIntro')}</p><AccountOwnershipChecklist plan={canonicalPlan} /></>
+      break
+    case 'saving.earned':
+      control = <EarnedIncomeQuestion plan={canonicalPlan} />
+      break
+    case 'account.rrsp.type':
+      control = <><p className="question-intro">{t('questionnaire.accountType.intro')}</p><RegisteredTypeQuestion plan={canonicalPlan} /></>
+      break
+    case 'account.rrif.details':
+      control = <><p className="question-intro">{t('questionnaire.rrif.intro')}</p><RrifDetailsQuestion plan={canonicalPlan} /></>
+      break
+    case 'housing.ownership':
+      control = <><p className="question-intro">{t('questionnaire.ownership.propertiesIntro')}</p><PropertyOwnershipChecklist plan={canonicalPlan} /></>
       break
     case 'family.people':
       control = <ChoiceGroup id={definition.id} value={inputs.partner ? 'couple' : answer} options={[
@@ -201,9 +296,17 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       }} />)}</>
       break
     }
-    case 'family.province':
-      control = <label className="question-select"><span>{t('province')}</span><select value={inputs.province} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>{PROVINCES.map((p) => <option key={p}>{p}</option>)}</select></label>
+    case 'family.province': {
+      // FE-40: the example province is not an answer, so the list starts on a
+      // prompt and choosing Ontario is a real change that records it.
+      const provinceMeta = answerMeta.province
+      const provinceConfirmed = !!provinceMeta && provinceMeta.status === 'confirmed' && provinceMeta.origin !== 'example'
+      control = <label className="question-select"><span>{t('province')}</span><select value={provinceConfirmed ? inputs.province : ''} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>
+        {!provinceConfirmed && <option value="" disabled>{t('questionnaire.chooseProvince')}</option>}
+        {PROVINCES.map((p) => <option key={p} value={p}>{t(`prov_${p}`)} ({p})</option>)}
+      </select></label>
       break
+    }
     case 'time.work':
       control = <>
         <FactNumber field="fireAge" label={t('fireAge')} value={inputs.fireAge} onValue={(fireAge) => set({ fireAge })} />
@@ -233,12 +336,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'time.horizon':
       control = <FactNumber field="lifeExpectancy" label={t('lifeExpectancy')} value={inputs.lifeExpectancy} onValue={(lifeExpectancy) => set({ lifeExpectancy })} />
       break
-    case 'saving.method':
-      control = <ChoiceGroup id={definition.id} value={answer} options={[{ value: 'monthly', label: t('questionnaire.choice.monthly') }, { value: 'annual', label: t('questionnaire.choice.annual') }]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
-      break
     case 'saving.amount': {
       const monthly = questionAnswers['saving.method'] !== 'annual'
-      control = <><FactNumber field="annualSavings" unit={monthly ? 'monthly' : 'canonical'} label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
+      control = <>
+        <div className="unit-toggle"><ChoiceGroup id="saving.method" value={monthly ? 'monthly' : 'annual'} options={[{ value: 'monthly', label: t('questionnaire.choice.monthly') }, { value: 'annual', label: t('questionnaire.choice.annual') }]} onChange={(value) => setQuestionAnswer('saving.method', value)} /></div><FactNumber field="annualSavings" unit={monthly ? 'monthly' : 'canonical'} label={monthly ? t('questionnaire.monthlySavings') : t('annualSavings')} value={monthly ? inputs.annualSavings / 12 : inputs.annualSavings} step={monthly ? 100 : 1000} onValue={(value) => set({ annualSavings: monthly ? value * 12 : value })} />
         <p className="answer-feedback">{t('questionnaire.savingFeedback', { monthly: cad(inputs.annualSavings / 12), annual: cad(inputs.annualSavings) })}</p></>
       break
     }
@@ -255,7 +356,14 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       }} />
       break
     case 'work.amount':
-      control = <FactNumber field="extraIncome.annual" label={t('extraIncomeAnnual')} value={inputs.extraIncome!.annual} onValue={(annual) => set({ extraIncome: { ...inputs.extraIncome!, annual } })} />
+      // BE-46: how the work is paid decides the CPP/QPP, EI and QPIP withheld.
+      control = <><FactNumber field="extraIncome.annual" label={t('extraIncomeAnnual')} value={inputs.extraIncome!.annual} onValue={(annual) => set({ extraIncome: { ...inputs.extraIncome!, annual } })} />
+        <p className="question-subhead">{t('sideIncomeKind')}</p>
+        <ChoiceGroup id="work.kind" label={t('sideIncomeKind')} value={inputs.extraIncome!.kind ?? 'employment'} options={[
+          { value: 'employment', label: t('sideIncomeEmployment'), detail: t('sideIncomeEmploymentDetail') },
+          { value: 'selfEmployment', label: t('sideIncomeSelf'), detail: t('sideIncomeSelfDetail') },
+          { value: 'other', label: t('sideIncomeOther'), detail: t('sideIncomeOtherDetail') },
+        ]} onChange={(kind) => set({ extraIncome: { ...inputs.extraIncome!, kind: kind as 'employment' | 'selfEmployment' | 'other' } })} /></>
       break
     case 'work.period':
       control = <div className="question-pair"><FactNumber field="extraIncome.fromAge" label={t('extraIncomeFrom')} value={inputs.extraIncome!.fromAge} onValue={(fromAge) => set({ extraIncome: { ...inputs.extraIncome!, fromAge } })} /><FactNumber field="extraIncome.toAge" label={t('extraIncomeTo')} value={inputs.extraIncome!.toAge} onValue={(toAge) => set({ extraIncome: { ...inputs.extraIncome!, toAge } })} /></div>
@@ -303,6 +411,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
           <strong>{t('questionnaire.allocationTotal', { total })}</strong>
           <span>{isComplete ? t('questionnaire.allocationComplete') : total < 100 ? t('questionnaire.allocationRemaining', { difference }) : t('questionnaire.allocationOver', { difference })}</span>
         </div>
+        <SavingsRoomHint plan={canonicalPlan} />
       </div>
       break
     }
@@ -349,7 +458,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'home.value': {
       const home = inputs.principalResidence!
       if (home.mode === 'planned') break
-      control = <><div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /><FactNumber field="principalResidence.sellAtAge" label={t('propSellAt')} value={home.sellAtAge ?? 0} onValue={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge: sellAtAge || null } })} /></div>{home.mortgage && home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
+      control = <><div className="question-pair"><FactNumber field="principalResidence.value" label={t('propValue')} value={home.value} onValue={(value) => set({ principalResidence: { ...home, value } })} /></div>
+        <SalePlan field="principalResidence.sellAtAge" sellAtAge={home.sellAtAge} defaultAge={Math.min(inputs.lifeExpectancy - 1, inputs.fireAge + 10)}
+          onChange={(sellAtAge) => set({ principalResidence: { ...home, sellAtAge } })} />
+        {home.mortgage && home.sellAtAge !== null && home.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'home.mortgage': {
@@ -369,7 +481,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     }
     case 'purchase.time': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <FactNumber field="principalResidence.buyAtAge" label={t('prBuyAtAge')} value={home.buyAtAge} onValue={(buyAtAge) => set({ principalResidence: { ...home, buyAtAge } })} />; break }
-    case 'purchase.price': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <div className="question-pair"><FactNumber field="principalResidence.price" label={t('prPrice')} value={home.price} onValue={(price) => set({ principalResidence: { ...home, price } })} /><FactNumber field="principalResidence.downPayment" label={t('prDownPayment')} value={home.downPayment} onValue={(downPayment) => set({ principalResidence: { ...home, downPayment } })} /></div>; break }
+    case 'purchase.price': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <div className="question-pair"><FactNumber field="principalResidence.price" label={t('prPrice')} value={home.price} onValue={(price) => set({ principalResidence: { ...home, price } })} /><FactNumber field="principalResidence.downPayment" label={t('prDownPayment')} value={home.downPayment} onValue={(downPayment) => set({ principalResidence: { ...home, downPayment } })} />
+      <label className="check-inline"><input type="checkbox" data-testid="guided-hbp-use" checked={home.hbp !== false} onChange={(e) => set({ principalResidence: { ...home, hbp: e.target.checked } })} /> <span>{t('hbpUse')}<small className="hint"> {t('hbpUseDetail')}</small></span></label></div>; break }
     case 'purchase.loan': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <div className="question-pair"><FactNumber field="principalResidence.annualMortgagePayment" label={t('debtPaymentLabel')} value={home.annualMortgagePayment ?? 0} onValue={(annualMortgagePayment) => set({ principalResidence: { ...home, annualMortgagePayment } })} /><FactNumber field="principalResidence.mortgageYears" label={t('debtYears')} value={home.mortgageYears ?? 0} onValue={(mortgageYears) => set({ principalResidence: { ...home, mortgageYears } })} /></div>; break }
     case 'housing.other':
       control = <div className="question-pair">
@@ -396,7 +509,11 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'rental.0.income': {
       const property = inputs.investmentProperties![0]
-      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.sellAtAge" label={t('propSellAt')} value={property.sellAtAge ?? 0} onValue={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge: sellAtAge || null }; set({ investmentProperties: next }) }} /><FactNumber field="investmentProperties.0.saleExpenses" label={t('propSaleExpenses')} value={property.saleExpenses ?? 0} onValue={(saleExpenses) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, saleExpenses }; set({ investmentProperties: next }) }} /></div>{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
+      control = <><div className="question-pair"><FactNumber field="investmentProperties.0.annualRent" label={t('propRent')} value={property.annualRent ?? 0} onValue={(annualRent) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, annualRent }; set({ investmentProperties: next }) }} /></div>
+        <SalePlan field="investmentProperties.0.sellAtAge" expensesField="investmentProperties.0.saleExpenses" sellAtAge={property.sellAtAge}
+          defaultAge={Math.min(inputs.lifeExpectancy - 1, inputs.fireAge + 10)}
+          onChange={(sellAtAge) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, sellAtAge }; set({ investmentProperties: next }) }} />
+        {property.sellAtAge !== null && <div className="question-pair"><FactNumber field="investmentProperties.0.saleExpenses" label={t('propSaleExpenses')} value={property.saleExpenses ?? 0} onValue={(saleExpenses) => { const next = [...inputs.investmentProperties!]; next[0] = { ...property, saleExpenses }; set({ investmentProperties: next }) }} /></div>}{property.mortgage && property.sellAtAge !== null && property.sellAtAge < inputs.fireAge && <p className="answer-feedback">{t('saleSavingsHint')}</p>}</>
       break
     }
     case 'rental.0.mortgage': {
@@ -432,9 +549,22 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     case 'spending.method':
       control = <ChoiceGroup id={definition.id} value={answer} options={[{ value: 'known', label: t('questionnaire.choice.knowBudget') }, { value: 'estimate', label: t('questionnaire.choice.estimateBudget') }, { value: 'unknown', label: t('questionnaire.choice.unknown') }]} onChange={(value) => setQuestionAnswer(definition.id, value)} />
       break
-    case 'spending.total':
-      control = <><FactNumber field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} onValue={(retirementSpending) => set({ retirementSpending })} /><p className="answer-feedback">{t('questionnaire.spendingFeedback', { monthly: cad(inputs.retirementSpending / 12), annual: cad(inputs.retirementSpending) })}</p></>
+    case 'spending.total': {
+      // FE-39: on the category path the total is the categories' sum, applied
+      // explicitly, and the page stays pending while the two disagree.
+      const estimating = questionAnswers['spending.method'] === 'estimate'
+      const categoryTotal = worksheetTotal(worksheet)
+      const applied = Math.abs(categoryTotal - inputs.retirementSpending) < 0.5
+      control = <>
+        {estimating && <div className="worksheet-summary" data-testid="guided-worksheet-summary">
+          <p>{t('questionnaire.worksheetTotal', { total: cad(categoryTotal) })}</p>
+          {categoryTotal > 0 && !applied && <button type="button" className="primary-action" data-testid="guided-worksheet-apply"
+            onClick={() => editSharedField('retirementSpending', String(categoryTotal))}>{t('questionnaire.useWorksheetTotal', { total: cad(categoryTotal) })}</button>}
+          {categoryTotal > 0 && applied && <p className="answer-feedback">{t('questionnaire.worksheetApplied')}</p>}
+        </div>}
+        <FactNumber field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} onValue={(retirementSpending) => set({ retirementSpending })} /><p className="answer-feedback">{t('questionnaire.spendingFeedback', { monthly: cad(inputs.retirementSpending / 12), annual: cad(inputs.retirementSpending) })}</p></>
       break
+    }
     case 'spending.homeFood':
       control = <div className="question-pair"><FactNumber field="worksheet.wsHousing" label={t('wsHousing')} value={worksheet.wsHousing} onValue={(value) => setWorksheet('wsHousing', value)} /><FactNumber field="worksheet.wsGroceries" label={t('wsGroceries')} value={worksheet.wsGroceries} onValue={(value) => setWorksheet('wsGroceries', value)} /></div>
       break
@@ -516,7 +646,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       </>
       break
     case 'pension.self':
-      control = <ChoiceGroup id={definition.id} value={inputs.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ pension: value === 'db' ? (inputs.pension ?? DEFAULT_PENSION) : null }); markAnswers(['pension'], value === 'db' ? 'estimated' : 'notApplicable') }} />
+      control = <><ChoiceGroup id={definition.id} value={inputs.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ pension: value === 'db' ? (inputs.pension ?? DEFAULT_PENSION) : null }); markAnswers(['pension'], value === 'db' ? 'estimated' : 'notApplicable'); if (value === 'dc') addLockedAccount('self') }} />{answer === 'dc' && <LockedAccountNote />}</>
       break
     case 'pension.self.details':
       control = <div className="question-pair"><FactNumber field="pension.annualAmount" label={t('pensionAnnual')} value={inputs.pension!.annualAmount} onValue={(annualAmount) => set({ pension: { ...inputs.pension!, annualAmount } })} /><FactNumber field="pension.startAge" label={t('pensionStartAge')} value={inputs.pension!.startAge} onValue={(startAge) => set({ pension: { ...inputs.pension!, startAge } })} /></div>
@@ -525,7 +655,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <PensionIndexing prefix="pension" pension={inputs.pension!} answer={answer} setAnswer={setQuestionAnswer} setPension={(pension) => set({ pension })} />
       break
     case 'pension.partner':
-      control = <ChoiceGroup id={definition.id} value={inputs.partner!.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ partner: { ...inputs.partner!, pension: value === 'db' ? (inputs.partner!.pension ?? DEFAULT_PENSION) : null } }); markAnswers(['partner.pension'], value === 'db' ? 'estimated' : 'notApplicable') }} />
+      control = <><ChoiceGroup id={definition.id} value={inputs.partner!.pension ? 'db' : answer} options={[{ value: 'none', label: t('questionnaire.choice.noPension') }, { value: 'db', label: t('questionnaire.choice.dbPension'), detail: t('questionnaire.choice.dbDetail') }, { value: 'dc', label: t('questionnaire.choice.dcPension'), detail: t('questionnaire.choice.dcDetail') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); set({ partner: { ...inputs.partner!, pension: value === 'db' ? (inputs.partner!.pension ?? DEFAULT_PENSION) : null } }); markAnswers(['partner.pension'], value === 'db' ? 'estimated' : 'notApplicable'); if (value === 'dc') addLockedAccount('partner') }} />{answer === 'dc' && <LockedAccountNote />}</>
       break
     case 'pension.partner.details':
       control = <div className="question-pair"><FactNumber field="partner.pension.annualAmount" label={t('pensionAnnual')} value={inputs.partner!.pension!.annualAmount} onValue={(annualAmount) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, annualAmount } } })} /><FactNumber field="partner.pension.startAge" label={t('pensionStartAge')} value={inputs.partner!.pension!.startAge} onValue={(startAge) => set({ partner: { ...inputs.partner!, pension: { ...inputs.partner!.pension!, startAge } } })} /></div>
@@ -576,6 +706,15 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         </div>
         <div className="tax-assumption-field">
           <FactNumber field="accumulationMarginalRate" label={t('questionnaire.taxRateLabel')} value={marginalRate * 100} step={1} onValue={(value) => set({ accumulationMarginalRate: value / 100 })} />
+          {/* FE-46: when employment income is recorded, offer the statutory rate
+              it implies instead of sending the user to look it up. */}
+          {(() => {
+            const earned = canonicalPlan.people.find((person) => person.role === 'self')?.earnedIncome
+            if (earned?.status !== 'known' || earned.value <= 0) return null
+            const suggested = Math.round(engineMarginalRate(earned.value, inputs.province) * 1000) / 10
+            return <p className="answer-feedback" data-testid="guided-rate-suggestion">{t('questionnaire.taxRateFromIncome', { income: cad(earned.value), rate: suggested })}{' '}
+              {Math.abs(suggested - marginalRate * 100) >= 0.05 && <button type="button" className="text-action" onClick={() => { set({ accumulationMarginalRate: suggested / 100 }); markAnswers(['accumulationMarginalRate'], 'confirmed') }}>{t('questionnaire.taxRateUse', { rate: suggested })}</button>}</p>
+          })()}
           <p>{t('questionnaire.taxRateMeaning')}</p>
           <p>{t('questionnaire.taxRateFind')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.taxRateSource')}</a></p>
         </div>

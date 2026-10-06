@@ -1,4 +1,6 @@
-// CPP/QPP and OAS start-age adjustments and OAS clawback. 2025 figures.
+// CPP/QPP and OAS start-age adjustments, OAS clawback, and GIS/Allowance by
+// household shape. 2026 figures; the GIS pack is the latest published quarter
+// (see docs/quarterly-benefit-refresh.md).
 
 import {
   freezeRuleContext,
@@ -81,10 +83,12 @@ export function oasAnnual(annualAt65: number, startAge: number): number {
   return annualAt65 * oasAgeFactor(startAge)
 }
 
-// 2026 figures — update annually. CPP max rises each year with the
-// enhancement phase-in; OAS is the 65-74 rate (75+ gets +10%).
+// 2026 figures. CPP max rises each year with the enhancement phase-in. OAS is
+// the 65-74 rate (75+ gets +10%), indexed quarterly: BE-45 uses the
+// October-December 2026 rate, 762.50 × 12 (ESDC Table 5), refreshed with the
+// GIS pack each quarter.
 export const CPP_MAX_AT_65 = 18092
-export const OAS_FULL_AT_65 = 9024
+export const OAS_FULL_AT_65 = 9150
 
 /**
  * Rough CPP/QPP estimate at 65: best 39 of the years between 18 and 65 count
@@ -121,8 +125,10 @@ export function estimateOasAt65(residenceYearsBy65: number): number {
  * of 42,144. Both figures now come from `GisRulePack`, one entry per category,
  * with the slope the official quarterly tables actually show.
  */
-export const OAS_GIS_ALLOWANCE_2026_Q3: GisRulePack = selectGisRules()
-const GIS_RULES: GisRulePack = OAS_GIS_ALLOWANCE_2026_Q3
+export const OAS_GIS_ALLOWANCE_2026_Q3: GisRulePack = selectGisRules('2026-07/2026-09')
+/** BE-45: the latest published quarter, which the projection prices with. */
+export const OAS_GIS_ALLOWANCE_2026_Q4: GisRulePack = selectGisRules('2026-10/2026-12')
+const GIS_RULES: GisRulePack = OAS_GIS_ALLOWANCE_2026_Q4
 
 /** The category keys a caller (and a reviewer) can ask about. */
 export const GIS_HOUSEHOLD_CATEGORIES: GisHouseholdRuleCategory[] = [
@@ -156,6 +162,8 @@ export interface GisCategoryOptions {
    * back to the "spouse receives neither OAS nor the Allowance" row.
    */
   grossIncome?: number
+  /** A specific published quarter; the latest one when omitted. */
+  gisPack?: GisRulePack
 }
 
 /**
@@ -182,10 +190,10 @@ function onlyPensionerIndex(
  * the pensioner's GIS falls back to the row whose cut-off is 54,624. Without
  * an income the only thing known is age eligibility.
  */
-function allowanceInPay(oasIdx: number, agesPerPerson: number[], income: number | undefined): boolean {
+function allowanceInPay(oasIdx: number, agesPerPerson: number[], income: number | undefined, pack: GisRulePack = GIS_RULES): boolean {
   const otherAge = agesPerPerson[1 - oasIdx]
   if (otherAge < 60 || otherAge >= 65) return false
-  return income === undefined || income < GIS_RULES.allowance.annualCutoff
+  return income === undefined || income < pack.allowance.annualCutoff
 }
 
 /**
@@ -231,7 +239,7 @@ export function gisHouseholdCategory(
   if (oasIdx === null) {
     return { status: 'unsupported', reason: 'the one-pensioner couple rows need both ages: a spouse aged 60 to 64 is the Allowance row, an older or younger one is the row whose cut-off is 54,624' }
   }
-  const inPay = allowanceInPay(oasIdx, agesPerPerson, options.grossIncome)
+  const inPay = allowanceInPay(oasIdx, agesPerPerson, options.grossIncome, options.gisPack)
   return {
     status: 'modeled',
     receivingAllowance: inPay,
@@ -279,8 +287,9 @@ function categoryAmounts(
   category: GisHouseholdRuleCategory,
   receivingAllowance: boolean,
   income: number,
+  pack: GisRulePack = GIS_RULES,
 ): CategoryAmounts {
-  const rule = GIS_RULES.categories[category]
+  const rule = pack.categories[category]
   // The maximum is the whole household's: a category whose table shows a
   // per-pensioner maximum (both pensioners) has two of them, which is why the
   // official reduction is 1/48 of joint income per pensioner and 1/4 for the
@@ -291,8 +300,8 @@ function categoryAmounts(
   // own fitted reduction, which the pensioner-side GIS follows rather than
   // staying flat.
   const allowance = receivingAllowance
-    ? Math.max(0, GIS_RULES.allowance.maxMonthly * 12 -
-        segmentReduction(GIS_RULES.allowance.reductionSegments, income))
+    ? Math.max(0, pack.allowance.maxMonthly * 12 -
+        segmentReduction(pack.allowance.reductionSegments, income))
     : 0
   return { gis, allowance }
 }
@@ -407,23 +416,26 @@ export function benefitIncomeBasis(
   receivingOas: boolean[],
   agesPerPerson: number[],
   grossIncome: number,
-  options: GisCategoryOptions & { workIncome?: number } = {},
+  options: GisCategoryOptions & { workIncome?: number | number[] } = {},
 ): BenefitBasis {
-  const workIncome = options.workIncome ?? 0
-  const workExemption = gisWorkExemption(workIncome)
+  // BE-46: the work exemption belongs to each earner (5,000 plus half of the
+  // next 10,000, not transferable), so a list of earnings is exempted per person.
+  const earnings = Array.isArray(options.workIncome) ? options.workIncome : [options.workIncome ?? 0]
+  const workExemption = earnings.reduce((sum, amount) => sum + gisWorkExemption(amount), 0)
   const countableIncome = Math.max(0, grossIncome - workExemption)
   const classification = gisHouseholdCategory(receivingOas, agesPerPerson, { ...options, grossIncome: countableIncome })
   if (classification.status !== 'modeled') return classification
+  const pack = options.gisPack ?? GIS_RULES
   const amounts = categoryAmounts(
-    classification.category, classification.receivingAllowance, countableIncome,
+    classification.category, classification.receivingAllowance, countableIncome, pack,
   )
-  const rule = GIS_RULES.categories[classification.category]
+  const rule = pack.categories[classification.category]
   return {
     status: 'modeled',
     category: classification.category,
     receivingAllowance: classification.receivingAllowance,
-    rulePackId: GIS_RULES.id,
-    paymentPeriod: GIS_RULES.paymentPeriod,
+    rulePackId: pack.id,
+    paymentPeriod: pack.paymentPeriod,
     grossIncome,
     workExemption,
     countableIncome,

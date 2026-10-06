@@ -7,6 +7,7 @@ import { oasAfterClawback } from './benefits'
 import { personCppAnnual } from './pensionProvenance'
 import { pensionPaid } from './pensionPaid'
 import { minimumForRrif } from './rrif'
+import type { PayrollDeductions, SideIncomeKind } from './payroll'
 
 export interface ProjectionTaxFacts {
   plan: InputsV2
@@ -19,6 +20,16 @@ export interface ProjectionTaxFacts {
   nonRegDistributions: number
   rent: number
   otherWork: number
+  /** BE-46: what the side income is. Only employment and self-employment earn the GIS work exemption. */
+  otherWorkKind?: SideIncomeKind
+  /** BE-46: payroll on the side income, which belongs to the self. */
+  payroll?: PayrollDeductions
+  /**
+   * BE-47: unpaid Home Buyers' Plan instalments included in income this year,
+   * by borrower. A null borrower means the plan does not say whose RRSP paid
+   * for the home.
+   */
+  hbpIncome?: { personId: string | null; amount: number }[]
   oasGross: number[]
   purchaseRrspWithdrawal: number
   purchaseNonRegTaxable: number
@@ -72,7 +83,15 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     grossPension += pension
     if (cpp) annualEvents.push({ id: `${item.canonical.id}:cpp:${f.year}`, kind: 'cpp', personId: item.canonical.id, amount: cpp })
     if (pension) annualEvents.push({ id: `${item.canonical.id}:pension:${f.year}`, kind: 'dbPension', personId: item.canonical.id, amount: pension })
-    if (index === 0 && f.otherWork) annualEvents.push({ id: `${item.canonical.id}:other:${f.year}`, kind: 'employment', personId: item.canonical.id, amount: f.otherWork })
+    if (index === 0 && f.otherWork) annualEvents.push({ id: `${item.canonical.id}:other:${f.year}`,
+      kind: f.otherWorkKind === 'other' ? 'other' : f.otherWorkKind === 'selfEmployment' ? 'selfEmployment' : 'employment',
+      personId: item.canonical.id, amount: f.otherWork })
+  }
+  for (const [index, due] of (f.hbpIncome ?? []).entries()) {
+    if (!(due.amount > 0)) continue
+    if (!due.personId || !plan.people.some(person => person.id === due.personId))
+      return { status: 'unsupported', reason: "Home Buyers' Plan borrower is not recorded" }
+    annualEvents.push({ id: `hbp:${due.personId}:${index}:${f.year}`, kind: 'hbpInclusion', personId: due.personId, amount: due.amount })
   }
   const nonReg = plan.accounts.filter(account => account.kind === 'nonReg')
   if ((f.nonRegDistributions || f.withdrawals.nonReg) && nonReg.length !== 1)
@@ -120,7 +139,9 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
   // never from the frozen canonical `account.balance`. The single-account path
   // above is the only one that reaches an RRIF event, so the balance maps to
   // that one account.
+  const payroll = f.otherWork && f.payroll ? { [self.id]: f.payroll } : undefined
   const yearContext: IncomeYearContext = {
+    payroll,
     registeredOpeningBalances: registered.length === 1 ? { [registered[0].id]: f.registeredBalance } : undefined,
     // Review fix B2: the same year-opening ledger feeds both tax passes, so the
     // OAS pass and the final pass agree, and the final pass's ledger is the one
@@ -145,5 +166,5 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
   return { status: 'ok', tax, oasNet, oasByPerson, grossCpp, grossPension,
     spousalAttribution: tax.spousalAttribution,
     taxableExOas: Object.values(tax.byPerson).reduce((sum, row) => sum + row.taxableIncome, 0) - oasNet,
-    earnedWork: f.otherWork }
+    earnedWork: f.otherWorkKind === 'other' ? 0 : f.otherWork }
 }

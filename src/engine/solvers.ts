@@ -3,6 +3,7 @@ import { buildDebtStream, releasedMortgagePayment, rollDebtsForward, yearStartSa
 import { inputsCppAnnual, inputsOasAnnual } from './pensionProvenance'
 import { validateInputs } from './validate'
 import { hasUnverifiedLockedWithdrawals } from './capabilities'
+import { allocateContributions } from './funding'
 import type { InputsV2 } from './model'
 import {
   ACCOUNT_TYPES,
@@ -250,14 +251,26 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
     return outcome('unsupported', null, assumptions, 0, 0, null, 'lockedOnlyBridge')
   if (hasUnverifiedLockedWithdrawals(inputs))
     return outcome('unsupported', null, assumptions, null, 0, null, 'lockedWithdrawalLimits')
-  // Re-basing currentAge to FIRE discards the real path of nominal ACB.
-  // Candidate T is a hypothetical FIRE-year portfolio, so neither a present
-  // holding nor future buys/reinvestments can be assigned a verified basis.
-  // The same limitation applies to an investment property carried forward.
-  if (inputs.fireAge > inputs.currentAge && (
+  // BE-42: re-basing currentAge to FIRE discards the real path of nominal ACB,
+  // so a working plan with non-registered money (or a property carried
+  // forward) used to get no number at all. The full projection does track that
+  // path, so the candidate portfolio takes the account mix and cost-base ratio
+  // the plan projects for the year it enters FIRE. The answer is labelled an
+  // estimate (`projectedBasisEstimate`): the candidate's own basis is scaled,
+  // not replayed purchase by purchase.
+  const projectedBasis = inputs.fireAge > inputs.currentAge && (
     inputs.balances.nonReg > 0 || inputs.annualSavings > 0 && inputs.savingsSplit.nonReg > 0 ||
-    (inputs.investmentProperties?.length ?? 0) > 0))
-    return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
+    (inputs.investmentProperties?.length ?? 0) > 0)
+  let fireYear: { balances: Record<'tfsa' | 'rrsp' | 'nonReg', number>; book: number; locked: number } | null = null
+  if (projectedBasis) {
+    const entering = checkedProjection(inputs).rows.find((row) => row.age === inputs.fireAge - 1)
+    if (!entering || entering.nonRegBook === undefined || !Number.isFinite(entering.nonRegBook))
+      return outcome('unsupported', null, assumptions, null, 0, null, 'nominalCapitalBasis')
+    // The row is the close of the year before FIRE; the FIRE year itself erodes
+    // the nominal basis by one more year of inflation, as the full plan does.
+    fireYear = { balances: entering.balances, book: entering.nonRegBook / (1 + (inputs.inflation ?? 0.021)), locked: entering.lockedRetirementBalance ?? 0 }
+    assumptions.splice(assumptions.indexOf('proportionalCurrentAccountAllocation'), 1, 'projectedFireYearAllocation')
+  }
   // A same-year snapshot can reuse a verified basis, but the scalar legacy
   // adapter is only a last-valid value. Unknown canonical ACB is not a tax
   // fact, and an unrealized loss needs unmodeled eligibility/carry treatment.
@@ -272,14 +285,14 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
   const planCapitalReason = capitalTaxReason(checkedProjection(inputs))
   if (planCapitalReason)
     return outcome('unsupported', null, assumptions, null, 0, null, planCapitalReason)
-  const b = inputs.balances
-  const lockedBalance = inputs.lockedRetirement?.balance ?? 0
+  const b = fireYear?.balances ?? inputs.balances
+  const lockedBalance = fireYear ? fireYear.locked : inputs.lockedRetirement?.balance ?? 0
   const total = b.tfsa + b.rrsp + b.nonReg + lockedBalance
   const prop =
     total > 0
       ? { tfsa: b.tfsa / total, rrsp: b.rrsp / total, nonReg: b.nonReg / total, locked: lockedBalance / total }
       : { tfsa: 1 / 3, rrsp: 1 / 3, nonReg: 1 / 3, locked: 0 }
-  const bookRatio = b.nonReg > 0 ? inputs.nonRegBook / b.nonReg : 1
+  const bookRatio = b.nonReg > 0 ? Math.max(0, (fireYear ? fireYear.book : inputs.nonRegBook) / b.nonReg) : 1
   const yearsToFire = inputs.fireAge - inputs.currentAge
 
   // real estate will have appreciated (and debts amortized) by the FIRE year
@@ -323,6 +336,8 @@ function requiredFireAssetsImpl(inputs: Inputs, canonical?: InputsV2 | null): So
       investmentProperties: (inputs.investmentProperties ?? []).map((p) => ({
         ...p,
         value: grow(p.value, p.appreciation),
+        // A nominal cost base loses real value while the plan works (BE-42).
+        acb: projectedBasis ? p.acb / Math.pow(1 + inflation, Math.max(0, yearsToFire)) : p.acb,
         mortgage: rollMortgage(p.mortgage),
       })),
       debts: rollDebtsForward(inputs.debts ?? [], yearsToFire, inflation),
@@ -421,7 +436,9 @@ export function rankCandidates<T>(
       // funded modeled path is therefore not a verified recommendation.
       if (hasUnverifiedLockedWithdrawals(inputs))
         return { ...common, status: 'unsupported', reason: 'lockedWithdrawalLimits' }
-      if (result.terminalTaxStatus === 'unsupported')
+      // BE-43: closing tax decides an estate ranking, not the spending a plan
+      // sustains, so a die-with-zero ranking does not wait for it.
+      if (objective !== 'maxSpending' && result.terminalTaxStatus === 'unsupported')
         return { ...common, status: 'unsupported', reason: 'terminalTax' }
       // A recommended strategy or start age is also a positive funding claim,
       // so it needs the same verified disposal tax as the quick answers.
@@ -636,15 +653,24 @@ export function targetReport(inputs: Inputs, target: number): TargetReport {
     }
     bal.nonReg += benefits * (1 - marginal)
     const releasedPayments = releasedMortgagePayment(prMortgage, prSold, yearIdx)
+    // P08: the same allocation the projection uses. The employee DC
+    // contribution comes out of the saving budget (it was added on top
+    // before), and contributions keep arriving after the locked balance
+    // unlocks, landing in the RRSP like the projection's.
+    const allocation = allocateContributions({
+      age, budget: inputs.annualSavings + releasedPayments, fhsa: 0,
+      employee: inputs.lockedRetirement?.employeeContribution ?? 0,
+      employer: inputs.lockedRetirement?.employerContribution ?? 0,
+      split: inputs.savingsSplit,
+    })
+    const lockedAdded = inputs.lockedRetirement ? allocation.employee + allocation.employer : 0
+    if (inputs.lockedRetirement && age >= inputs.lockedRetirement.accessibleAge) bal.rrsp += lockedAdded
+    else lockedBal += lockedAdded
     for (const t of ACCOUNT_TYPES) {
-      bal[t] += (inputs.annualSavings + releasedPayments) * (inputs.savingsSplit[t] ?? 0)
+      bal[t] += allocation.voluntary[t]
       bal[t] *= 1 + inputs.returns[t] - (inputs.fees ?? 0)
     }
-    if (lockedBal > 0) {
-      lockedBal += inputs.lockedRetirement?.employeeContribution ?? 0
-      lockedBal += inputs.lockedRetirement?.employerContribution ?? 0
-      lockedBal *= 1 + inputs.returns.rrsp - (inputs.fees ?? 0)
-    }
+    if (lockedBal > 0) lockedBal *= 1 + inputs.returns.rrsp - (inputs.fees ?? 0)
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation

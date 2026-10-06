@@ -1,13 +1,28 @@
 import type { Inputs } from '../engine'
+import type { InputsV2 } from '../engine/model'
+import { refreshCanonicalFromLegacy } from '../engine/migration'
 import type { AnswerMeta } from '../store'
 import type { QuestionDefinition } from './schema'
+import { accountOwnershipComplete, propertyOwnershipComplete, qcCoverageComplete } from './householdFacts'
+import { earnedIncomeComplete, hasRecordedRegisteredType, rrifDetailsComplete } from './accountFacts'
+import { fhsaRoomComplete, pensionSplitRecorded, rrspRoomComplete, spousalHistoryComplete, tfsaRoomComplete } from './taxDetails'
+import { worksheetTotal } from './spending'
 
 /** The store slice page completeness actually reads. */
 export interface PageState {
   inputs: Inputs
   answerMeta: Record<string, AnswerMeta>
   questionAnswers: Record<string, string | boolean | string[]>
-  canonical: { budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } | null
+  /** The retirement-spending categories, when the store has them. */
+  worksheet?: Record<string, number>
+  canonical: ({ budget: { kind: 'incomeBudget' | 'savingsBudget' }; migration: { sourcePersistVersion: number; budgetReconciliation?: { answered: boolean } } } &
+    Partial<Pick<InputsV2, 'people' | 'accounts' | 'properties' | 'taxProfile'>>) | null
+}
+
+/** The recorded plan the household-fact pages are answered against. */
+function householdPlan(state: PageState): InputsV2 {
+  return state.canonical?.people && state.canonical.accounts && state.canonical.properties
+    ? state.canonical as InputsV2 : refreshCanonicalFromLegacy(null, state.inputs)
 }
 
 function requiredFields(definition: QuestionDefinition, partner: boolean): string[] {
@@ -34,12 +49,36 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
       answerIsUsable(state.answerMeta.fireTargetAssets) &&
       (state.inputs.fireTargetAssets ?? 0) > 0
   }
+  // FE-43 A: the household tax facts are answered when the recorded plan holds
+  // them, or when the user explicitly says they are not sure yet.
+  if (definition.id === 'family.spouseSupport') {
+    return householdPlan(state).taxProfile?.spouseSupported.status === 'known' || state.questionAnswers['family.spouseSupport'] === 'unknown'
+  }
+  if (definition.id === 'family.livesAlone') return householdPlan(state).taxProfile?.livesAlone?.status === 'known' || state.questionAnswers['family.livesAlone'] === 'unknown'
+  if (definition.id === 'family.qcDrug') return qcCoverageComplete(householdPlan(state)) || state.questionAnswers['family.qcDrug'] === 'unknown'
+  if (definition.id === 'assets.ownership') return accountOwnershipComplete(householdPlan(state))
+  if (definition.id === 'housing.ownership') return propertyOwnershipComplete(householdPlan(state))
+  // FE-43 B: optional facts, answered once recorded (or explicitly confirmed).
+  if (definition.id === 'saving.earned') return earnedIncomeComplete(householdPlan(state))
+  if (definition.id === 'account.rrsp.type') return state.questionAnswers['account.rrsp.type'] !== undefined || hasRecordedRegisteredType(householdPlan(state))
+  if (definition.id === 'account.rrif.details') return rrifDetailsComplete(householdPlan(state))
+  // FE-39: on the category path the total is answered once the categories'
+  // sum is the recorded retirement spending.
+  if (definition.id === 'spending.total' && state.questionAnswers['spending.method'] === 'estimate') {
+    const total = worksheetTotal(state.worksheet)
+    return answerIsUsable(state.answerMeta.retirementSpending) && total > 0 && Math.abs(total - state.inputs.retirementSpending) < 0.5
+  }
   if (definition.id === 'housing.other') {
     return state.questionAnswers['housing.other.rentals'] !== undefined && state.questionAnswers['housing.other.debts'] !== undefined
   }
-  // Unknown tax facts are a valid saved state: guided users may still see a
-  // labelled legacy preview, while the person-tax capability remains gated.
-  if (definition.id === 'income.taxFacts') return true
+  // FE-43 C: the optional tax-details category. Unknown tax facts stay a valid
+  // saved state; these pages only report whether the facts are recorded.
+  if (definition.id === 'tax.intro') return state.questionAnswers['tax.intro'] !== undefined
+  if (definition.id === 'tax.tfsaRoom') return tfsaRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.rrspRoom') return rrspRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.fhsaRoom') return fhsaRoomComplete(householdPlan(state))
+  if (definition.id === 'tax.pensionSplit') return state.questionAnswers['tax.pensionSplit'] !== undefined || pensionSplitRecorded(householdPlan(state))
+  if (definition.id === 'tax.spousalHistory') return spousalHistoryComplete(householdPlan(state))
   if (definition.id === 'budget.method') {
     const budget = state.canonical?.budget
     // Answering an inclusion fact is itself an answer to the mode question, so
@@ -57,7 +96,7 @@ export function pageIsComplete(definition: QuestionDefinition, state: PageState)
       !(state.canonical.migration.budgetReconciliation?.answered ?? false)
     return basisAnswerable && !migratedPending
   }
-  const choicePages = ['family.people', 'family.children', 'saving.method', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
+  const choicePages = ['family.people', 'family.children', 'work.after', 'assets.identify', 'home.situation', 'home.mortgage', 'rental.0.mortgage', 'debt.0.type', 'spending.method', 'pension.self', 'pension.partner', 'intent.legacy', 'intent.spending', 'invest.mix', 'invest.strategy']
   if (choicePages.includes(definition.id)) return state.questionAnswers[definition.id] !== undefined
   const fields = requiredFields(definition, !!state.inputs.partner)
   if (!fields.length) return true

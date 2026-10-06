@@ -123,6 +123,22 @@ export function selectPlanTaxRules(request: TaxRuleRequest): TaxRuleContext {
  * resolver's cached copy cannot be mutated by a caller either, so the shared
  * pack can never be re-priced behind `rulePackId`.
  */
+const steadyContexts = new WeakMap<TaxRuleContext, TaxRuleContext>()
+/**
+ * BE-45: the context that prices a calendar year after the pack's own year.
+ * Only a pack that records a different later basic personal amount changes;
+ * every other context is returned as is.
+ */
+export function rulesForCalendarYear(context: TaxRuleContext, calendarYear: number | undefined): TaxRuleContext {
+  const later = context.pack.provincialBpaAfterTaxYear
+  if (later === undefined || calendarYear === undefined || calendarYear <= context.taxYear) return context
+  const cached = steadyContexts.get(context)
+  if (cached) return cached
+  const steady = freezeRuleContext({ ...context, pack: { ...context.pack, provincial: { ...context.pack.provincial, bpa: later } } })
+  steadyContexts.set(context, steady)
+  return steady
+}
+
 const anchorContexts = new Map<string, TaxRuleContext>()
 export function anchorTaxRules(province: string, taxYear = PLAN_TAX_YEAR): TaxRuleContext {
   const key = `${province}:${taxYear}`
@@ -162,6 +178,10 @@ export interface PersonCredits {
    * senior credit, so under-65 RPP income gets the federal amount only.)
    */
   pensionIncome?: number
+  /** BE-46: base CPP/QPP contributions and EI/QPIP premiums, credited federally and provincially. */
+  payrollCredit?: number
+  /** BE-46: the Canada employment amount, a federal credit only. */
+  employmentAmount?: number
   /** Provincial eligibility can differ from the federal pension amount. */
   provincialPensionIncome?: number
   /** Only supplied after the claimant confirms support/cohabitation. */
@@ -201,8 +221,19 @@ export function federalIncomeTax(taxable: number, rules: TaxRuleContext, credits
     credit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if ((credits?.age ?? 0) >= 65)
     credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold)) * federal.brackets[0].rate
+  // BE-46: base CPP/QPP, EI and QPIP contributions and the Canada employment amount.
+  credit += ((credits?.payrollCredit ?? 0) + (credits?.employmentAmount ?? 0)) * federal.brackets[0].rate
   const amount = Math.max(0, bracketTax(taxable, federal.brackets) - credit)
   return quebecAbatement ? amount * (1 - QC_ABATEMENT) : amount
+}
+
+/** BE-44: the part of a person's Québec basic personal credit their own tax
+ * cannot use, which TP-1 line 431 lets a spouse claim. */
+export function unusedQuebecBasicCredit(taxable: number, rules: TaxRuleContext): number {
+  if (rules.pack.jurisdiction !== 'QC')
+    throw new Error(`Quebec credit transfer needs a QC rule pack, got ${rules.pack.id}`)
+  const qc = rules.pack.provincial
+  return Math.max(0, qc.bpa * qc.brackets[0].rate - bracketTax(Math.max(0, taxable), qc.brackets))
 }
 
 export function ordinaryQuebecIncomeTax(taxable: number, rules: TaxRuleContext): number {
@@ -245,6 +276,7 @@ export function incomeTax(
   // the pension income amount has no age test of its own — eligibility by
   // income type is the caller's job (see PersonCredits.pensionIncome)
   fedCredit += Math.min(FED_PENSION_AMOUNT, pensionInc) * federal.brackets[0].rate
+  fedCredit += ((credits?.payrollCredit ?? 0) + (credits?.employmentAmount ?? 0)) * federal.brackets[0].rate
   if (credits?.spouseNetIncome !== undefined)
     fedCredit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if (senior) {
@@ -265,7 +297,9 @@ export function incomeTax(
     const phase = Math.min(1, Math.max(0, (taxable - from) / (to - from)))
     provBpa = p.bpa - (p.bpa - min) * phase
   }
-  let provCredit = provBpa * lowRate
+  // Quebec has no separate credit for QPP, EI and QPIP: they are folded into
+  // its basic personal amount.
+  let provCredit = provBpa * lowRate + (province === 'QC' ? 0 : credits?.payrollCredit ?? 0) * lowRate
   if (credits?.spouseNetIncome !== undefined && province !== 'QC')
     provCredit += (provincialSpouseAmount2026(province, credits.spouseNetIncome) ?? 0) * lowRate
   // provincial pension amounts (outside QC) have no age test either; QC's

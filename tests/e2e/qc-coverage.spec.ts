@@ -59,17 +59,19 @@ test('QC couple confirms a whole-year status with no month-by-month work in prof
 
 test('guided mode records a genuine mid-year change that survives reload and mode switch', async ({ page }) => {
   await seed(page, { guided: true })
-  await page.goto('/#/guided/income/income.taxFacts')
-  await expect(page.getByTestId('qc-drug-coverage')).toBeVisible()
+  await page.goto('/#/guided/family/family.qcDrug')
+  await expect(page.getByTestId('guided-qc-drug')).toBeVisible()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
-  await page.getByTestId('qc-coverage-all-self').selectOption('private')
-  await page.getByTestId('qc-coverage-all-partner').selectOption('private')
+  // Guided shows the whole-year status as choice cards, like every other page.
+  await page.getByTestId('qc-coverage-all-self-private').check()
+  await page.getByTestId('qc-coverage-all-partner-private').check()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // A genuine mid-year change: reveal the month detail, then edit one month.
   await page.getByTestId('qc-coverage-changed-self').check()
   await expect(page.getByTestId('qc-coverage-self-7')).toBeVisible()
   await page.getByTestId('qc-coverage-self-7').selectOption('public')
-  await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('mixed')
+  await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
+  await expect(page.getByTestId('qc-coverage-all-self-private')).not.toBeChecked()
   // Guided never auto-regenerates results on an edit: generate stays explicit.
   const stale = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(stale.resultRevision).toBeNull()

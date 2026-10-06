@@ -116,15 +116,33 @@ describe('requiredFireAssets', () => {
     expect(requiredFireAssets({ ...sameYear, nonRegBook: 700_000 })).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
     expect(requiredFireAssets(sameYear, refreshCanonicalFromLegacy(null, sameYear)).status).toBe('solved')
   })
-  it('withholds a FIRE number when a future non-registered basis cannot be reconstructed from the candidate', () => {
+  it('prices a working plan from the basis it projects for the FIRE year, labelled as an estimate (BE-42)', () => {
+    // Audit vector P06: 500,000 of non-registered money with a 500,000 nominal
+    // cost base, 2% inflation, 20 working years and one 500,000 retirement year.
     const p06: Inputs = { ...base, currentAge: 40, fireAge: 60, lifeExpectancy: 60,
       annualSavings: 0, retirementSpending: 500_000, inflation: .02,
       balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 }, nonRegBook: 500_000,
       returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, savingsSplit: { tfsa: 0, rrsp: 0, nonReg: 1 },
       nonRegDistributionYield: 0, fees: 0, cppAnnualAt65: 0, oasAnnualAt65: 0,
       strategy: 'nonRegFirst' }
-    expect(runProjection(p06).rows.at(-1)?.shortfall).toBeCloseTo(16_018.249433, 2)
-    expect(requiredFireAssets(p06)).toMatchObject({ status: 'unsupported', value: null, reason: 'nominalCapitalBasis' })
+    const full = runProjection(p06)
+    expect(full.rows.at(-1)?.shortfall).toBeCloseTo(16_018.249433, 2)
+    // The close of the year before FIRE carries 19 years of erosion; the FIRE
+    // year prices the basis after the 20th: 500,000 / 1.02^20.
+    const entering = full.rows.find(row => row.age === 59)!
+    expect(entering.nonRegBook).toBeCloseTo(500_000 / Math.pow(1.02, 19), 4)
+    // A FIRE-year snapshot built from that mix and basis reproduces the full
+    // plan exactly, which is what the old candidate-only basis could not do.
+    const snapshot = runProjection({ ...p06, currentAge: 60, balances: { tfsa: 0, rrsp: 0, nonReg: 500_000 },
+      nonRegBook: 500_000 / Math.pow(1.02, 20) })
+    expect(snapshot.rows.at(-1)?.shortfall).toBeCloseTo(16_018.249433, 2)
+    const answer = requiredFireAssets(p06)
+    expect(answer.status).toBe('solved')
+    expect(answer.assumptions).toContain('projectedFireYearAllocation')
+    // More than the 500,000 that falls 16,018 short, and less than covering
+    // the shortfall twice over.
+    expect(answer.value!).toBeGreaterThan(516_018)
+    expect(answer.value!).toBeLessThan(532_037)
   })
   it('withholds every quick answer when the plan itself realizes an unverified non-registered loss', () => {
     // Cost equal to value at the base year, but the reinvested distribution

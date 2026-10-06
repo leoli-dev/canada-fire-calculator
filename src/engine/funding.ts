@@ -4,11 +4,78 @@ import { ageReachedInYear } from './model'
 import { plannedFhsaYearTotal } from './fhsaPlan'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 
+/** BE-47: Home Buyers' Plan withdrawal limit per buyer (CRA, withdrawals after April 16, 2024). */
+export const HBP_LIMIT_PER_BUYER = 60_000
+
+/**
+ * Years from the first HBP withdrawal to the first repayment. CRA's temporary
+ * relief defers the start to the fifth following year for a first withdrawal
+ * made from January 1, 2022 to December 31, 2028; otherwise it is the second
+ * following year.
+ */
+export function hbpGraceYears(withdrawalCalendarYear: number): number {
+  return withdrawalCalendarYear >= 2022 && withdrawalCalendarYear <= 2028 ? 5 : 2
+}
+
+export interface HbpBuyer { personId: string | null; capacity: number }
+
+/**
+ * Each buyer may withdraw up to the limit from their own RRSPs only (regular
+ * or spousal, before the end of the year they turn 71); RRIF and LIF money is
+ * not eligible, and a partner never lends their unused limit to the other.
+ * The projection pools registered money in one bucket, so each owner's
+ * eligible capacity is that bucket times their RRSP share of the recorded
+ * registered balances. A recorded RRIF or LIF therefore counts as zero
+ * capacity. Without a recorded plan the legacy bucket is treated as RRSP; an
+ * eligible account whose owner is not recorded gives a buyer whose person is
+ * unknown, which never overstates the tax-free amount for a couple.
+ */
+export function hbpBuyers(pooledRrsp: number, hasPartner: boolean, plan?: InputsV2, year?: number): HbpBuyer[] {
+  const rrsp = Math.max(0, pooledRrsp)
+  const self = plan?.people.find(person => person.role === 'self')?.id ?? null
+  const registered = (plan?.accounts ?? []).filter(account =>
+    ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && account.balance > 0)
+  const total = registered.reduce((sum, account) => sum + account.balance, 0)
+  if (!plan || total <= 0) return [{ personId: hasPartner ? null : self, capacity: rrsp }]
+  const tooOld = (personId: string | null) => {
+    const person = personId ? plan.people.find(candidate => candidate.id === personId) : undefined
+    return !!person && year !== undefined && person.ageInBaseYear + year - plan.baseYear > 71
+  }
+  const byOwner = new Map<string | null, number>()
+  for (const account of registered) {
+    if (account.kind !== 'rrsp' && account.kind !== 'spousalRrsp') continue
+    const known = account.ownerId !== null && plan.people.some(person => person.id === account.ownerId)
+    // A single person owns everything; a couple's unrecorded owner stays unknown.
+    const owner = known ? account.ownerId : hasPartner ? null : self
+    if (tooOld(owner)) continue
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + account.balance)
+  }
+  return [...byOwner].map(([personId, balance]) => ({ personId, capacity: rrsp * balance / total }))
+}
+
+/**
+ * The 60,000 limit is fixed in dollars. The projection works in base-year
+ * purchasing power, so a purchase in a later year passes the limit deflated
+ * to that year (`cap`); the default is the limit itself.
+ */
+export const hbpLimitFor = (buyers: HbpBuyer[], cap = HBP_LIMIT_PER_BUYER) =>
+  buyers.reduce((sum, buyer) => sum + Math.min(cap, buyer.capacity), 0)
+
+/** Splits a household HBP withdrawal into each buyer's own repayable loan, in the same units as `cap`. */
+export function splitHbpWithdrawal(total: number, buyers: HbpBuyer[], cap = HBP_LIMIT_PER_BUYER): { personId: string | null; amount: number }[] {
+  let remaining = Math.max(0, total)
+  return [...buyers].sort((a, b) => b.capacity - a.capacity).map((buyer) => {
+    const amount = Math.min(remaining, cap, buyer.capacity)
+    remaining -= amount
+    return { personId: buyer.personId, amount }
+  }).filter(loan => loan.amount > 0)
+}
+
 export interface FundingGap {
   eventId: string
   field: string
   amount: number
-  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase' | 'saleDischarge' | 'saleTax'
+  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase' | 'saleDischarge' | 'saleTax' | 'hbpRepaymentTax'
 }
 
 export interface PurchaseFunds {
@@ -20,6 +87,8 @@ export interface PurchaseFunds {
   taxOnWithdrawal?: (taxable: number, rrspGross: number) => number
   annualSavings: number
   firstYearCost: number
+  /** BE-47: RRSP dollars the Home Buyers' Plan lets this purchase withdraw tax-free. */
+  hbpLimit?: number
 }
 
 export interface PurchaseAllocation {
@@ -36,6 +105,8 @@ export interface PurchaseAllocation {
   downPaymentFromAccounts: number
   /** A non-registered disposal realized a loss whose tax treatment is unmodeled. */
   nonRegLossRealized: boolean
+  /** BE-47: RRSP withdrawn tax-free under the Home Buyers' Plan, to be repaid over 15 years. */
+  hbpWithdrawal: number
 }
 
 /** Validate the consideration identity before any home or loan is booked. */
@@ -72,6 +143,8 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   let rrspWithdrawal = 0
   let nonRegLossRealized = false
   const grossWithdrawals: Record<AccountType, number> = { tfsa: 0, nonReg: 0, rrsp: 0 }
+  let hbpRemaining = Math.max(0, funds.hbpLimit ?? 0)
+  let hbpWithdrawal = 0
   const tax = funds.taxOnWithdrawal ?? ((taxable: number) => taxable * funds.marginalRate)
   const takeTaxable = (capacity: number, taxablePerGross: number, need: number, isRrsp: boolean) => {
     const net = (gross: number) => gross - (tax(
@@ -89,7 +162,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     }
     return hi
   }
-  const drawNet = (need: number) => {
+  const drawNet = (need: number, allowHbp = false) => {
     let remaining = Math.max(0, need)
     const tfsa = Math.min(remaining, Math.max(0, balances.tfsa))
     balances.tfsa -= tfsa
@@ -113,7 +186,17 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
     remaining -= nonReg - nonRegTax
     taxableWithdrawal += nonRegGain
     nonRegTaxable += nonRegGain
-    const rrsp = takeTaxable(balances.rrsp, 1, Math.max(0, remaining), true)
+    // BE-47: the down payment may take RRSP money tax-free under the Home
+    // Buyers' Plan first; only the rest is a taxable withdrawal.
+    if (allowHbp && remaining > 0 && hbpRemaining > 0) {
+      const hbp = Math.min(remaining, hbpRemaining, Math.max(0, balances.rrsp))
+      balances.rrsp -= hbp
+      grossWithdrawals.rrsp += hbp
+      hbpRemaining -= hbp
+      hbpWithdrawal += hbp
+      remaining -= hbp
+    }
+    const rrsp = remaining > 1e-9 ? takeTaxable(balances.rrsp, 1, remaining, true) : 0
     const rrspTax = tax(taxableWithdrawal + rrsp, rrspWithdrawal + rrsp) - tax(taxableWithdrawal, rrspWithdrawal)
     balances.rrsp -= rrsp
     grossWithdrawals.rrsp += rrsp
@@ -124,7 +207,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
   }
   const downPaymentFromFhsa = Math.min(home.downPayment, funds.fhsaBalance)
   const downPaymentFromAccounts = home.downPayment - downPaymentFromFhsa
-  const remaining = drawNet(downPaymentFromAccounts)
+  const remaining = drawNet(downPaymentFromAccounts, true)
   if (remaining > 0.01) return {
     mortgagePrincipal: principal, allocation: null,
     gap: { eventId: `purchase:${age}`, field: 'principalResidence.downPayment',
@@ -143,7 +226,7 @@ export function planPurchaseFunding(home: PlannedResidence, age: number, funds?:
       balances, grossWithdrawals, nonRegBook: book, taxableWithdrawal, nonRegTaxable, rrspWithdrawal,
       withdrawalTax: tax(taxableWithdrawal, rrspWithdrawal),
       firstYearCostFromSavings, firstYearCostFromOpening: firstYearCostFromOpening - unpaidCost,
-      downPaymentFromFhsa, downPaymentFromAccounts, nonRegLossRealized,
+      downPaymentFromFhsa, downPaymentFromAccounts, nonRegLossRealized, hbpWithdrawal,
     },
   }
 }

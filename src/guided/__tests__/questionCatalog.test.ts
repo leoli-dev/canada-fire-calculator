@@ -12,9 +12,9 @@ describe('question catalog', () => {
     expect(QUESTION_CATALOG.every((page) => page.questions.length >= 1 && page.questions.length <= 2)).toBe(true)
   })
 
-  it('keeps all seven categories in the directory', () => {
+  it('keeps the seven categories in the directory, then one optional tax-details category', () => {
     expect(QUESTION_CATEGORIES.map((category) => category.id)).toEqual([
-      'family', 'saving', 'assets', 'housing', 'spending', 'income', 'preferences',
+      'family', 'saving', 'assets', 'housing', 'spending', 'income', 'preferences', 'taxDetails',
     ])
   })
 
@@ -47,7 +47,10 @@ describe('question catalog', () => {
   it('uses the final answer review instead of a separate assumption-acceptance page', () => {
     expect(QUESTION_CATALOG.some((definition) => definition.id === 'assumptions.review')).toBe(false)
     expect(pageById('assumptions.review')?.id).toBe('invest.strategy')
-    expect(QUESTION_CATALOG.at(-1)?.id).toBe('invest.strategy')
+    // FE-43 C: only optional tax details follow the last required page.
+    const last = QUESTION_CATALOG.findIndex((definition) => definition.id === 'invest.strategy')
+    expect(QUESTION_CATALOG.filter((definition) => !definition.optional).at(-1)?.id).toBe('invest.strategy')
+    expect(QUESTION_CATALOG.slice(last + 1).every((definition) => definition.optional && definition.categoryId === 'taxDetails')).toBe(true)
   })
 
   it('provides distinct page-level guidance in every supported language', () => {
@@ -103,7 +106,8 @@ describe('BE-13 A budget page completeness', () => {
 
   it('sits in the saving category right after the amount it reinterprets', () => {
     const ids = QUESTION_CATALOG.filter((page) => page.categoryId === 'saving').map((page) => page.id)
-    expect(ids).toEqual(['saving.method', 'saving.amount', 'budget.method', 'work.after', 'work.amount', 'work.period'])
+    expect(ids).toEqual(['saving.amount', 'budget.method', 'saving.earned', 'work.after', 'work.amount', 'work.period'])
+    expect(pageById('saving.method')?.id).toBe('saving.amount')
   })
 
   it('is pending until the mode and both inclusion facts are answered', () => {

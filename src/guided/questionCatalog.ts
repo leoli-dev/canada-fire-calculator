@@ -1,4 +1,7 @@
 import type { Inputs } from '../engine'
+import type { InputsV2 } from '../engine/model'
+import { hasRecordedRegisteredType } from './accountFacts'
+import { spousalPlanAccounts, taxDetailsSkipped } from './taxDetails'
 import type { CategoryDefinition, QuestionAnswers, QuestionDefinition } from './schema'
 
 export const QUESTION_CATEGORIES: readonly CategoryDefinition[] = [
@@ -9,6 +12,7 @@ export const QUESTION_CATEGORIES: readonly CategoryDefinition[] = [
   { id: 'spending', contentKey: 'spending' },
   { id: 'income', contentKey: 'income' },
   { id: 'preferences', contentKey: 'preferences' },
+  { id: 'taxDetails', contentKey: 'taxDetails' },
 ]
 
 const page = (
@@ -16,7 +20,7 @@ const page = (
   categoryId: QuestionDefinition['categoryId'],
   questions: readonly string[],
   fieldBindings: readonly string[],
-  options: Partial<Pick<QuestionDefinition, 'estimatePolicy' | 'applicableWhen' | 'prerequisitePageId'>> = {},
+  options: Partial<Pick<QuestionDefinition, 'estimatePolicy' | 'applicableWhen' | 'prerequisitePageId' | 'optional'>> = {},
 ): QuestionDefinition => ({
   id,
   categoryId,
@@ -35,16 +39,23 @@ const accountSelected = (answers: QuestionAnswers, kind: string) =>
 export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('family.people', 'family', ['household'], ['household']),
   page('family.ages', 'family', ['currentAge', 'partnerAge'], ['currentAge', 'partner.currentAge']),
+  // FE-43 A: household tax facts live where the user is already thinking about them.
+  page('family.spouseSupport', 'family', ['spouseSupport'], [], { applicableWhen: (i) => !!i.partner, estimatePolicy: 'none', optional: true }),
   page('family.children', 'family', ['children'], ['children']),
   page('family.province', 'family', ['province'], ['province']),
+  page('family.qcDrug', 'family', ['qcDrugCoverage'], [], { applicableWhen: (i) => i.province === 'QC', estimatePolicy: 'none', optional: true }),
+  // BE-44: the Québec amount for a person living alone.
+  page('family.livesAlone', 'family', ['livesAlone'], [], { applicableWhen: (i) => i.province === 'QC' && !i.partner, estimatePolicy: 'none', optional: true }),
   page('time.work', 'family', ['workStyle', 'targetAssets'], ['fireAge', 'fireTargetAssets']),
   page('time.horizon', 'family', ['lifeExpectancy'], ['lifeExpectancy']),
 
-  page('saving.method', 'saving', ['savingUnit'], []),
   page('saving.amount', 'saving', ['annualSavings'], ['annualSavings']),
   // BE-13 A: what the saving figure means. Placed right after the amount so the
   // basis is decided next to the number it reinterprets.
   page('budget.method', 'saving', ['budgetMode'], ['budget.method', 'budget.debtIncluded', 'budget.taxBenefitIncluded']),
+  // FE-43 B: current employment income per person; optional, it only feeds the
+  // RRSP room preview.
+  page('saving.earned', 'saving', ['earnedIncome'], [], { estimatePolicy: 'none', optional: true }),
   page('work.after', 'saving', ['extraIncome'], ['extraIncome']),
   page('work.amount', 'saving', ['extraIncomeAnnual'], ['extraIncome.annual'], {
     applicableWhen: (_inputs, answers) => answerIs(answers, 'work.after', 'yes'),
@@ -58,6 +69,10 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('assets.identify', 'assets', ['accounts'], ['balances', 'fhsa', 'lockedRetirement']),
   page('account.tfsa.balance', 'assets', ['balance'], ['balances.tfsa'], { applicableWhen: (_i, a) => accountSelected(a, 'tfsa'), prerequisitePageId: 'assets.identify' }),
   page('account.rrsp.balance', 'assets', ['balance'], ['balances.rrsp'], { applicableWhen: (_i, a) => accountSelected(a, 'rrsp'), prerequisitePageId: 'assets.identify' }),
+  // FE-43 B: the account type defaults to a plain RRSP; a RRIF asks its own
+  // minimum-withdrawal facts on the next page.
+  page('account.rrsp.type', 'assets', ['registeredType'], [], { applicableWhen: (_i, a, plan) => accountSelected(a, 'rrsp') || hasRecordedRegisteredType(plan), prerequisitePageId: 'assets.identify', estimatePolicy: 'none', optional: true }),
+  page('account.rrif.details', 'assets', ['rrifOpened', 'rrifCategory'], [], { applicableWhen: (_i, _a, plan) => !!plan?.accounts.some((account) => account.kind === 'rrif'), prerequisitePageId: 'account.rrsp.type', estimatePolicy: 'none', optional: true }),
   page('account.nonReg.balance', 'assets', ['balance', 'nonRegBook'], ['balances.nonReg', 'nonRegBook'], { applicableWhen: (_i, a) => accountSelected(a, 'nonReg'), prerequisitePageId: 'assets.identify' }),
   page('allocation.tfsa', 'assets', ['allocation'], ['savingsSplit.tfsa', 'savingsSplit.rrsp', 'savingsSplit.nonReg'], { estimatePolicy: 'assumption' }),
   page('fhsa.details', 'assets', ['fhsaBalance', 'fhsaContribution'], ['fhsa.balance', 'fhsa.annualContribution'], { applicableWhen: (i) => !!i.fhsa, prerequisitePageId: 'assets.identify' }),
@@ -65,6 +80,7 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('locked.balance', 'assets', ['lockedBalance'], ['lockedRetirement.balance'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
   page('locked.access', 'assets', ['lockedAccess', 'lockedOwner'], ['lockedRetirement.accessibleAge', 'lockedRetirement.owner'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
   page('locked.contributions', 'assets', ['lockedEmployee', 'lockedEmployer'], ['lockedRetirement.employeeContribution', 'lockedRetirement.employerContribution'], { applicableWhen: (i) => !!i.lockedRetirement, prerequisitePageId: 'assets.identify' }),
+  page('assets.ownership', 'assets', ['accountOwnership'], [], { applicableWhen: (i) => !!i.partner, estimatePolicy: 'none' }),
 
   page('home.situation', 'housing', ['homeSituation'], ['housingMode']),
   page('home.value', 'housing', ['homeValue', 'homeFuture'], ['principalResidence.value', 'principalResidence.sellAtAge'], { applicableWhen: (i) => !!i.principalResidence && i.principalResidence.mode !== 'planned', prerequisitePageId: 'home.situation' }),
@@ -83,13 +99,16 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('debt.0.type', 'housing', ['debtType'], ['debts.0.kind'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
   page('debt.0.balance', 'housing', ['debtBalance'], ['debts.0.balance'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
   page('debt.0.payment', 'housing', ['debtPayment', 'debtTerm'], ['debts.0.annualPayment', 'debts.0.yearsRemaining'], { applicableWhen: (i) => (i.debts?.length ?? 0) > 0, prerequisitePageId: 'housing.other' }),
+  page('housing.ownership', 'housing', ['propertyOwnership'], [], { applicableWhen: (i) => !!i.partner && (!!i.principalResidence || (i.investmentProperties?.length ?? 0) > 0), estimatePolicy: 'none' }),
 
   page('spending.method', 'spending', ['spendingMethod'], []),
-  page('spending.total', 'spending', ['retirementSpending'], ['retirementSpending']),
   page('spending.homeFood', 'spending', ['wsHousing', 'wsGroceries'], ['worksheet.wsHousing', 'worksheet.wsGroceries'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.travelHealth', 'spending', ['wsTravel', 'wsHealth'], ['worksheet.wsTravel', 'worksheet.wsHealth'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.utilitiesTransport', 'spending', ['wsUtilities', 'wsTransport'], ['worksheet.wsUtilities', 'worksheet.wsTransport'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
   page('spending.funOther', 'spending', ['wsEntertainment', 'wsOther'], ['worksheet.wsEntertainment', 'worksheet.wsOther'], { applicableWhen: (_i, a) => answerIs(a, 'spending.method', 'estimate'), prerequisitePageId: 'spending.method' }),
+  // FE-39: the total comes after the categories, so the category path ends on
+  // the sum it applies instead of asking for a total first.
+  page('spending.total', 'spending', ['retirementSpending'], ['retirementSpending']),
 
   page('cpp.self', 'income', ['cppAmount', 'cppClaim'], ['cppAnnualAt65', 'cppStartAge']),
   page('oas.self', 'income', ['oasAmount', 'oasClaim'], ['oasAnnualAt65', 'oasStartAge']),
@@ -101,7 +120,6 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('pension.partner', 'income', ['pensionKind'], ['partner.pension'], { applicableWhen: (i) => !!i.partner }),
   page('pension.partner.details', 'income', ['pensionAmount', 'pensionStart'], ['partner.pension.annualAmount', 'partner.pension.startAge'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
   page('pension.partner.indexing', 'income', ['pensionIndexing', 'pensionBridge'], ['partner.pension.indexation', 'partner.pension.bridgeAnnual'], { applicableWhen: (i) => !!i.partner?.pension, prerequisitePageId: 'pension.partner' }),
-  page('income.taxFacts', 'income', ['taxFacts'], [], { estimatePolicy: 'none' }),
 
   page('intent.legacy', 'preferences', ['legacyPreference'], [], { estimatePolicy: 'none' }),
   page('intent.spending', 'preferences', ['spendingPreference'], ['goal'], { estimatePolicy: 'none' }),
@@ -109,10 +127,19 @@ export const QUESTION_CATALOG: readonly QuestionDefinition[] = [
   page('invest.fees', 'preferences', ['investmentFees', 'inflation'], ['fees', 'inflation'], { estimatePolicy: 'assumption' }),
   page('invest.tax', 'preferences', ['distributions', 'workingTaxRate'], ['nonRegDistributionYield', 'accumulationMarginalRate'], { estimatePolicy: 'assumption' }),
   page('invest.strategy', 'preferences', ['withdrawalStrategy'], ['strategy'], { estimatePolicy: 'assumption' }),
+
+  // FE-43 C: CRA room figures and the remaining tax elections, in one optional
+  // last category. Skipping it hides the rest of it and never blocks results.
+  page('tax.intro', 'taxDetails', ['taxDetailsChoice'], [], { estimatePolicy: 'none', optional: true }),
+  page('tax.tfsaRoom', 'taxDetails', ['tfsaRoom'], [], { applicableWhen: (_i, a) => !taxDetailsSkipped(a), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.rrspRoom', 'taxDetails', ['rrspRoom'], [], { applicableWhen: (_i, a) => !taxDetailsSkipped(a), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.fhsaRoom', 'taxDetails', ['fhsaRoom'], [], { applicableWhen: (i, a, plan) => !taxDetailsSkipped(a) && (!!i.fhsa || !!plan?.accounts.some((account) => account.kind === 'fhsa')), prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.pensionSplit', 'taxDetails', ['pensionSplit'], [], { applicableWhen: (i, a) => !taxDetailsSkipped(a) && !!i.partner, prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
+  page('tax.spousalHistory', 'taxDetails', ['spousalHistory'], [], { applicableWhen: (_i, a, plan) => !taxDetailsSkipped(a) && !!plan && spousalPlanAccounts(plan).length > 0, prerequisitePageId: 'tax.intro', estimatePolicy: 'none', optional: true }),
 ]
 
-export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers): QuestionDefinition[] {
-  return QUESTION_CATALOG.filter((definition) => definition.applicableWhen?.(inputs, answers) ?? true)
+export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers, plan?: InputsV2 | null): QuestionDefinition[] {
+  return QUESTION_CATALOG.filter((definition) => definition.applicableWhen?.(inputs, answers, plan) ?? true)
 }
 
 export function questionForField(field: string): QuestionDefinition | undefined {
@@ -128,6 +155,10 @@ export function pageById(id: string): QuestionDefinition | undefined {
     'allocation.nonReg': 'allocation.tfsa',
     'intent.confirm': 'intent.spending',
     'assumptions.review': 'invest.strategy',
+    // FE-43 C: the old all-in-one tax page now opens the optional category.
+    'income.taxFacts': 'tax.intro',
+    // FE-46: the monthly/yearly unit is a toggle on the amount page.
+    'saving.method': 'saving.amount',
   }
   const resolvedId = aliases[id] ?? id
   return QUESTION_CATALOG.find((definition) => definition.id === resolvedId)

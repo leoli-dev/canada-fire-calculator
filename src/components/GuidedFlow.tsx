@@ -9,6 +9,7 @@ import { useStore } from '../store'
 import { useCad } from '../format'
 import { QuestionPage } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
+import { ResetPlan } from './ResetPlan'
 
 function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
   const { t } = useTranslation()
@@ -16,10 +17,11 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
   return <nav className="category-navigation" aria-label={t('questionnaire.directory')}>
     {QUESTION_CATEGORIES.map((category) => {
       const categoryPages = pages.filter((page) => page.categoryId === category.id)
-      const answered = categoryPages.filter((page) => pageIsComplete(page, state)).length
+      // An unanswered optional page is not outstanding work.
+      const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
         <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(`questionnaire.pages.${page.contentKey}.question`)}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : t('questionnaire.status.pending')}</small></button>)}</div>
+        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(`questionnaire.pages.${page.contentKey}.question`)}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></button>)}</div>
       </details>
     })}
     <button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</button>
@@ -31,7 +33,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
   const cad = useCad()
   const state = useStore()
   const issues = validateInputs(state.inputs).filter((issue) => issue.severity === 'error')
-  const incomplete = pages.filter((page) => !pageIsComplete(page, state))
+  const incomplete = pages.filter((page) => !page.optional && !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
   const canGenerate = issues.length === 0 && incomplete.length === 0
   const formatNumber = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { maximumFractionDigits: 2 })
@@ -85,7 +87,11 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
     </section>
     <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
       const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
-      const value = category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
+      const categoryPages = pages.filter((page) => page.categoryId === category.id)
+      const value = category.id === 'taxDetails'
+        ? (state.questionAnswers['tax.intro'] === 'skip' ? t('questionnaire.taxDetails.reviewSkipped')
+          : t('questionnaire.taxDetails.reviewRecorded', { answered: categoryPages.filter((page) => page.id !== 'tax.intro' && pageIsComplete(page, state)).length, total: categoryPages.filter((page) => page.id !== 'tax.intro').length }))
+        : category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
       return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</button></div><p>{value}</p></article>
     })}</div>
     {(incomplete.length > 0 || issues.length > 0) && <div className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
@@ -93,6 +99,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
       {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
     </ul></div>}
     <button type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</button>
+    <ResetPlan onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
   </section>
 }
 
@@ -100,15 +107,18 @@ export function GuidedFlow() {
   const { t } = useTranslation()
   const state = useStore()
   const [directoryOpen, setDirectoryOpen] = useState(false)
-  const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers), [state.inputs, state.questionAnswers])
+  const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers, state.canonical), [state.inputs, state.questionAnswers, state.canonical])
   const current = pages.find((page) => page.id === state.activePageId) ?? pages[0]
   const index = Math.max(0, pages.findIndex((page) => page.id === current.id))
+  // FE-46: progress within the current category; the overall count grows as
+  // answers open branches, which read as going backwards.
+  const categoryPages = pages.filter((page) => page.categoryId === current.categoryId)
   const navigate = (id: string) => { state.setActivePage(id); window.location.hash = `#/guided/${pageById(id)?.categoryId}/${id}`; setDirectoryOpen(false) }
 
   useEffect(() => {
     const applyHash = () => {
       const latest = useStore.getState()
-      const latestPages = visibleQuestionPages(latest.inputs, latest.questionAnswers)
+      const latestPages = visibleQuestionPages(latest.inputs, latest.questionAnswers, latest.canonical)
       const hash = window.location.hash
       if (hash === '#/guided/review' || hash.endsWith('/assumptions.review')) {
         latest.setGuidedView('review')
@@ -147,6 +157,6 @@ export function GuidedFlow() {
   return <div className="questionnaire-layout">
     <button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</button>
     <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span>{index + 1} / {pages.length}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span data-testid="guided-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
   </div>
 }

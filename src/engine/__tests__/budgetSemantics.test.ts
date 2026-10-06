@@ -131,8 +131,8 @@ function recordedFact(budget: Extract<BudgetMode, { kind: 'savingsBudget' }>, fa
 describe('BE-13 A copy agrees with the fact each option records', () => {
   const optionCopy = (budget: Record<string, string>, parts: string[]): string => parts.map(part => budget[part]).join(' ')
   const copy = {
-    debtNet: { en: /net of .*listed loan payments/i, fr: /net d(es|u) .*remboursements de prêts inscrits/i, zh: /单列贷款还款/ },
-    noTax: { en: /without the tax difference/i, fr: /sans l’économie d’impôt/i, zh: /不含抵税差额/ },
+    debtNet: { en: /net of .*your loan payments/i, fr: /net d(e|u) .*vos remboursements de prêts/i, zh: /已扣掉?.*贷款还款/ },
+    noTax: { en: /without the RRSP tax refund/i, fr: /sans le remboursement d’impôt REER/i, zh: /不含RRSP退税/ },
     withTax: { en: /no separate tax refund/i, fr: /sans remboursement d’impôt distinct/i, zh: /不含单独退税/ },
     included: { en: /already included/i, fr: /déjà inclus/i, zh: /已经包含/ },
     excluded: { en: /not included yet/i, fr: /pas encore inclus/i, zh: /还没有包含/ },

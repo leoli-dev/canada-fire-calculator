@@ -622,6 +622,33 @@ export function removePerson(plan: InputsV2, personId: string): InputsV2 {
   }
 }
 
+/**
+ * FE-38: confirm that a one-person plan is now single. Every unassigned asset
+ * belongs to that person, and the removed partner's income sources and
+ * orphaned record are dropped, so the plan can leave the household estimate
+ * without resetting anything else. Refused (unchanged) for a couple, where an
+ * owner is a real choice between two people.
+ */
+export function settleSingleHousehold(plan: InputsV2): InputsV2 {
+  if (plan.people.length !== 1) return plan
+  const selfId = plan.people[0].id
+  const mine = { status: 'known' as const, shares: { [selfId]: 1 } }
+  const orphaned = new Set((plan.orphanedPeople ?? []).map(person => person.id))
+  return {
+    ...plan,
+    accounts: plan.accounts.map(account => account.ownerId === selfId && account.taxableOwnerShares.status === 'known' ? account
+      : { ...account, ownerId: selfId, taxableOwnerShares: mine }),
+    properties: plan.properties.map(property => property.taxableOwnerShares.status === 'known' ? property : { ...property, taxableOwnerShares: mine }),
+    incomeSources: plan.incomeSources.filter(source => source.recipientId !== null ||
+      ![...orphaned].some(id => source.id.startsWith(`${id}:`))).map(source => source.recipientId === null ? { ...source, recipientId: selfId } : source),
+    contributions: plan.contributions.map(c => c.contributorId === null ? { ...c, contributorId: selfId } : c),
+    recurringContributions: plan.recurringContributions.map(c => c.contributorId === null ? { ...c, contributorId: selfId } : c),
+    ownershipAmounts: undefined,
+    orphanedPeople: undefined,
+    migration: { ...plan.migration, ownershipNeedsConfirmation: false },
+  }
+}
+
 /** Populate facts introduced after early v11 snapshots without altering saved ownership. */
 export function completeCanonicalFacts(plan: InputsV2, inputs: Inputs): InputsV2 {
   if (!plan || !Array.isArray(plan.people) || !Array.isArray(plan.accounts) || !Array.isArray(plan.properties) || !Number.isInteger(plan.baseYear)) throw new Error('Invalid canonical plan')

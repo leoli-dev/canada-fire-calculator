@@ -199,7 +199,9 @@ export function changeAccountPresence(
     const fieldMeta = unresolved
       ? previous?.status === 'unknown' ? previous : { status: 'unknown' as const, origin: 'user' as const, updatedAt }
       : previous?.status === 'confirmed' || previous?.status === 'estimated'
-        ? previous : { status: 'estimated' as const, origin: 'default' as const, updatedAt }
+        // FE-40: ticking an account shows its sample balance, which is not an
+        // answer until the user enters or confirms the real amount.
+        ? previous : { status: 'estimated' as const, origin: 'example' as const, updatedAt }
     return {
       questionAnswers: { ...state.questionAnswers, 'assets.identify': nextSelected },
       answerMeta: { ...state.answerMeta, [id]: fieldMeta, [account]: { status: 'estimated', origin: 'user', updatedAt } },

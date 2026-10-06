@@ -460,6 +460,8 @@ export const PROV_AGE_PENSION: Record<
     pension: number
     /** SK senior supplementary amount — 65+, not income-tested */
     seniorSupplement?: number
+    /** QC amount for a person living alone (Schedule B), reduced with the age/pension amounts */
+    livingAlone?: number
   }
 > = {
   ON: { ageMax: 6342, ageThreshold: 47210, ageRate: 0.15, pension: 1796 },
@@ -468,7 +470,12 @@ export const PROV_AGE_PENSION: Record<
   // QC uses a combined family-tested credit (age + retirement income),
   // reduced at 18.75% of family net income above the threshold; we apply it
   // per person on their income share, which matches the engine's 50/50 split.
-  QC: { ageMax: 3986, ageThreshold: 42955, ageRate: 0.1875, pension: 3541 },
+  // BE-44: the amount for a person living alone shares that one reduction.
+  // 2026 figures (2025 in brackets): living alone 2,172 (2,128), age 3,986,
+  // retirement income 3,541, threshold 42,955. Source: Québec Finance,
+  // "Parameters of the personal income tax system for 2026", table of
+  // parameters subject to indexing (AUTEN_IncomeTax2026.pdf).
+  QC: { ageMax: 3986, ageThreshold: 42955, ageRate: 0.1875, pension: 3541, livingAlone: 2172 },
   MB: { ageMax: 3728, ageThreshold: 27749, ageRate: 0.15, pension: 1000 }, // frozen
   SK: { ageMax: 5901, ageThreshold: 43927, ageRate: 0.15, pension: 1000, seniorSupplement: 2569 },
   NS: { ageMax: 5826, ageThreshold: 30828, ageRate: 0.15, pension: 1173 },

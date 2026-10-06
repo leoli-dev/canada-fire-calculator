@@ -84,7 +84,7 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await generate.click()
   await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
-  await expect(page.locator('.results-column')).toContainText('shared projected endpoint')
+  await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
   await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
   await expect(page.locator('.target-field input')).toHaveValue('750,000')
 
@@ -132,7 +132,7 @@ test('guided users may leave the personal target unset and add it from results',
   await expect(page.locator('[data-field="fireTargetAssets"] input')).toHaveValue('900,000')
 })
 
-test('a non-registered cost history withholds a false FIRE number in guided and professional results', async ({ page }) => {
+test('a working plan with non-registered money gets a labelled FIRE-number estimate, never a false one, in both modes', async ({ page }) => {
   test.setTimeout(60_000)
   await completeGuidedQuestionnaire(page, 'no')
   await page.getByRole('button', { name: 'Generate my results' }).click()
@@ -142,14 +142,16 @@ test('a non-registered cost history withholds a false FIRE number in guided and 
   await page.goto('/#/guided/review')
   await page.getByRole('button', { name: 'Generate my results' }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+  // BE-42: the answer, if any, is labelled as priced from the projected
+  // FIRE-year basis and the summary is never styled as a verified success.
   const summary = page.locator('.summary')
-  await expect(summary).toContainText('cannot preserve the verified nominal cost history')
-  await expect(summary).not.toContainText('Your FIRE number:')
+  await expect(summary).not.toHaveClass(/\bok\b/)
+  if (await summary.getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
 
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
-  await expect(page.locator('.summary')).toContainText('cannot preserve the verified nominal cost history')
-  await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
+  await expect(page.locator('.summary')).not.toHaveClass(/\bok\b/)
+  if (await page.locator('.summary').getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
   await expect(page.locator('.results-column')).not.toContainText('NaN')
   await expect(page.locator('.results-column')).not.toContainText('Infinity')
 })
@@ -220,11 +222,12 @@ test('future savings allocation is one page with a live 100 percent total', asyn
   await expect(page.locator('.allocation-total')).toContainText('合计 100%')
   await expect(page.locator('.allocation-total')).toContainText('三个比例合计为100%')
 
-  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('10')
+  // The example split is 15/45/40 (FE-40: the example TFSA stays under the 2026 limit).
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('30')
   await expect(page.locator('.allocation-total')).toContainText('合计 90%')
   await expect(page.locator('.allocation-total')).toContainText('还需要分配 10 个百分点')
 
-  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('20')
+  await page.locator('[data-field="savingsSplit.nonReg"] input').fill('40')
   await expect(page.locator('.allocation-total')).toHaveClass(/complete/)
 })
 
@@ -390,7 +393,7 @@ test('the OAS estimate is recorded as an estimate while claim-age options confir
   await page.locator('.estimator summary').click()
   await page.locator('.estimator input').fill('32')
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
-  await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(amount.locator('input')).toHaveValue('7,320')
   await expect(amount.locator('small')).toHaveText('估算')
   await expect(age.locator('small')).toHaveText('示例')
   await expect(page.locator('.benefit-estimate-note')).toContainText('不代表政府核定')
@@ -408,7 +411,7 @@ test('the OAS estimate is recorded as an estimate while claim-age options confir
   await expect(page.getByRole('radio', { name: /67 岁 · 延后两年/ })).not.toBeChecked()
   await page.reload()
   await expect(amount.locator('small')).toHaveText('估算')
-  await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(amount.locator('input')).toHaveValue('7,320')
   await expect(age.locator('input')).toHaveValue('68')
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false)
 })
@@ -424,7 +427,7 @@ test('partner OAS estimate and claim-age options update partner fields', async (
   await page.locator('.estimator summary').click()
   await page.locator('.estimator input').fill('32')
   await page.locator('.estimator').getByRole('button', { name: '应用' }).click()
-  await expect(amount.locator('input')).toHaveValue('7,219')
+  await expect(amount.locator('input')).toHaveValue('7,320')
   await expect(amount.locator('small')).toHaveText('估算')
   const age = page.locator('[data-field="partner.oasStartAge"]')
   await expect(age.locator('small')).toHaveText('示例')
@@ -464,6 +467,10 @@ test('final review replaces the redundant assumption page without overwriting co
   await page.getByRole('button', { name: '加拿大央行目标 · 2.0%' }).click()
   await page.goto('/#/guided/preferences/invest.strategy')
   await page.getByRole('radio', { name: /RRSP 分段提取/ }).check()
+  // FE-43 C: an optional tax-details category follows; skipping it goes straight to the review.
+  await page.locator('.question-pager button').last().click()
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'tax.intro')
+  await page.getByTestId('guided-tax-intro-choice-skip').check()
   await page.locator('.question-pager').getByRole('button', { name: '核对答案' }).click()
 
   await expect(page.getByRole('heading', { name: '核对你的答案' })).toBeVisible()

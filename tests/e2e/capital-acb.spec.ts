@@ -58,6 +58,8 @@ test('investment-property selling expenses are one shared fact in both entry mod
   expect((await saved()).inputs.investmentProperties[0].saleExpenses).toBe(12000)
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await page.goto('/#/guided/housing/rental.0.income')
+  // FE-40: sale costs belong to a planned sale, so guided asks keep-or-sell first.
+  await page.getByRole('radio', { name: 'Sell it at a certain age' }).check()
   await expect(page.locator('[data-field="investmentProperties.0.saleExpenses"] input')).toHaveValue('12,000')
   await page.locator('[data-field="investmentProperties.0.saleExpenses"] input').fill('15000')
   await page.reload()

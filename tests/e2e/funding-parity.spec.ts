@@ -167,7 +167,7 @@ test('the same funded purchase yields the same result after guided generation an
   await generate.click()
   const guidedSummary = await page.locator('.summary').innerText()
   expect(guidedSummary).toContain('Final-year taxable addition')
-  expect(guidedSummary).toContain('shared projected endpoint')
+  expect(guidedSummary).toContain('adds remaining registered balances')
   expect(guidedSummary).toMatch(/Added final-return tax and repayment (?!CA\$0\b)/)
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   expect(await page.locator('.summary').innerText()).toBe(guidedSummary)

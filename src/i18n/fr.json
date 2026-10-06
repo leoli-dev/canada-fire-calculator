@@ -6,10 +6,10 @@
     "modeSavings": "Montant d’épargne (argent net à investir)",
     "modeSavingsDetail": "Vous inscrivez le montant qui reste à investir; les deux questions ci-dessous précisent ce qu’il déduit déjà.",
     "modeIncome": "Revenu et dépenses",
-    "modeIncomeDetail": "Vous inscrivez les dépenses de la période de travail et le plan puise dans vos revenus. Pas encore modélisé dans cette tranche.",
-    "debtIncluded": "Ce montant déduit-il déjà les remboursements de prêts inscrits?",
+    "modeIncomeDetail": "Vous inscrivez les dépenses de la période de travail et le plan puise dans vos revenus. Le plan ne chiffre pas encore cette option.",
+    "debtIncluded": "Ce montant déduit-il déjà vos remboursements de prêts (l’hypothèque et les autres prêts inscrits dans Logement et prêts)?",
     "debtIncludedDetail": "Oui indique que le montant les déduit déjà; le plan ne doit pas les déduire de nouveau.",
-    "taxBenefitIncluded": "Tient-il déjà compte de l’économie d’impôt REER/FERR?",
+    "taxBenefitIncluded": "Tient-il déjà compte du remboursement d’impôt que procurent vos cotisations REER?",
     "taxBenefitIncludedDetail": "Oui indique que le montant en tient déjà compte; aucun remboursement ne s’ajoute.",
     "yes": "Oui, déjà inclus",
     "no": "Non, pas encore inclus",
@@ -17,30 +17,28 @@
     "workingSpendingHint": "Inscrivez vos dépenses d’une année de travail normale, sans les remboursements de prêts inscrits plus loin. Ce n’est pas le montant de retraite.",
     "legacyReview": "Ce montant vient de votre plan précédent, où une définition différente s’appliquait. Précisez ce qu’il signifie avant qu’il soit utilisé.",
     "legacyKeep": "Le garder comme approximation",
-    "legacyKeepDetail": "Considérer le montant comme déjà net des remboursements de prêts inscrits et sans l’économie d’impôt. Le plan l’enregistre, et le chiffrage reste indisponible tant que la règle n’existe pas.",
+    "legacyKeepDetail": "Considérer le montant comme déjà net de vos remboursements de prêts et sans le remboursement d’impôt REER. Le plan l’enregistre, et le chiffrage reste indisponible tant que la règle n’existe pas.",
     "legacyAdopt": "Le traiter comme le nouveau montant net d’épargne",
-    "legacyAdoptDetail": "Utiliser le même nombre selon la définition ci-dessus: déjà net du coût de la vie, de l’impôt et des remboursements de prêts inscrits, sans remboursement d’impôt distinct.",
+    "legacyAdoptDetail": "Utiliser le même nombre selon la définition ci-dessus : déjà net du coût de la vie, de l’impôt et de vos remboursements de prêts, sans remboursement d’impôt distinct.",
     "legacyBaseline": "Votre plan précédent amortissait aussi {{annualDebt}} de remboursements de prêts par année. Cette base sert seulement à la comparaison; rien ne s’ajoute automatiquement à votre montant.",
     "stateTitle": "Base enregistrée",
-    "stateReady": "Prêt: montant net d’épargne de {{value}} par année, net des remboursements de prêts inscrits et de l’économie d’impôt.",
+    "stateReady": "Prêt : montant net d’épargne de {{value}} par année, net de vos remboursements de prêts et du remboursement d’impôt REER.",
     "stateUnknown": "À répondre: {{fields}}. Le plan les garde inconnues plutôt que de supposer une réponse.",
     "stateKnownFalse": "Enregistré comme non inclus: {{detail}}",
     "stateIncome": "Enregistré comme budget de revenu. {{detail}}",
-    "estimateExcluded": "La base d’épargne que vous avez enregistrée omet un élément que cette projection traite encore comme inclus; le résultat ci-dessous est donc une estimation, et non un chiffre précis, jusqu’à ce que BE-14 B chiffre la base enregistrée.",
+    "estimateExcluded": "La base d’épargne que vous avez enregistrée omet un élément que cette projection traite encore comme inclus; le résultat ci-dessous est donc une estimation, et non un chiffre précis, tant que la projection ne peut pas chiffrer la base enregistrée.",
     "fieldDebt": "si les remboursements de prêts inscrits sont déjà déduits",
-    "fieldTax": "si l’économie d’impôt REER/FERR est déjà prise en compte"
+    "fieldTax": "si le remboursement d’impôt REER est déjà compté"
   },
   "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; le tableau fiscal, les classements de stratégies et les comparaisons précises sont masqués.",
   "be11SingleEstimate": "L’impôt, les graphiques et les outils d’une seule personne utilisent encore l’ancienne estimation pendant l’emploi ou pour les événements non pris en charge.",
-  "be11QcLimit": "La précision fiscale au Québec est limitée pour ce plan. Une couverture médicaments inconnue ou publique attend l’annexe K 2026 non publiée; les autres événements non pris en charge restent aussi estimatifs. Les conseils et comparaisons précis sont masqués.",
+  "be11QcLimit": "L’impôt du Québec utilise ici des règles québécoises simplifiées. Une couverture médicaments inconnue ou publique exige l’annexe K 2026, non publiée, et les autres événements non pris en charge restent des estimations; les tableaux, classements et comparaisons ci-dessous sont donc aussi des estimations.",
   "be11ComparisonLimit": "La comparaison exacte entre le plan actuel et le scénario A exige un impôt individuel vérifié pour les deux plans.",
   "be11ComparisonEstimate": "Cette comparaison d’une seule personne reste une estimation de l’ancien modèle fiscal.",
   "be11TerminalComparisonLimit": "La comparaison des successions après impôt est indisponible : l’impôt final individuel n’est pas vérifié pour les deux plans. La valeur nette finale exclut l’impôt successoral et n’est affichée que si la comparaison est prise en charge.",
   "be11AuxiliaryEstimate": "Les outils de calendrier, stratégie et Monte Carlo ci-dessous utilisent encore l’ancienne approximation individuelle; leurs classements sont estimatifs.",
   "be11": {
     "title": "Bénéficiaire et propriétaire du revenu imposable",
-    "reviewed": "J’ai vérifié ces données fiscales",
-    "unknownStill": "Je ne peux pas encore les confirmer; garder des estimations",
     "personLedger": "Impôt par personne et par année",
     "ledgerLimit": "L’impôt annuel utilise les hypothèses de 2026 en dollars réels. L’impôt successoral, les autres solveurs et les événements complexes exigent d’autres règles individuelles.",
     "person": "Personne",
@@ -77,7 +75,10 @@
     "rrifAllOther": "Autres FERR",
     "rrifFactorHelp": "Vérifiez les dossiers d’ouverture, de transfert et de modification du fournisseur avant de choisir. L’année d’ouverture ne prouve pas la catégorie; laissez-la non confirmée pour limiter le minimum et l’impôt précis.",
     "rrifFactorSource": "Tableau des facteurs prescrits de l’ARC",
-    "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas. Les crédits familiaux, FSS et RAMQ du Québec attendent BE-35."
+    "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas.",
+    "homeOwner": "Propriétaire de la résidence principale",
+    "typeSpousalRrsp": "REER de conjoint",
+    "accountOwner": "Titulaire"
   },
   "be35": {
     "qcSplitTransferor": "Choix québécois de l’annexe Q : qui transfère?",
@@ -85,7 +86,7 @@
     "splitHelp": "Le choix québécois est distinct du fractionnement fédéral. La personne qui transfère doit avoir au moins 65 ans; ne choisissez un transfert que si vous faites le choix de l’annexe Q.",
     "coverageTitle": "Assurance médicaments du Québec",
     "coverageHelp": "Ceci ne touche que la prime d’assurance médicaments du Québec (ligne 447 de la déclaration TP-1), dans la ligne fiscale québécoise de chaque personne — rien d’autre. Cela concerne les résidents du Québec couverts par le régime public de la RAMQ, un régime privé admissible ou une exemption vérifiée. Choisissez un statut pour toute l’année; le détail mensuel ne sert que si la couverture a réellement changé en cours d’année. Une année comportant un mois public demeure une estimation étiquetée jusqu’à la publication de l’annexe K 2026.",
-    "coveragePerson": "Couverture de {{person}}",
+    "coveragePerson": "{{person}} : assurance médicaments",
     "mixed": "Mois différents",
     "unknown": "Non confirmé",
     "private": "Régime privé de base",
@@ -112,9 +113,9 @@
   "ruleAssumptionsLimit": "Les échelles de taux fédérale et provinciale et les montants personnels de base proviennent du paquet retenu. La liste par province ci-dessus nomme ce que ces chiffres incluent et excluent. Chaque autorité citée est affichée soit avec les chiffres qu’une personne a vérifiés dans le document et la date de cette vérification, soit avec la mention claire qu’elle est seulement citée et que son contenu n’a pas été vérifié; lorsqu’une ligne consigne une limite — une approximation, un montant dérivé plutôt que publié, ou une page qui bloque les lecteurs automatisés — cette limite est indiquée à côté du lien. La réduction ajustée du GIS/Allocation et les approximations du PPE sont inchangées, et aucun résultat n’est une déclaration de revenus complète ni une situation complète après prestations.",
   "ruleCoverageImplemented": "Crédits compris dans ces chiffres de {{year}} pour {{jurisdiction}} :",
   "ruleCoverageUnsupported": "Crédits non compris dans ces chiffres pour {{jurisdiction}} :",
-  "ruleCoverageNotModelled": "« Non modélisé » signifie « non approximé » : rien dans le moteur ne remplace les éléments ci-dessus, et aucun résultat n’est une déclaration de revenus complète.",
+  "ruleCoverageNotModelled": "« Non modélisé » signifie « non approximé » : rien dans le calculateur ne remplace les éléments ci-dessus, et aucun résultat n’est une déclaration de revenus complète.",
   "ruleCoverageAuthorityChecked": "contenu vérifié le {{date}} : {{figures}}",
-  "ruleCoverageAuthorityListed": "seulement citée — contenu non vérifié",
+  "ruleCoverageAuthorityListed": "seulement citée, contenu non vérifié",
   "ruleCoverageAuthorityBlocked": "bloquée pour les lecteurs automatisés ({{gate}})",
   "ruleCoverageCaveat": "Ce calculateur ne modélise que les tranches d’impôt sur le revenu fédérales et provinciales, le montant personnel de base et les crédits nommés dans cette liste. Il ne modélise pas le crédit pour la TPS/TVH, aucune prestation en espèces provinciale ou territoriale, aucune réduction d’impôt pour faible revenu ni réduction remboursable, les crédits d’impôt pour dividendes, le montant pour l’emploi au Canada ni la base de revenu net qu’utilisent les feuillets provinciaux du crédit pour conjoint (les lignes « conjoint » appliquent les maximums et les seuils publiés, pas cette base) : aucun chiffre produit n’est donc une déclaration de revenus complète, une situation après impôt complète ni une situation complète après prestations. Lorsqu’un crédit appliqué est un montant fixe plutôt qu’indexé par année (les montants pour âge et pour revenu de pension, les maximums pour conjoint, la surtaxe et la prime-santé de l’Ontario, les frais d’homologation, le taux d’inclusion des gains en capital, les cotisations du Québec), un exercice futur présumé reporte tel quel ce montant de 2026, et la ligne le précise.",
   "ruleTaxSource": "Source des tranches d’impôt",
@@ -182,7 +183,7 @@
   "valLockedEmployeeExceedsSavings": "Votre cotisation CD ne peut pas dépasser l'épargne annuelle",
   "nonReg": "Non enregistré",
   "nonRegBook": "Prix de base rajusté (PBR) du non enregistré",
-  "nonRegBookHint": "Utilisez le prix de base rajusté vérifié, y compris les distributions réinvesties et les achats. S'il est inconnu, choisissez Inconnu : un pourcentage deviné ne permet pas un impôt précis. Le coût peut dépasser la valeur actuelle.",
+  "nonRegBookHint": "Utilisez le prix de base rajusté vérifié, y compris les distributions réinvesties et les achats. S’il est inconnu, laissez le champ vide ou choisissez « Je ne sais pas encore » : un pourcentage deviné ne permet pas un impôt précis. Le coût peut dépasser la valeur actuelle.",
   "nonRegTaxTitle": "Frein fiscal du compte non enregistré",
   "nonRegYieldLabel": "Distributions annuelles (intérêts/dividendes, %/an)",
   "nonRegYieldHint": "Les valeurs par défaut ci-dessous conviennent à la plupart des gens - laissez-les telles quelles en cas de doute. Les intérêts, dividendes et distributions de FNB d'un compte non enregistré sont imposés l'année où ils sont versés, même réinvestis automatiquement - c'est le frein fiscal. À la retraite, ils s'ajoutent au revenu imposable; pendant les années de travail, ils sont imposés au taux marginal ci-dessous. FNB d'actions : ~2 %; obligations/CPG : davantage. Mettre 0 pour désactiver.",
@@ -307,9 +308,7 @@
   "scenarioA": "Scénario A",
   "scenarioCurrent": "Actuel",
   "scenarioHint": "Sauvegardez un instantané, puis modifiez les paramètres pour comparer.",
-  "reset": "Réinitialiser",
   "disclaimer": "Estimation éducative seulement, en dollars d'aujourd'hui, règles fiscales simplifiées - pas un conseil financier.",
-  "simplificationsNote": "Ce calculateur fait un certain nombre d'hypothèses simplificatrices — les résultats sont une approximation, pas une garantie de la réalité.",
   "simplificationsLink": "Voir ce qui est simplifié",
   "saleLabel": "Vente",
   "mode_target": "Atteindrai-je ma cible ?",
@@ -471,7 +470,7 @@
     },
     "debt": {
       "title": "Amortissement des dettes et inflation",
-      "body": "Les versements hypothécaires et de prêts sont fixés contractuellement en dollars nominaux : le même montant papier chaque année. Ce calculateur travaille du début à la fin en pouvoir d’achat d’aujourd’hui, donc le fardeau réel d’un même versement rétrécit d’année en année — à 2 % d’inflation, le dernier versement d’une hypothèque de 25 ans ne pèse qu’environ 61 % d’aujourd’hui. C’est le mécanisme honnête derrière « l’inflation paie votre hypothèque » ; l’ignorer surestime la pression de la dette et repousse votre âge FIRE. Le moteur déduit le taux implicite de (solde, versement annuel, années restantes) et amortit année par année ; exprimés en dollars réels, les versements en phase de retraite s’ajoutent à la cible de dépenses et le solde restant est soustrait de la valeur nette. Notez la sémantique de « l’épargne annuelle » : c’est ce que vous épargnez après les versements — une dette remboursée avant FIRE touche le bilan, pas les flux de retraite. Une hypothèque peut aussi être rattachée directement à un immeuble précis plutôt qu’à cette liste générale — la vente la rembourse alors automatiquement en priorité sur le produit, et tant que l’immeuble est détenu, ses intérêts (pas le capital) sont déductibles du loyer de cet immeuble, comme dans un vrai montage locatif à effet de levier. Saisissez chaque hypothèque à un seul endroit, pas les deux."
+      "body": "Les versements hypothécaires et de prêts sont fixés contractuellement en dollars nominaux : le même montant papier chaque année. Ce calculateur travaille du début à la fin en pouvoir d’achat d’aujourd’hui, donc le fardeau réel d’un même versement rétrécit d’année en année — à 2 % d’inflation, le dernier versement d’une hypothèque de 25 ans ne pèse qu’environ 61 % d’aujourd’hui. C’est le mécanisme honnête derrière « l’inflation paie votre hypothèque » ; l’ignorer surestime la pression de la dette et repousse votre âge FIRE. Le calculateur déduit le taux implicite de (solde, versement annuel, années restantes) et amortit année par année ; exprimés en dollars réels, les versements en phase de retraite s’ajoutent à la cible de dépenses et le solde restant est soustrait de la valeur nette. Notez la sémantique de « l’épargne annuelle » : c’est ce que vous épargnez après les versements — une dette remboursée avant FIRE touche le bilan, pas les flux de retraite. Une hypothèque peut aussi être rattachée directement à un immeuble précis plutôt qu’à cette liste générale — la vente la rembourse alors automatiquement en priorité sur le produit, et tant que l’immeuble est détenu, ses intérêts (pas le capital) sont déductibles du loyer de cet immeuble, comme dans un vrai montage locatif à effet de levier. Saisissez chaque hypothèque à un seul endroit, pas les deux."
     },
     "qclevies": {
       "title": "Prime RAMQ + cotisation au FSS (retraités québécois)",
@@ -483,7 +482,7 @@
     },
     "hbp": {
       "title": "RAP - Régime d'accession à la propriété",
-      "body": "Un programme distinct pour une première propriété : retirez jusqu'à 60 000 $ de votre REER libre d'impôt pour un achat admissible, puis remboursez-le dans le REER sur 15 ans (les remboursements manqués deviennent un revenu imposable cette année-là). Il peut être combiné au CELIAPP pour le même achat. Non modélisé ici — le CELIAPP couvre déjà la majeure partie d'une mise de fonds typique, et suivre un calendrier de remboursement sur 15 ans ajoute de la complexité; c'est une simplification délibérée. Financer la mise de fonds autrement sous-estimerait l'avantage fiscal propre au CELIAPP."
+      "body": "Un programme distinct pour une première propriété : retirez jusqu'à 60 000 $ de votre REER libre d'impôt pour un achat admissible, puis remboursez-le dans le REER sur 15 ans (les remboursements manqués deviennent un revenu imposable cette année-là). Il peut être combiné au CELIAPP pour le même achat. Le calculateur l'utilise pour la part REER de la mise de fonds d'une première propriété prévue, jusqu'à 60 000 $ par acheteur, et rembourse 1/15 par année à même votre épargne à partir de la deuxième année suivant l'achat; un versement que l'épargne ne couvre pas est imposé comme revenu. Vous pouvez le désactiver pour l'achat."
     },
     "ccb": {
       "title": "ACE - Allocation canadienne pour enfants",
@@ -491,7 +490,7 @@
     },
     "simplifications": {
       "title": "Ce que ce calculateur simplifie",
-      "body": "Pour garder le calcul maîtrisable et vérifiable, ce calculateur fait un certain nombre de simplifications; les résultats sont une approximation honnête dans sa direction, pas une garantie de votre résultat fiscal réel futur. Le mode couple suppose que le RPC, les retraits REER, le revenu locatif et le revenu de placement peuvent tous être fractionnés 50/50 — en réalité, les retraits REER avant 65 ans sont imposés uniquement au titulaire du compte (sauf REER de conjoint mis en place à l'avance), le revenu d'appoint Barista FIRE ne peut légalement pas être partagé avec un conjoint (le calculateur le traite déjà séparément), et l'impôt successoral est estimé comme un partage égal entre conjoints plutôt que selon le barème du survivant seul (habituellement plus lourd). Les distributions non enregistrées et le loyer net sont imposés chaque année comme revenu ordinaire (pas de majoration/crédit de dividendes, pas de DPA locative modélisée); le SRG et l'Allocation pour le conjoint de 60 à 64 ans utilisent un ajustement linéaire par morceaux aux tables officielles des montants mensuels, à 3 $/mois près à chaque tranche de revenu publiée (les maximums et les seuils sont exacts); les plafonds de cotisation CELI/REER ne sont pas vérifiés et les remboursements REER ne sont pas réinvestis automatiquement; la bonification du RPC (cotisations postérieures à 2019) n'est pas modélisée, ce qui sous-estime les prestations des utilisateurs plus jeunes (direction prudente); les dettes et hypothèques sont traitées comme des paiements nominaux fixes, sans refinancement ni taux variable; Monte-Carlo tire un seul résultat de marché par année pour tous les comptes (corrélation complète), alors que la corrélation réelle est un peu plus faible (également prudent); les coûts ponctuels importants comme les soins de longue durée ne sont pas modélisés; et certains chiffres RAMQ/FSS du Québec ainsi que les taux d'homologation provinciaux sont approximés à partir de sources secondaires plutôt que de données officielles année par année, les sites officiels bloquant la récupération automatisée. Les régimes d'employeur ajoutent leurs propres simplifications : la rente au survivant n'est pas modélisée (les deux conjoints sont supposés atteindre l'espérance de vie commune), la règle québécoise exigeant 65 ans pour le fractionnement provincial est ignorée (fractionnement idéalisé à tout âge), une rente partiellement indexée ne s'érode qu'à partir de l'âge de début (pas pendant les années de report), et les soldes CD/CRI entrés dans le champ REER ignorent les plafonds de retrait des FRV. La déduction fiscale des cotisations au CELIAPP n'est pas non plus modélisée comme un remboursement séparé (même simplification que pour le REER ci-dessus); le Régime d'accession à la propriété (RAP) n'est pas modélisé du tout; la mise de fonds d'un achat prévu est toujours financée dans l'ordre CELIAPP puis CELI puis non enregistré puis REER, un ordre fixe non modifiable; et le champ de changement net du coût de possession est ce que vous y indiquez (p. ex. taxes foncières et entretien moins le loyer épargné) — il exclut le versement hypothécaire, traité séparément. L'Allocation canadienne pour enfants (ACE) n'est calculée qu'à partir de l'âge FIRE, fédérale seulement (sans compléments provinciaux ni Prestation pour enfants handicapés), sans partage en garde partagée, sur le revenu du ménage de l'année même sans décalage d'un an (comme le SRG), et sa formule de réduction est continue plutôt que les chiffres arrondis de l'ARC (à moins de 1 $) — voir l'entrée du glossaire ACE pour la liste complète."
+      "body": "Pour garder le calcul maîtrisable et vérifiable, ce calculateur fait un certain nombre de simplifications; les résultats sont une approximation honnête dans sa direction, pas une garantie de votre résultat fiscal réel futur. Le mode couple suppose que le RPC, les retraits REER, le revenu locatif et le revenu de placement peuvent tous être fractionnés 50/50 — en réalité, les retraits REER avant 65 ans sont imposés uniquement au titulaire du compte (sauf REER de conjoint mis en place à l'avance), le revenu d'appoint Barista FIRE ne peut légalement pas être partagé avec un conjoint (le calculateur le traite déjà séparément), et l'impôt successoral est estimé comme un partage égal entre conjoints plutôt que selon le barème du survivant seul (habituellement plus lourd). Les distributions non enregistrées et le loyer net sont imposés chaque année comme revenu ordinaire (pas de majoration/crédit de dividendes, pas de DPA locative modélisée); le SRG et l'Allocation pour le conjoint de 60 à 64 ans utilisent un ajustement linéaire par morceaux aux tables officielles des montants mensuels, à 3 $/mois près à chaque tranche de revenu publiée (les maximums et les seuils sont exacts); les plafonds de cotisation CELI/REER ne sont pas vérifiés et les remboursements REER ne sont pas réinvestis automatiquement; la bonification du RPC (cotisations postérieures à 2019) n'est pas modélisée, ce qui sous-estime les prestations des utilisateurs plus jeunes (direction prudente); les dettes et hypothèques sont traitées comme des paiements nominaux fixes, sans refinancement ni taux variable; Monte-Carlo tire un seul résultat de marché par année pour tous les comptes (corrélation complète), alors que la corrélation réelle est un peu plus faible (également prudent); les coûts ponctuels importants comme les soins de longue durée ne sont pas modélisés; et certains chiffres RAMQ/FSS du Québec ainsi que les taux d'homologation provinciaux sont approximés à partir de sources secondaires plutôt que de données officielles année par année, les sites officiels bloquant la récupération automatisée. Les régimes d'employeur ajoutent leurs propres simplifications : la rente au survivant n'est pas modélisée (les deux conjoints sont supposés atteindre l'espérance de vie commune), la règle québécoise exigeant 65 ans pour le fractionnement provincial est ignorée (fractionnement idéalisé à tout âge), une rente partiellement indexée ne s'érode qu'à partir de l'âge de début (pas pendant les années de report), et les soldes CD/CRI entrés dans le champ REER ignorent les plafonds de retrait des FRV. La déduction fiscale des cotisations au CELIAPP n'est pas non plus modélisée comme un remboursement séparé (même simplification que pour le REER ci-dessus); le Régime d'accession à la propriété (RAP) couvre la part REER de la mise de fonds d'une première propriété prévue (60 000 $ par acheteur, remboursés sur 15 ans à même l'épargne); la mise de fonds d'un achat prévu est toujours financée dans l'ordre CELIAPP puis CELI puis non enregistré puis REER, un ordre fixe non modifiable; et le champ de changement net du coût de possession est ce que vous y indiquez (p. ex. taxes foncières et entretien moins le loyer épargné) — il exclut le versement hypothécaire, traité séparément. L'Allocation canadienne pour enfants (ACE) n'est calculée qu'à partir de l'âge FIRE, fédérale seulement (sans compléments provinciaux ni Prestation pour enfants handicapés), sans partage en garde partagée, sur le revenu du ménage de l'année même sans décalage d'un an (comme le SRG), et sa formule de réduction est continue plutôt que les chiffres arrondis de l'ARC (à moins de 1 $) — voir l'entrée du glossaire ACE pour la liste complète."
     },
     "dbpension": {
       "title": "Régime de retraite d'employeur (PD/CD)",
@@ -545,7 +544,7 @@
   "mcFailWhy": "Les essais échoués ont fait en moyenne {{failed}} %/an sur les 5 premières années post-FIRE, contre {{succeeded}} % pour les réussis - le mauvais scénario est presque toujours le même : un marché baissier juste après la retraite force à vendre au plus bas (risque de séquence des rendements). Un marché baissier tardif fait à peine mal.",
   "mcNoFail": "Les {{n}} essais ont tous tenu jusqu'à l'espérance de vie - aucun scénario d'échec.",
   "createdBy": "Créé par",
-  "privacyNote": "Toutes vos données financières restent dans votre navigateur et ne sont jamais téléversées. Des statistiques d'utilisation anonymes (pages vues, clics sur les fonctionnalités) sont recueillies via Google Analytics.",
+  "privacyNote": "Toutes vos données financières restent dans votre navigateur et ne sont jamais téléversées.",
   "valBanner": "{{count}} erreur(s) de saisie — les résultats ci-dessous ne sont pas fiables avant correction",
   "valAgeRange": "Doit être entre {{min}} et {{max}}",
   "valFireBeforeCurrent": "L’âge FIRE ne peut pas être inférieur à l’âge actuel",
@@ -582,7 +581,7 @@
   "solver_infeasible": "Aucune réponse réalisable avec ces paramètres, même au montant minimal testé.",
   "solver_invalid": "Les données saisies sont invalides. Vérifiez les champs signalés avant d'utiliser cette estimation.",
   "solver_unsupported": "Ce scénario dépasse les hypothèses prises en charge par le solveur rapide. Consultez la projection complète.",
-  "solverReason_nominalCapitalBasis": "La cible de portefeuille à l'âge FIRE ne peut pas conserver l'historique vérifié du coût nominal des placements non enregistrés ou de l'immeuble de placement. Un coût de base inconnu ou un traitement des pertes non vérifié empêche aussi un chiffre fiable. Consultez la projection complète; cette réponse rapide est indisponible.",
+  "solverReason_nominalCapitalBasis": "Ce chiffre exige un prix de base confirmé pour les placements non enregistrés. Inscrivez le prix de base rajusté de votre relevé de courtage; un plan qui vend à perte reste aussi non chiffré, car les règles sur les pertes ne sont pas modélisées. La projection complète ci-dessus s’applique toujours.",
   "solverReason_investmentPropertySale": "Une réponse qui dépend de la vente modélisée d'un immeuble de placement exige un coût de base, des frais de vente et des faits fiscaux vérifiés (répartition terrain/bâtiment et historique d'ACC). Consultez la projection complète; cette réponse rapide est indisponible.",
   "targetPropertySaleUnsupported": "Une cible avec vente d'un immeuble de placement exige un coût nominal, des frais de vente et des faits fiscaux vérifiés. Consultez la projection complète; cette réponse rapide est indisponible.",
   "solver_searchLimit": "La limite de recherche a été atteinte sans réponse vérifiée. Aucun montant FIRE n'est affiché.",
@@ -626,10 +625,10 @@
   "debt_carLoan": "Prêt auto",
   "debt_other": "Autre dette",
   "debtBalance": "Solde actuel",
-  "debtPaymentLabel": "Versement ($/an)",
+  "debtPaymentLabel": "Versement ($/an), mensuel × 12",
   "debtYears": "Années restantes",
   "addDebt": "+ Ajouter une dette",
-  "debtNote": "Les versements sont fixes en dollars nominaux — l’inflation allège leur poids réel chaque année ; le moteur déduit le taux d’intérêt implicite de (solde, versement, années) et amortit en conséquence. À la retraite, les versements s’ajoutent à la cible de dépenses jusqu’au remboursement ; « l’épargne annuelle » est supposée déjà nette des versements.",
+  "debtNote": "Les versements sont fixes en dollars nominaux — l’inflation allège leur poids réel chaque année ; le calculateur déduit le taux d’intérêt implicite de (solde, versement, années) et amortit en conséquence. À la retraite, les versements s’ajoutent à la cible de dépenses jusqu’au remboursement ; « l’épargne annuelle » est supposée déjà nette des versements.",
   "debtLabel": "Solde des dettes",
   "netWorthLabel": "Valeur nette (après dettes)",
   "debtPaymentCol": "Versement",
@@ -678,7 +677,7 @@
   "guidedPerYear": "{{amount}} par année",
   "guidedSavingsExcludes": "Comptez seulement les nouveaux dépôts. Les gains de marché et transferts entre vos comptes ne sont pas une nouvelle épargne.",
   "guidedBalancesToday": "Soldes d’aujourd’hui — pas à la retraite",
-  "guidedBalanceNotRoom": "Le solde est l’argent déjà dans le compte. Les droits de cotisation sont une limite ARC distincte que cette version ne vérifie pas.",
+  "guidedBalanceNotRoom": "Le solde est l’argent déjà dans le compte. Les droits de cotisation sont une limite ARC distincte que ce calculateur ne vérifie pas.",
   "guidedAcbFeedback": "Valeur {{value}} moins coût {{cost}} : variation latente {{gain}}. Un montant négatif est une perte; aucun de ces montants n'est l'impôt.",
   "guidedSpecialAccounts": "Comptes à calendrier particulier",
   "guidedLockedTimeline": "Vous prévoyez prendre votre retraite à {{fire}} ans; ces fonds immobilisés deviennent disponibles à {{access}} ans.",
@@ -689,7 +688,7 @@
   "guidedHomeLiquidity": "Une propriété augmente la valeur nette, mais ne paie pas les dépenses courantes sans vente. Cette version n’emprunte pas automatiquement sur sa valeur.",
   "guidedAdvancedHousingPresent": "Votre plan contient aussi {{properties}} immeuble(s) locatif(s) et {{debts}} dette(s) distincte(s). Modifiez leurs détails en mode Professionnel.",
   "guidedSpendingQuestion": "Une année de vie à la retraite",
-  "guidedSpendingTaxNote": "Utilisez les prix d’aujourd’hui et excluez les prêts saisis séparément. C’est votre dépense souhaitée; le moteur calcule les retraits et l’impôt nécessaires.",
+  "guidedSpendingTaxNote": "Utilisez les prix d’aujourd’hui et excluez les prêts saisis séparément. C’est votre dépense souhaitée; le calculateur calcule les retraits et l’impôt nécessaires.",
   "guidedAssumptions": "Affichage de la projection",
   "guidedAssumptionNote": "Les rendements sont réels (après inflation) et les frais les réduisent. La volatilité Monte-Carlo diffère du rendement moyen.",
   "guidedCppAgeGuideTitle": "Vous hésitez sur l’âge? Comparez ces options",
@@ -775,7 +774,7 @@
         "title": "Dépenses de retraite",
         "help": "Exprimez la vie souhaitée en pouvoir d’achat actuel.",
         "question": "Combien coûterait une année de retraite ?",
-        "why": "Cette cible détermine les retraits. Le moteur calcule séparément l’impôt et le financement nécessaires.",
+        "why": "Cette cible détermine les retraits. Le calculateur calcule séparément l’impôt et le financement nécessaires.",
         "how": "Partez des essentiels mensuels, puis ajoutez voyages, santé et maison annuels. Excluez les prêts déjà saisis.",
         "example": "3 000 $ par mois donnent 36 000 $ par année avant les dettes modélisées séparément."
       },
@@ -838,7 +837,7 @@
     "housingOtherLimit": "Les immeubles locatifs et les autres dettes ont leurs propres pages de suivi.",
     "confirmRemoveValue": "Cet élément contient un montant non nul enregistré. Le retirer du plan?",
     "intentRecommendationLabel": "Selon vos choix, les résultats compareront :",
-    "intentUnsupported": "Un legs fixe ou un don de votre vivant est conservé comme souhait, mais le moteur ne l’impose pas encore comme contrainte.",
+    "intentUnsupported": "Un legs fixe ou un don de votre vivant est conservé comme souhait, mais le calculateur ne l’impose pas encore comme contrainte.",
     "reviewAssumptionsTitle": "Hypothèses utilisées dans cette projection",
     "reviewAssumptionsIntro": "Voici les valeurs actuelles. Une ligne « À vérifier » contient encore des exemples ou un choix manquant; complétez-la avant de générer les résultats.",
     "reviewAssumptionSet": "Défini",
@@ -901,11 +900,13 @@
       "housing": "Logement et prêts",
       "spending": "Vie à la retraite",
       "income": "Autres revenus de retraite",
-      "preferences": "Préférences et hypothèses"
+      "preferences": "Préférences et hypothèses",
+      "taxDetails": "Détails fiscaux (facultatif)"
     },
     "status": {
       "answered": "répondu",
-      "pending": "à faire"
+      "pending": "à faire",
+      "optional": "facultatif"
     },
     "accountNames": {
       "tfsa": "CELI",
@@ -995,7 +996,7 @@
       },
       "spending": {
         "essential": "Utilisez les prix d’aujourd’hui et excluez les prêts déjà saisis.",
-        "why": "Il s’agit du niveau de vie après impôt; le moteur calcule séparément les retraits et l’impôt.",
+        "why": "Il s’agit du niveau de vie après impôt; le calculateur calcule séparément les retraits et l’impôt.",
         "help": "Partez des dépenses récentes et ajustez seulement ce qui changera réellement à la retraite.",
         "example": "3 000 $ par mois donnent 36 000 $ par année, avant les prêts modélisés séparément."
       },
@@ -1013,9 +1014,6 @@
       }
     },
     "pages": {
-      "income_taxFacts": {
-        "question": "Qui reçoit chaque revenu et possède les actifs imposables?"
-      },
       "family_people": {
         "question": "Ce plan est-il pour vous seul ou avec un conjoint?"
       },
@@ -1207,8 +1205,139 @@
       },
       "invest_strategy": {
         "question": "Dans quel ordre les comptes devraient-ils financer les dépenses?"
+      },
+      "family_spouseSupport": {
+        "question": "Vivez-vous ensemble et vous soutenez-vous financièrement?"
+      },
+      "family_qcDrug": {
+        "question": "Comment chacun de vous est-il couvert pour les médicaments au Québec?"
+      },
+      "assets_ownership": {
+        "question": "Au nom de qui est chaque compte?"
+      },
+      "housing_ownership": {
+        "question": "Au nom de qui est chaque bien immobilier?"
+      },
+      "saving_earned": {
+        "question": "Combien gagnez-vous en revenus de travail cette année?"
+      },
+      "account_rrsp_type": {
+        "question": "De quel type de REER s’agit-il?"
+      },
+      "account_rrif_details": {
+        "question": "Quand le FERR a-t-il été ouvert et quel minimum s’applique?"
+      },
+      "tax_intro": {
+        "question": "Voulez-vous ajouter vos droits de cotisation et d’autres détails fiscaux?"
+      },
+      "tax_tfsaRoom": {
+        "question": "Combien de droits de cotisation CELI avez-vous?"
+      },
+      "tax_rrspRoom": {
+        "question": "Combien de droits de cotisation REER avez-vous?"
+      },
+      "tax_fhsaRoom": {
+        "question": "Combien de droits de participation CELIAPP avez-vous cette année?"
+      },
+      "tax_pensionSplit": {
+        "question": "Allez-vous fractionner votre revenu de pension?"
+      },
+      "tax_spousalHistory": {
+        "question": "Quelles cotisations ont été versées au REER de conjoint?"
+      },
+      "family_livesAlone": {
+        "question": "Avez-vous vécu seul toute l’année?"
       }
-    }
+    },
+    "ownership": {
+      "mine": "Le mien",
+      "partners": "Celui de mon conjoint",
+      "eachHasOne": "Nous en avons chacun un",
+      "joint": "Détenu conjointement",
+      "zeroBalance": "Aucun solde aujourd’hui. Choisissez qui détiendrait les nouveaux dépôts.",
+      "home": "Votre résidence",
+      "rental": "Immeuble locatif {{n}}",
+      "accountsIntro": "Un compte enregistré appartient toujours à une seule personne. Si vous en avez chacun un, choisissez « Nous en avons chacun un » et inscrivez chaque solde. Un compte non enregistré peut être détenu conjointement.",
+      "propertiesIntro": "Choisissez qui figure sur le titre. Pour un bien détenu conjointement, inscrivez votre part."
+    },
+    "spouseSupport": {
+      "yesDetail": "Vous partagez un logement, et l’un soutient l’autre au besoin.",
+      "noDetail": "Vous vivez séparés pour une raison autre que le travail ou la santé, ou aucun ne soutient l’autre."
+    },
+    "qcDrug": {
+      "intro": "Le Québec perçoit une prime d’assurance médicaments dans la déclaration des personnes couvertes par le régime public de la RAMQ. Une personne couverte par un régime collectif privé, ou exemptée, ne paie rien. Choisissez la couverture de chacun pour toute l’année."
+    },
+    "earned": {
+      "intro": "Revenu d’emploi ou de travail autonome avant impôt, pour chaque personne. Vous pouvez passer cette question : elle ne sert qu’à l’aperçu des droits de cotisation REER, et votre plan donne le même résultat sans elle.",
+      "label": "{{person}} : revenus de travail cette année",
+      "optional": "Facultatif",
+      "recorded": "Enregistré",
+      "clear": "Effacer"
+    },
+    "accountType": {
+      "intro": "La plupart des gens ont un REER ordinaire. Choisissez un autre type seulement si votre relevé l’indique.",
+      "rrsp": "Un REER ordinaire",
+      "rrspDetail": "Il devient un FERR ou une rente au plus tard à la fin de l’année des 71 ans du titulaire.",
+      "spousalRrsp": "Un REER de conjoint",
+      "spousalRrspDetail": "Un conjoint a cotisé pour l’autre. Un retrait dans les trois ans suivant une cotisation peut être imposé au cotisant.",
+      "rrif": "Déjà converti en FERR",
+      "rrifDetail": "Un minimum prescrit doit être retiré chaque année, à partir de l’année suivant l’ouverture.",
+      "lif": "Un FRV",
+      "lifDetail": "Un fonds de revenu viager issu d’une épargne-retraite immobilisée, avec un minimum et un maximum annuels."
+    },
+    "rrif": {
+      "intro": "Le minimum annuel dépend de ces faits. Passez ceux que vous ne pouvez pas confirmer; le résultat indiquera alors un minimum limité.",
+      "openedYear": "Année d’ouverture du FERR",
+      "category": "Quelle catégorie de facteur prescrit s’applique?",
+      "qualifyingDetail": "En général, un FERR ouvert avant 1993 sans nouvel apport depuis 1992.",
+      "allOtherDetail": "Tous les autres FERR, y compris ceux ouverts en 1993 ou après.",
+      "notConfirmed": "Pas encore confirmé",
+      "election": "L’âge de qui sert au calcul du minimum?",
+      "electedAge": "{{person}} (âge choisi à l’ouverture)"
+    },
+    "taxDetails": {
+      "intro": "Ces montants viennent de Mon dossier de l’ARC ou de votre dernier avis de cotisation. Vous pouvez passer cette section : vos résultats restent les mêmes, et le plan suppose, à titre d’estimation, que vos cotisations prévues respectent vos droits. Les inscrire ajoute une vérification des droits pour chaque compte.",
+      "add": "Ajouter les détails",
+      "addDetail": "Environ cinq minutes avec Mon dossier ou votre avis de cotisation.",
+      "skip": "Passer à la révision",
+      "skipDetail": "Vous pouvez revenir à cette section quand vous voulez.",
+      "tfsaIntro": "Inscrivez les droits de cotisation CELI que l’ARC indique au 1er janvier de cette année. Laissez vide si vous ne les avez pas.",
+      "tfsaRoom": "Droits CELI au 1er janvier",
+      "tfsaMore": "Retraits de l’année et vérification des droits",
+      "rrspIntro": "Votre avis de cotisation indique un plafond de déduction REER et vos droits de cotisation disponibles. Inscrivez les droits disponibles; les autres lignes sont facultatives.",
+      "rrspRoom": "Droits de cotisation REER disponibles",
+      "rrspMore": "Autres lignes du relevé, cotisation prévue et vérification des droits",
+      "fhsaIntro": "Les droits CELIAPP appartiennent au titulaire du compte. Inscrivez les droits de participation disponibles cette année selon Mon dossier.",
+      "fhsaRoom": "Droits de participation CELIAPP cette année",
+      "fhsaMore": "Année d’ouverture, cotisations passées, montant prévu et vérification des droits",
+      "fhsaNoHolder": "Indiquez d’abord à qui appartient le CELIAPP à la page des propriétaires : les droits appartiennent au titulaire.",
+      "withinRoom": "Le plan de cette année verse {{planned}} dans ce compte, dans les limites des droits inscrits.",
+      "overRoom": "Le plan de cette année verse {{planned}} dans ce compte, soit {{retained}} de plus que les droits inscrits. La projection ne plafonne pas encore les cotisations : réduisez le montant ou la répartition de l’épargne.",
+      "noPlan": "Aucune cotisation à ce compte n’est prévue cette année.",
+      "splitIntro": "Les couples peuvent fractionner leur revenu de pension admissible avec le formulaire fédéral T1032. Au Québec, l’annexe Q est un choix distinct. Passez cette question si vous n’avez pas décidé.",
+      "splitNo": "Aucun fractionnement",
+      "splitYes": "Oui, inscrire le choix",
+      "splitYesDetail": "Choisissez qui transfère le revenu et le montant annuel.",
+      "spousalIntro": "Un retrait d’un REER de conjoint peut être imposé au cotisant si des cotisations ont été versées cette année-là ou les deux années précédentes. Indiquez si l’historique ci-dessous est complet.",
+      "reviewSkipped": "Passé",
+      "reviewRecorded": "{{answered}} sur {{total}} inscrits",
+      "allocationOver": "{{account}} ({{person}}) : la répartition de cette année verse {{planned}}, plus que les {{room}} de droits inscrits dans les détails fiscaux. La projection ne plafonne pas encore les cotisations.",
+      "howCounted": "Comment ces droits sont calculés",
+      "notAttributed": "La répartition de l’épargne du ménage n’est pas encore divisée entre vous deux; ces droits ne sont donc pas comparés à elle."
+    },
+    "chooseProvince": "Choisissez votre province ou territoire",
+    "salePlan": "Prévoyez-vous de le vendre?",
+    "saleKeep": "Le garder, aucune vente prévue",
+    "saleSell": "Le vendre à un âge précis",
+    "saleAge": "Âge à la vente",
+    "worksheetTotal": "Vos catégories totalisent {{total}} par année.",
+    "useWorksheetTotal": "Utiliser {{total}} comme dépenses à la retraite",
+    "worksheetApplied": "Le plan utilise le total de vos catégories.",
+    "lockedCreated": "Un compte de retraite immobilisé a été ajouté à Épargne existante.",
+    "lockedGoToBalance": "Inscrire son solde maintenant",
+    "taxRateFromIncome": "Avec les {{income}} de revenu d’emploi inscrits, votre taux combiné fédéral et provincial sur le prochain dollar est d’environ {{rate}} % avant déductions.",
+    "taxRateUse": "Utiliser {{rate}} %",
+    "pagerProgress": "{{category}} · {{current}} sur {{total}}"
   },
   "noFeasibleCandidate": "Aucune option valide et financée. Examinez les échecs et les manques éventuels ci-dessous; aucune recommandation ne peut être appliquée.",
   "unrankedObjective": "Au moins une option finance les dépenses prévues, mais le résultat du calcul rapide ne permet pas de classer cet objectif. Aucune recommandation ne peut être appliquée.",
@@ -1216,7 +1345,7 @@
   "manualFailureExploration": "Cet ordre choisi manuellement est un scénario d’échec à explorer, et non une recommandation.",
   "manualFailureGap": "Plus grand manque annuel : {{amount}}.",
   "candidateGap": "Plus grand manque annuel : {{amount}}.",
-  "migrationOwnershipWarning": "La propriété des comptes du ménage doit être confirmée. La projection affichée est une estimation familiale de l’ancien modèle; les comparaisons fiscales et stratégiques précises sont indisponibles.",
+  "migrationOwnershipWarning": "La propriété des comptes du ménage doit être confirmée. La projection affichée est une estimation familiale; les comparaisons fiscales et stratégiques précises sont indisponibles.",
   "migrationSharedPlan": "Le même plan et les soldes non attribués apparaissent dans les deux modes.",
   "migrationUnassigned": "non attribué",
   "migrationBasis": "coût de base",
@@ -1225,9 +1354,9 @@
   "storageCorrupt": "Le plan enregistré ne peut pas être lu en toute sécurité. Les données originales n’ont pas été remplacées.",
   "migrationOwnerSelf": "vous",
   "migrationOwnerPartner": "partenaire",
-  "migrationLegacySummary": "Estimation familiale de l’ancien modèle : la propriété des comptes reste à confirmer; ce résultat n’est pas un conseil fiscal ou de retraite précis.",
+  "migrationLegacySummary": "Estimation familiale : la propriété des comptes reste à confirmer; ce résultat n’est pas un conseil fiscal ou de retraite précis.",
   "storageDownloadOriginal": "Télécharger le plan original",
-  "migrationStatusUnassigned": "Le propriétaire ou bénéficiaire n'est pas attribué. Ce plan reste une estimation familiale de l'ancien modèle.",
+  "migrationStatusUnassigned": "Le propriétaire ou bénéficiaire n’est pas attribué. Ce plan reste une estimation familiale.",
   "migrationStatusReady": "La propriété est attribuée pour ce plan.",
   "migrationNoScenario": "Aucun scénario A n'est enregistré.",
   "migrationNoAutomaticSplit": "Le montant total du ménage est conservé. Aucune répartition entre partenaires n'a été supposée.",
@@ -1260,16 +1389,16 @@
     "adjustmentNote": "Le FE, la DCSP et le RFE sont enregistrés séparément pour comparaison avec l'état. Les droits disponibles de l'état les incluent déjà; cette ligne ne les retranche donc pas une seconde fois.",
     "pspa": "Disposition de cotisations pour services passés (DCSP)",
     "par": "Redressement du facteur d'équivalence (RFE)",
-    "person": "Droits REER de {{person}}",
+    "person": "{{person}} : droits REER",
     "planned": "Cotisation prévue à votre propre REER cette année",
     "deductLater": "Déduire cette cotisation une année ultérieure",
     "zero": "0",
     "unknown": "Non confirmé",
     "ledger": "Droit d'ouverture {{opening}} + ajouts {{additions}} + ajustements {{adjustments}} − cotisations {{applied}} = droit de clôture {{closing}} $ CA",
-    "retained": "Conservé et non cotisé : {{retained}} $ CA.",
-    "retainedHelp": "Le droit n'est jamais dépassé et l'argent ne disparaît pas : le solde reste dans le compte non enregistré.",
+    "retained": "Au-delà de ces droits : {{retained}} $ CA.",
+    "retainedHelp": "La projection n’applique pas encore cette vérification et ajoute tout le montant prévu au REER. Réduisez le montant prévu ou la répartition de l’épargne pour respecter les droits.",
     "savingsShare": "La répartition de l'épargne de cette année verse aussi {{amount}} $ CA au REER; ce montant est donc déjà compris dans la cotisation prévue et le solde conservé ci-dessus.",
-    "unknownRoom": "Les droits de cotisation ne sont pas confirmés; aucune cotisation n'est chiffrée. Saisissez les lignes de l'état de l'ARC pour obtenir un montant exact.",
+    "unknownRoom": "Les droits de cotisation ne sont pas confirmés; la vérification des droits ne peut pas se faire. Saisissez les lignes de l’état de l’ARC pour obtenir un montant exact.",
     "mismatch": "Les droits disponibles ne correspondent pas au maximum déductible moins les cotisations non déduites. Vérifiez les lignes de l'état de l'ARC; tant qu'elles ne concordent pas, aucune cotisation n'est chiffrée.",
     "overContribution": "Les cotisations non déduites dépassent le maximum déductible de {{amount}} $ CA. Les droits disponibles sont nuls; faites confirmer le surplus par l'ARC.",
     "noOwnAccount": "Attribuez d'abord à cette personne son propre compte REER dans la section de propriété ci-dessus avant de planifier une cotisation.",
@@ -1304,8 +1433,8 @@
   },
   "be36": {
     "title": "Droits de cotisation au CELIAPP",
-    "explanation": "Les droits de participation au CELIAPP appartiennent au titulaire du compte et sont donc consignés par personne. Relevez l'année d'ouverture, les cotisations antérieures et les droits inutilisés sur l'état des droits de participation ou les feuillets T4CELIAPP. Laissez une ligne vide si vous ne pouvez pas la confirmer : elle reste inconnue, aucune cotisation n'est calculée à partir d'elle, et elle n'est jamais traitée comme zéro ni comme 8 000 $ de droits.",
-    "person": "Droits CELIAPP de {{person}}",
+    "explanation": "Les droits de participation au CELIAPP appartiennent au titulaire du compte et sont donc consignés par personne. Relevez l’année d’ouverture, les cotisations antérieures et les droits inutilisés sur l’état des droits de participation ou les feuillets T4CELIAPP. Laissez une ligne vide si vous ne pouvez pas la confirmer : elle reste inconnue et n’est jamais traitée comme zéro ni comme 8 000 $ de droits.",
+    "person": "{{person}} : droits CELIAPP",
     "noAccount": "Cette personne n'a pas de CELIAPP à elle : il n'y a donc aucun droit de participation à calculer. Un CELIAPP n'est jamais partagé et un total ménage n'est pas réparti entre deux personnes.",
     "ambiguousAccount": "Cette personne a plus d'un CELIAPP : une cotisation prévue ne peut pas être attribuée à un seul compte.",
     "multipleActive": "Plus d'un CELIAPP est actif cette année. Cette estimation ne calcule qu'un seul CELIAPP actif par plan : la projection s'arrête tant qu'un seul compte a un plan ou un solde.",
@@ -1317,9 +1446,9 @@
     "scheduledRecorded": "Une cotisation planifiée de {{amount}} CAD est consignée pour cette année du plan : le plan affiché correspond au montant le plus élevé entre cette cotisation planifiée et le montant consigné.",
     "ledger": "Droits d'ouverture {{opening}} + droits de l'année {{addition}} − cotisations {{applied}} = droits à la fin {{closing}} CAD",
     "lifetime": "Plafond à vie de {{limit}} CAD : {{used}} utilisés, {{remaining}} restants. La croissance des placements ne l'entame jamais et un transfert n'est jamais déduit deux fois.",
-    "retained": "Conservé et non cotisé : {{retained}} CAD.",
-    "retainedHelp": "Les droits de participation ne sont jamais dépassés et l'argent ne disparaît pas : le reste demeure dans le compte non enregistré.",
-    "unknownRoom": "Les droits de participation au CELIAPP ne sont pas confirmés, donc aucune cotisation n'est calculée : {{reason}}",
+    "retained": "Au-delà de ces droits : {{retained}} CAD.",
+    "retainedHelp": "La projection n’applique pas encore cette vérification et ajoute tout le montant prévu au CELIAPP. Réduisez le montant prévu pour respecter les droits.",
+    "unknownRoom": "Les droits de participation au CELIAPP ne sont pas confirmés; la vérification des droits ne peut pas se faire : {{reason}}",
     "maturity": "Ce CELIAPP a atteint sa période de participation de 15 ans. Le transfert légal vers un REER/FRRV n'est pas encore implémenté, donc aucune cotisation n'est calculée pour cette année.",
     "limit": "Le plafond annuel publié de 8 000 $, le plafond à vie de 40 000 $ et le maximum de report des droits de participation de 8 000 $ proviennent des pages de l'ARC sur le CELIAPP. Les droits de l'année correspondent aux 8 000 $ de l'année plus, au plus, ce maximum reporté, et le plafond à vie limite ce total entier : les droits reportés des années précédentes ne sont donc jamais utilisés en plus des droits à vie restants. Ne sont pas encore implémentés : le délai de 15 ans ou l'âge de 71 ans, le transfert vers un REER/FRRV, les retraits admissibles ou non, l'admissibilité à l'achat d'une première habitation et le décès. Les droits de re-participation, les montants désignés et l'impôt sur l'excédent CELIAPP le sont aussi : ce registre ne déclare donc que les droits que les plafonds publiés autorisent.",
     "source": "ARC : cotiser à son CELIAPP",
@@ -1327,8 +1456,8 @@
   },
   "be27": {
     "title": "Droits de cotisation au CELI",
-    "person": "Droits CELI de {{person}}",
-    "explanation": "Les droits de cotisation au CELI appartiennent à la personne, pas à un compte : un seul chiffre de l'ARC couvre tous vos CELI, donc ils sont saisis et calculés par personne. Copiez les droits de cotisation disponibles depuis votre compte de l'ARC et inscrivez tout retrait CELI effectué. Laissez le champ vide si vous ne pouvez pas le confirmer : une ligne vide reste inconnue, aucune nouvelle cotisation n'est exécutée et elle n'est jamais traitée comme des droits illimités ni comme zéro.",
+    "person": "{{person}} : droits CELI",
+    "explanation": "Les droits de cotisation au CELI appartiennent à la personne, pas à un compte : un seul chiffre de l’ARC couvre tous vos CELI, donc ils sont saisis et vérifiés par personne. Copiez les droits de cotisation disponibles depuis votre compte de l’ARC et inscrivez tout retrait CELI effectué. Laissez le champ vide si vous ne pouvez pas le confirmer : une ligne vide reste inconnue et n’est jamais traitée comme des droits illimités ni comme zéro.",
     "availableRoom": "Droits de cotisation CELI disponibles (compte de l'ARC)",
     "availableRoomNote": "Entrez le chiffre de l'ARC pour l'année du plan, au 1er janvier. Ce chiffre contient déjà le plafond annuel de l'année et tous les retraits faits lors d'une année antérieure : ce registre n'ajoute donc rien pour le plafond de l'année et ne rétablit pas ces retraits antérieurs une seconde fois.",
     "withdrawalsHelp": "Les retraits faits depuis ce chiffre rétablissent des droits l'année suivante, jamais l'année du retrait. Un transfert direct entre vos propres CELI n'est pas un retrait et n'est pas inscrit ici.",
@@ -1339,12 +1468,12 @@
     "ledger": "Droits d'ouverture {{opening}} + ajout de l'année {{addition}} + droits rétablis {{restored}} − cotisations {{applied}} = droits de clôture {{closing}} CAD",
     "savingsShare": "Le plan cotise {{amount}} CAD au CELI de cette personne cette année, selon la répartition de l'épargne résolue.",
     "restoredNext": "Les retraits inscrits pour {{year}} rétablissent {{amount}} CAD de droits en {{nextYear}}, pas en {{year}}.",
-    "retained": "Conservé et non cotisé : {{retained}} CAD.",
-    "retainedHelp": "Les droits de cotisation ne sont jamais dépassés et l'argent ne disparaît pas : le reste demeure dans le compte non enregistré.",
-    "unknownRoom": "Les droits de cotisation au CELI ne sont pas confirmés, donc aucune nouvelle cotisation n'est exécutée et l'argent est conservé : {{reason}}",
+    "retained": "Au-delà de ces droits : {{retained}} CAD.",
+    "retainedHelp": "La projection n’applique pas encore cette vérification et ajoute tout le montant prévu au CELI. Réduisez la répartition de l’épargne pour respecter les droits.",
+    "unknownRoom": "Les droits de cotisation au CELI ne sont pas confirmés; la vérification des droits ne peut pas se faire : {{reason}}",
     "limit": "Selon l'ARC, les droits de cotisation sont le plafond annuel du CELI, plus les droits inutilisés des années précédentes, plus les retraits faits lors des années précédentes (à l'exclusion des transferts directs). C'est la règle que ce registre recalcule. Le plafond annuel lui-même n'est pas encodé : il est indexé par tranches de 500 $ et aucun jeu de règles sourcé n'est publié, donc une année postérieure à l'année du relevé n'ajoute aucun droit ici et le dit au lieu de deviner.",
     "source": "ARC : cotiser à un CELI",
-    "scope": "Pas encore mis en œuvre (BE-27 B), donc aucun argent n'y est acheminé ici : la politique de remplissage des surplus à la retraite et des surplus de trésorerie, l'interaction de réinvestissement du surplus forcé d'un FERR, la comparaison des stratégies de surplus et le traitement des transferts internes conformes."
+    "scope": "Pas encore modélisé, donc aucun argent n’y est acheminé ici : le remplissage du CELI à partir d’un surplus à la retraite, une politique de surplus de trésorerie, le réinvestissement d’un surplus forcé de FERR, la comparaison des stratégies de surplus et les transferts directs entre comptes."
   },
   "benefitCategoryTitle": "SRG et Allocation : quelle ligne de ménage s'applique",
   "benefitCategoryNote": "Juillet-septembre 2026 publie un maximum et un seuil de revenu différents selon la situation du ménage ({{id}}, {{period}}). La projection chiffre ce plan avec la ligne indiquée; le montant et le seuil viennent tous deux de cette ligne.",
@@ -1382,7 +1511,7 @@
   "pensionReconfirm": "Vérifier et reconfirmer",
   "pensionStatementNeedsReview": "L’âge de retraite saisi a changé depuis l’enregistrement de ce montant. Le montant n’a pas été modifié – vérifiez que l’hypothèse d’âge de début du relevé tient toujours, puis reconfirmez.",
   "pensionEstimatorNeedsReview": "Cette estimation reposait sur les années de résidence que vous avez saisies. Un changement d’âge de retraite peut modifier le nombre d’années comptées – confirmez ce chiffre avant de vous y fier. Le montant n’a pas été modifié.",
-  "pensionSourceUnknownNote": "Cette valeur a été enregistrée avant que le calculateur ne note sa provenance. Elle est traitée comme non confirmée, et non comme une estimation.",
+  "pensionSourceUnknownNote": "Aucune provenance n’est encore inscrite pour ce montant. Indiquez d’où il vient; d’ici là, il est traité comme non confirmé, et non comme une estimation.",
   "pensionSourceManualNote": "Enregistré tel que saisi par vous. Un changement d’âge de retraite ne le modifie pas.",
   "pensionSourceStatementNote": "Enregistré d’après un relevé ({{year}}). Le calculateur ne l’écrasera jamais ; un changement d’âge de retraite demande seulement une reconfirmation.",
   "pensionSourceEstimatorNote": "Estimé par ce calculateur ({{year}}) à partir de vos hypothèses de travail ou de résidence. Un changement d’âge de retraite relance cette estimation.",
@@ -1473,11 +1602,83 @@
   "coverageLimitation.provincialPensionIncomeAmount": "Non indexé par année, et appliqué sans test de revenu dans ce modèle.",
   "coverageLimitation.provincialSpouseAmount": "Le montant est `min(max, seuil − revenu net du conjoint)`, algébriquement identique à la feuille de calcul du TD1 parce que chaque formulaire publie `max + low = seuil`; le véritable écart est la base du revenu net du conjoint, et les maximums et seuils sont des montants 2026 fixés.",
   "coverageLimitation.quebecBasicPersonalAmount": "Le PDF des paramètres du ministère des Finances cité contient le montant personnel de base 2026 utilisé par ce calculateur. Le barème 2026 dont le taux inférieur le crédite — 14 % jusqu’à 54 345 $, puis 19 %, 24 % et 25,75 % — est imprimé dans le Guide des mesures fiscales du CFFP, cité comme source additionnelle. La page des taux de Revenu Québec est aussi citée, mais elle répond aux lecteurs automatisés par une erreur HTTP 403; ce sont donc le guide du CFFP et cette note qui permettent de vérifier les taux.",
-  "coverageLimitation.quebecFssContribution": "L’aperçu hérité l’applique au revenu imposable; le volet québécois propre à la personne utilise la base de l’annexe F. Les deux plafonds (150 $ et 1 000 $) ne figurent pas dans le PDF de paramètres cité.",
+  "coverageLimitation.quebecFssContribution": "L’aperçu simplifié l’applique au revenu imposable; le volet québécois propre à la personne utilise la base de l’annexe F. Les deux plafonds (150 $ et 1 000 $) ne figurent pas dans le PDF de paramètres cité.",
   "coverageLimitation.quebecIncomeTaxBrackets": "Le PDF des paramètres du ministère des Finances cité contient les seuils 2026 utilisés par ce calculateur. Le barème 2026 complet — 14 %, 19 %, 24 % et 25,75 % au-dessus de ces seuils — est imprimé dans le Guide des mesures fiscales du CFFP, cité comme source additionnelle. La page des taux de Revenu Québec est aussi citée, mais elle répond aux lecteurs automatisés par une erreur HTTP 403; ce sont donc le guide du CFFP et cette note qui permettent de vérifier les taux.",
   "coverageLimitation.quebecProvincialAgeAmount": "Montants 2026 fixés; appliqué au revenu imposable par personne plutôt que par le test du revenu familial de l’annexe B, que ce calculateur ne calcule pas. Le taux de réduction de 18,75 % est imprimé dans le Guide des mesures fiscales du CFFP, cité comme source additionnelle.",
   "coverageLimitation.quebecProvincialPensionIncomeAmount": "Montants 2026 fixés; le montant pour revenus de retraite n’est calculé qu’à l’intérieur du crédit combiné 65 ans et plus et partage la même approximation par personne de l’annexe B que le montant en raison de l’âge.",
-  "coverageLimitation.quebecRamqPremium": "Les montants calculés sont un aperçu hérité, et non un barème 2026 publié : le guide cité imprime le tableau 2025 (tranche de 5 000 $ à 7,84 %/11,76 %, base de 392 $, maximum de 755 $, seuil de 19 890 $ pour une personne seule), que ce calculateur indexe de 2 % pour obtenir 20 288 $ et 770 $, Revenu Québec n’ayant pas publié l’annexe K de l’année d’imposition 2026. Le document cité n’imprime donc pas lui-même les montants calculés.",
+  "coverageLimitation.quebecRamqPremium": "Les montants calculés sont un aperçu simplifié, et non un barème 2026 publié : le guide cité imprime le tableau 2025 (tranche de 5 000 $ à 7,84 %/11,76 %, base de 392 $, maximum de 755 $, seuil de 19 890 $ pour une personne seule), que ce calculateur indexe de 2 % pour obtenir 20 288 $ et 770 $, Revenu Québec n’ayant pas publié l’annexe K de l’année d’imposition 2026. Le document cité n’imprime donc pas lui-même les montants calculés.",
   "coverageLimitation.yukonBpaPhaseOut": "Reprend la réduction fédérale du montant personnel de base bonifié et constitue un montant fixé plutôt qu’une ligne de tableau.",
-  "coverageLimitation.quebecFederalAbatement": "Une part législative fixée, non sélectionnée par année d’imposition. Aucun formulaire de l’ARC pour 2026 n’est encore publié; le formulaire cité est donc l’édition la plus récente qui imprime le taux de 16,5 %, et le rapport du ministère des Finances l’atteste pour 2026."
+  "coverageLimitation.quebecFederalAbatement": "Une part législative fixée, non sélectionnée par année d’imposition. Aucun formulaire de l’ARC pour 2026 n’est encore publié; le formulaire cité est donc l’édition la plus récente qui imprime le taux de 16,5 %, et le rapport du ministère des Finances l’atteste pour 2026.",
+  "migrationSettleSingle": "Ce plan est pour une seule personne : tout m’appartient",
+  "migrationSettleSingleHelp": "Votre conjoint a été retiré du plan. Confirmez que chaque compte et chaque bien vous appartiennent et retirez les revenus de votre ancien conjoint. Pour garder ses renseignements, choisissez de nouveau « Planifier avec mon conjoint ».",
+  "pensionSourceStatementOas": "Relevé de Service Canada",
+  "infl_custom": "Personnalisé ({{value}} %)",
+  "infl_customLabel": "Inflation (% par année)",
+  "resetAll": "Réinitialiser toutes les données…",
+  "resetConfirmTitle": "Effacer tout le plan?",
+  "resetConfirmBody": "Cette action supprime votre plan actuel et le scénario A : chaque montant, réponse, feuille de catégories et choix revient à l’exemple. Votre langue et vos réglages d’affichage restent. Elle ne peut pas être annulée.",
+  "resetCancel": "Garder mon plan",
+  "resetConfirm": "Tout effacer",
+  "estimateSuccess": "Estimation : l’argent dure jusqu’à {{age}} ans.",
+  "estimateDepleted": "Estimation : l’argent s’épuise à {{age}} ans.",
+  "estimateShortfall": "Premier manque à {{age}} ans : {{shortfall}} des dépenses de cette année ne sont pas couverts.",
+  "estimateChartsNote": "Les graphiques ci-dessous sont des estimations de planification : l’impôt utilise des montants du ménage tant que la propriété et les autres faits ouverts ne sont pas confirmés.",
+  "fireNumberProjectedBasis": "Estimation : la cible utilise la répartition des comptes et le prix de base non enregistré que votre plan projette à {{age}} ans, ajustés au montant cible.",
+  "terminalQcSimplified": "La valeur successorale utilise des règles québécoises simplifiées pour la déclaration finale; considérez-la, ainsi que tout classement qui en dépend, comme une estimation.",
+  "incomeNeed": "Besoin (dépenses plus impôt)",
+  "incomeShortfall": "Non couvert",
+  "checkPersonTax": "L’impôt est une estimation du ménage tant que le revenu et la propriété de chaque personne ne sont pas confirmés.",
+  "checkLockedLimits": "Les limites de retrait du FRV ne sont pas vérifiées pour ce compte.",
+  "checkClosingTax": "L’impôt de la déclaration finale n’est pas estimé pour ce plan.",
+  "nextStepsTitle": "Ce qui pourrait fonctionner",
+  "nextStepEarliest": "Voir l’âge le plus tôt où ce plan fonctionne",
+  "nextStepSustainable": "Trouver les dépenses que ce plan soutient",
+  "nextStepSustainableAnswer": "Environ {{amount}} par année durent jusqu’à {{age}} ans, tout le reste inchangé.",
+  "terminalEstimateNoteSingle": "Cette valeur successorale après impôt ajoute les soldes enregistrés restants et les gains latents imposables au revenu modélisé de la dernière année. Elle ne modélise pas les désignations de bénéficiaires; ce n’est donc pas une déclaration finale complète.",
+  "be44": {
+    "livesAlone": "A vécu seul toute l’année (montant pour personne vivant seule)",
+    "intro": "Le Québec accorde un crédit d’impôt à la personne qui a vécu seule toute l’année dans son propre logement, ou seulement avec des enfants à charge. Il est réduit avec les montants pour âge et pour revenus de retraite dès que le revenu familial dépasse 42 955 $.",
+    "yesDetail": "Ajoute le montant de 2 172 $ pour personne vivant seule à vos crédits du Québec.",
+    "noDetail": "Vous avez partagé votre logement avec un autre adulte."
+  },
+  "sideIncomeKind": "Comment ce travail est-il payé?",
+  "sideIncomeEmployment": "Comme salarié",
+  "sideIncomeEmploymentDetail": "Le RPC ou le RRQ, l’AE (et le RQAP au Québec) sont retenus sur la paie; vous avez droit au montant canadien pour emploi.",
+  "sideIncomeSelf": "Travailleur autonome",
+  "sideIncomeSelfDetail": "Vous payez les deux parts du RPC ou du RRQ, et le RQAP au Québec; pas d’AE.",
+  "sideIncomeOther": "Sans cotisations sociales",
+  "sideIncomeOtherDetail": "Par exemple des redevances; imposé seulement comme revenu ordinaire.",
+  "hbpUse": "Utiliser le RAP pour la part REER de la mise de fonds",
+  "hbpUseDetail": "Jusqu'à 60 000 $ par acheteur sortent libres d'impôt et sont remboursés sur 15 ans.",
+  "ruleAssumptionsSummary": "Règles fiscales {{jurisdiction}} {{year}}, prestations pour {{quarter}}. Ouvrez pour les sources et ce que ces chiffres excluent.",
+  "migrationKinds": {
+    "cpp": "RPC/RRQ",
+    "oas": "SV",
+    "pension": "Pension",
+    "employment": "Revenu d’emploi",
+    "other": "Autre revenu",
+    "rent": "Revenu locatif",
+    "self": "Vous",
+    "partner": "Conjoint"
+  },
+  "modeTabsLabel": "Question sur le résultat",
+  "chartSummary": "La valeur nette est de {{start}} à {{startAge}} ans, de {{atFire}} à l’âge FIRE de {{fireAge}} ans et de {{end}} à {{endAge}} ans.",
+  "incomeChartSummary": "De {{startAge}} à {{endAge}} ans, les revenus et les retraits couvrent le besoin annuel pendant {{covered}} années sur {{years}}.",
+  "incomeChartSummaryGap": "Le plus grand manque est de {{gap}} à {{age}} ans.",
+  "taxChartSummary": "L’impôt de {{startAge}} à {{endAge}} ans totalise {{total}}. L’année la plus élevée atteint {{peak}} à {{peakAge}} ans.",
+  "analysisPending": "Comparaison des options…",
+  "analysisUpdating": "Mise à jour selon votre dernière modification…",
+  "analysisFailed": "Cette comparaison n’a pas pu être calculée. Modifiez une valeur pour réessayer.",
+  "resultPeekJump": "Voir tous les résultats",
+  "analyticsPromptLabel": "Statistiques d’utilisation",
+  "analyticsPrompt": "Autoriser des statistiques d’utilisation anonymes (Google Analytics) pour améliorer le calculateur? Les montants saisis ne sont jamais envoyés.",
+  "analyticsAllow": "Autoriser",
+  "analyticsDecline": "Non merci",
+  "analyticsOn": "Les statistiques d’utilisation anonymes sont activées.",
+  "analyticsOff": "Les statistiques d’utilisation anonymes sont désactivées.",
+  "analyticsTurnOff": "Les désactiver",
+  "analyticsTurnOn": "Les autoriser",
+  "analyticsSignal": "Votre navigateur demande aux sites de ne pas vous suivre; les statistiques restent donc désactivées.",
+  "storageUnavailable": "Ce navigateur bloque le stockage du site : votre plan n’est pas enregistré et disparaîtra à la fermeture de la page.",
+  "valHbpTaxUnfunded": "À {{age}} ans, l’impôt sur un versement non remboursé du Régime d’accession à la propriété dépasse de {{amount}} $ ce que votre épargne et vos comptes peuvent couvrir."
 }

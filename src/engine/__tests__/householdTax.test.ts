@@ -163,7 +163,8 @@ describe('BE-11 person-owned tax and elections', () => {
     const inputs: Inputs = { ...legacy, currentAge: 62, fireAge: 62, lifeExpectancy: 62,
       retirementSpending: 75_000, strategy: 'rrspFirst',
       balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 },
-      pension: undefined, extraIncome: { annual: 40_000, fromAge: 62, toAge: 62 },
+      // Plain ordinary income: this test is about the pension credit, not payroll (BE-46).
+      pension: undefined, extraIncome: { annual: 40_000, fromAge: 62, toAge: 62, kind: 'other' },
       partner: { ...legacy.partner!, currentAge: 68,
         pension: { annualAmount: 20_000, startAge: 60, indexation: 1, bridgeAnnual: 0 } },
     }

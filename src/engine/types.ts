@@ -97,6 +97,8 @@ export interface PensionAmountProvenance {
 export interface ExtraIncome {
   /** net annual amount, today's dollars */
   annual: number
+  /** BE-46: employment (CPP/QPP, EI, QPIP withheld; employment amount) or self-employment (both CPP/QPP halves). Employment when omitted. */
+  kind?: 'employment' | 'selfEmployment' | 'other'
   /** clamped to no earlier than fireAge */
   fromAge: number
   toAge: number
@@ -208,6 +210,8 @@ export interface PlannedResidence {
   netHoldingCostChange: number
   /** tax-free sale at the opening of this age, after purchase; null = never sell */
   sellAtAge: number | null
+  /** BE-47: use the Home Buyers' Plan for any RRSP part of the down payment (default true). */
+  hbp?: boolean
 }
 
 export type PrincipalResidence = OwnedResidence | PlannedResidence
@@ -416,6 +420,8 @@ export interface YearRow {
   } | null
   /** end-of-year balances (after withdrawals/contributions and growth) */
   balances: Record<AccountType, number>
+  /** BE-42: end-of-year adjusted cost base of the non-registered holdings, today's dollars */
+  nonRegBook?: number
   withdrawals: Record<AccountType, number>
   cpp: number
   /** OAS actually received, after clawback */
@@ -503,6 +509,8 @@ export interface ProjectionResult {
   /** Unsupported when an invalid direct-engine plan ends in accumulation;
    * numeric fields then retain a known-income surrogate for legacy callers. */
   terminalTaxStatus: 'estimated' | 'unsupported'
+  /** BE-43: a closing-tax estimate that rests on simplified Quebec rules, disclosed wherever it is used. */
+  terminalTaxDisclosure?: 'quebecSimplified'
   /**
    * Incremental final-return income tax and OAS recovery from remaining RRSP/RRIF and taxable
    * unrealized gains, added to the year's modeled ordinary income. The

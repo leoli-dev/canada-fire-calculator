@@ -3,10 +3,16 @@ import { ageReachedInYear, pricingGate } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { advanceAttributionLedger, applyAttributionLedger, attributeSpousalPayment, resolveSpousalPlan, type SpousalAttributionLedger, type SpousalPremium } from './spousalAttribution'
 
-export type IncomeKind = 'employment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
-  'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'other'
-const INCOME_KINDS: readonly IncomeKind[] = ['employment', 'cpp', 'oas', 'dbPension', 'rrspWithdrawal',
-  'rrifWithdrawal', 'lifWithdrawal', 'rent', 'interest', 'realizedGain', 'other']
+/**
+ * `selfEmployment` is business income: work income for the GIS exemption, but
+ * not wages, so it stays in Quebec's Schedule F base. `hbpInclusion` is an
+ * unpaid Home Buyers' Plan instalment included in the borrower's income (RRSP
+ * income, not eligible pension income).
+ */
+export type IncomeKind = 'employment' | 'selfEmployment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
+  'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'hbpInclusion' | 'other'
+const INCOME_KINDS: readonly IncomeKind[] = ['employment', 'selfEmployment', 'cpp', 'oas', 'dbPension', 'rrspWithdrawal',
+  'rrifWithdrawal', 'lifWithdrawal', 'rent', 'interest', 'realizedGain', 'hbpInclusion', 'other']
 export interface IncomeEvent {
   id: string
   kind: IncomeKind
@@ -29,6 +35,10 @@ export interface PersonIncome {
   provincialPensionEligible: number
   bySource: Partial<Record<IncomeKind, number>>
   entries: { eventId: string; kind: IncomeKind; gross: number; taxable: number }[]
+  /** BE-46: base CPP/QPP, EI and QPIP contributions, credited at the lowest rate. */
+  payrollCredit: number
+  /** BE-46: the Canada employment amount, a federal credit. */
+  employmentAmount: number
 }
 export type IncomeResult = { status: 'ok'; byPerson: Record<string, PersonIncome>; spousalAttribution?: SpousalAttributionLedger } |
   { status: 'invalid' | 'unsupported'; reason: string }
@@ -53,6 +63,12 @@ const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult =
 export interface IncomeYearContext {
   registeredOpeningBalances?: Record<string, number>
   spousalAttributionLedger?: SpousalAttributionLedger
+  /**
+   * BE-46: payroll on a person's side income this year. The deduction lowers
+   * net and taxable income (and so the OAS and GIS bases); the credit amounts
+   * are claimed on that person's return.
+   */
+  payroll?: Record<string, { taxDeduction: number; creditAmount: number; employmentAmount: number }>
 }
 
 /**
@@ -136,7 +152,7 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
   const byPerson: Record<string, PersonIncome> = Object.fromEntries(plan.people.map(person => [person.id, {
     personId: person.id, age: ageReachedInYear(person, plan.baseYear, year), gross: 0, netIncome: 0, taxableIncome: 0,
     earnedWork: 0, oasGross: 0, gisIncomeBase: 0, fssIncomeBase: 0, federalPensionEligible: 0, provincialPensionEligible: 0,
-    bySource: {}, entries: [],
+    bySource: {}, entries: [], payrollCredit: 0, employmentAmount: 0,
   }]))
   const ids = new Set<string>()
   // Premium attribution is consumed once per (account, year) event sequence.
@@ -156,12 +172,12 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
       person.taxableIncome += taxable
       person.bySource[event.kind] = (person.bySource[event.kind] ?? 0) + taxable
       person.entries.push({ eventId: event.id, kind: event.kind, gross, taxable })
-      if (event.kind === 'employment') person.earnedWork += gross
+      if (event.kind === 'employment' || event.kind === 'selfEmployment') person.earnedWork += gross
       if (event.kind === 'oas') person.oasGross += gross
       else person.gisIncomeBase += taxable
       // Schedule F starts at total income and subtracts wages and OAS, among
       // other specific items. CPP/QPP is not one of those exclusions.
-      if (['cpp', 'rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension'].includes(event.kind)) person.fssIncomeBase += taxable
+      if (['cpp', 'rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension', 'selfEmployment', 'hbpInclusion'].includes(event.kind)) person.fssIncomeBase += taxable
       if (event.kind === 'dbPension' || (['rrifWithdrawal', 'lifWithdrawal'].includes(event.kind) && person.age >= 65)) {
         person.federalPensionEligible += taxable
         if (plan.province !== 'QC') person.provincialPensionEligible += taxable
@@ -171,6 +187,15 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
       if (plan.province === 'QC' && ['dbPension', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal'].includes(event.kind))
         person.provincialPensionEligible += taxable
     }
+  }
+  for (const [id, payroll] of Object.entries(context?.payroll ?? {})) {
+    const person = byPerson[id]
+    if (!person) return fail('invalid', `payroll for unknown person: ${id}`)
+    person.netIncome -= payroll.taxDeduction
+    person.taxableIncome -= payroll.taxDeduction
+    person.gisIncomeBase -= payroll.taxDeduction
+    person.payrollCredit += payroll.creditAmount
+    person.employmentAmount += payroll.employmentAmount
   }
   // Carry the year's post-payment state out so the next projected year cannot
   // re-attribute a premium this year already attributed (ITA s.146(8.6)(a)).

@@ -27,18 +27,28 @@ export function Jargon(props: { text: string }) {
     if (!id) continue
     if (start > last) parts.push(text.slice(last, start))
     parts.push(
-      <button
+      // A span, not a <button>: a button is labelable, so inside a <label> it
+      // would become the label's control and leave the input unnamed (FE-45).
+      <span
         key={start}
-        type="button"
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
         className="term"
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
           open(id)
         }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          e.stopPropagation()
+          open(id)
+        }}
       >
         {m[0]}
-      </button>,
+      </span>,
     )
     last = end
   }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   findEarliestFireAge,
   maxSustainableSpending,
@@ -17,13 +18,31 @@ import { NumberInput } from './NumberInput'
 import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
+const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
+
+/**
+ * The "will my money last" sentence, shared by the results summary and the
+ * mobile peek above the form (FE-48), so the two can never disagree.
+ */
+export function headlineVerdict(t: TFunction, inputs: Inputs, result: ProjectionResult,
+  flags: { estimate?: boolean; personTax?: boolean; taxWarning?: boolean }): { text: string; tone: 'ok' | 'bad' | 'uncertain' } {
+  if (flags.estimate) return { text: result.success ? t('estimateSuccess', { age: inputs.lifeExpectancy }) : t('estimateDepleted', { age: result.depletedAge }), tone: result.success ? 'uncertain' : 'bad' }
+  if (flags.personTax) return { text: result.success ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }) : t('stratDepleted', { age: result.depletedAge }), tone: result.success ? 'uncertain' : 'bad' }
+  if (!result.success) return { text: t('depleted', { age: result.depletedAge }), tone: 'bad' }
+  const unverified = flags.taxWarning || hasUnverifiedLockedWithdrawals(inputs) || result.terminalTaxStatus === 'unsupported'
+  return unverified ? { text: t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }), tone: 'uncertain' } : { text: t('success', { age: inputs.lifeExpectancy }), tone: 'ok' }
+}
 
 export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
+  const [sustainableRun, setSustainableRun] = useState<{ answer: ReturnType<typeof maxSustainableSpending>; inputs: Inputs; canonical: unknown } | null>(null)
   const { inputs, result } = props
   const canonical = useStore((s) => s.canonical)
+  // The answer belongs to the plan it was computed for; any edit retires it.
+  const sustainable = sustainableRun && sustainableRun.inputs === inputs && sustainableRun.canonical === canonical
+    ? sustainableRun.answer : null
 
   const earliest = useMemo(
     () => (mode === 'when' ? findEarliestFireAge(inputs, canonical) : null),
@@ -77,8 +96,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           ? t('solverReason_lockedWithdrawalLimits') : t(`solver_${fireNumber?.status ?? 'unsupported'}`)
   const lockedWithdrawalUnverified = hasUnverifiedLockedWithdrawals(inputs)
   const lastResultUnverified = result.success && (props.taxWarning || lockedWithdrawalUnverified || result.terminalTaxStatus === 'unsupported')
+  // BE-42: a FIRE number priced from the projected FIRE-year basis is a labelled estimate.
+  const fireNumberProjected = mode === 'number' && fireNumber?.status === 'solved' && fireNumber.assumptions.includes('projectedFireYearAllocation')
   const quickResultUnverified = (mode === 'when' && earliest?.reason === 'lockedWithdrawalLimits') ||
-    (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits')
+    (mode === 'number' && fireNumber?.reason === 'lockedWithdrawalLimits') || fireNumberProjected
   const targetResultUnverified = mode === 'target' && goal?.status === 'supported' && lockedWithdrawalUnverified
   const resultUnverified = props.taxWarning || props.taxEstimate || (mode === 'last' && lastResultUnverified) || quickResultUnverified || targetResultUnverified
 
@@ -94,38 +115,65 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               fireNumber?.value !== undefined && projectedAtFire! >= fireNumber.value
             : true
 
+  // FE-37: a gate lowers the wording to an estimate; it never withholds
+  // whether the money lasts or where the first shortfall is, so a failing plan
+  // is never reduced to one large final net worth.
+  const firstShortfall = result.rows.find((row) => row.shortfall > 0.5)
+  const estimateVerdict = <>
+    <p className={`verdict${result.success ? '' : ' verdict-bad'}`} data-testid="estimate-verdict">
+      {headlineVerdict(t, inputs, result, { estimate: true }).text}</p>
+    {firstShortfall && <p data-testid="estimate-shortfall">{t('estimateShortfall', { age: firstShortfall.age, shortfall: cad(firstShortfall.shortfall) })}</p>}
+  </>
+
   if (props.legacyEstimate) return (
-    <div className="summary uncertain" data-testid="legacy-estimate">
+    <div className={`summary uncertain${result.success ? '' : ' bad'}`} data-testid="legacy-estimate">
+      {estimateVerdict}
       <p className="hint">{t(props.legacyOwnershipPending ? 'migrationLegacySummary'
         : props.budgetBasisExcluded ? 'budget.estimateExcluded' : 'migrationApproximate')}</p>
       <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     </div>
   )
 
-  if (props.taxEstimate) return <div className="summary uncertain" data-testid="person-tax-estimate">
+  if (props.taxEstimate) return <div className={`summary uncertain${result.success ? '' : ' bad'}`} data-testid="person-tax-estimate">
+    {estimateVerdict}
     <p className="hint">{t('be11TaxLimit')}</p>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
   </div>
 
   if (props.personTax) return <div className="summary uncertain" data-testid="person-tax-summary">
-    <p className="verdict">{result.success ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }) : t('stratDepleted', { age: result.depletedAge })}</p>
+    <p className="verdict">{headlineVerdict(t, inputs, result, { personTax: true }).text}</p>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     <p className="hint">{t('be11.ledgerLimit')}</p>
   </div>
 
   return (
     <div className={`summary ${resultUnverified
-      ? 'uncertain' : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
-      <div className="mode-tabs" role="tablist">
-        {(['last', 'when', 'number', 'target'] as Mode[]).map((m) => (
+      // FE-44: an unverified failure still reads as a failure.
+      ? (ok || mode === 'target' && target <= 0 ? 'uncertain' : 'uncertain bad') : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
+      {/* FE-45: tabs with roving focus, arrow keys, and one labelled panel. */}
+      <div className="mode-tabs" role="tablist" aria-label={t('modeTabsLabel')}>
+        {MODES.map((m, index) => (
           <button
             key={m}
+            id={`mode-tab-${m}`}
+            type="button"
             role="tab"
             aria-selected={mode === m}
+            aria-controls="mode-panel"
+            tabIndex={mode === m ? 0 : -1}
             className={mode === m ? 'active' : ''}
             onClick={() => {
               setMode(m)
               track('question_mode_change', { mode: m })
+            }}
+            onKeyDown={(e) => {
+              const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+              const next = e.key === 'Home' ? MODES[0] : e.key === 'End' ? MODES[MODES.length - 1]
+                : step ? MODES[(index + step + MODES.length) % MODES.length] : null
+              if (!next) return
+              e.preventDefault()
+              setMode(next)
+              document.getElementById(`mode-tab-${next}`)?.focus()
             }}
           >
             {t(`mode_${m}`)}
@@ -133,15 +181,26 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
         ))}
       </div>
 
+      <div role="tabpanel" id="mode-panel" aria-labelledby={`mode-tab-${mode}`}>
       {mode === 'last' && (
         <>
           <p className="verdict">
-            {result.success
-              ? lastResultUnverified ? t('modeledSuccessUnverified', { age: inputs.lifeExpectancy })
-                : t('success', { age: inputs.lifeExpectancy })
-              : t('depleted', { age: result.depletedAge })}
+            {headlineVerdict(t, inputs, result, { taxWarning: props.taxWarning }).text}
           </p>
           {lockedWithdrawalUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
+          {result.success && lastResultUnverified && <ul className="needs-checks" data-testid="needs-checks">
+            {props.taxWarning && <li>{t('checkPersonTax')}</li>}
+            {lockedWithdrawalUnverified && <li>{t('checkLockedLimits')}</li>}
+            {result.terminalTaxStatus === 'unsupported' && <li>{t('checkClosingTax')}</li>}
+          </ul>}
+          {/* FE-44: a failing plan gets a next step, not just a final net worth. */}
+          {!result.success && <div className="next-steps" data-testid="next-steps">
+            <p><strong>{t('nextStepsTitle')}</strong></p>
+            <button type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</button>
+            <button type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</button>
+            {sustainable?.status === 'solved' && sustainable.value !== null && <p data-testid="next-step-sustainable-answer">{t('nextStepSustainableAnswer', { amount: cad(sustainable.value), age: inputs.lifeExpectancy })}</p>}
+            {sustainable && sustainable.status !== 'solved' && <p className="hint">{t(`solver_${sustainable.status}`)}</p>}
+          </div>}
           {result.unfundedObligations.length > 0 && <ul className="funding-gaps">
             {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
               {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
@@ -150,6 +209,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
                 : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
                   : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
                   : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
+                  : gap.reason === 'hbpRepaymentTax' ? 'valHbpTaxUnfunded'
                   : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}
@@ -168,7 +228,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             oas: cad(result.terminalOasRecovery),
             probate: cad(result.probateFee),
           })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
-          <p className="hint">{t('terminalEstimateNote')}</p>
+          <p className="hint">{t(inputs.partner ? 'terminalEstimateNote' : 'terminalEstimateNoteSingle')}</p>
+          {result.terminalTaxDisclosure === 'quebecSimplified' && <p className="hint" data-testid="terminal-qc-simplified">{t('terminalQcSimplified')}</p>}
           {dwzSpending?.status === 'solved' && dwzSpending.value !== null && (
             <>
               <p>
@@ -243,6 +304,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           <p className="hint">
             <Jargon text={t('numberExplain', { age: inputs.fireAge, life: inputs.lifeExpectancy })} />
           </p>
+          {fireNumberProjected && <p className="hint" data-testid="fire-number-projected">{t('fireNumberProjectedBasis', { age: inputs.fireAge })}</p>}
           </>}
           <p className="hint">{t('solverNumberAssumptions')}</p>
         </>
@@ -294,6 +356,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           <p className="hint"><Jargon text={t('targetHint')} /></p>
         </>
       )}
+      </div>
     </div>
   )
 }

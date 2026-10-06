@@ -24,7 +24,7 @@ async function seed(page: Page, options: { guided?: boolean; currentAge?: number
     const canonical = refreshCanonicalFromLegacy(null, inputs)
     localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
       inputs, canonical, entryMode: guided ? 'guided' : 'professional', guidedView: guided ? 'results' : 'questionnaire',
-      inputRevision: 0, resultRevision: guided ? 0 : null,
+      inputRevision: 0, resultRevision: guided ? 0 : null, questionAnswers: guided ? { 'assets.identify': ['rrsp'] } : {},
     } }))
   }, options)
   await page.reload()
@@ -94,17 +94,18 @@ test('professional records premiums, prices the contributor room and previews th
   await page.reload()
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
   await expect(page.getByTestId(`spousal-year-${ROW0}`)).toHaveValue(String(year - 2))
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6000')
+  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
   await expect(page.getByTestId(`spousal-contributor-${ROW0}`)).toHaveValue(PARTNER)
   await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('6,000')
   await previewPayment(page, 12_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
   // The same recorded facts and split show in guided mode.
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.goto('/#/guided/income/income.taxFacts')
+  // FE-43 C: the premium history is on the optional spousal-history page.
+  await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('4000')
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('4,000')
+  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
   await previewPayment(page, 12_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
@@ -114,22 +115,31 @@ test('professional records premiums, prices the contributor room and previews th
 
 test('guided records the premium history and keeps it through reload and a mode switch', async ({ page }) => {
   await seed(page, { guided: true })
-  await page.goto('/#/guided/income/income.taxFacts')
+  // FE-43 A: guided names the owner on the ownership checklist, then records
+  // the plan type and its history with the other tax details.
+  await page.goto('/#/guided/assets/assets.ownership')
+  await page.getByTestId(`owner-choice-${ACCOUNT}-self`).check()
+  await page.goto('/#/guided/assets/account.rrsp.type')
+  await page.getByTestId(`registered-type-${ACCOUNT}-spousalRrsp`).check()
+  await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   const year = await baseYear(page)
-  await makeSpousal(page)
+  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toBeVisible()
   await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
   await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 5_000 })
+  // The contributor's room is on the RRSP room page; the premium opens its detail.
+  await page.goto('/#/guided/taxDetails/tax.rrspRoom')
   await page.getByTestId('rrsp-available-room-partner').fill('8000')
   await page.getByTestId('rrsp-available-room-partner').blur()
   await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('5,000')
   // Guided does not auto-run: recorded facts change but results stay stale.
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   await page.reload()
-  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5000')
   await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('5,000')
+  await page.goto('/#/guided/taxDetails/tax.spousalHistory')
+  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
   await previewPayment(page, 7_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,000')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
@@ -190,7 +200,7 @@ test('a recorded spousal history stays visible and attributed after the type swi
   await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('rrif')
   await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40000')
+  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40,000')
   // The seeded account reaches age 72 during the year, i.e. January 1 age 71,
   // so the post-1986 factor category is required. `allOther` is 0.0528, and
   // 100,000 * 0.0528 = a 5,280 minimum.

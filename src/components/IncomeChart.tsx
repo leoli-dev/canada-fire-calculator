@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Area,
@@ -33,6 +34,7 @@ export function IncomeChart(props: {
   scale?: (age: number) => number
 }) {
   const { t } = useTranslation()
+  const id = useId()
   const cad = useCad()
   const cadTick = useCadCompact()
   const k = props.scale ?? (() => 1)
@@ -51,6 +53,9 @@ export function IncomeChart(props: {
       extraIncome: Math.round(r.extraIncome * k(r.age)),
       pension: Math.round(r.pension * k(r.age)),
       tax: Math.round(r.tax * k(r.age)),
+      // FE-44: what the year needed before tax, and the part nothing covered.
+      need: Math.round((r.netCash + r.shortfall + r.tax) * k(r.age)),
+      shortfall: Math.round(r.shortfall * k(r.age)),
       total: Math.round(
         (r.withdrawals.tfsa + r.withdrawals.rrsp + r.withdrawals.nonReg +
           r.cpp + r.oas + r.gis + r.ccb + r.rent + r.extraIncome + r.pension) *
@@ -63,12 +68,22 @@ export function IncomeChart(props: {
   const hasRent = data.some((d) => d.rent > 0)
   const hasExtra = data.some((d) => d.extraIncome > 0)
   const hasPension = data.some((d) => d.pension > 0)
+  const hasShortfall = data.some((d) => d.shortfall > 0)
 
   if (data.length === 0) return null
 
+  const gap = data.reduce((worst, d) => (d.shortfall > worst.shortfall ? d : worst), data[0])
+  const summary = t('incomeChartSummary', {
+    startAge: data[0].age, endAge: data[data.length - 1].age,
+    covered: data.filter((d) => d.shortfall <= 0).length, years: data.length,
+  }) + (hasShortfall ? ' ' + t('incomeChartSummaryGap', { gap: cad(gap.shortfall), age: gap.age }) : '')
+
   return (
     <div className="chart-card">
-      <h3>{t('incomeChartTitle')}</h3>
+      <h3 id={`${id}-title`}>{t('incomeChartTitle')}</h3>
+      {/* FE-45: the chart is one image to assistive tech, described in words. */}
+      <p className="sr-only" id={`${id}-summary`}>{summary}</p>
+      <div role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-summary`}>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
@@ -100,9 +115,14 @@ export function IncomeChart(props: {
           {hasExtra && (
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
           )}
+          {hasShortfall && (
+            <Area dataKey="shortfall" stackId="1" name={t('incomeShortfall')} stroke="#c62828" fill="#c62828" fillOpacity={0.35} />
+          )}
+          <Line dataKey="need" name={t('incomeNeed')} stroke="#c62828" strokeWidth={2} strokeDasharray="2 3" dot={false} />
           <Line dataKey="tax" name={t('taxLabel')} stroke="#37474f" strokeWidth={2} strokeDasharray="5 3" dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
       <p className="hint"><Jargon text={t('incomeChartNote')} /></p>
     </div>
   )

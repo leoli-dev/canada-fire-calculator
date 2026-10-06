@@ -175,6 +175,8 @@ export interface InputsV2 {
     qcPensionSplit?: { transferorId: EntityId; recipientId: EntityId; amount: number } | null
     /** Missing months are unknown; indices 0–11 mean January–December of the projected tax year. */
     qcDrugCoverage?: Record<EntityId, QcDrugCoverage[]>
+    /** BE-44: a one-person Québec household that lived alone all year (Schedule B). Unknown claims nothing. */
+    livesAlone?: Known<boolean>
   }
   dependents: Dependent[]
   strategy: Strategy

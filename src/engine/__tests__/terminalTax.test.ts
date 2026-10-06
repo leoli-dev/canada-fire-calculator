@@ -15,7 +15,8 @@ const p07: Inputs = {
   balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 }, nonRegBook: 0,
   cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0,
   strategy: 'tfsaFirst', inflation: 0, fees: 0, nonRegDistributionYield: 0,
-  extraIncome: { annual: 50_000, fromAge: 50, toAge: 50 },
+  // Plain ordinary income: this vector tests closing-tax stacking, not payroll (BE-46).
+  extraIncome: { annual: 50_000, fromAge: 50, toAge: 50, kind: 'other' },
 }
 
 describe('terminal-year tax', () => {

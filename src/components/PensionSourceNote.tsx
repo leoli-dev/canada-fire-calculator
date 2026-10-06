@@ -62,7 +62,7 @@ export function PensionSourceNote(props: {
             {source === 'estimator' && <option value="">{t('pensionSourceEstimator')}</option>}
             {source === 'unknown' && <option value="">{t('pensionSourceUnknown')}</option>}
             <option value="manual">{t('pensionSourceManual')}</option>
-            <option value="statement">{t('pensionSourceStatement')}</option>
+            <option value="statement">{t(props.kind === 'oas' ? 'pensionSourceStatementOas' : 'pensionSourceStatement')}</option>
           </select>
         </label>
         {source === 'statement' && <>

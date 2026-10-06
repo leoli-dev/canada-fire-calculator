@@ -139,22 +139,27 @@ describe('dated rule selection', () => {
   })
 
   it('selects the published GIS quarter and refuses one that is not published', () => {
+    // BE-45: the default is the latest published quarter, October-December 2026
+    // (ESDC Table 5); July-September stays selectable by its period.
     const gis = selectGisRules()
     expect([gis.id, gis.paymentPeriod, gis.basedOnIncomeYear])
-      .toEqual(['CA-OAS-GIS-2026-Q3-v1', '2026-07/2026-09', 2025])
-    expect(gis.categories.single).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 22800 })
-    expect(gis.categories['couple-both-pensioners']).toMatchObject({ maxMonthly: 2 * 676.09, annualCutoff: 30096 })
-    expect(gis.categories['couple-partner-allowance']).toMatchObject({ maxMonthly: 676.09, annualCutoff: 42144 })
-    expect(gis.categories['couple-partner-no-oas-no-allowance']).toMatchObject({ maxMonthly: 1123.17, annualCutoff: 54624 })
-    expect(gis.allowance).toMatchObject({ maxMonthly: 1428.06, annualCutoff: 42144, topUpIncome: 8800 })
+      .toEqual(['CA-OAS-GIS-2026-Q4-v1', '2026-10/2026-12', 2025])
+    expect(gis.categories.single).toMatchObject({ maxMonthly: 1138.90, annualCutoff: 23112 })
+    expect(gis.categories['couple-both-pensioners']).toMatchObject({ maxMonthly: 2 * 685.56, annualCutoff: 30528 })
+    expect(gis.categories['couple-partner-allowance']).toMatchObject({ maxMonthly: 685.56, annualCutoff: 42768 })
+    expect(gis.categories['couple-partner-no-oas-no-allowance']).toMatchObject({ maxMonthly: 1138.90, annualCutoff: 55392 })
+    expect(gis.allowance).toMatchObject({ maxMonthly: 1448.06, annualCutoff: 42768, topUpIncome: 8800 })
+    const q3 = selectGisRules('2026-07/2026-09')
+    expect([q3.id, q3.categories.single.maxMonthly, q3.categories.single.annualCutoff]).toEqual(['CA-OAS-GIS-2026-Q3-v1', 1123.17, 22800])
+    expect(() => selectGisRules('2027-01/2027-03')).toThrow(/Unpublished/)
     expect(gis.unsupportedPaths.map(p => p.id)).toContain('prior-year-base-period')
     // A quarter the pack does not publish has no amounts at all: there is no
     // indexation mechanism for a quarterly table, so a new quarter needs a new
     // pack rather than an interpolated number.
-    expect(() => selectGisRules('2026-10/2026-12')).toThrow()
+    expect(() => selectGisRules('2027-01/2027-03')).toThrow()
     // The selector hands back a copy, so a caller cannot mutate the pinned pack.
     selectGisRules().categories.single.annualCutoff = 1
-    expect(selectGisRules().categories.single.annualCutoff).toBe(22800)
+    expect(selectGisRules().categories.single.annualCutoff).toBe(23112)
   })
 
   it('rejects a GIS pack whose categories, cut-offs or sources are incomplete', () => {
@@ -182,7 +187,9 @@ describe('dated rule selection', () => {
     expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: '' }] })).toThrow()
     expect(() => publishRulePack({ ...gis, unsupportedPaths: [{ id: 'x', reason: 'y' }, { id: 'x', reason: 'z' }] })).toThrow()
     expect(() => publishRulePack({ ...gis, basedOnIncomeYear: 2024 })).toThrow()
-    expect(() => publishRulePack({ ...gis, paymentPeriod: '2026-10/2026-12' })).toThrow()
+    // A period that is not a calendar quarter, or whose effective date is not its first day.
+    expect(() => publishRulePack({ ...gis, paymentPeriod: '2026-08/2026-10' })).toThrow()
+    expect(() => publishRulePack({ ...gis, effectiveDate: '2026-07-01' })).toThrow()
     // Exactly one shape discriminator per pack: a GIS pack is never accepted
     // through the CCB or FHSA branch.
     expect(() => publishRulePack({ ...gis, program: 'CCB' })).toThrow()
