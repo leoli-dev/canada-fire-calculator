@@ -1670,5 +1670,6 @@
   "analyticsTurnOff": "Turn them off",
   "analyticsTurnOn": "Allow them",
   "analyticsSignal": "Your browser asks sites not to track you, so usage statistics stay off.",
-  "storageUnavailable": "This browser is blocking site storage, so your plan is not being saved and will be gone when you close the page."
+  "storageUnavailable": "This browser is blocking site storage, so your plan is not being saved and will be gone when you close the page.",
+  "valHbpTaxUnfunded": "At age {{age}}, the tax on an unpaid Home Buyers' Plan instalment is ${{amount}} more than your savings and accounts can cover."
 }

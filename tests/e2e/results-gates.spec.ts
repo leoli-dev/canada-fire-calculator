@@ -53,3 +53,18 @@ test('a failing plan offers next steps and shades the uncovered spending', async
   await next.getByRole('button', { name: 'See the earliest age this plan works' }).click()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('a sustainable-spending answer is retired when the plan changes', async ({ page }) => {
+  await seed(page, { province: 'ON' })
+  await page.getByTestId('next-step-sustainable').click()
+  const answer = page.getByTestId('next-step-sustainable-answer')
+  await expect(answer).toContainText('CA$')
+  const first = await answer.innerText()
+  await page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input').fill('1000')
+  await page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input').press('Tab')
+  await expect(answer).toHaveCount(0)
+  // Asking again answers for the edited plan.
+  await page.getByTestId('next-step-sustainable').click()
+  await expect(answer).toBeVisible()
+  expect(await answer.innerText()).not.toBe(first)
+})

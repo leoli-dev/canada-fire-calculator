@@ -9,7 +9,7 @@ import {
   type YearRow,
 } from './types'
 import { sideIncomeDeductions } from './payroll'
-import { HBP_LIMIT_PER_BUYER } from './funding'
+import { hbpBuyers, hbpGraceYears, hbpLimitFor, splitHbpWithdrawal } from './funding'
 import { incomeTax, PLAN_TAX_YEAR, probateTax, rulesForCalendarYear, selectPlanTaxRules, taxRuleProvenance, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
@@ -140,6 +140,9 @@ export interface Step {
   cap?: number
 }
 
+/** BE-47: an unpaid HBP instalment included in the borrower's income (null: borrower unknown). */
+type HbpIncome = { personId: string | null; amount: number }
+
 function evaluate(
   G: number,
   balances: Record<AccountType, number>,
@@ -165,6 +168,7 @@ function evaluate(
   taxYear?: number,
   spousalAttribution?: SpousalAttributionLedger,
   legacyRules?: TaxRuleContext,
+  hbpIncome?: HbpIncome[],
 ): WithdrawalOutcome {
   const w: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
   let remaining = G
@@ -200,7 +204,8 @@ function evaluate(
   const taxPeople: TerminalTaxPerson[] = []
   // BE-46: side income carries its payroll contributions: cash withheld, the
   // enhanced/second contributions deducted and the base ones credited.
-  const payroll = sideIncomeDeductions(extraIncome, inputs.extraIncome?.kind ?? 'employment', inputs.province)
+  const sideKind = inputs.extraIncome?.kind ?? 'employment'
+  const payroll = sideIncomeDeductions(extraIncome, sideKind, inputs.province, agesPerPerson[0])
   for (let i = 0; i < persons; i++) {
     const personExtra = i === 0 ? extraIncome - payroll.taxDeduction : 0
     const personTaxable = share + personExtra
@@ -228,17 +233,19 @@ function evaluate(
   // cut-off, and the Allowance is computed inside that same category rather
   // than added from a household-wide helper.
   const receivingOas = oasGrossPerPerson.map((o) => o > 0)
-  const gisIncome = pooledTaxable + extraIncome
+  const gisIncome = pooledTaxable + extraIncome - payroll.taxDeduction
   // One classification decides the row, the amount and the Allowance in pay.
   // The projection always has both spouses' ages and OAS flags, so the only
   // non-modelled outcome here is `none` (nobody draws OAS, so neither the GIS
   // nor the Allowance is payable) — a real zero, via `basisAnnualAmount`.
+  // Only employment and self-employment earnings get the work exemption;
+  // dividends, royalties and other side income count in full.
   const legacyBasis = benefitIncomeBasis(receivingOas, agesPerPerson, gisIncome, {
-    workIncome: [extraIncome],
+    workIncome: [sideKind === 'other' ? 0 : extraIncome],
   })
   const gis = basisAnnualAmount(legacyBasis)
   // CCB's AFNI approximation, unlike GIS, includes OAS
-  const totalTaxable = pooledTaxable + extraIncome + oasNet
+  const totalTaxable = pooledTaxable + extraIncome - payroll.taxDeduction + oasNet
   // BE-38 B2: the CCB is priced from the selected, sourced, versioned pack
   // (`anchorBenefitRules()`), not from a literal in benefits.ts.
   const ccb = ccbAnnual(nUnder6, n6to17, totalTaxable, anchorBenefitRules())
@@ -250,7 +257,7 @@ function evaluate(
     const person = personProjectionTax({ plan: canonical, inputs, year: taxYear,
       selfAge: agesPerPerson[0], withdrawals: w, registeredBalance: balances.rrsp,
       nonRegGainFraction: gainFraction,
-      nonRegDistributions, rent, otherWork: extraIncome,
+      nonRegDistributions, rent, otherWork: extraIncome, otherWorkKind: sideKind, payroll, hbpIncome,
       oasGross: oasGrossPerPerson, purchaseRrspWithdrawal,
       purchaseNonRegTaxable, propertySaleTaxable, spousalAttribution })
     if (person.status === 'ok') {
@@ -273,7 +280,7 @@ function evaluate(
         { workIncome: person.earnedWork })
       const personGis = basisAnnualAmount(personBasis)
       const personCcb = ccbAnnual(nUnder6, n6to17, householdTaxable, anchorBenefitRules())
-      // The person-level ledger does not settle payroll yet; the cash is still withheld.
+      // The ledger above deducted and credited the payroll; the cash is withheld here.
       netCash = cpp + pension + oasNet + personGis + personCcb + rent + extraIncome - payroll.contributions + w.tfsa + w.rrsp + w.nonReg - tax + prepaidPurchaseTax
       return { withdrawals: w, tax, rrspTax, oasNet, gis: personGis, gisBasis: personBasis.status === 'modeled' ? personBasis : undefined, ccb: personCcb,
         netCash, taxablePerPerson, taxPeople, byPersonTax: person.tax.byPerson,
@@ -314,10 +321,11 @@ function solveWithdrawals(
   taxYear?: number,
   spousalAttribution?: SpousalAttributionLedger,
   legacyRules?: TaxRuleContext,
+  hbpIncome?: HbpIncome[],
 ): WithdrawalOutcome {
   const total = balances.tfsa + balances.rrsp + balances.nonReg
   const run = (G: number) =>
-    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution, legacyRules)
+    evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution, legacyRules, hbpIncome)
 
   const atMin = run(forcedRrsp)
   if (atMin.netCash >= target) return atMin
@@ -396,13 +404,18 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   const pr = inputs.principalResidence
   const plannedPurchase = pr && pr.mode === 'planned' ? pr : null
   // BE-47: the Home Buyers' Plan. A first-home purchase may take up to 60,000
-  // per buyer from RRSPs tax-free (CRA, withdrawals after April 16, 2024), and
-  // repays 1/15 a year from the second year after the withdrawal; an unpaid
-  // instalment is included in income that year.
-  const hbpLimit = plannedPurchase && plannedPurchase.hbp !== false ? HBP_LIMIT_PER_BUYER * (inputs.partner ? 2 : 1) : 0
-  let hbpBalance = 0
-  let hbpInstalment = 0
+  // per buyer from that buyer's own RRSPs tax-free (CRA, withdrawals after
+  // April 16, 2024), repaid 1/15 a year after a grace period set by the
+  // withdrawal year; an unpaid instalment is included in the borrower's income.
+  const hbpEligible = !!plannedPurchase && plannedPurchase.hbp !== false
+  let hbpLoans: { personId: string | null; balance: number; instalment: number }[] = []
   let hbpFirstRepayIdx = Infinity
+  const startHbp = (withdrawal: number, buyers: ReturnType<typeof hbpBuyers>, yearIdx: number) => {
+    if (withdrawal <= 0) return
+    hbpLoans = splitHbpWithdrawal(withdrawal, buyers)
+      .map(loan => ({ personId: loan.personId, balance: loan.amount, instalment: loan.amount / 15 }))
+    hbpFirstRepayIdx = yearIdx + hbpGraceYears(baseCalendarYear + yearIdx)
+  }
   // clamp for safety; validation flags a buy age before currentAge
   const buyYearIdx = plannedPurchase
     ? Math.max(0, plannedPurchase.buyAtAge - inputs.currentAge)
@@ -501,8 +514,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let housingFunding: YearRow['housingFunding'] = null
     const yearGaps: FundingGap[] = []
     const yearIdx = age - inputs.currentAge
-    const hbpDue = yearIdx >= hbpFirstRepayIdx && hbpBalance > 0 ? Math.min(hbpInstalment, hbpBalance) : 0
-    hbpBalance -= hbpDue
+    const hbpDues = yearIdx >= hbpFirstRepayIdx
+      ? hbpLoans.map(loan => {
+        const amount = Math.min(loan.instalment, loan.balance)
+        loan.balance -= amount
+        return { personId: loan.personId, amount }
+      }).filter(due => due.amount > 0)
+      : []
+    const hbpDue = hbpDues.reduce((sum, due) => sum + due.amount, 0)
     const factor = nominalFactor(inflation, yearIdx)
     const nonRegBookReal = () => toReal(nonRegBook, factor)
     // A purchase or housing-funding disposal can realize an unverified loss in
@@ -542,6 +561,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // annual tax context for gross-up, but only opening assets may close the
     // year-start transaction. Later income can fund ordinary annual costs.
     if (plannedPurchase && yearIdx === buyYearIdx) {
+      const buyers = hbpEligible ? hbpBuyers(bal.rrsp, !!inputs.partner, canonical) : []
+      const hbpLimit = hbpLimitFor(buyers)
       if (phase === 'accumulation') {
         const plan = planPurchaseFunding(plannedPurchase, age, {
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
@@ -571,11 +592,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
-          if (plan.allocation.hbpWithdrawal > 0) {
-            hbpBalance = plan.allocation.hbpWithdrawal
-            hbpInstalment = plan.allocation.hbpWithdrawal / 15
-            hbpFirstRepayIdx = yearIdx + 2
-          }
+          startHbp(plan.allocation.hbpWithdrawal, buyers, yearIdx)
         }
       } else {
         const purchaseYearRent = ips.reduce((sum, p) => sum + (p.value > 0 ? p.rent : 0), 0)
@@ -606,11 +623,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
-          if (plan.allocation.hbpWithdrawal > 0) {
-            hbpBalance = plan.allocation.hbpWithdrawal
-            hbpInstalment = plan.allocation.hbpWithdrawal / 15
-            hbpFirstRepayIdx = yearIdx + 2
-          }
+          startHbp(plan.allocation.hbpWithdrawal, buyers, yearIdx)
         }
       }
     }
@@ -848,7 +861,25 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       const hbpRepaid = Math.min(hbpDue, savingsBudget)
       bal.rrsp += hbpRepaid
       hbpUnpaidTax = (hbpDue - hbpRepaid) * (inputs.accumulationMarginalRate ?? 0.35)
-      bal.nonReg -= hbpUnpaidTax
+      if (hbpUnpaidTax > 0) {
+        // The tax on the unpaid part is cash: it is raised from liquid assets
+        // like any other cost (grossing up a taxable sale), and a shortfall
+        // is a funding gap rather than a negative account.
+        const funding = planAnnualHousingFunding(age, hbpUnpaidTax, {
+          balances: bal, nonRegBook: nonRegBookReal(), marginalRate: inputs.accumulationMarginalRate ?? 0.35,
+          annualSavings: 0,
+        })
+        if (funding.allocation) {
+          Object.assign(bal, funding.allocation.balances)
+          noteFundingLoss(funding.allocation)
+          nonRegBook = toNominal(funding.allocation.nonRegBook, factor)
+          dpAccumTax += funding.allocation.withdrawalTax
+          purchaseNonRegTaxable += funding.allocation.nonRegTaxable
+          purchaseRrspWithdrawal += funding.allocation.rrspWithdrawal
+        }
+        if (funding.gap) yearGaps.push({ eventId: `hbp:${age}`, field: 'principalResidence.hbp',
+          amount: funding.gap.amount, reason: 'hbpRepaymentTax' })
+      }
       const budget = savingsBudget - hbpRepaid
       const allocation = allocateContributions({
         age, budget,
@@ -999,7 +1030,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         extraIncome, nUnder6, n6to17, steps, inputs, purchaseTaxPaid, purchaseRrspWithdrawal,
         purchaseNonRegTaxable, saleGainsTaxable,
         canonical, canonical ? canonical.baseYear + yearIdx : undefined,
-        spousalAttribution, rulesForCalendarYear(rules, baseCalendarYear + yearIdx),
+        spousalAttribution, rulesForCalendarYear(rules, baseCalendarYear + yearIdx), hbpDues,
       )
       // The accepted solve's ledger is the year's post-payment state; the
       // rejected binary-search candidates each started from the same
@@ -1034,23 +1065,26 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       const nonRegGainTaxable = withdrawals.nonReg * gainFraction * CAPITAL_GAINS_INCLUSION
       const propertyTaxable = saleGainsTaxable + rent - rentMortgageInterest
       const taxShare = (component: number) => (totalTaxable > 0 ? tax * (component / totalTaxable) : 0)
-      rrspTaxTotal += taxShare(purchaseRrspWithdrawal)
+      // Side income counts net of its payroll deduction; an unpaid HBP
+      // instalment is RRSP income included in the year.
+      const sideTaxable = extraIncome - sideIncomeDeductions(extraIncome, inputs.extraIncome?.kind ?? 'employment', inputs.province, age).taxDeduction
+      rrspTaxTotal += taxShare(purchaseRrspWithdrawal + hbpDue)
       taxBySource = {
-        rrsp: taxShare(withdrawals.rrsp + purchaseRrspWithdrawal),
+        rrsp: taxShare(withdrawals.rrsp + purchaseRrspWithdrawal + hbpDue),
         nonReg: taxShare(dist + nonRegGainTaxable + purchaseNonRegTaxable),
         cpp: taxShare(cpp),
         oas: taxShare(oas),
         property: taxShare(propertyTaxable),
-        extraIncome: taxShare(extraIncome),
+        extraIncome: taxShare(sideTaxable),
         pension: taxShare(pension),
       }
       taxableBySource = {
-        rrsp: withdrawals.rrsp + purchaseRrspWithdrawal,
+        rrsp: withdrawals.rrsp + purchaseRrspWithdrawal + hbpDue,
         nonReg: dist + nonRegGainTaxable + purchaseNonRegTaxable,
         cpp,
         oas,
         property: propertyTaxable,
-        extraIncome,
+        extraIncome: sideTaxable,
         pension,
       }
 

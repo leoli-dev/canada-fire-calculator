@@ -1679,5 +1679,6 @@
   "analyticsTurnOff": "关闭",
   "analyticsTurnOn": "开启",
   "analyticsSignal": "你的浏览器要求网站不要跟踪你，因此使用统计保持关闭。",
-  "storageUnavailable": "此浏览器阻止了网站存储，你的计划不会被保存，关闭页面后就会消失。"
+  "storageUnavailable": "此浏览器阻止了网站存储，你的计划不会被保存，关闭页面后就会消失。",
+  "valHbpTaxUnfunded": "{{age}} 岁时，未偿还的购房计划（HBP）分期款所产生的税款比你的储蓄和账户能支付的多 ${{amount}}。"
 }

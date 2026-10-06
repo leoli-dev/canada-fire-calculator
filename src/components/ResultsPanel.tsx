@@ -37,9 +37,12 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
-  const [sustainable, setSustainable] = useState<ReturnType<typeof maxSustainableSpending> | null>(null)
+  const [sustainableRun, setSustainableRun] = useState<{ answer: ReturnType<typeof maxSustainableSpending>; inputs: Inputs; canonical: unknown } | null>(null)
   const { inputs, result } = props
   const canonical = useStore((s) => s.canonical)
+  // The answer belongs to the plan it was computed for; any edit retires it.
+  const sustainable = sustainableRun && sustainableRun.inputs === inputs && sustainableRun.canonical === canonical
+    ? sustainableRun.answer : null
 
   const earliest = useMemo(
     () => (mode === 'when' ? findEarliestFireAge(inputs, canonical) : null),
@@ -194,7 +197,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           {!result.success && <div className="next-steps" data-testid="next-steps">
             <p><strong>{t('nextStepsTitle')}</strong></p>
             <button type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</button>
-            <button type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainable(maxSustainableSpending(inputs, canonical))}>{t('nextStepSustainable')}</button>
+            <button type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</button>
             {sustainable?.status === 'solved' && sustainable.value !== null && <p data-testid="next-step-sustainable-answer">{t('nextStepSustainableAnswer', { amount: cad(sustainable.value), age: inputs.lifeExpectancy })}</p>}
             {sustainable && sustainable.status !== 'solved' && <p className="hint">{t(`solver_${sustainable.status}`)}</p>}
           </div>}
@@ -206,6 +209,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
                 : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
                   : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
                   : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
+                  : gap.reason === 'hbpRepaymentTax' ? 'valHbpTaxUnfunded'
                   : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}

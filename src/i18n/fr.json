@@ -1679,5 +1679,6 @@
   "analyticsTurnOff": "Les désactiver",
   "analyticsTurnOn": "Les autoriser",
   "analyticsSignal": "Votre navigateur demande aux sites de ne pas vous suivre; les statistiques restent donc désactivées.",
-  "storageUnavailable": "Ce navigateur bloque le stockage du site : votre plan n’est pas enregistré et disparaîtra à la fermeture de la page."
+  "storageUnavailable": "Ce navigateur bloque le stockage du site : votre plan n’est pas enregistré et disparaîtra à la fermeture de la page.",
+  "valHbpTaxUnfunded": "À {{age}} ans, l’impôt sur un versement non remboursé du Régime d’accession à la propriété dépasse de {{amount}} $ ce que votre épargne et vos comptes peuvent couvrir."
 }

@@ -106,7 +106,8 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     const spouseNetIncome = claimant === id && other ? people[other].netIncome : undefined
     const tax = incomeTax(person.taxableIncome, plan.province, { age: person.age,
       pensionIncome: person.federalPensionEligible,
-      provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome }, rules)
+      provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome,
+      payrollCredit: person.payrollCredit, employmentAmount: person.employmentAmount }, rules)
     byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
       taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
       provincialPensionEligible: person.provincialPensionEligible,

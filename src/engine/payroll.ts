@@ -20,7 +20,13 @@ import type { Province } from './types'
  * lowest rate; the first additional 1% and the second additional (CPP2/QPP2)
  * contributions are deductions; a self-employed person also deducts the
  * employer half. Provincial credits for these amounts are approximated at the
- * provincial lowest rate.
+ * provincial lowest rate outside Quebec; Quebec folds them into its basic
+ * personal amount.
+ *
+ * Age: CPP stops at 70 and QPP in the year the worker turns 73, while EI and
+ * QPIP have no upper age. The year a person turns 70 is treated as a whole
+ * non-contributing year, and the optional stop available from 65 to a worker
+ * already drawing a CPP/QPP pension is not modelled (contributions continue).
  */
 export const PAYROLL_2026 = {
   ympe: 74_600,
@@ -31,6 +37,10 @@ export const PAYROLL_2026 = {
   ei: { insurable: 68_900, rate: 0.0163, quebecRate: 0.013 },
   qpip: { insurable: 103_000, employee: 0.0043, selfEmployed: 0.00764 },
   canadaEmploymentAmount: 1_501,
+  /** CPP contributions end once the contributor turns 70 (CRA). */
+  cppLastAge: 69,
+  /** QPP contributions end on January 1 of the year the worker turns 73 (since 2024). */
+  qppLastAge: 72,
 } as const
 
 /** `other`: income with no payroll contributions (royalties, director fees taken as dividends, and so on). */
@@ -47,15 +57,16 @@ export interface PayrollDeductions {
   employmentAmount: number
 }
 
-export function sideIncomeDeductions(earnings: number, kind: SideIncomeKind, province: Province): PayrollDeductions {
+export function sideIncomeDeductions(earnings: number, kind: SideIncomeKind, province: Province, age = 0): PayrollDeductions {
   const e = Math.max(0, earnings)
   if (e === 0 || kind === 'other') return { contributions: 0, taxDeduction: 0, creditAmount: 0, employmentAmount: 0 }
   const p = PAYROLL_2026
   const quebec = province === 'QC'
   const plan = quebec ? p.qpp : p.cpp
   const self = kind === 'selfEmployment'
-  const pensionable = Math.max(0, Math.min(e, p.ympe) - p.basicExemption)
-  const second = Math.max(0, Math.min(e, p.yampe) - p.ympe)
+  const contributesToPlan = age <= (quebec ? p.qppLastAge : p.cppLastAge)
+  const pensionable = contributesToPlan ? Math.max(0, Math.min(e, p.ympe) - p.basicExemption) : 0
+  const second = contributesToPlan ? Math.max(0, Math.min(e, p.yampe) - p.ympe) : 0
   const multiplier = self ? 2 : 1
   const base = pensionable * plan.employee * multiplier
   const secondContribution = second * plan.secondEmployee * multiplier

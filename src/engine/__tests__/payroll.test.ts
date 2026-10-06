@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { sideIncomeDeductions } from '../payroll'
 import { benefitIncomeBasis } from '../benefits'
+import { DEFAULT_INPUTS } from '../../store'
+import { refreshCanonicalFromLegacy } from '../migration'
+import { runProjection } from '../projection'
+import type { Inputs } from '../types'
 
 describe('BE-46 payroll on side income (2026)', () => {
   it('withholds employee CPP, CPP2 and EI outside Quebec', () => {
@@ -42,5 +46,44 @@ describe('BE-46 payroll on side income (2026)', () => {
     if (twoEarners.status !== 'modeled' || pooled.status !== 'modeled') throw new Error('unsupported')
     expect(twoEarners.workExemption).toBe(15_000)
     expect(pooled.workExemption).toBe(10_000)
+  })
+})
+
+describe('BE-46 review fixes', () => {
+  it('stops CPP at 70 and QPP in the year the worker turns 73, keeping EI and QPIP', () => {
+    const at69 = sideIncomeDeductions(40_000, 'employment', 'ON', 69)
+    const at70 = sideIncomeDeductions(40_000, 'employment', 'ON', 70)
+    expect(at69.contributions).toBeCloseTo(0.0595 * 36_500 + 0.0163 * 40_000, 2)
+    expect(at70.contributions).toBeCloseTo(0.0163 * 40_000, 2) // EI only
+    expect(at70.taxDeduction).toBe(0)
+    expect(at70.creditAmount).toBeCloseTo(0.0163 * 40_000, 2)
+    // QPP continues at 71 and 72 and ends in the year of 73.
+    expect(sideIncomeDeductions(40_000, 'employment', 'QC', 72).contributions).toBeCloseTo(2_299.5 + 520 + 172, 2)
+    expect(sideIncomeDeductions(40_000, 'employment', 'QC', 73).contributions).toBeCloseTo(520 + 172, 2)
+  })
+
+  const retiree: Inputs = { ...DEFAULT_INPUTS, province: 'ON', currentAge: 60, fireAge: 60, lifeExpectancy: 62,
+    partner: undefined, pension: undefined, children: [], debts: [], investmentProperties: [], principalResidence: null,
+    returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, fees: 0, nonRegDistributionYield: 0, inflation: 0,
+    balances: { tfsa: 2_000_000, rrsp: 0, nonReg: 0 }, nonRegBook: 0, strategy: 'tfsaFirst',
+    cppStartAge: 70, oasStartAge: 70, retirementSpending: 30_000,
+    extraIncome: { annual: 40_000, fromAge: 60, toAge: 65, kind: 'employment' } }
+
+  it('the person ledger deducts and credits the payroll exactly like the household estimate', () => {
+    const legacy = runProjection(retiree).rows[0]
+    const person = runProjection(retiree, undefined, refreshCanonicalFromLegacy(null, retiree)).rows[0]
+    expect(person.taxCapability).toBe('person')
+    expect(person.tax).toBeCloseTo(legacy.tax, 6)
+    expect(person.netCash).toBeCloseTo(legacy.netCash, 6)
+  })
+
+  it('gives no GIS work exemption to side income that is not earnings, in either tax path', () => {
+    const pensioner: Inputs = { ...retiree, currentAge: 67, fireAge: 67, lifeExpectancy: 68, oasStartAge: 65,
+      extraIncome: { annual: 10_000, fromAge: 67, toAge: 90, kind: 'other' } }
+    const legacy = runProjection(pensioner).rows[0]
+    const person = runProjection(pensioner, undefined, refreshCanonicalFromLegacy(null, pensioner)).rows[0]
+    const earned = runProjection({ ...pensioner, extraIncome: { ...pensioner.extraIncome!, kind: 'employment' } }).rows[0]
+    expect(legacy.gis).toBeCloseTo(person.gis, 6)
+    expect(earned.gis).toBeGreaterThan(legacy.gis + 4_000)
   })
 })

@@ -215,6 +215,7 @@ export function calculateQuebecTax(plan: InputsV2, original: Record<string, Pers
     byPerson[id] = { federalTax: federalIncomeTax(federal.taxableIncome, rules, {
       age: federal.age, pensionIncome: federal.federalPensionEligible,
       spouseNetIncome: claimant === id ? federalPeople[ids.find(other => other !== id)!].netIncome : undefined,
+      payrollCredit: federal.payrollCredit, employmentAmount: federal.employmentAmount,
     }, true), provincialIncomeTax: ordinary[id] - claims[id] - transferred[id], scheduleBCredit: claims[id], spouseCreditTransfer: transferred[id],
     fss: fss.contribution, ramq: ramq.premium, qcTaxableIncome: source.taxableIncome,
     qcRetirementEligible: source.provincialPensionEligible, qcFssBase: fss.base }

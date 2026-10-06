@@ -7,11 +7,56 @@ import { CAPITAL_GAINS_INCLUSION } from './taxData'
 /** BE-47: Home Buyers' Plan withdrawal limit per buyer (CRA, withdrawals after April 16, 2024). */
 export const HBP_LIMIT_PER_BUYER = 60_000
 
+/**
+ * Years from the first HBP withdrawal to the first repayment. CRA's temporary
+ * relief defers the start to the fifth following year for a first withdrawal
+ * made from January 1, 2022 to December 31, 2028; otherwise it is the second
+ * following year.
+ */
+export function hbpGraceYears(withdrawalCalendarYear: number): number {
+  return withdrawalCalendarYear >= 2022 && withdrawalCalendarYear <= 2028 ? 5 : 2
+}
+
+export interface HbpBuyer { personId: string | null; capacity: number }
+
+/**
+ * Each buyer may withdraw up to the limit from their own RRSPs only, so a
+ * partner never lends their unused limit to the other's RRSP. The pooled
+ * registered balance is divided by recorded ownership. When ownership is not
+ * recorded, one buyer (person unknown) is assumed, which never overstates the
+ * tax-free amount.
+ */
+export function hbpBuyers(pooledRrsp: number, hasPartner: boolean, plan?: InputsV2): HbpBuyer[] {
+  const rrsp = Math.max(0, pooledRrsp)
+  const self = plan?.people.find(person => person.role === 'self')?.id ?? null
+  if (!hasPartner) return [{ personId: self, capacity: rrsp }]
+  const accounts = (plan?.accounts ?? []).filter(account => (account.kind === 'rrsp' || account.kind === 'spousalRrsp') && account.balance > 0)
+  const total = accounts.reduce((sum, account) => sum + account.balance, 0)
+  const owned = accounts.every(account => account.ownerId !== null && plan!.people.some(person => person.id === account.ownerId))
+  if (!plan || total <= 0 || !owned) return [{ personId: null, capacity: rrsp }]
+  const byOwner = new Map<string, number>()
+  for (const account of accounts) byOwner.set(account.ownerId!, (byOwner.get(account.ownerId!) ?? 0) + account.balance)
+  return [...byOwner].map(([personId, balance]) => ({ personId, capacity: rrsp * balance / total }))
+}
+
+export const hbpLimitFor = (buyers: HbpBuyer[]) =>
+  buyers.reduce((sum, buyer) => sum + Math.min(HBP_LIMIT_PER_BUYER, buyer.capacity), 0)
+
+/** Splits a household HBP withdrawal into each buyer's own repayable loan. */
+export function splitHbpWithdrawal(total: number, buyers: HbpBuyer[]): { personId: string | null; amount: number }[] {
+  let remaining = Math.max(0, total)
+  return [...buyers].sort((a, b) => b.capacity - a.capacity).map((buyer) => {
+    const amount = Math.min(remaining, HBP_LIMIT_PER_BUYER, buyer.capacity)
+    remaining -= amount
+    return { personId: buyer.personId, amount }
+  }).filter(loan => loan.amount > 0)
+}
+
 export interface FundingGap {
   eventId: string
   field: string
   amount: number
-  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase' | 'saleDischarge' | 'saleTax'
+  reason: 'missingMortgage' | 'downPayment' | 'employeeContribution' | 'fhsaContribution' | 'purchaseCost' | 'invalidPurchase' | 'saleDischarge' | 'saleTax' | 'hbpRepaymentTax'
 }
 
 export interface PurchaseFunds {
