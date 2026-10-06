@@ -9,7 +9,7 @@ import {
   type YearRow,
 } from './types'
 import { sideIncomeDeductions } from './payroll'
-import { hbpBuyers, hbpGraceYears, hbpLimitFor, splitHbpWithdrawal } from './funding'
+import { HBP_LIMIT_PER_BUYER, hbpBuyers, hbpGraceYears, hbpLimitFor, splitHbpWithdrawal } from './funding'
 import { incomeTax, PLAN_TAX_YEAR, probateTax, rulesForCalendarYear, selectPlanTaxRules, taxRuleProvenance, type TaxRuleContext } from './tax'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { terminalTax, type TerminalTaxPerson } from './terminalTax'
@@ -421,7 +421,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   const startHbp = (withdrawal: number, buyers: ReturnType<typeof hbpBuyers>, yearIdx: number) => {
     if (withdrawal <= 0) return
     const toNominalDollars = nominalFactor(inflation, yearIdx)
-    hbpLoans = splitHbpWithdrawal(withdrawal, buyers).map(loan => ({ personId: loan.personId,
+    hbpLoans = splitHbpWithdrawal(withdrawal, buyers, HBP_LIMIT_PER_BUYER / toNominalDollars).map(loan => ({ personId: loan.personId,
       nominalBalance: loan.amount * toNominalDollars, nominalInstalment: loan.amount * toNominalDollars / 15 }))
     hbpFirstRepayIdx = yearIdx + hbpGraceYears(baseCalendarYear + yearIdx)
   }
@@ -571,7 +571,8 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // year-start transaction. Later income can fund ordinary annual costs.
     if (plannedPurchase && yearIdx === buyYearIdx) {
       const buyers = hbpEligible ? hbpBuyers(bal.rrsp, !!inputs.partner, canonical, baseCalendarYear + yearIdx) : []
-      const hbpLimit = hbpLimitFor(buyers)
+      // The dollar limit, in this row's real dollars.
+      const hbpLimit = hbpLimitFor(buyers, HBP_LIMIT_PER_BUYER / factor)
       if (phase === 'accumulation') {
         const plan = planPurchaseFunding(plannedPurchase, age, {
           balances: bal, fhsaBalance: fhsaActive ? fhsaBal : 0, nonRegBook: nonRegBookReal(),
@@ -1219,6 +1220,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     province: inputs.province,
     people: finalYearPeople,
     remainingRegistered: bal.rrsp + lockedBal,
+    // CRA includes an HBP balance still owed at death in the final return.
+    // This year's instalment was already settled above, so only the rest is added.
+    hbpOutstanding: hbpLoans.reduce((sum, loan) => sum + loan.nominalBalance, 0) / finalFactor,
     nonRegisteredGain: nonRegGain,
     investmentPropertyGain: ipGain,
     rules: rulesForCalendarYear(rules, baseCalendarYear + (inputs.lifeExpectancy - inputs.currentAge)),

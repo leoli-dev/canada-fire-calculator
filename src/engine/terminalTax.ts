@@ -18,6 +18,11 @@ export interface TerminalTaxInput {
   people: TerminalTaxPerson[]
   /** Closing registered balances only. Annual withdrawals are already taxable income. */
   remainingRegistered: number
+  /**
+   * BE-47: a Home Buyers' Plan balance still owed at death, which the final
+   * return includes in income. It is not cash and not part of the balances.
+   */
+  hbpOutstanding?: number
   /** Unrealized gains may be negative and offset other terminal capital gains. */
   nonRegisteredGain: number
   investmentPropertyGain: number
@@ -51,6 +56,7 @@ export interface TerminalTaxResult {
 export function terminalTax(input: TerminalTaxInput): TerminalTaxResult {
   const finite = (value: number) => Number.isFinite(value)
   if (!finite(input.remainingRegistered) || input.remainingRegistered < -0.01 ||
+      !finite(input.hbpOutstanding ?? 0) || (input.hbpOutstanding ?? 0) < 0 ||
       !finite(input.nonRegisteredGain) || !finite(input.investmentPropertyGain) ||
       input.people.length === 0 || input.people.some((person) => {
         const gross = person.oasGross ?? 0
@@ -63,7 +69,7 @@ export function terminalTax(input: TerminalTaxInput): TerminalTaxResult {
     throw new RangeError('terminalTax requires finite, valid tax inputs and at least one person')
   }
   // Withdrawal bisection can leave sub-cent negative floating-point dust.
-  const registered = Math.max(0, input.remainingRegistered)
+  const registered = Math.max(0, input.remainingRegistered) + (input.hbpOutstanding ?? 0)
   const taxableGains = CAPITAL_GAINS_INCLUSION *
     Math.max(0, input.nonRegisteredGain + input.investmentPropertyGain)
   const taxableDisposition = registered + taxableGains

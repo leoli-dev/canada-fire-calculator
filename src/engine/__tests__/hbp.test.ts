@@ -162,3 +162,29 @@ describe('BE-47 review round 2', () => {
     expect(at(46).balances.rrsp - at(45).balances.rrsp).toBeCloseTo(4_000 / 1.021 ** 6, 6)
   })
 })
+
+describe('BE-47 review round 3', () => {
+  it('caps a future purchase at 60,000 dollars, not 60,000 of today’s purchasing power', () => {
+    const inputs: Inputs = { ...DEFAULT_INPUTS, ...zero, inflation: 0.021, currentAge: 40, fireAge: 60, lifeExpectancy: 62,
+      partner: undefined, annualSavings: 0, balances: { tfsa: 0, rrsp: 200_000, nonReg: 0 }, nonRegBook: 0,
+      principalResidence: home(60_000, { buyAtAge: 45 }) }
+    const row = runProjection(inputs).rows.find(item => item.age === 45)!
+    // 60,000 in 2031 is 54,078.24 of 2026 purchasing power; the rest is a taxable, grossed-up withdrawal.
+    const capReal = 60_000 / 1.021 ** 5
+    expect(capReal).toBeCloseTo(54_078.24, 2)
+    expect(row.purchaseFunding!.withdrawalTax).toBeCloseTo((60_000 - capReal) / 0.65 * 0.35, 4)
+  })
+
+  it('includes an HBP balance still owed at death on the final return', () => {
+    const inputs: Inputs = { ...DEFAULT_INPUTS, ...zero, province: 'ON', currentAge: 60, fireAge: 60, lifeExpectancy: 60,
+      partner: undefined, pension: undefined, children: [], debts: [], investmentProperties: [], extraIncome: null,
+      cppStartAge: 70, oasStartAge: 70, retirementSpending: 0, annualSavings: 0,
+      balances: { tfsa: 0, rrsp: 200_000, nonReg: 0 }, nonRegBook: 0, principalResidence: home(60_000, { buyAtAge: 60 }) }
+    const result = runProjection(inputs)
+    expect(result.rows[0].balances.rrsp).toBeCloseTo(140_000, 6)
+    // The 60,000 still owed is income on the final return, as if 200,000 of RRSP were left.
+    const asIfRegistered = runProjection({ ...inputs, principalResidence: null }).estateTax
+    expect(result.estateTax).toBeCloseTo(asIfRegistered, 6)
+    expect(result.estateTax).toBeCloseTo(64_721.98, 2)
+  })
+})

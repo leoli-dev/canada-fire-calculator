@@ -53,14 +53,19 @@ export function hbpBuyers(pooledRrsp: number, hasPartner: boolean, plan?: Inputs
   return [...byOwner].map(([personId, balance]) => ({ personId, capacity: rrsp * balance / total }))
 }
 
-export const hbpLimitFor = (buyers: HbpBuyer[]) =>
-  buyers.reduce((sum, buyer) => sum + Math.min(HBP_LIMIT_PER_BUYER, buyer.capacity), 0)
+/**
+ * The 60,000 limit is fixed in dollars. The projection works in base-year
+ * purchasing power, so a purchase in a later year passes the limit deflated
+ * to that year (`cap`); the default is the limit itself.
+ */
+export const hbpLimitFor = (buyers: HbpBuyer[], cap = HBP_LIMIT_PER_BUYER) =>
+  buyers.reduce((sum, buyer) => sum + Math.min(cap, buyer.capacity), 0)
 
-/** Splits a household HBP withdrawal into each buyer's own repayable loan. */
-export function splitHbpWithdrawal(total: number, buyers: HbpBuyer[]): { personId: string | null; amount: number }[] {
+/** Splits a household HBP withdrawal into each buyer's own repayable loan, in the same units as `cap`. */
+export function splitHbpWithdrawal(total: number, buyers: HbpBuyer[], cap = HBP_LIMIT_PER_BUYER): { personId: string | null; amount: number }[] {
   let remaining = Math.max(0, total)
   return [...buyers].sort((a, b) => b.capacity - a.capacity).map((buyer) => {
-    const amount = Math.min(remaining, HBP_LIMIT_PER_BUYER, buyer.capacity)
+    const amount = Math.min(remaining, cap, buyer.capacity)
     remaining -= amount
     return { personId: buyer.personId, amount }
   }).filter(loan => loan.amount > 0)
