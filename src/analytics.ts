@@ -20,8 +20,12 @@ export type AnalyticsConsent = 'granted' | 'denied' | null
  * Track signal counts as a refusal that is never asked about.
  */
 export function privacySignal(): boolean {
+  // Node (tests, CI on Node 20) has no navigator; there is nothing to track there.
+  if (typeof navigator === 'undefined') return false
   return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1'
 }
+
+const inBrowser = () => typeof window !== 'undefined'
 
 // The answer given this session, which holds even when storage is blocked.
 let sessionConsent: AnalyticsConsent = null
@@ -33,6 +37,7 @@ export function subscribeAnalyticsConsent(listener: () => void) {
 }
 
 export function getAnalyticsConsent(): AnalyticsConsent {
+  if (!inBrowser()) return 'denied'
   if (privacySignal()) return 'denied'
   if (sessionConsent) return sessionConsent
   try {
@@ -44,6 +49,7 @@ export function getAnalyticsConsent(): AnalyticsConsent {
 export function setAnalyticsConsent(consent: 'granted' | 'denied') {
   sessionConsent = consent
   try { localStorage.setItem(CONSENT_KEY, consent) } catch { /* asked again next visit */ }
+  if (!inBrowser()) return
   if (consent === 'granted') loadAnalytics()
   else (window as unknown as Record<string, unknown>)[`ga-disable-${GA_ID}`] = true
   listeners.forEach((listener) => listener())
