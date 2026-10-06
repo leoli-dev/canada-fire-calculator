@@ -267,10 +267,15 @@ function evaluate(
       taxablePerPerson = householdTaxable / persons
       rrspTax = householdTaxable > 0 ? tax * (w.rrsp / householdTaxable) : 0
       taxPeople.length = 0
+      const selfId = canonical.people.find(p => p.role === 'self')?.id
       for (const row of Object.values(person.tax.byPerson)) {
         const personAge = canonical.people.find(p => p.id === row.personId)!.ageInBaseYear + taxYear - canonical.baseYear
+        // The final return keeps the side income's payroll credits, as the
+        // household estimate's people do.
+        const payrollCredits = row.personId === selfId && extraIncome > 0
+          ? { payrollCredit: payroll.creditAmount, employmentAmount: payroll.employmentAmount } : {}
         taxPeople.push({ taxableIncome: row.taxableIncome, credits: { age: personAge,
-          pensionIncome: row.federalPensionEligible },
+          pensionIncome: row.federalPensionEligible, ...payrollCredits },
           oasGross: person.oasByPerson[row.personId]?.gross ?? 0,
           oasNet: person.oasByPerson[row.personId]?.net ?? 0 })
       }
@@ -408,12 +413,16 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
   // April 16, 2024), repaid 1/15 a year after a grace period set by the
   // withdrawal year; an unpaid instalment is included in the borrower's income.
   const hbpEligible = !!plannedPurchase && plannedPurchase.hbp !== false
-  let hbpLoans: { personId: string | null; balance: number; instalment: number }[] = []
+  // The HBP balance is a dollar debt, so loans are held in nominal dollars
+  // from the withdrawal year and each instalment is deflated to the row's
+  // real dollars when it falls due.
+  let hbpLoans: { personId: string | null; nominalBalance: number; nominalInstalment: number }[] = []
   let hbpFirstRepayIdx = Infinity
   const startHbp = (withdrawal: number, buyers: ReturnType<typeof hbpBuyers>, yearIdx: number) => {
     if (withdrawal <= 0) return
-    hbpLoans = splitHbpWithdrawal(withdrawal, buyers)
-      .map(loan => ({ personId: loan.personId, balance: loan.amount, instalment: loan.amount / 15 }))
+    const toNominalDollars = nominalFactor(inflation, yearIdx)
+    hbpLoans = splitHbpWithdrawal(withdrawal, buyers).map(loan => ({ personId: loan.personId,
+      nominalBalance: loan.amount * toNominalDollars, nominalInstalment: loan.amount * toNominalDollars / 15 }))
     hbpFirstRepayIdx = yearIdx + hbpGraceYears(baseCalendarYear + yearIdx)
   }
   // clamp for safety; validation flags a buy age before currentAge
@@ -514,15 +523,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     let housingFunding: YearRow['housingFunding'] = null
     const yearGaps: FundingGap[] = []
     const yearIdx = age - inputs.currentAge
+    const factor = nominalFactor(inflation, yearIdx)
     const hbpDues = yearIdx >= hbpFirstRepayIdx
       ? hbpLoans.map(loan => {
-        const amount = Math.min(loan.instalment, loan.balance)
-        loan.balance -= amount
-        return { personId: loan.personId, amount }
-      }).filter(due => due.amount > 0)
+        const nominal = Math.min(loan.nominalInstalment, loan.nominalBalance)
+        loan.nominalBalance -= nominal
+        return { personId: loan.personId, amount: nominal / factor }
+      }).filter(due => due.amount > 1e-9)
       : []
     const hbpDue = hbpDues.reduce((sum, due) => sum + due.amount, 0)
-    const factor = nominalFactor(inflation, yearIdx)
     const nonRegBookReal = () => toReal(nonRegBook, factor)
     // A purchase or housing-funding disposal can realize an unverified loss in
     // either phase; the funding planner reports it so no year's tax is called
@@ -561,7 +570,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // annual tax context for gross-up, but only opening assets may close the
     // year-start transaction. Later income can fund ordinary annual costs.
     if (plannedPurchase && yearIdx === buyYearIdx) {
-      const buyers = hbpEligible ? hbpBuyers(bal.rrsp, !!inputs.partner, canonical) : []
+      const buyers = hbpEligible ? hbpBuyers(bal.rrsp, !!inputs.partner, canonical, baseCalendarYear + yearIdx) : []
       const hbpLimit = hbpLimitFor(buyers)
       if (phase === 'accumulation') {
         const plan = planPurchaseFunding(plannedPurchase, age, {

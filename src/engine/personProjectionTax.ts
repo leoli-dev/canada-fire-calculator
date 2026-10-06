@@ -84,13 +84,14 @@ export function personProjectionTax(f: ProjectionTaxFacts): ProjectionTaxResult 
     if (cpp) annualEvents.push({ id: `${item.canonical.id}:cpp:${f.year}`, kind: 'cpp', personId: item.canonical.id, amount: cpp })
     if (pension) annualEvents.push({ id: `${item.canonical.id}:pension:${f.year}`, kind: 'dbPension', personId: item.canonical.id, amount: pension })
     if (index === 0 && f.otherWork) annualEvents.push({ id: `${item.canonical.id}:other:${f.year}`,
-      kind: f.otherWorkKind === 'other' ? 'other' : 'employment', personId: item.canonical.id, amount: f.otherWork })
+      kind: f.otherWorkKind === 'other' ? 'other' : f.otherWorkKind === 'selfEmployment' ? 'selfEmployment' : 'employment',
+      personId: item.canonical.id, amount: f.otherWork })
   }
   for (const [index, due] of (f.hbpIncome ?? []).entries()) {
     if (!(due.amount > 0)) continue
     if (!due.personId || !plan.people.some(person => person.id === due.personId))
       return { status: 'unsupported', reason: "Home Buyers' Plan borrower is not recorded" }
-    annualEvents.push({ id: `hbp:${due.personId}:${index}:${f.year}`, kind: 'other', personId: due.personId, amount: due.amount })
+    annualEvents.push({ id: `hbp:${due.personId}:${index}:${f.year}`, kind: 'hbpInclusion', personId: due.personId, amount: due.amount })
   }
   const nonReg = plan.accounts.filter(account => account.kind === 'nonReg')
   if ((f.nonRegDistributions || f.withdrawals.nonReg) && nonReg.length !== 1)

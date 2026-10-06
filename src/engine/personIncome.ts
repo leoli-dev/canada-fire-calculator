@@ -3,10 +3,16 @@ import { ageReachedInYear, pricingGate } from './model'
 import { CAPITAL_GAINS_INCLUSION } from './taxData'
 import { advanceAttributionLedger, applyAttributionLedger, attributeSpousalPayment, resolveSpousalPlan, type SpousalAttributionLedger, type SpousalPremium } from './spousalAttribution'
 
-export type IncomeKind = 'employment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
-  'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'other'
-const INCOME_KINDS: readonly IncomeKind[] = ['employment', 'cpp', 'oas', 'dbPension', 'rrspWithdrawal',
-  'rrifWithdrawal', 'lifWithdrawal', 'rent', 'interest', 'realizedGain', 'other']
+/**
+ * `selfEmployment` is business income: work income for the GIS exemption, but
+ * not wages, so it stays in Quebec's Schedule F base. `hbpInclusion` is an
+ * unpaid Home Buyers' Plan instalment included in the borrower's income (RRSP
+ * income, not eligible pension income).
+ */
+export type IncomeKind = 'employment' | 'selfEmployment' | 'cpp' | 'oas' | 'dbPension' | 'rrspWithdrawal' | 'rrifWithdrawal' |
+  'lifWithdrawal' | 'rent' | 'interest' | 'realizedGain' | 'hbpInclusion' | 'other'
+const INCOME_KINDS: readonly IncomeKind[] = ['employment', 'selfEmployment', 'cpp', 'oas', 'dbPension', 'rrspWithdrawal',
+  'rrifWithdrawal', 'lifWithdrawal', 'rent', 'interest', 'realizedGain', 'hbpInclusion', 'other']
 export interface IncomeEvent {
   id: string
   kind: IncomeKind
@@ -166,12 +172,12 @@ export function calculatePersonIncome(plan: InputsV2, year: number, events: Inco
       person.taxableIncome += taxable
       person.bySource[event.kind] = (person.bySource[event.kind] ?? 0) + taxable
       person.entries.push({ eventId: event.id, kind: event.kind, gross, taxable })
-      if (event.kind === 'employment') person.earnedWork += gross
+      if (event.kind === 'employment' || event.kind === 'selfEmployment') person.earnedWork += gross
       if (event.kind === 'oas') person.oasGross += gross
       else person.gisIncomeBase += taxable
       // Schedule F starts at total income and subtracts wages and OAS, among
       // other specific items. CPP/QPP is not one of those exclusions.
-      if (['cpp', 'rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension', 'other'].includes(event.kind)) person.fssIncomeBase += taxable
+      if (['cpp', 'rent', 'interest', 'realizedGain', 'rrspWithdrawal', 'rrifWithdrawal', 'lifWithdrawal', 'dbPension', 'selfEmployment', 'hbpInclusion'].includes(event.kind)) person.fssIncomeBase += taxable
       if (event.kind === 'dbPension' || (['rrifWithdrawal', 'lifWithdrawal'].includes(event.kind) && person.age >= 65)) {
         person.federalPensionEligible += taxable
         if (plan.province !== 'QC') person.provincialPensionEligible += taxable

@@ -3,6 +3,7 @@ import { sideIncomeDeductions } from '../payroll'
 import { benefitIncomeBasis } from '../benefits'
 import { DEFAULT_INPUTS } from '../../store'
 import { refreshCanonicalFromLegacy } from '../migration'
+import { applyQcAnnualCoverage } from '../quebecTax'
 import { runProjection } from '../projection'
 import type { Inputs } from '../types'
 
@@ -86,4 +87,28 @@ describe('BE-46 review fixes', () => {
     expect(legacy.gis).toBeCloseTo(person.gis, 6)
     expect(earned.gis).toBeGreaterThan(legacy.gis + 4_000)
   })
+
+  it('keeps Quebec self-employment income in the Schedule F base', () => {
+    const qc: Inputs = { ...retiree, province: 'QC', extraIncome: { annual: 40_000, fromAge: 60, toAge: 65, kind: 'selfEmployment' } }
+    const plan = refreshCanonicalFromLegacy(null, qc)
+    const self = plan.people.find(person => person.role === 'self')!.id
+    plan.taxProfile = { ...plan.taxProfile!, qcDrugCoverage: applyQcAnnualCoverage(undefined, self, 'private') }
+    const row = runProjection(qc, undefined, plan).rows[0]
+    expect(row.taxCapability).toBe('person')
+    const qcRow = row.byPersonTax![self].qc!
+    expect(qcRow.qcFssBase).toBeGreaterThan(0)
+    expect(qcRow.fss).toBe(150)
+  })
+
+  it('carries the payroll credits onto the final return in the person ledger', () => {
+    // A low-income final year: unused credits become usable on the deemed RRSP disposition.
+    const lastYear: Inputs = { ...retiree, lifeExpectancy: 60, retirementSpending: 5_000,
+      balances: { tfsa: 300_000, rrsp: 200_000, nonReg: 0 },
+      extraIncome: { annual: 10_000, fromAge: 60, toAge: 65, kind: 'employment' } }
+    const legacy = runProjection(lastYear)
+    const person = runProjection(lastYear, undefined, refreshCanonicalFromLegacy(null, lastYear))
+    expect(person.rows[0].taxCapability).toBe('person')
+    expect(person.estateTax).toBeCloseTo(legacy.estateTax, 6)
+  })
 })
+

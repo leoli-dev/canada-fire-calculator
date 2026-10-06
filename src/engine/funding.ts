@@ -20,22 +20,36 @@ export function hbpGraceYears(withdrawalCalendarYear: number): number {
 export interface HbpBuyer { personId: string | null; capacity: number }
 
 /**
- * Each buyer may withdraw up to the limit from their own RRSPs only, so a
- * partner never lends their unused limit to the other's RRSP. The pooled
- * registered balance is divided by recorded ownership. When ownership is not
- * recorded, one buyer (person unknown) is assumed, which never overstates the
- * tax-free amount.
+ * Each buyer may withdraw up to the limit from their own RRSPs only (regular
+ * or spousal, before the end of the year they turn 71); RRIF and LIF money is
+ * not eligible, and a partner never lends their unused limit to the other.
+ * The projection pools registered money in one bucket, so each owner's
+ * eligible capacity is that bucket times their RRSP share of the recorded
+ * registered balances. A recorded RRIF or LIF therefore counts as zero
+ * capacity. Without a recorded plan the legacy bucket is treated as RRSP; an
+ * eligible account whose owner is not recorded gives a buyer whose person is
+ * unknown, which never overstates the tax-free amount for a couple.
  */
-export function hbpBuyers(pooledRrsp: number, hasPartner: boolean, plan?: InputsV2): HbpBuyer[] {
+export function hbpBuyers(pooledRrsp: number, hasPartner: boolean, plan?: InputsV2, year?: number): HbpBuyer[] {
   const rrsp = Math.max(0, pooledRrsp)
   const self = plan?.people.find(person => person.role === 'self')?.id ?? null
-  if (!hasPartner) return [{ personId: self, capacity: rrsp }]
-  const accounts = (plan?.accounts ?? []).filter(account => (account.kind === 'rrsp' || account.kind === 'spousalRrsp') && account.balance > 0)
-  const total = accounts.reduce((sum, account) => sum + account.balance, 0)
-  const owned = accounts.every(account => account.ownerId !== null && plan!.people.some(person => person.id === account.ownerId))
-  if (!plan || total <= 0 || !owned) return [{ personId: null, capacity: rrsp }]
-  const byOwner = new Map<string, number>()
-  for (const account of accounts) byOwner.set(account.ownerId!, (byOwner.get(account.ownerId!) ?? 0) + account.balance)
+  const registered = (plan?.accounts ?? []).filter(account =>
+    ['rrsp', 'spousalRrsp', 'rrif', 'lif'].includes(account.kind) && account.balance > 0)
+  const total = registered.reduce((sum, account) => sum + account.balance, 0)
+  if (!plan || total <= 0) return [{ personId: hasPartner ? null : self, capacity: rrsp }]
+  const tooOld = (personId: string | null) => {
+    const person = personId ? plan.people.find(candidate => candidate.id === personId) : undefined
+    return !!person && year !== undefined && person.ageInBaseYear + year - plan.baseYear > 71
+  }
+  const byOwner = new Map<string | null, number>()
+  for (const account of registered) {
+    if (account.kind !== 'rrsp' && account.kind !== 'spousalRrsp') continue
+    const known = account.ownerId !== null && plan.people.some(person => person.id === account.ownerId)
+    // A single person owns everything; a couple's unrecorded owner stays unknown.
+    const owner = known ? account.ownerId : hasPartner ? null : self
+    if (tooOld(owner)) continue
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + account.balance)
+  }
   return [...byOwner].map(([personId, balance]) => ({ personId, capacity: rrsp * balance / total }))
 }
 

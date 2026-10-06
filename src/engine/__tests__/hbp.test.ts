@@ -33,7 +33,7 @@ describe("BE-47 Home Buyers' Plan", () => {
   })
 
   it('repays 1/15 a year into the RRSP from savings once the grace period ends', () => {
-    const inputs: Inputs = { ...DEFAULT_INPUTS, currentAge: 40, fireAge: 60, lifeExpectancy: 62,
+    const inputs: Inputs = { ...DEFAULT_INPUTS, inflation: 0, currentAge: 40, fireAge: 60, lifeExpectancy: 62,
       annualSavings: 10_000, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
       balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 }, nonRegBook: 0,
       returns: { tfsa: 0, rrsp: 0, nonReg: 0 }, fees: 0, nonRegDistributionYield: 0,
@@ -121,5 +121,44 @@ describe('BE-47 review: an unpaid instalment', () => {
     expect(withInstalment.tax.total).toBeGreaterThan(without.tax.total)
     expect(personProjectionTax({ ...facts, hbpIncome: [{ personId: null, amount: 4_000 }] }))
       .toEqual({ status: 'unsupported', reason: "Home Buyers' Plan borrower is not recorded" })
+  })
+})
+
+describe('BE-47 review round 2', () => {
+  it('gives a recorded RRIF no HBP capacity, and a mixed couple only the RRSP owner’s share', () => {
+    const single: Inputs = { ...DEFAULT_INPUTS, ...zero, currentAge: 60, fireAge: 60, lifeExpectancy: 62, partner: undefined,
+      balances: { tfsa: 0, rrsp: 200_000, nonReg: 0 }, nonRegBook: 0, principalResidence: home(60_000, { buyAtAge: 60 }) }
+    const rrifPlan = refreshCanonicalFromLegacy(null, single)
+    const account = rrifPlan.accounts.find(item => item.id === 'legacy:account:rrsp')!
+    account.kind = 'rrif'
+    expect(hbpBuyers(200_000, false, rrifPlan)).toEqual([])
+    expect(hbpLimitFor(hbpBuyers(200_000, false, rrifPlan))).toBe(0)
+
+    const couple: Inputs = { ...single, partner: { ...DEFAULT_PARTNER, currentAge: 60 }, balances: { tfsa: 0, rrsp: 210_000, nonReg: 0 } }
+    const mixed = refreshCanonicalFromLegacy(null, couple)
+    applyAccountSplit(mixed, 'legacy:account:rrsp', 200_000, 10_000)
+    const selfAccount = mixed.accounts.find(item => item.ownerId === mixed.people.find(person => person.role === 'self')!.id && item.balance === 200_000)!
+    selfAccount.kind = 'rrif'
+    const buyers = hbpBuyers(210_000, true, mixed)
+    expect(buyers).toHaveLength(1)
+    expect(buyers[0].capacity).toBeCloseTo(10_000, 6)
+    expect(hbpLimitFor(buyers)).toBeCloseTo(10_000, 6)
+  })
+
+  it('gives no capacity to an RRSP owner past the year they turn 71', () => {
+    const plan = refreshCanonicalFromLegacy(null, { ...DEFAULT_INPUTS, currentAge: 70, partner: undefined, balances: { tfsa: 0, rrsp: 100_000, nonReg: 0 } })
+    expect(hbpLimitFor(hbpBuyers(100_000, false, plan, plan.baseYear + 1))).toBe(60_000)
+    expect(hbpBuyers(100_000, false, plan, plan.baseYear + 2)).toEqual([])
+  })
+
+  it('owes each instalment in nominal dollars, deflated to the row’s real dollars', () => {
+    const inputs: Inputs = { ...DEFAULT_INPUTS, ...zero, inflation: 0.021, currentAge: 40, fireAge: 60, lifeExpectancy: 62,
+      partner: undefined, annualSavings: 20_000, savingsSplit: { tfsa: 1, rrsp: 0, nonReg: 0 },
+      balances: { tfsa: 0, rrsp: 200_000, nonReg: 0 }, nonRegBook: 0, principalResidence: home(60_000, { buyAtAge: 40 }) }
+    const rows = runProjection(inputs).rows
+    const at = (age: number) => rows.find(row => row.age === age)!
+    // 4,000 a year is owed in dollars; in 2031 that is 4,000 / 1.021^5 of 2026 purchasing power.
+    expect(at(45).balances.rrsp - at(44).balances.rrsp).toBeCloseTo(4_000 / 1.021 ** 5, 6)
+    expect(at(46).balances.rrsp - at(45).balances.rrsp).toBeCloseTo(4_000 / 1.021 ** 6, 6)
   })
 })
