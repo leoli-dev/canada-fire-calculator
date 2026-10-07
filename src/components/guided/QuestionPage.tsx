@@ -12,6 +12,7 @@ import {
 import { useCad } from '../../format'
 import type { QuestionDefinition } from '../../guided/schema'
 import { guidanceForPage } from '../../guided/pageGuidance'
+import { asksCoupleTotal, questionTitleKey } from '../../guided/questionCatalog'
 import { NumberInput } from '../NumberInput'
 import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
@@ -208,7 +209,6 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     markAnswers(['lockedRetirement'], 'estimated')
     markAnswers(['lockedRetirement.owner'], 'confirmed', 'user')
   }
-  const key = definition.contentKey
   const answer = questionAnswers[definition.id] as string | undefined
   const markChoice = (field: string, value: string, status: 'confirmed' | 'notApplicable' = 'confirmed') => {
     setQuestionAnswer(definition.id, value)
@@ -393,11 +393,11 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'account.tfsa.balance': case 'account.rrsp.balance': {
       const account = definition.id.split('.')[1] as 'tfsa' | 'rrsp'
-      control = <FactNumber field={`balances.${account}`} label={t(account)} value={inputs.balances[account]} step={5000} onValue={(value) => set({ balances: { ...inputs.balances, [account]: value } })} />
+      control = <><FactNumber field={`balances.${account}`} label={t(account)} value={inputs.balances[account]} step={5000} onValue={(value) => set({ balances: { ...inputs.balances, [account]: value } })} />{asksCoupleTotal(definition, inputs) && <p className="hint">{t('questionnaire.ownership.coupleTotalHint')}</p>}</>
       break
     }
     case 'account.nonReg.balance':
-      control = <><div className="question-pair"><FactNumber field="balances.nonReg" label={t('nonReg')} value={inputs.balances.nonReg} step={5000} onValue={(nonReg) => set({ balances: { ...inputs.balances, nonReg } })} /><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onValue={(nonRegBook) => set({ nonRegBook })} /></div><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(inputs.balances.nonReg - inputs.nonRegBook) })}</p><p className="hint">{t('nonRegBookHint')}</p></>
+      control = <><div className="question-pair"><FactNumber field="balances.nonReg" label={t('nonReg')} value={inputs.balances.nonReg} step={5000} onValue={(nonReg) => set({ balances: { ...inputs.balances, nonReg } })} /><FactNumber field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} onValue={(nonRegBook) => set({ nonRegBook })} /></div><p className="answer-feedback">{t('guidedAcbFeedback', { value: cad(inputs.balances.nonReg), cost: cad(inputs.nonRegBook), gain: cad(inputs.balances.nonReg - inputs.nonRegBook) })}</p><p className="hint">{t('nonRegBookHint')}</p>{asksCoupleTotal(definition, inputs) && <p className="hint">{t('questionnaire.ownership.coupleTotalHint')}</p>}</>
       break
     case 'allocation.tfsa': {
       const accounts = ['tfsa', 'rrsp', 'nonReg'] as const
@@ -740,7 +740,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
 
   return <article className="question-page" data-page-id={definition.id}>
     <p className="question-location">{t(`questionnaire.categories.${definition.categoryId}`)}</p>
-    <h2 id="question-title" tabIndex={-1}>{t(`questionnaire.pages.${key}.question`)}</h2>
+    <h2 id="question-title" tabIndex={-1}>{t(questionTitleKey(definition, inputs))}</h2>
     {control}
     <QuestionHelp guidanceKey={definition.guidanceKey} />
     {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <p className="pending-note">{t('questionnaire.pendingSaved')}</p>}

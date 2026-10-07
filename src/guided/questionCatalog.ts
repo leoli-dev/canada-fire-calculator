@@ -142,6 +142,19 @@ export function visibleQuestionPages(inputs: Inputs, answers: QuestionAnswers, p
   return QUESTION_CATALOG.filter((definition) => definition.applicableWhen?.(inputs, answers, plan) ?? true)
 }
 
+// Balance pages ask for the household total; a couple splits it per person on
+// the assets.ownership page, so their wording says "both of you" up front.
+const COUPLE_TOTAL_PAGES = new Set(['account.tfsa.balance', 'account.rrsp.balance', 'account.nonReg.balance'])
+
+export function asksCoupleTotal(definition: QuestionDefinition, inputs: Inputs): boolean {
+  return !!inputs.partner && COUPLE_TOTAL_PAGES.has(definition.id)
+}
+
+/** The i18n key for a page's question, in its couple wording when one applies. */
+export function questionTitleKey(definition: QuestionDefinition, inputs: Inputs): string {
+  return `questionnaire.pages.${definition.contentKey}.${asksCoupleTotal(definition, inputs) ? 'questionCouple' : 'question'}`
+}
+
 export function questionForField(field: string): QuestionDefinition | undefined {
   return QUESTION_CATALOG.find((definition) => definition.fieldBindings.some(
     (binding) => field === binding || field.startsWith(`${binding}.`) || binding.startsWith(`${field}.`),

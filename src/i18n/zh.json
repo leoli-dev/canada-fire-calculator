@@ -1054,13 +1054,16 @@
         "question": "哪些账户里的钱准备留作退休使用？"
       },
       "account_tfsa_balance": {
-        "question": "你现在所有TFSA的总余额是多少？"
+        "question": "你现在所有TFSA的总余额是多少？",
+        "questionCouple": "你和伴侣名下所有TFSA的合计余额是多少？"
       },
       "account_rrsp_balance": {
-        "question": "你现在所有RRSP的总余额是多少？"
+        "question": "你现在所有RRSP的总余额是多少？",
+        "questionCouple": "你和伴侣名下所有RRSP的合计余额是多少？"
       },
       "account_nonReg_balance": {
-        "question": "非注册投资现在值多少，成本基础是多少？"
+        "question": "非注册投资现在值多少，成本基础是多少？",
+        "questionCouple": "你和伴侣的非注册投资合计值多少，成本基础是多少？"
       },
       "assets_allocation": {
         "question": "今后的储蓄准备怎样分到主要账户？"
@@ -1258,6 +1261,7 @@
       "home": "自住房",
       "rental": "出租房 {{n}}",
       "accountsIntro": "注册账户只能属于一个人。如果两人都有，请选“两人各有一个”并分别填写余额。非注册账户可以共同持有。",
+      "coupleTotalHint": "请填两人合计。后面会再问每个账户在谁名下、各有多少。",
       "propertiesIntro": "按产权登记选择。共同持有的房产，请填写你的份额。"
     },
     "spouseSupport": {

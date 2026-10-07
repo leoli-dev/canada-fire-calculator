@@ -1054,13 +1054,16 @@
         "question": "Which accounts contain money you intend to use for retirement?"
       },
       "account_tfsa_balance": {
-        "question": "What is the current total balance in your TFSA accounts?"
+        "question": "What is the current total balance in your TFSA accounts?",
+        "questionCouple": "What is the combined balance of all TFSAs held by you and your partner?"
       },
       "account_rrsp_balance": {
-        "question": "What is the current total balance in your RRSP accounts?"
+        "question": "What is the current total balance in your RRSP accounts?",
+        "questionCouple": "What is the combined balance of all RRSPs held by you and your partner?"
       },
       "account_nonReg_balance": {
-        "question": "What are your non-registered investments worth now, and what is their cost base?"
+        "question": "What are your non-registered investments worth now, and what is their cost base?",
+        "questionCouple": "What are your and your partner's non-registered investments worth together, and what is their cost base?"
       },
       "allocation_tfsa": {
         "question": "How will you divide future new savings among your accounts?"
@@ -1249,6 +1252,7 @@
       "home": "Your home",
       "rental": "Rental property {{n}}",
       "accountsIntro": "Registered accounts always belong to one person. If you both have one, choose \"We each have one\" and enter each balance. A non-registered account can be owned jointly.",
+      "coupleTotalHint": "Enter the total for both of you. A later page asks whose name each account is in and how much each of you holds.",
       "propertiesIntro": "Choose who is on title. For a jointly owned property, enter your share of it."
     },
     "spouseSupport": {
