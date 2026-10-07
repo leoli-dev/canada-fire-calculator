@@ -282,7 +282,7 @@ describe('BE-12 B deduction year versus contribution year', () => {
 describe('BE-12 B unknown is never zero', () => {
   it('refuses a missing contribution history with a concrete reason', () => {
     const result = attributeSpousalPayment(request({ premiums: null }))
-    expect(result).toEqual({ status: 'unsupported', reason: SPOUSAL_HISTORY_UNKNOWN_REASON })
+    expect(result).toEqual({ status: 'unsupported', code: 'historyMissing', reason: SPOUSAL_HISTORY_UNKNOWN_REASON })
     expect(SPOUSAL_HISTORY_UNKNOWN_REASON).toMatch(/not recorded/i)
   })
 

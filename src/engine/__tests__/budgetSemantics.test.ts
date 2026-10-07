@@ -109,9 +109,9 @@ describe('BE-13 A canonical budget construction', () => {
 
 type PackCode = 'en' | 'fr' | 'zh'
 const packs: { code: PackCode; budget: Record<string, string> }[] = [
-  { code: 'en', budget: en.budget as Record<string, string> },
-  { code: 'fr', budget: fr.budget as Record<string, string> },
-  { code: 'zh', budget: zh.budget as Record<string, string> },
+  { code: 'en', budget: en.budget as unknown as Record<string, string> },
+  { code: 'fr', budget: fr.budget as unknown as Record<string, string> },
+  { code: 'zh', budget: zh.budget as unknown as Record<string, string> },
 ]
 
 /** The inclusion fact an option's click records, read off the built budget. */

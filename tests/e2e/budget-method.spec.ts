@@ -58,7 +58,7 @@ test('both entry modes record the saving basis, which survives a reload and a mo
 
   // A recorded "no" is a fact, not a gap, and it stays recorded across a reload.
   await page.getByTestId('budget-tax-no').check()
-  await expect(page.getByTestId('budget-state')).toContainText('cannot yet add it as refund cash')
+  await expect(page.getByTestId('budget-state')).toContainText('cannot add that refund as cash yet')
   await page.reload()
   await expect(page.getByTestId('budget-tax-no')).toBeChecked()
   expect(await canonicalBudget(page)).toMatchObject({ taxBenefitIncluded: { status: 'known', value: false } })
@@ -66,7 +66,7 @@ test('both entry modes record the saving basis, which survives a reload and a mo
   // The income budget is a different decision with its own reason, and its
   // working spending round-trips through the reload.
   await page.getByTestId('budget-mode-income').check()
-  await expect(page.getByTestId('budget-state')).toContainText('out of scope for BE-13 A')
+  await expect(page.getByTestId('budget-state')).toContainText('cannot price an income budget yet')
   await page.getByTestId('budget-working-spending').locator('input').fill('61000')
   expect(await canonicalBudget(page)).toMatchObject({ kind: 'incomeBudget', workingSpending: 61_000 })
   await page.reload()
@@ -95,7 +95,7 @@ test('a migrated v10 plan presents its legacy figure for review instead of reint
   await page.getByTestId('budget-basis-legacy').check()
   await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
   await expect(page.getByTestId('budget-tax-no')).toBeChecked()
-  await expect(page.getByTestId('budget-state')).toContainText('cannot yet add it as refund cash')
+  await expect(page.getByTestId('budget-state')).toContainText('cannot add that refund as cash yet')
   expect(await canonicalBudget(page)).toMatchObject({ annualNetSavings: 24_000, debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: false } })
   await page.reload()
   await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
@@ -111,7 +111,7 @@ test('an answered-excluded budget basis labels the headline result as an estimat
   await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)
   await page.getByTestId('budget-debt-no').check()
   await page.getByTestId('budget-tax-no').check()
-  await expect(page.getByTestId('budget-state')).toContainText('cannot yet add them back to a cash budget')
+  await expect(page.getByTestId('budget-state')).toContainText('cannot add them back yet')
   // Once a fact is recorded as excluded, the caveat sits where the number does.
   const estimate = page.getByTestId('legacy-estimate')
   await expect(estimate).toHaveCount(1)

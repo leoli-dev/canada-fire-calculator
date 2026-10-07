@@ -4,8 +4,8 @@ import type { Account, InputsV2, Known, Person, QcDrugCoverage } from '../engine
 import { applyAccountSplit, applyPropertySplit, derivedAccountId, splitAmountsMatch } from '../engine/migration'
 import { applyQcAnnualCoverage, qcCoverageAnnualStatus, qcCoverageUniform } from '../engine/quebecTax'
 import { ownRrspAccount, previewRrspRoomYear } from '../engine/rrspRoom'
-import { previewTfsaRoomYear, tfsaStatement, type TfsaWithdrawalLine } from '../engine/tfsaRoom'
-import { activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
+import { TFSA_BLOCKING, previewTfsaRoomYear, tfsaStatement, type TfsaWithdrawalLine } from '../engine/tfsaRoom'
+import { FHSA_BLOCKING, activeFhsaAccounts, fhsaStatementHistory, ownFhsaAccount, previewFhsaRoomYear } from '../engine/fhsa'
 import { fhsaPlanRowId, fhsaScheduledContributions, plannedFhsaYearTotal } from '../engine/fhsaPlan'
 import { attributeSpousalPayment, resolveSpousalPlan } from '../engine/spousalAttribution'
 import { commitCanonicalEdit, commitRegisteredRowEdit, useCanonicalPlan } from '../forms/canonicalEdit'
@@ -294,7 +294,8 @@ export function FhsaRoomRow({ person, account, plan, onEdit, guided = false }: {
         {preview && <p className="hint" data-testid={`fhsa-retained-${role}`}>{t('be36.retained', { retained: money(preview.ledger.retained) })}
           {preview.ledger.retained > 0 ? ` ${t('be36.retainedHelp')}` : ''}</p>}
         {preview?.ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`fhsa-room-unknown-${role}`}>
-          {t('be36.unknownRoom', { reason: preview.ledger.closingRoom.reason })}</p>}
+          {t('be36.unknownRoom', { reason: preview.ledger.limitations.filter(item => FHSA_BLOCKING.has(item.code))
+            .map(item => t(`be36.reason.${item.code}`, { year: plan.baseYear })).join(' ') })}</p>}
         {maturityReached && <p className="hint" role="status" data-testid={`fhsa-maturity-${role}`}>{t('be36.maturity')}</p>}
       </>}
     <p className="hint">{t('be36.limit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/contributing-your-fhsa.html"
@@ -394,7 +395,8 @@ export function TfsaRoomRow({ person, plan, onEdit, guided = false }: { person: 
     <p className="hint" data-testid={`tfsa-retained-${role}`}>{t('be27.retained', { retained: money(ledger.retained) })}
       {ledger.retained > 0 ? ` ${t('be27.retainedHelp')}` : ''}</p>
     {ledger.closingRoom.status === 'unknown' && <p className="hint" role="status" data-testid={`tfsa-room-unknown-${role}`}>
-      {t('be27.unknownRoom', { reason: ledger.closingRoom.reason })}</p>}
+      {t('be27.unknownRoom', { reason: ledger.limitations.filter(item => TFSA_BLOCKING.has(item.code))
+        .map(item => t(`be27.reason.${item.code}`, { year: plan.baseYear })).join(' ') })}</p>}
   </div>
 }
 
@@ -456,7 +458,7 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
     : null
   // A recorded plan that cannot be priced still says why, so a confirmed
   // history never leaves the user with a field that can never answer.
-  const blocker = complete && routing.status === 'unsupported' ? routing.reason : null
+  const blocker = complete && routing.status === 'unsupported' ? routing.code : null
   return <div data-testid={`spousal-attribution-${account.id}`}>
     <h5>{t('be12.spousalTitle')}</h5>
     <p className="hint">{t('be12.spousalExplanation')}</p>
@@ -519,7 +521,7 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
         onChange={value => setPaymentRaw(value === null ? '' : String(value))} />
     </label>}
     {blocker && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
-      {t('be12.spousalUnsupported', { reason: blocker })}</p>}
+      {t('be12.spousalUnsupported', { reason: t(`be12.spousalReason.${blocker}`) })}</p>}
     {preview && preview.status === 'ok' && <p data-testid={`spousal-split-${account.id}`}>{t('be12.spousalSplit', {
       contributor: label(routing.status === 'ok' ? routing.parties.contributorId : spouse?.id),
       attributed: money(preview.attributedToContributor),
@@ -527,7 +529,7 @@ export function SpousalAttributionRow({ account, plan, onEdit }: { account: Acco
       taxed: money(preview.taxedToAnnuitant),
     })}</p>}
     {preview && preview.status !== 'ok' && <p className="hint" role="status" data-testid={`spousal-unsupported-${account.id}`}>
-      {t('be12.spousalUnsupported', { reason: preview.reason })}</p>}
+      {t('be12.spousalUnsupported', { reason: t(`be12.spousalReason.${preview.code}`) })}</p>}
     <p className="hint">{t('be12.spousalLimit')}{' '}<a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t2205.html"
       target="_blank" rel="noopener noreferrer">{t('be12.spousalSource')}</a></p>
   </div>
@@ -879,7 +881,7 @@ export function RegisteredAccountRows({ plan }: { plan: InputsV2 }) {
       <label>{t('be11.registeredType')}
         <select data-testid={`registered-type-${account.id}`} value={account.kind} onChange={event => setRow(item => {
           item.kind = event.target.value as 'rrsp' | 'spousalRrsp' | 'rrif' | 'lif'
-        })}><option value="rrsp">RRSP</option><option value="spousalRrsp">{t('be11.typeSpousalRrsp')}</option><option value="rrif">RRIF</option><option value="lif">LIF</option></select>
+        })}><option value="rrsp">{t('be11.typeRrsp')}</option><option value="spousalRrsp">{t('be11.typeSpousalRrsp')}</option><option value="rrif">{t('be11.typeRrif')}</option><option value="lif">{t('be11.typeLif')}</option></select>
       </label>
       {account.kind === 'rrif' && <>
         <label>{t('be11.rrifOpenedYear')}
