@@ -13,10 +13,22 @@ tout cela.
 **Démo en ligne : <https://leoli-dev.github.io/canada-fire-calculator/>**
 
 **Application 100 % frontale, axée sur la vie privée** : pas de serveur, pas de
-compte, pas d'IA — vos chiffres ne quittent jamais le navigateur (persistés en
-`localStorage`); seules des statistiques d'utilisation anonymes (pages vues, clics
-sur les fonctionnalités — jamais vos données saisies) sont envoyées à Google
-Analytics. Anglais / Français / 中文.
+compte, pas d'IA. Vos chiffres ne quittent jamais le navigateur (persistés en
+`localStorage`; si le stockage du site est bloqué, l'application démarre quand même
+et indique que le plan n'est pas enregistré). Les statistiques d'utilisation anonymes
+(pages vues, clics sur les fonctionnalités, jamais vos données saisies) sont
+**facultatives** : Google Analytics ne se charge qu'après votre accord, un signal
+Global Privacy Control ou Do Not Track vaut un refus, et le pied de page permet de
+changer d'avis. Anglais / Français / 中文.
+
+**Deux façons de commencer.** Le mode *Guidé* vous fait avancer par courtes pages de
+questions réparties en huit catégories (famille, épargne, actifs, logement, dépenses,
+revenus, préférences et une catégorie facultative « Détails fiscaux »), permet de
+naviguer librement, puis affiche une page de vérification avant de produire les
+résultats. Le mode *Professionnel* est le formulaire complet avec résultats en direct.
+Les deux modifient le même plan, vous pouvez donc passer de l'un à l'autre à tout
+moment, et une seule commande confirmée « Réinitialiser toutes les données » efface
+tout dans les deux modes.
 
 ![Vue d'ensemble](docs/screenshots/hero.png)
 
@@ -25,13 +37,18 @@ Analytics. Anglais / Français / 中文.
 ```sh
 npm install
 npm run dev      # serveur de développement
-npm test         # tests unitaires du moteur (vitest)
+npm test         # tests unitaires (vitest)
+npm run test:e2e # tests de bout en bout (Playwright, bureau et téléphone 320 px)
 npm run build    # vérification de types + build de production
 ```
 
 Le moteur de calcul (`src/engine/`) est un module TypeScript pur, sans dépendance
-UI — chaque chiffre affiché provient d'une simulation année par année,
-déterministe et testée.
+UI : chaque chiffre affiché provient d'une simulation année par année,
+déterministe et testée. Les paramètres fiscaux et de prestations vivent dans des
+ensembles de règles datés et versionnés sous `src/engine/rules/`, chaque champ relié
+à la source officielle d'où il provient (voir
+[docs/rule-coverage.md](docs/rule-coverage.md) et, pour la mise à jour trimestrielle
+SV/SRG, [docs/quarterly-benefit-refresh.md](docs/quarterly-benefit-refresh.md)).
 
 ## Ce qui est calculé
 
@@ -58,9 +75,19 @@ retraits FERR dès 65 ans — y compris le
 supplément pour aînés de la Saskatchewan), inclusion de 50 % des gains en capital
 suivie par le PBR, frein fiscal annuel sur les distributions non enregistrées,
 récupération de la SV par personne (taux 75+ inclus), SRG pour les retraités à
-faible revenu imposable (avec l'exemption pour revenu d'emploi et l'Allocation
-pour le conjoint de 60 à 64 ans), frais d'homologation au décès et, pour les
-couples, fractionnement du revenu sur deux déclarations.
+faible revenu imposable, calculé à partir des dernières tables trimestrielles d'EDSC
+pour chaque type de ménage (personne seule, deux conjoints à la SV, conjoint à
+l'Allocation, conjoint sans l'un ni l'autre), avec une exemption pour revenu de
+travail par personne qui gagne un revenu et l'Allocation pour le conjoint de 60 à
+64 ans, frais d'homologation au décès et, pour les couples, fractionnement du revenu
+sur deux déclarations (le fractionnement du revenu de pension se répercute aussi sur
+la récupération de la SV et les crédits de pension liés à l'âge). Au Québec s'ajoutent
+le montant pour personne vivant seule et le transfert au conjoint du crédit personnel
+de base inutilisé (ligne 431 de la TP-1). Le revenu d'appoint après FIRE paie ses
+cotisations sociales 2026 : RPC/RRQ, RPC2/RRQ2, AE et, au Québec, RQAP; un travailleur
+autonome paie les deux parts du RPC. Une matrice de couverture par province, dans
+l'application, indique quels crédits chaque montant inclut, la source officielle de
+chaque chiffre et ce qui est laissé de côté.
 
 **Stratégies de décaissement**, comparées côte à côte avec vos propres chiffres :
 
@@ -78,9 +105,12 @@ couples, fractionnement du revenu sur deux déclarations.
 **Honnêteté successorale** : au décès, le REER/FERR restant est entièrement imposé
 dans la dernière année et la moitié des gains non réalisés est imposée (le CELI et
 la résidence principale passent libres d'impôt); les avoirs non enregistrés et
-l'immobilier non vendu doivent aussi des frais d'homologation (les 13 barèmes
-provinciaux/territoriaux sont intégrés — les comptes avec bénéficiaire désigné y
-échappent). Les stratégies sont donc classées par **valeur successorale après
+l'immobilier non vendu doivent aussi des frais d'homologation (chacune des 13
+provinces et territoires calculée d'après sa propre loi ou son propre règlement sur
+les frais; les comptes enregistrés avec bénéficiaire désigné y échappent). Les gains
+en capital sont mesurés par rapport à un registre du PBR nominal, et la déclaration
+finale impose l'année du décès comme un revenu supplémentaire, en conservant les
+pertes en capital finales. Les stratégies sont donc classées par **valeur successorale après
 impôt** — ou, sous l'objectif **Die with Zero**, par les dépenses annuelles
 soutenables maximales.
 
@@ -94,8 +124,12 @@ prélevées sur l'épargne annuelle, la croissance suit l'hypothèse REER, et il
 transfère toujours libre d'impôt — soit vers l'achat d'une maison, soit, à
 défaut, vers le REER au plus tôt de 15 ans après l'ouverture ou 71 ans), vente
 de la résidence principale (libre d'impôt) **ou un achat futur prévu** (mise de
-fonds financée dans l'ordre fixe CELIAPP → CELI → non enregistré → REER, le
-reste amorti par une hypothèque générée automatiquement),
+fonds financée dans l'ordre fixe CELIAPP → CELI → non enregistré → REER; la part
+REER d'une première propriété passe par le **Régime d'accession à la propriété
+(RAP)**, libre d'impôt jusqu'à 60 000 $ par acheteur et remboursée à raison de 1/15
+par an dès la deuxième année suivant l'achat, toute tranche que l'épargne ne couvre
+pas étant imposée comme revenu; le reste est amorti par une hypothèque générée
+automatiquement),
 n'importe quel nombre d'immeubles locatifs — chacun vendable à son propre âge
 (gain imposé) ou conservé pour son **revenu locatif net** (imposé comme revenu
 ordinaire, visible pour la récupération de la SV et le SRG) — avec en option une
@@ -105,7 +139,8 @@ produit de la vente, ses intérêts déductibles du loyer de cet immeuble), **de
 prêt et laisse l'inflation éroder les paiements nominaux fixes — les paiements
 s'ajoutent aux dépenses de retraite jusqu'au remboursement, les soldes réduisent
 la valeur nette et la succession), **revenu d'appoint Barista-FIRE** sur une
-plage d'âges choisie (avec l'exemption officielle du SRG pour revenu de travail),
+plage d'âges choisie (emploi, travail autonome ou autre, avec retenues sociales et
+l'exemption officielle du SRG pour revenu de travail),
 l'**Allocation canadienne pour enfants (ACE)** pour les ménages avec enfants —
 non imposable, testée selon le revenu comme le SRG (mais la mesure du revenu
 inclut la SV, contrairement au SRG), calculée seulement à partir de l'âge FIRE,
@@ -121,8 +156,9 @@ prêts qui ne s'amortissent jamais sont signalés directement dans le formulaire
 
 ## Comment remplir
 
-Descendez la colonne de gauche; chaque terme souligné ouvre une explication en
-langage clair (voir le tiroir-glossaire ci-dessous).
+En mode Professionnel, descendez la colonne de gauche; en mode Guidé, les mêmes
+champs arrivent une courte page à la fois, chacune avec sa propre aide. Chaque terme
+souligné ouvre une explication en langage clair (voir le tiroir-glossaire ci-dessous).
 
 - **Profil** — âges, province, épargne annuelle après impôt, dépenses de retraite
   nettes souhaitées (pouvoir d'achat d'aujourd'hui; une feuille de dépenses aide à
@@ -131,9 +167,15 @@ langage clair (voir le tiroir-glossaire ci-dessous).
   changent que l'*affichage* — le calcul reste en dollars réels.
 - **Ménage** — le mode couple totalise comptes et dépenses et impose le revenu
   fractionné sur les deux conjoints; chacun a son propre calendrier RPC/SV.
-- **Comptes** — soldes actuels par enveloppe. Pour le non enregistré, entrez le
-  **PBR** (« book cost » chez le courtier) : seul le gain au-dessus est imposé,
-  laisser 0 gonfle énormément l'impôt. Les préréglages de répartition d'actifs
+- **Comptes** — soldes actuels par enveloppe. Un couple saisit le total des deux,
+  puis indique au nom de qui est chaque compte (ou le montant de chacun); tant que
+  ce n'est pas confirmé, les résultats qui dépendent de qui détient quoi s'affichent
+  comme estimations signalées. Pour le non enregistré, entrez le **PBR** (« book
+  cost » chez le courtier, y compris les distributions réinvesties et les achats
+  ultérieurs) : seul le gain au-dessus est imposé, et un pourcentage deviné ne permet
+  pas un impôt précis sur les gains en capital. Laissez-le inconnu tant que vous ne
+  pouvez pas le vérifier; un coût supérieur à la valeur actuelle est une perte dont
+  l'admissibilité doit être confirmée. Les préréglages de répartition d'actifs
   fixent des rendements réels et volatilités réalistes.
 - **CELIAPP** — un seul montant combiné du ménage (le total des deux conjoints,
   pas chacun séparément) : solde actuel, cotisation annuelle (prélevée sur
@@ -150,31 +192,57 @@ langage clair (voir le tiroir-glossaire ci-dessous).
   annuel net optionnel (loyer moins frais d'exploitation; il cesse l'année de
   la vente). La vente de la résidence principale est libre d'impôt; la mise de
   fonds d'un achat prévu est financée dans l'ordre fixe CELIAPP → CELI → non
-  enregistré → REER, non modifiable.
+  enregistré → REER, non modifiable. Le RAP est activé par défaut pour la part REER
+  et peut être désactivé pour cet achat.
 - **Dettes** — hypothèque, prêt auto ou autre, chacune en (solde, paiement
   annuel, années restantes). Saisissez comme épargne annuelle ce que vous
   épargnez réellement *après* les paiements de dettes; le moteur ajoute les
   paiements aux dépenses de retraite jusqu'au remboursement de chaque prêt.
 - **Revenu d'appoint** — revenu post-FIRE optionnel (Barista FIRE) avec une
-  plage d'âges; ne le soustrayez pas vous-même des dépenses de retraite.
+  plage d'âges et un type (emploi par défaut, travail autonome, ou autre revenu sans
+  cotisations sociales); ne le soustrayez pas vous-même des dépenses de retraite.
 - **Enfants** — optionnel, une ligne par enfant avec son âge actuel; active
   l'Allocation canadienne pour enfants (ACE) à partir de l'âge FIRE. L'ACE déjà
   reçue en travaillant est supposée déjà incluse dans les économies annuelles,
   donc rien n'est compté deux fois.
 - **Prestations gouvernementales** — âges de début et montants à 65 ans RPC/RRQ
   et SV, par conjoint, avec estimateurs intégrés (historique de travail pour le
-  RPC, années de résidence pour la SV).
+  RPC, années de résidence pour la SV) ou les chiffres exacts de Mon dossier
+  Service Canada. Chaque montant garde sa provenance : une estimation est recalculée
+  quand vous changez votre âge FIRE, tandis qu'un chiffre tiré de votre relevé n'est
+  jamais réécrit et est plutôt signalé pour révision.
 - **Rente d'employeur** — optionnelle, par conjoint : le montant annuel viager
   indiqué sur votre relevé de retraite (déjà réduit pour un début anticipé),
   l'âge de début, le pourcentage d'indexation à l'IPC, et toute prestation de
   raccordement (versée jusqu'à 65 ans). Un régime CD ou un CRI ? Utilisez plutôt
   le compte CD/CRI bloqué; il reste indisponible jusqu'à l'âge minimal saisi.
+- **Détails fiscaux** (facultatif) — les faits dont un impôt précis par personne a
+  besoin : le revenu d'emploi de chaque conjoint, les types de comptes (REER, FERR,
+  FRV) et leur titulaire, les droits CELI, REER et CELIAPP du relevé de l'ARC de
+  chacun, l'historique des cotisations à un REER de conjoint et, au Québec, le statut
+  d'assurance médicaments et le fait de vivre seul. Le panneau tient un registre des
+  droits par personne pour chaque compte et affiche toute cotisation prévue au-delà
+  des droits inscrits; des droits inconnus ne sont jamais traités comme illimités ni
+  comme nuls. Sans cette catégorie, les résultats restent disponibles et les parties
+  qui en dépendent sont marquées comme estimations.
 
 ## Comment lire les résultats
 
 **Les quatre onglets-questions** : *Mon argent durera-t-il ?* · *Quand puis-je me
-retirer ?* · *Mon chiffre FIRE ?* · *Atteindrai-je ma cible ?* — chaque réponse
-est accompagnée de sa méthode.
+retirer ?* · *Mon chiffre FIRE ?* · *Atteindrai-je ma cible ?* Chaque réponse est
+accompagnée de sa méthode. Sur téléphone, ils forment une grille 2 × 2, et un titre
+au-dessus du formulaire mène directement aux résultats complets.
+
+Un plan qui manque d'argent le dit clairement : l'âge où l'argent s'épuise, le
+premier manque, la raison et ce que vous pourriez changer. Quand il manque au plan un
+fait nécessaire à une réponse précise (propriété des comptes non confirmée, PBR
+inconnu, couple encore au travail ou ménage québécois sans détails fiscaux par
+personne), le résumé, les graphiques et le panneau des prestations restent visibles
+comme estimations signalées; seuls les outils fiscaux précis (tableaux d'impôt,
+classements de stratégies et d'âges de début, Monte-Carlo) attendent que ce fait soit
+fourni. Une ligne repliable *sources des règles*, sous le formulaire et sur la page de
+vérification, nomme les ensembles de règles, les années et les sources officielles
+derrière les chiffres.
 
 **Soldes des comptes par âge** — richesse empilée par enveloppe; lignes
 pointillées pour FIRE, la première prestation et toute vente immobilière; zone
@@ -205,7 +273,9 @@ marginal.
 
 **Comparaison des ordres de décaissement** — les quatre stratégies sur vos
 chiffres : impôt total (succession incluse), impôt payé sur l'argent REER/FERR, et
-la métrique de classement selon votre objectif. Un clic applique la ligne.
+la métrique de classement selon votre objectif. Un clic applique la ligne. Cette
+comparaison et le balayage du calendrier RPC/SV tournent dans un web worker, et
+seulement quand leur panneau est ouvert, pour que la saisie reste fluide.
 
 ![Stratégies](docs/screenshots/strategy-comparison.png)
 
@@ -227,7 +297,7 @@ séquence des rendements), et le graphique superpose la trajectoire du pire scé
 ![Monte-Carlo](docs/screenshots/monte-carlo.png)
 
 **Le tiroir-glossaire** — chaque terme souligné (REER, PBR, meltdown,
-récupération, taux marginal…) ouvre une explication claire; 39 entrées, trois
+récupération, taux marginal…) ouvre une explication claire; 40 entrées, trois
 langues.
 
 ![Glossaire](docs/screenshots/glossary-drawer.png)
@@ -235,14 +305,24 @@ langues.
 ## Hypothèses et limites
 
 - Tous les montants sont en **pouvoir d'achat d'aujourd'hui**; rendements réels.
-- Données fiscales 2026, fédéral + toutes les provinces et tous les territoires
-  (vérifiées contre l'ARC, les budgets provinciaux et TaxTips), mises à jour
-  manuellement.
+- Données fiscales 2026, fédéral + toutes les provinces et tous les territoires,
+  tirées des guides T4032 de l'ARC, des paramètres fiscaux du Québec et des lois
+  provinciales, conservées dans des ensembles de règles datés avec une source pour
+  chaque champ et mises à jour manuellement chaque année. La SV, le SRG et
+  l'Allocation utilisent le dernier trimestre publié (actuellement octobre à décembre
+  2026). La projection applique l'ensemble 2026 à chaque année future; elle ne passe
+  pas encore à des ensembles par année.
 - Le mode couple suppose un fractionnement idéal 50/50 du RPC, des retraits REER,
   du loyer et des revenus de placement; avant 65 ans, les retraits REER sont
   imposés au seul titulaire — préparez des soldes comparables (REER de conjoint).
   Exception : le revenu d'appoint Barista FIRE est imposé entièrement sur vous,
   car un revenu de type emploi ne peut légalement pas être partagé avec un conjoint.
+- Québec : une personne seule au Québec obtient un impôt final estimé selon des
+  règles québécoises simplifiées, indiqué sous le montant de la succession, ce qui
+  permet de classer stratégies et âges de début à titre d'estimation. L'impôt final
+  d'un couple québécois n'est pas encore pris en charge, donc son classement par
+  succession reste retenu; l'objectif Die with Zero classe selon les dépenses
+  soutenables et n'en a pas besoin.
 - Les distributions non enregistrées et le loyer net sont imposés chaque année
   comme revenu ordinaire (simplification volontaire : pas de majoration/crédit de
   dividendes, pas de DPA locative); le SRG suit une approximation linéaire des
@@ -256,10 +336,10 @@ langues.
   déductibles du loyer de cet immeuble tant qu'il est détenu.
 - La déduction fiscale des cotisations au CELIAPP n'est pas modélisée comme un
   remboursement séparé, cohérent avec « le remboursement REER n'est pas recyclé »
-  ci-dessus; le Régime d'accession à la propriété (RAP) n'est pas modélisé non
-  plus — le CELIAPP couvre déjà la majeure partie d'une mise de fonds typique, et
-  suivre un calendrier de remboursement du RAP sur 15 ans ajoute de la complexité
-  pour peu de précision supplémentaire. La mise de fonds d'un achat prévu est
+  ci-dessus. Le RAP ne couvre que la part REER de la mise de fonds d'une première
+  propriété prévue (jusqu'à 60 000 $ par acheteur, la limite de l'ARC pour les
+  retraits après le 16 avril 2024); les remboursements viennent de l'épargne, et un
+  solde encore dû au décès est imposé dans la déclaration finale. La mise de fonds d'un achat prévu est
   toujours financée dans l'ordre CELIAPP → CELI → non enregistré → REER — non
   modifiable, même si un autre ordre serait plus avantageux fiscalement pour un
   ménage donné. Le champ de changement net du coût de possession est ce que vous
@@ -273,9 +353,15 @@ langues.
   idéalisé à tout âge), une rente partiellement indexée ne s'érode qu'à partir
   de son âge de début (pas d'érosion pendant la période de report), et les
   soldes CD/CRI saisis comme REER ignorent les plafonds de retrait du FRV.
-- Pas encore modélisés : crédits de dividendes, plafonds CELI/REER, bonification
-  du RPC (cotisations post-2019 — estimations prudentes pour les plus jeunes),
-  chocs de soins de longue durée.
+- Les droits de cotisation sont inscrits et vérifiés dans le panneau Détails fiscaux,
+  mais la projection principale ne limite pas encore les cotisations CELI/REER/CELIAPP
+  prévues à ces droits. Les droits des années futures restent aussi inconnus : le
+  plafond CELI est indexé par tranches de 500 $ et la règle REER de 18 % du revenu
+  gagné n'est pas dans l'ensemble de règles, donc les droits ne valent que ce que
+  vaut le relevé de l'ARC que vous saisissez.
+- Pas encore modélisés : crédits de dividendes, bonification du RPC (cotisations
+  post-2019; estimations prudentes pour les plus jeunes), chocs de soins de longue
+  durée.
 - L'ACE n'est calculée qu'à partir de l'âge FIRE (l'ACE reçue avant FIRE est
   supposée déjà incluse dans les économies annuelles); fédérale seulement, sans
   compléments provinciaux (p. ex. l'Allocation famille du Québec) ni Prestation

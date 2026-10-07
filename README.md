@@ -10,10 +10,19 @@ what happens to an RRSP at death. This calculator models all of it.
 
 **Live demo: <https://leoli-dev.github.io/canada-fire-calculator/>**
 
-**Privacy-first: a pure frontend app.** No backend, no account, no AI — your numbers
-never leave the browser (they persist to `localStorage`); only anonymous usage
-analytics (page views, feature clicks — never your inputs) go to Google Analytics.
-English / Français / 中文.
+**Privacy-first: a pure frontend app.** No backend, no account, no AI. Your numbers
+never leave the browser (they persist to `localStorage`, and the app still runs, with
+a notice, when site storage is blocked). Anonymous usage statistics (page views,
+feature clicks, never your inputs) are **opt-in**: Google Analytics loads only after
+you allow it, a Global Privacy Control or Do Not Track signal counts as a no, and the
+footer lets you change your answer. English / Français / 中文.
+
+**Two ways in.** *Guided* mode walks you through short question pages in eight
+categories (family, saving, assets, housing, spending, income, preferences and an
+optional tax-details category), lets you jump around freely, then shows a review page
+before it generates results. *Professional* mode is the full form with live results.
+Both edit the same plan, so you can switch at any time, and one confirmed
+"Reset all data" clears it in either mode.
 
 ![Overview](docs/screenshots/hero.png)
 
@@ -22,12 +31,17 @@ English / Français / 中文.
 ```sh
 npm install
 npm run dev      # local dev server
-npm test         # engine unit tests (vitest)
+npm test         # unit tests (vitest)
+npm run test:e2e # end-to-end tests (Playwright, desktop and 320px phone)
 npm run build    # type-check + production build
 ```
 
-The calculation engine (`src/engine/`) is a pure, UI-free TypeScript module — every
+The calculation engine (`src/engine/`) is a pure, UI-free TypeScript module: every
 number in the UI comes from a deterministic, unit-tested year-by-year simulation.
+Tax and benefit figures live in dated, versioned rule packs under
+`src/engine/rules/`, each field tied to the official source it was read from (see
+[docs/rule-coverage.md](docs/rule-coverage.md) and, for the quarterly OAS/GIS update,
+[docs/quarterly-benefit-refresh.md](docs/quarterly-benefit-refresh.md)).
 
 ## What it calculates
 
@@ -52,9 +66,17 @@ pension income credit (employer pension annuities qualify at any age, RRIF
 withdrawals from 65 — including Saskatchewan's senior supplement), 50% capital-gains
 inclusion tracked against your ACB, annual tax drag on non-registered distributions,
 per-person OAS clawback (75+ rates included), GIS for low-taxable-income retirees
-(with the employment-income exemption and the Allowance for a 60-64 spouse),
-probate/estate administration fees on death, and — for couples — income
-splitting across two returns.
+priced from the latest quarterly ESDC tables for each household shape (single, both
+spouses on OAS, a spouse on the Allowance, a spouse with neither), with a work
+exemption per earner and the Allowance for a 60-64 spouse, probate/estate
+administration fees on death, and, for couples, income splitting across two returns
+(pension splitting also flows through to the OAS clawback and the age-qualified
+pension credits). In Québec it adds the amount for a person living alone and the
+transfer of a spouse's unused basic personal credit (TP-1 line 431). Post-FIRE side
+income pays its 2026 payroll: CPP/QPP, CPP2/QPP2, EI and, in Québec, QPIP, with
+self-employed income paying both CPP halves. A per-jurisdiction coverage matrix in
+the app lists which credits each priced number includes, the authority each figure
+comes from, and what is left out.
 
 **Withdrawal strategies**, compared side by side with your own numbers:
 
@@ -71,8 +93,10 @@ splitting across two returns.
 **Estate honesty**: at death the remaining RRSP/RRIF is fully taxable in the final
 year and half of unrealized gains is taxed (TFSA and the principal residence pass
 free); non-registered holdings and unsold real estate also owe probate/estate
-administration fees (province-dependent, all 13 tables built in — registered
-accounts bypass it via named beneficiary). Strategies are therefore ranked by
+administration fees (each of the 13 jurisdictions priced from its own published
+fee statute or regulation; registered accounts bypass it via named beneficiary).
+Capital gains are measured against a nominal ACB ledger, and the final return taxes
+the year of death as incremental income, keeping terminal capital losses. Strategies are therefore ranked by
 **after-tax estate value** — or, under the **Die-with-Zero** goal, by the
 maximum sustainable annual spending.
 
@@ -86,7 +110,10 @@ tracks the RRSP assumption, and it rolls tax-free — either into a home purchas
 or, failing that, into the RRSP at 15 years/age 71, whichever comes first),
 principal-residence sale (tax-free, e.g. downsizing at a chosen age) **or a
 planned future purchase** (down payment funded FHSA → TFSA → non-registered →
-RRSP, a fixed order; a mortgage for the rest amortizes from the purchase year),
+RRSP, a fixed order; an RRSP draw for a first home goes through the **Home Buyers'
+Plan**, tax-free up to $60,000 per buyer and repaid at 1/15 a year from the second
+year after the purchase, with any instalment your savings can't cover taxed as
+income; a mortgage for the rest amortizes from the purchase year),
 any number of investment properties — each sellable at its own age (gain
 taxed) or kept for **net rental income** (taxed as ordinary income, visible to the
 OAS clawback and GIS) — optionally leveraged with a **mortgage tied to that specific
@@ -94,8 +121,9 @@ property**, discharged from the sale proceeds and with its interest (not princip
 deductible against the rent, **debts** (mortgage / car loan / other: the engine
 back-solves each loan's implied rate and lets inflation erode the fixed nominal
 payments — payments join retirement spending until paid off, balances reduce net
-worth and the estate), **Barista-FIRE side income** over a chosen age range (with
-the official GIS work exemption), the **Canada Child Benefit (CCB)** for households
+worth and the estate), **Barista-FIRE side income** over a chosen age range
+(employment, self-employment or other, with payroll withheld and the official GIS
+work exemption), the **Canada Child Benefit (CCB)** for households
 with children — tax-free, income-tested like GIS (but the household income measure
 includes OAS, unlike GIS), computed only from FIRE age on, since pre-FIRE CCB is
 assumed already folded into annual savings — CPP/QPP estimation from work history
@@ -110,8 +138,9 @@ never-amortizing loans are flagged inline.
 
 ## How to fill in the inputs
 
-Work down the left column; every underlined term opens a plain-language explanation
-(see the glossary drawer below).
+In Professional mode, work down the left column; in Guided mode the same fields come
+one short page at a time, each with its own help. Every underlined term opens a
+plain-language explanation (see the glossary drawer below).
 
 - **Profile** — ages, province, after-tax annual savings, desired after-tax annual
   spending in retirement (today's purchasing power; a spending worksheet helps you
@@ -122,7 +151,10 @@ Work down the left column; every underlined term opens a plain-language explanat
 - **Household** — couple mode treats accounts and spending as household totals and
   taxes the income split across both spouses (two personal amounts, two runs up the
   low brackets). Each partner has their own CPP/OAS timeline.
-- **Accounts** — current balances per wrapper. For the non-registered account also
+- **Accounts** — current balances per wrapper. Couples enter the combined total for
+  both of you, then say whose name each account is in (or the amount each person
+  holds); until that's confirmed, results that depend on who owns what are shown as
+  labelled estimates. For the non-registered account also
   enter the **ACB** (your broker calls it *book cost*, including reinvested
   distributions and later purchases): tax applies only to the gain above it, so a
   guessed percentage cannot support precise capital-gains tax. Leave it unknown
@@ -144,12 +176,14 @@ Work down the left column; every underlined term opens a plain-language explanat
   an optional net annual rent (rent minus operating costs; it stops the year the
   property sells). A principal-residence sale is tax-free and becomes investable
   capital the same year; a planned purchase's down payment is funded FHSA → TFSA →
-  non-registered → RRSP, a fixed order that isn't configurable.
+  non-registered → RRSP, a fixed order that isn't configurable. The Home Buyers'
+  Plan is on by default for the RRSP part and can be switched off for the purchase.
 - **Debts** — mortgage, car loan or other, each as (balance, annual payment, years
   remaining). Enter your annual savings as what you actually save *after* debt
   payments; the engine adds the payments to retirement spending until each loan
   is gone.
-- **Side income** — optional post-FIRE income (Barista FIRE) with an age range;
+- **Side income** — optional post-FIRE income (Barista FIRE) with an age range and
+  a type (employment by default, self-employment, or other income with no payroll);
   don't subtract it from retirement spending yourself.
 - **Children** — optional, one row per child with their current age; enables the
   Canada Child Benefit (CCB) from FIRE age on. The CCB you already collect while
@@ -158,19 +192,39 @@ Work down the left column; every underlined term opens a plain-language explanat
 - **Government benefits** — CPP/QPP and OAS start ages and age-65 amounts, per
   spouse. Not sure of the amounts? Use the built-in estimators (work history for
   CPP, residence years for OAS) or copy the exact figures from My Service Canada
-  Account.
+  Account. Each amount remembers where it came from: an estimate is re-priced when
+  you change your FIRE age, while a figure from your statement is never rewritten
+  and is flagged for review instead.
 - **Employer pension** — optional, per spouse: the lifetime annual amount from
   your pension statement (already reduced for an early start), start age, CPI
   indexing percentage, and any bridge benefit (paid until 65). Have a DC plan or
   a LIRA? Use the separate Locked DC/LIRA account instead. It remains unavailable
   until the earliest withdrawal age you enter.
+- **Tax details** (optional) — the facts a precise per-person tax result needs:
+  each spouse's employment income, account types (RRSP, RRIF, LIF) and who holds
+  them, TFSA, RRSP and FHSA room from each person's CRA statement, spousal RRSP
+  contribution history, and in Québec the drug-insurance status and whether you
+  lived alone. The panel keeps a per-person room ledger for each account and shows
+  any planned contribution above the recorded room; unknown room is never treated as
+  unlimited or as zero. Skip it and results stay available, with the parts that need
+  these facts marked as estimates.
 
 ## How to read the outputs
 
 **The four question tabs** at the top answer, with method notes under each answer:
 *Will my money last?* · *When can I retire (earliest feasible age)?* · *What's my
 FIRE number (assets needed at FIRE, vs what you're projected to have)?* · *Will I
-hit my asset target (and at what age)?*
+hit my asset target (and at what age)?* On a phone they form a 2 × 2 grid, and a
+headline above the form jumps straight to the full results.
+
+A plan that runs out of money says so plainly: the age it runs out, the first
+shortfall, why, and what you could change. When the plan is missing a fact that a
+precise answer needs (unconfirmed account ownership, an unknown ACB, a working
+couple or a Québec household without per-person tax details), the summary, charts
+and benefit panel stay visible as labelled estimates; only the precise tax tools
+(tax tables, strategy and timing rankings, Monte Carlo) wait until the fact is
+filled in. A collapsible *rule sources* line under the form and on the review page
+names the rule packs, years and official sources behind the numbers.
 
 **Account balances by age** — stacked wealth by wrapper. Dashed lines mark FIRE, the
 first government benefit, and any planned property sale; the tinted region is the
@@ -201,7 +255,9 @@ per person and the marginal bracket it lands in.
 
 **Withdrawal-order comparison** — all four strategies on your numbers: total tax
 (including estate tax), tax paid on RRSP/RRIF money specifically, and the ranking
-metric for your goal. One click applies any row.
+metric for your goal. One click applies any row. This comparison and the CPP/OAS
+timing scan run in a background worker, and only while their panel is open, so
+typing stays fast.
 
 ![Strategies](docs/screenshots/strategy-comparison.png)
 
@@ -224,7 +280,7 @@ of the percentile bands.
 
 **The glossary drawer** — every underlined term on the page (RRSP, ACB, meltdown,
 clawback, marginal rate, …) opens a plain-language explanation; terms inside
-explanations are clickable too. 39 entries in all three languages.
+explanations are clickable too. 40 entries in all three languages.
 
 ![Glossary](docs/screenshots/glossary-drawer.png)
 
@@ -232,13 +288,22 @@ explanations are clickable too. 39 entries in all three languages.
 
 - All amounts are **today's purchasing power**; returns are real (net of inflation).
   Tax brackets are held in real terms.
-- Tax data: 2026 federal + all-province/territory tables (verified against CRA /
-  provincial budgets / TaxTips), updated manually each year.
+- Tax data: 2026 federal + all-province/territory tables from CRA's T4032 guides,
+  Québec's fiscal parameters and provincial statutes, held in dated rule packs with a
+  source on every field and updated manually each year. OAS, GIS and the Allowance
+  use the latest published quarter (currently October to December 2026). The
+  projection uses the 2026 pack in every future year; it doesn't switch to per-year
+  packs yet.
 - Couple taxation assumes ideal 50/50 income splitting for CPP/RRSP/rental/investment
   income. In reality, pre-65 RRSP withdrawals are taxed to the account owner — an
   even split during the bridge requires comparable RRSP balances (plan ahead with a
   spousal RRSP). Barista-FIRE side income is the exception: it's taxed entirely on
   you, since employment-type income can't legally be split with a spouse.
+- Québec: a single Québec owner gets an estimated closing tax from simplified Québec
+  rules, disclosed under the estate figure, so strategies and claim ages can be
+  ranked as estimates. Closing tax for a Québec couple isn't supported yet, so their
+  estate ranking stays withheld; the Die-with-Zero goal ranks by sustainable spending
+  and doesn't need it.
 - Non-registered distributions and net rent are taxed yearly as ordinary income (a
   deliberate simplification: no dividend gross-up/credit, no rental CCA); GIS uses a
   linear approximation of the official tables; enter your annual savings **after
@@ -249,10 +314,10 @@ explanations are clickable too. 39 entries in all three languages.
   then discharged from the sale proceeds and its interest (not principal) is
   deductible against that property's rent, rather than continuing forever.
 - The FHSA's contribution deduction isn't modelled as a separate refund, consistent
-  with "the RRSP refund isn't recycled automatically" above; the CRA's Home Buyers'
-  Plan (HBP) isn't modelled either — the FHSA already covers most of a typical down
-  payment, and tracking a 15-year HBP repayment schedule on top adds complexity for
-  little extra accuracy. A planned purchase's down payment is always funded
+  with "the RRSP refund isn't recycled automatically" above. The Home Buyers' Plan
+  covers only the RRSP part of a planned first-home down payment (up to $60,000 per
+  buyer, the CRA limit for withdrawals after April 16, 2024); repayments come from
+  savings, and a balance still owed at death is taxed on the final return. A planned purchase's down payment is always funded
   FHSA → TFSA → non-registered → RRSP, in that order — this isn't configurable, even
   if a different order would be more tax-efficient for a given household. The net
   holding-cost-change field is whatever you say it is (e.g. property tax and
@@ -267,9 +332,14 @@ explanations are clickable too. 39 entries in all three languages.
   age; after that v1 treats it as a normal taxable registered account. Its
   jurisdiction is retained for a future LIF model, but v1 does **not** model LIF
   annual minimums/maximums, special unlocking, or 50% unlocking.
-- Not yet modelled: dividend tax credits, TFSA/RRSP contribution-room caps, the CPP
-  enhancement (post-2019 contributions — estimates lean conservative for younger
-  users), long-term-care cost shocks.
+- Contribution room is recorded and checked in the Tax details panel, but the main
+  projection doesn't yet clip planned TFSA/RRSP/FHSA contributions to that room.
+  Future-year room additions also stay unknown: the TFSA limit is indexed in $500
+  steps and the RRSP 18%-of-earnings rule isn't in the rule pack, so room is only as
+  good as the CRA statement you enter.
+- Not yet modelled: dividend tax credits, the CPP enhancement (post-2019
+  contributions; estimates lean conservative for younger users), long-term-care
+  cost shocks.
 - The CCB is only calculated from FIRE age on (pre-FIRE CCB is assumed already
   folded into annual savings); federal only, with no provincial top-ups (e.g.
   Quebec's Family Allowance) and no Child Disability Benefit; no shared-custody
