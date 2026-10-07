@@ -162,7 +162,7 @@ test('an unrecorded history stays unsupported while a confirmed empty history is
   // A premium with no recorded contributor is refused with a reason.
   await addPremium(page, ROW0, { year: await baseYear(page), contributor: '', amount: 3_000 })
   await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toBeVisible()
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText('no recorded contributor')
+  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText('has no contributor')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -234,7 +234,7 @@ test('a single-person plan explains why a spousal payment cannot be attributed',
   await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
   await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
   await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toBeVisible()
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText("needs the annuitant's spouse in the plan")
+  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText('needs the annuitant’s spouse or common-law partner')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toHaveCount(0)
   expect(await inViewport(page)).toBe(true)
 })
