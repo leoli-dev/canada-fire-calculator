@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
 import { accountSummary } from '../guidedReview'
 import { pageIsComplete } from '../guided/pageState'
-import { pageById, QUESTION_CATEGORIES, questionForField, visibleQuestionPages } from '../guided/questionCatalog'
+import { pageById, QUESTION_CATEGORIES, questionForField, questionTitleKey, visibleQuestionPages } from '../guided/questionCatalog'
 import type { QuestionDefinition } from '../guided/schema'
 import { useStore } from '../store'
 import { useCad } from '../format'
@@ -21,7 +21,7 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
       const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
         <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(`questionnaire.pages.${page.contentKey}.question`)}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></button>)}</div>
+        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></button>)}</div>
       </details>
     })}
     <button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</button>
@@ -95,7 +95,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
       return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</button></div><p>{value}</p></article>
     })}</div>
     {(incomplete.length > 0 || issues.length > 0) && <div className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
-      {incomplete.map((page) => <li key={page.id}><button type="button" onClick={() => editPage(page.id)}>{t(`questionnaire.pages.${page.contentKey}.question`)}</button></li>)}
+      {incomplete.map((page) => <li key={page.id}><button type="button" onClick={() => editPage(page.id)}>{t(questionTitleKey(page, state.inputs))}</button></li>)}
       {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
     </ul></div>}
     <button type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</button>

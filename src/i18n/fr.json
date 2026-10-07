@@ -1054,13 +1054,16 @@
         "question": "Quels comptes contiennent l’argent destiné à la retraite?"
       },
       "account_tfsa_balance": {
-        "question": "Quel est le solde total actuel de vos CELI?"
+        "question": "Quel est le solde total actuel de vos CELI?",
+        "questionCouple": "Quel est le solde total de tous les CELI que vous et votre conjoint détenez?"
       },
       "account_rrsp_balance": {
-        "question": "Quel est le solde total actuel de vos REER?"
+        "question": "Quel est le solde total actuel de vos REER?",
+        "questionCouple": "Quel est le solde total de tous les REER que vous et votre conjoint détenez?"
       },
       "account_nonReg_balance": {
-        "question": "Que valent vos placements non enregistrés et quel est leur prix de base?"
+        "question": "Que valent vos placements non enregistrés et quel est leur prix de base?",
+        "questionCouple": "Que valent ensemble vos placements non enregistrés et ceux de votre conjoint, et quel est leur prix de base?"
       },
       "assets_allocation": {
         "question": "Comment répartirez-vous la nouvelle épargne?"
@@ -1258,6 +1261,7 @@
       "home": "Votre résidence",
       "rental": "Immeuble locatif {{n}}",
       "accountsIntro": "Un compte enregistré appartient toujours à une seule personne. Si vous en avez chacun un, choisissez « Nous en avons chacun un » et inscrivez chaque solde. Un compte non enregistré peut être détenu conjointement.",
+      "coupleTotalHint": "Inscrivez le total pour vous deux. Une page suivante demande au nom de qui est chaque compte et combien chacun détient.",
       "propertiesIntro": "Choisissez qui figure sur le titre. Pour un bien détenu conjointement, inscrivez votre part."
     },
     "spouseSupport": {

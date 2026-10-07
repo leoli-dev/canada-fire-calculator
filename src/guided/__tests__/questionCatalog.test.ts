@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, visibleQuestionPages } from '../questionCatalog'
+import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, questionTitleKey, visibleQuestionPages } from '../questionCatalog'
 import { pageIsComplete, type PageState } from '../pageState'
-import { DEFAULT_INPUTS } from '../../store'
+import { DEFAULT_INPUTS, DEFAULT_PARTNER } from '../../store'
+import en from '../../i18n/en.json'
+import fr from '../../i18n/fr.json'
+import zh from '../../i18n/zh.json'
 import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
 describe('question catalog', () => {
@@ -162,5 +165,29 @@ describe('BE-13 A budget page completeness', () => {
         'budget.taxBenefitIncluded': { status: 'confirmed', origin: 'user', updatedAt: '2026-01-01T00:00:00.000Z' },
       },
     }))).toBe(true)
+  })
+})
+
+const messages = { en, fr, zh }
+
+describe('couple balance wording', () => {
+  const balancePages = ['account.tfsa.balance', 'account.rrsp.balance', 'account.nonReg.balance']
+
+  it('asks a couple for the combined balance, in every language', () => {
+    const couple = { ...DEFAULT_INPUTS, partner: DEFAULT_PARTNER }
+    for (const id of balancePages) {
+      const key = questionTitleKey(pageById(id)!, couple)
+      expect(key).toBe(`questionnaire.pages.${pageById(id)!.contentKey}.questionCouple`)
+      for (const language of ['en', 'fr', 'zh'] as const) {
+        const pages = (messages[language] as { questionnaire: { pages: Record<string, Record<string, string>> } }).questionnaire.pages
+        expect(pages[pageById(id)!.contentKey].questionCouple, `${id} (${language})`).toBeTruthy()
+      }
+    }
+  })
+
+  it('keeps the single-person wording without a partner and on other pages', () => {
+    const single = { ...DEFAULT_INPUTS, partner: null }
+    for (const id of balancePages) expect(questionTitleKey(pageById(id)!, single)).toBe(`questionnaire.pages.${pageById(id)!.contentKey}.question`)
+    expect(questionTitleKey(pageById('assets.identify')!, { ...DEFAULT_INPUTS, partner: DEFAULT_PARTNER })).toBe('questionnaire.pages.assets_identify.question')
   })
 })
