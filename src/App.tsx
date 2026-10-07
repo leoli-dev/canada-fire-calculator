@@ -28,6 +28,9 @@ import { migrationReview } from './engine/migrationReview'
 import { MigrationReview } from './components/MigrationReview'
 import { PersonTaxTable } from './components/PersonTaxTable'
 
+/** Precision reasons the pooled household tools do not depend on. */
+const POOLED_IGNORES = new Set(['ownershipUnknown', 'recipientUnknown'])
+
 const LANGS = [
   { code: 'en', label: 'EN' },
   { code: 'fr', label: 'FR' },
@@ -63,6 +66,15 @@ export default function App() {
   const taxBlocked = result?.taxCapability?.status !== 'person' && !singleLegacyPreview
   const taxWarning = result?.taxCapability?.status !== 'person'
   const oldSingleTools = singleLegacyPreview
+  // Couples get the planning tools too, priced on the pooled household
+  // approximation and labelled as such, instead of losing them until person
+  // tax covers every year (BE-14 B). The pooled approximation never reads who
+  // owns an account or receives an income, so those two open facts do not
+  // withhold them; any other precision reason (e.g. a savings figure that
+  // excludes debt payments) still does. Only the tax tables stay single-only.
+  const coupleTools = !!inputs.partner && !singleLegacyPreview && !!precision &&
+    precision.reasons.every((reason) => POOLED_IGNORES.has(reason))
+  const planningTools = (!precisionBlocked && !taxBlocked && oldSingleTools) || coupleTools
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
     [inputs],
@@ -135,7 +147,8 @@ export default function App() {
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}
-          {!precisionBlocked && !taxBlocked && oldSingleTools && <WithdrawalOrderCard inputs={inputs} />}
+          {coupleTools && <p role="status" className="hint" data-testid="couple-tools-estimate">{t('coupleToolsEstimate')}</p>}
+          {planningTools && <WithdrawalOrderCard inputs={inputs} />}
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}
@@ -159,12 +172,11 @@ export default function App() {
           {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
           {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}
           {oldSingleTools && result.taxCapability?.status === 'person' && <p className="hint">{t('be11AuxiliaryEstimate')}</p>}
-          {!taxBlocked && oldSingleTools && <StrategyCard inputs={inputs} />}
-          {!taxBlocked && oldSingleTools && <TimingCard inputs={inputs} />}
-          {!taxBlocked && oldSingleTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
-            inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />
-          }
           </>}
+          {planningTools && <StrategyCard inputs={inputs} />}
+          {planningTools && <TimingCard inputs={inputs} />}
+          {planningTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
+            inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />}
           <ScenarioCard />
         </section>}
       </main>

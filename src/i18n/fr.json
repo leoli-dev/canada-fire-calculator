@@ -36,7 +36,8 @@
       "invalidAmount": "le montant d’épargne enregistré n’est pas un nombre valide."
     }
   },
-  "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; le tableau fiscal, les classements de stratégies et les comparaisons précises sont masqués.",
+  "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; les tableaux fiscaux annuels sont masqués.",
+  "coupleToolsEstimate": "Pour un couple, les outils d’ordre de retrait, de calendrier des prestations et de Monte Carlo ci-dessous calculent l’impôt pour le ménage entier, en répartissant le revenu à parts égales entre vous deux plutôt que personne par personne. Servez-vous-en pour comparer les choix entre eux; les montants d’impôt et l’ordre des options proches peuvent être décalés.",
   "be11SingleEstimate": "L’impôt, les graphiques et les outils d’une seule personne utilisent encore l’ancienne estimation pendant l’emploi ou pour les événements non pris en charge.",
   "be11QcLimit": "L’impôt du Québec utilise ici des règles québécoises simplifiées. Une couverture médicaments inconnue ou publique exige l’annexe K 2026, non publiée, et les autres événements non pris en charge restent des estimations; les tableaux, classements et comparaisons ci-dessous sont donc aussi des estimations.",
   "be11ComparisonLimit": "La comparaison exacte entre le plan actuel et le scénario A exige un impôt individuel vérifié pour les deux plans.",
@@ -1521,15 +1522,17 @@
       "additionUnsourced": "Aucun plafond annuel du CELI publié n’est disponible pour {{year}}."
     }
   },
-  "benefitCategoryTitle": "SRG et Allocation : quelle ligne de ménage s'applique",
-  "benefitCategoryNote": "Juillet-septembre 2026 publie un maximum et un seuil de revenu différents selon la situation du ménage ({{id}}, {{period}}). La projection chiffre ce plan avec la ligne indiquée; le montant et le seuil viennent tous deux de cette ligne.",
-  "benefitCategoryYear": "Année",
+  "benefitCategoryTitle": "SRG et Allocation : compléments pour faible revenu",
+  "benefitCategorySummary": "Dans ce plan, votre ménage les reçoit à {{ages}} ans, {{total}} non imposables au total.",
+  "benefitCategoryMissed": "Pendant les {{n}} autre(s) année(s) de PSV, le revenu modélisé du ménage dépasse le seuil : rien n’est versé.",
+  "benefitCategoryWhat": "Le SRG est un complément mensuel non imposable pour les bénéficiaires de la PSV à faible revenu. L’Allocation est versée à une personne de 60 à 64 ans dont le conjoint reçoit la PSV et le SRG. Les deux diminuent quand le revenu du ménage augmente et s’arrêtent au seuil. La PSV elle-même et les retraits du CELI ne comptent pas comme revenu ; les retraits REER/FERR, le RPC et les revenus de travail, oui. Le seuil dépend de la ligne de ménage, par exemple un couple où un seul conjoint reçoit la PSV.",
+  "benefitCategoryAge": "Âge",
   "benefitCategoryRow": "Ligne de ménage",
   "benefitCategoryCutoff": "Seuil de revenu",
   "benefitCategoryGis": "SRG",
-  "benefitCategoryAllowance": "Allocation (conjoint de 60 à 64 ans)",
+  "benefitCategoryAllowance": "Allocation",
   "benefitCategoryTotal": "Total non imposable",
-  "benefitCategoryLimit": "Le maximum, le seuil de revenu et le seuil du complément sont les chiffres publiés, reproduits exactement ({{id}}). La réduction entre eux est un ajustement linéaire par morceaux à la table publiée des montants mensuels : à chaque tranche de revenu publiée, le montant modélisé s'écarte de la table officielle d'au plus 1,00 $/mois pour une personne seule, 2,00 $ pour deux pensionnés, 3,00 $ pour la ligne Allocation et 1,81 $ pour le conjoint sans SRG ni Allocation, soit environ 3 $/mois au plus.",
+  "benefitCategoryLimit": "Montants tirés de la table publiée pour {{period}} ({{id}}). Les maximums et les seuils correspondent aux chiffres officiels ; entre les deux, l’écart avec la table mensuelle officielle est d’environ 3 $ par mois au plus.",
   "benefitCategory": {
     "single": "Personne seule",
     "couple-both-pensioners": "Couple, les deux reçoivent la SV",
