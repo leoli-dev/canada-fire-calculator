@@ -318,14 +318,11 @@ test('structurally shallow v11 canonical or Scenario A canonical cannot hydrate 
   }
 })
 
-test('unassigned couple has no precise quick answer and sees Monte Carlo only as a labelled estimate', async ({ page }) => {
+test('unassigned couple has no precise quick answer or Monte Carlo in either mode', async ({ page }) => {
   await seedV10(page)
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
-  // The pooled household tools never read ownership, so they stay available,
-  // under a note saying their tax is a household estimate.
-  await expect(page.getByTestId('couple-tools-estimate')).toBeVisible()
-  await expect(page.getByText('Monte Carlo simulation', { exact: true })).toBeVisible()
+  await expect(page.getByText('Monte Carlo simulation', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Guided', exact: true }).click()
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)

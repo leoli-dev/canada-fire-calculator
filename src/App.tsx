@@ -28,6 +28,9 @@ import { migrationReview } from './engine/migrationReview'
 import { MigrationReview } from './components/MigrationReview'
 import { PersonTaxTable } from './components/PersonTaxTable'
 
+/** Precision reasons the pooled household tools do not depend on. */
+const POOLED_IGNORES = new Set(['ownershipUnknown', 'recipientUnknown'])
+
 const LANGS = [
   { code: 'en', label: 'EN' },
   { code: 'fr', label: 'FR' },
@@ -65,10 +68,12 @@ export default function App() {
   const oldSingleTools = singleLegacyPreview
   // Couples get the planning tools too, priced on the pooled household
   // approximation and labelled as such, instead of losing them until person
-  // tax covers every year (BE-14 B). The pooled approximation never reads
-  // account ownership, so an unconfirmed owner does not withhold them either.
-  // Only the tax tables stay single-only.
-  const coupleTools = !!inputs.partner && !singleLegacyPreview
+  // tax covers every year (BE-14 B). The pooled approximation never reads who
+  // owns an account or receives an income, so those two open facts do not
+  // withhold them; any other precision reason (e.g. a savings figure that
+  // excludes debt payments) still does. Only the tax tables stay single-only.
+  const coupleTools = !!inputs.partner && !singleLegacyPreview && !!precision &&
+    precision.reasons.every((reason) => POOLED_IGNORES.has(reason))
   const planningTools = (!precisionBlocked && !taxBlocked && oldSingleTools) || coupleTools
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
