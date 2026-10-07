@@ -28,7 +28,13 @@
     "stateIncome": "Recorded as an income budget. {{detail}}",
     "estimateExcluded": "The saving basis you recorded leaves out a component this projection still treats as included, so the result below is an estimate rather than a precise number until the projection can price the recorded basis.",
     "fieldDebt": "whether the listed loan payments are already subtracted",
-    "fieldTax": "whether the RRSP tax refund is already counted"
+    "fieldTax": "whether the RRSP tax refund is already counted",
+    "reason": {
+      "debtExcluded": "the amount does not yet deduct the loan payments listed in Housing and loans, and the plan cannot add them back yet, so this basis is not priced.",
+      "taxBenefitExcluded": "the amount does not include the RRSP tax refund, and the plan cannot add that refund as cash yet, so this basis is not priced.",
+      "incomeBudget": "The plan cannot price an income budget yet (wages per person, payroll deductions and a staged retirement).",
+      "invalidAmount": "the recorded savings amount is not a valid number."
+    }
   },
   "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
   "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
@@ -78,7 +84,10 @@
     "limit": "Only DB pension and qualifying RRIF/LIF income can be split. CPP, OAS and plain RRSP cannot.",
     "homeOwner": "Home (principal residence) owner",
     "typeSpousalRrsp": "Spousal RRSP",
-    "accountOwner": "Owner"
+    "accountOwner": "Owner",
+    "typeRrsp": "RRSP",
+    "typeRrif": "RRIF",
+    "typeLif": "LIF"
   },
   "be35": {
     "qcSplitTransferor": "Quebec Schedule Q election: who transfers?",
@@ -1420,7 +1429,25 @@
     "spousalRrifNote": "The registered type is RRIF, so the year's required minimum is taxed to the plan holder and only the excess over it can be attributed to the contributor.",
     "spousalSource": "CRA form T2205",
     "limit": "Your own RRSP contribution and a recorded spousal-plan premium are priced against the contributor's room. The couple voluntary-savings RRSP split, RRSP/RRIF age-71 conversion and multi-account destination allocation are not implemented.",
-    "source": "CRA T4040 RRSPs and other registered plans"
+    "source": "CRA T4040 RRSPs and other registered plans",
+    "spousalReason": {
+      "lifUnsupported": "a spousal LIF cannot be attributed yet, because LIF minimum and maximum withdrawals are not modelled.",
+      "liraUnsupported": "a spousal LIRA cannot be attributed yet, because LIRA withdrawal and transfer rules are not modelled.",
+      "ordinaryRrspWithHistory": "a spousal contribution history is recorded for an ordinary RRSP. Change the account type to spousal RRSP or clear the history.",
+      "holderUnknown": "the account holder (annuitant) is not identified.",
+      "spouseMissing": "the plan needs the annuitant’s spouse or common-law partner.",
+      "historyMissing": "the spousal contribution history is not recorded, so the payment is not assumed to belong to the annuitant.",
+      "invalidPayment": "the payment must be a valid amount of zero or more.",
+      "invalidPaymentYear": "the payment year must be a calendar year.",
+      "invalidIncomeBefore": "the income already counted for the annuitant must be a valid amount of zero or more.",
+      "contributorUnknown": "the contributing spouse is not recorded.",
+      "annuitantUnknown": "the account holder (annuitant) is not identified.",
+      "invalidHistory": "the recorded contribution history cannot be read.",
+      "invalidPremium": "a recorded contribution has an invalid year or amount, or more attributed than was contributed.",
+      "rrifMinimumUnknown": "the RRIF minimum for this year is not confirmed. Record the RRIF opening year and factor category first.",
+      "invalidRrifMinimum": "the RRIF minimum for the year must be a valid amount of zero or more.",
+      "premiumContributorUnknown": "a recorded contribution has no contributor, so the attribution cannot be determined."
+    }
   },
   "be36": {
     "title": "FHSA contribution room",
@@ -1443,7 +1470,18 @@
     "maturity": "This FHSA has reached its 15-year participation clock. The statutory rollover into an RRSP/RRIF is not implemented yet, so no contribution is priced for that year.",
     "limit": "The published $8,000 annual limit, $40,000 lifetime limit and $8,000 participation-room carryforward maximum come from the CRA FHSA pages. The year's room is this year's $8,000 plus at most that carryforward maximum, and the lifetime limit bounds that whole total, so room carried in from earlier years is never spent on top of the remaining lifetime room. Not implemented yet: the 15-year / age-71 clock, rollover into an RRSP/RRIF, qualifying and non-qualifying withdrawals, home-purchase eligibility and the death event. FHSA re-participation room, designated amounts and the excess-FHSA-amount tax are out of scope too, so this ledger reports only room the published limits allow.",
     "source": "CRA: participating in your FHSAs",
-    "scope": "FHSA room is tracked per person and per year. Maturity, rollover, withdrawals and home-purchase eligibility remain outside this estimate."
+    "scope": "FHSA room is tracked per person and per year. Maturity, rollover, withdrawals and home-purchase eligibility remain outside this estimate.",
+    "reason": {
+      "openingYearUnknown": "The FHSA opening year is not confirmed.",
+      "historyUnknown": "Your FHSA contributions to date are not confirmed.",
+      "openingRoomUnknown": "The participation room from your CRA statement is not confirmed.",
+      "accountNotOpen": "The recorded opening year is implausibly early for this person.",
+      "notYetOpen": "The FHSA is not open yet in {{year}}, so that year has no participation room.",
+      "transferUnverified": "An RRSP-to-FHSA transfer cannot be verified from this plan, so it is not counted against the room.",
+      "ownershipUnknown": "The FHSA holder is not identified.",
+      "ambiguousAccount": "More than one active FHSA is recorded, and the plan prices only one per person.",
+      "lifetimeExceeded": "Your contributions to date already exceed the lifetime limit. The excess amount rules are not modelled, so no further contribution is priced."
+    }
   },
   "be27": {
     "title": "TFSA contribution room",
@@ -1464,7 +1502,11 @@
     "unknownRoom": "TFSA contribution room is not confirmed, so the room check cannot run: {{reason}}",
     "limit": "The CRA states that contribution room is the annual TFSA dollar limit plus unused room from previous years plus withdrawals made in previous years (excluding direct transfers). That is the rule this ledger recomputes. The annual dollar limit itself is not encoded: it is indexed in $500 increments and no sourced limit pack is published, so a year after the statement year adds no room here and says so instead of guessing.",
     "source": "CRA: contributing to a TFSA",
-    "scope": "Not modelled yet, so no cash is routed by them here: refilling the TFSA from a retirement surplus, a cash-flow surplus policy, reinvesting a RRIF-forced surplus, comparing surplus strategies, and direct transfers between accounts."
+    "scope": "Not modelled yet, so no cash is routed by them here: refilling the TFSA from a retirement surplus, a cash-flow surplus policy, reinvesting a RRIF-forced surplus, comparing surplus strategies, and direct transfers between accounts.",
+    "reason": {
+      "roomUnknown": "The available room from your CRA statement is not entered.",
+      "additionUnsourced": "No published TFSA annual limit is available for {{year}}."
+    }
   },
   "benefitCategoryTitle": "GIS and Allowance: which household row applies",
   "benefitCategoryNote": "July-September 2026 publishes a different maximum and income cut-off for each household shape ({{id}}, {{period}}). The projection prices this plan from the row shown; the amount and the cut-off both come from that row.",
@@ -1511,7 +1553,7 @@
   "ruleAssumptionsTaxPolicyPublished": "published figures",
   "ruleAssumptionsTaxPolicyAssumed": "assumed: the pack’s eligible nominal thresholds indexed once a year at {{rate}} from tax year {{from}}",
   "ruleAssumptionsTaxNotModelled": "This tax pack does not year-switch:",
-  "ruleAssumptionsRefused": "Tax rules unavailable, so no tax figure is priced: {{reason}}",
+  "ruleAssumptionsRefused": "No published tax rules are available for {{jurisdiction}} in {{year}}, so no tax figure is priced.",
   "taxUnsupported.federal-age-pension-amounts": "the federal age amount and pension income amount (pinned 2026 figures)",
   "taxUnsupported.provincial-age-pension-amounts": "each province’s age amount, pension income amount and senior supplement (pinned 2026 figures)",
   "taxUnsupported.spouse-credit": "the spouse/common-law-partner amounts and their income tests (pinned 2026 figures)",
@@ -1524,7 +1566,7 @@
   "ruleAssumptionsCcbPolicyPublished": "published figures",
   "ruleAssumptionsCcbPolicyAssumed": "assumed: the pack’s eligible amounts indexed once per program year at {{rate}} from the published period {{from}}",
   "ruleAssumptionsCcbNotModelled": "This CCB pack does not model:",
-  "ruleAssumptionsBenefitRefused": "CCB rules unavailable, so no child-benefit amount is priced: {{reason}}",
+  "ruleAssumptionsBenefitRefused": "No published CCB rules are available for the {{period}} payment period, so no child-benefit amount is priced.",
   "ccbUnsupported.ccb-prior-year-afni": "the prior-year adjusted family net income: the real test uses the previous year’s income, this calculator uses the same year’s",
   "ccbUnsupported.ccb-shared-custody": "shared custody at 50%, so a child is never split between two recipient households",
   "ccbUnsupported.ccb-child-disability-benefit": "the Child Disability Benefit, a separate supplement that is not added to any amount here",
@@ -1671,5 +1713,7 @@
   "analyticsTurnOn": "Allow them",
   "analyticsSignal": "Your browser asks sites not to track you, so usage statistics stay off.",
   "storageUnavailable": "This browser is blocking site storage, so your plan is not being saved and will be gone when you close the page.",
-  "valHbpTaxUnfunded": "At age {{age}}, the tax on an unpaid Home Buyers' Plan instalment is ${{amount}} more than your savings and accounts can cover."
+  "valHbpTaxUnfunded": "At age {{age}}, the tax on an unpaid Home Buyers' Plan instalment is ${{amount}} more than your savings and accounts can cover.",
+  "githubSource": "View source on GitHub",
+  "close": "Close"
 }

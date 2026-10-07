@@ -17,9 +17,9 @@ import type { Inputs } from './types'
 export type BudgetFacts =
   | { status: 'ready'; annualNetSavings: number }
   | { status: 'needs-facts'; unconfirmed: string[]; detail: string }
-  | { status: 'unsupported'; detail: string }
-  | { status: 'income-budget'; detail: string }
-  | { status: 'invalid'; detail: string }
+  | { status: 'unsupported'; code: 'debtExcluded' | 'taxBenefitExcluded'; detail: string }
+  | { status: 'income-budget'; code: 'incomeBudget'; detail: string }
+  | { status: 'invalid'; code: 'invalidAmount'; detail: string }
 
 /**
  * What a `savingsBudget` means, exactly: money available to voluntary investing
@@ -36,6 +36,7 @@ export type BudgetFacts =
 export function budgetFacts(budget: BudgetMode): BudgetFacts {
   if (budget.kind === 'incomeBudget') return {
     status: 'income-budget',
+    code: 'incomeBudget',
     detail: 'income budget (per-person wages, payroll deductions and staged retirement) is out of scope for BE-13 A',
   }
   const unconfirmed: string[] = []
@@ -50,13 +51,15 @@ export function budgetFacts(budget: BudgetMode): BudgetFacts {
   const taxBenefitIncluded = budget.taxBenefitIncluded.status === 'known' && budget.taxBenefitIncluded.value
   if (!debtIncluded) return {
     status: 'unsupported',
+    code: 'debtExcluded',
     detail: 'the savings budget excludes separately listed debt payments, and the kernel cannot yet add them back to a cash budget (BE-13 A)',
   }
   if (!taxBenefitIncluded) return {
     status: 'unsupported',
+    code: 'taxBenefitExcluded',
     detail: 'the savings budget excludes the registered-contribution tax benefit, and the kernel cannot yet add it as refund cash (BE-13 A)',
   }
-  if (!Number.isFinite(budget.annualNetSavings)) return { status: 'invalid', detail: 'nominal savings budget is not a finite amount' }
+  if (!Number.isFinite(budget.annualNetSavings)) return { status: 'invalid', code: 'invalidAmount', detail: 'nominal savings budget is not a finite amount' }
   return { status: 'ready', annualNetSavings: budget.annualNetSavings }
 }
 

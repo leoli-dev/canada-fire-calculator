@@ -1,12 +1,15 @@
+import { useTranslation } from 'react-i18next'
+
 /** Classic GitHub corner ribbon (via tholman/github-corners), fixed top-right. */
 export function GithubCorner(props: { href: string }) {
+  const { t } = useTranslation()
   return (
     <a
       className="github-corner"
       href={props.href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="View source on GitHub"
+      aria-label={t('githubSource')}
     >
       <svg width="64" height="64" viewBox="0 0 250 250" aria-hidden="true">
         <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z" />

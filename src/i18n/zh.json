@@ -28,7 +28,13 @@
     "stateIncome": "已记录为收入预算。{{detail}}",
     "estimateExcluded": "你记录的储蓄口径不含某一项，而本次推演仍把它视为已包含；在推演能按所记录口径计价之前，下面只是估算，不是精确数字。",
     "fieldDebt": "是否已扣掉单列贷款还款",
-    "fieldTax": "是否已算上RRSP退税"
+    "fieldTax": "是否已算上RRSP退税",
+    "reason": {
+      "debtExcluded": "该金额还没有扣掉“住房与贷款”里填写的贷款还款，计划暂时无法替你补算这部分，所以这种口径暂不计算。",
+      "taxBenefitExcluded": "该金额没有算上RRSP供款带来的退税，计划暂时无法把这笔退税作为现金加进来，所以这种口径暂不计算。",
+      "incomeBudget": "计划暂时还不能按收入预算计算（每个人的工资、工资预扣和分阶段退休）。",
+      "invalidAmount": "记录的储蓄金额不是有效数字。"
+    }
   },
   "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；税表、策略排名和精确比较暂不展示。",
   "be11SingleEstimate": "单人计划的工作期或未支持事件仍沿用旧税额、图表和规划工具估算。",
@@ -78,7 +84,10 @@
     "limit": "仅固定收益养老金和合格的 RRIF/LIF 收入可分拆；CPP、OAS 与普通 RRSP 不可。",
     "homeOwner": "自住房（主要住所）归属",
     "typeSpousalRrsp": "配偶RRSP",
-    "accountOwner": "持有人"
+    "accountOwner": "持有人",
+    "typeRrsp": "RRSP",
+    "typeRrif": "RRIF",
+    "typeLif": "LIF"
   },
   "be35": {
     "qcSplitTransferor": "魁省附表Q选择：由谁转出？",
@@ -1429,7 +1438,25 @@
     "spousalRrifNote": "注册类型为 RRIF：当年法定最低提款额由计划持有人纳税，只有超出最低额的部分才能归属给供款人。",
     "spousalSource": "CRA T2205 表格",
     "limit": "本人 RRSP 供款和已记录的配偶计划供款都按供款人的额度计算。夫妻自愿储蓄的 RRSP 分拆、71 岁 RRSP／RRIF 转换以及多账户去向分配尚未实现。",
-    "source": "CRA T4040 RRSP 及其他注册计划"
+    "source": "CRA T4040 RRSP 及其他注册计划",
+    "spousalReason": {
+      "lifUnsupported": "配偶 LIF 暂时无法计算归属，因为本计算器还没有建模 LIF 的最低和最高提款额。",
+      "liraUnsupported": "配偶 LIRA 暂时无法计算归属，因为本计算器还没有建模 LIRA 的提款和转账规则。",
+      "ordinaryRrspWithHistory": "这个普通 RRSP 记录了配偶供款历史。请把账户类型改为配偶 RRSP，或清除这些供款记录。",
+      "holderUnknown": "还没有指定账户持有人（年金受领人）。",
+      "spouseMissing": "计划里需要有账户持有人的配偶或同居伴侣。",
+      "historyMissing": "还没有记录配偶供款历史，所以不会默认这笔取款全部归账户持有人。",
+      "invalidPayment": "取款金额必须是大于或等于零的有效数字。",
+      "invalidPaymentYear": "取款年份必须是一个日历年份。",
+      "invalidIncomeBefore": "已计入账户持有人收入的金额必须是大于或等于零的有效数字。",
+      "contributorUnknown": "还没有记录是哪位配偶供的款。",
+      "annuitantUnknown": "还没有指定账户持有人（年金受领人）。",
+      "invalidHistory": "记录的供款历史无法读取。",
+      "invalidPremium": "某笔已记录的供款年份或金额无效，或者已归属的金额超过了供款本身。",
+      "rrifMinimumUnknown": "今年的 RRIF 最低提款额还没有确认。请先填写 RRIF 的开户年份和系数类别。",
+      "invalidRrifMinimum": "当年的 RRIF 最低提款额必须是大于或等于零的有效数字。",
+      "premiumContributorUnknown": "有一笔已记录的供款没有标明供款人，所以无法确定归属。"
+    }
   },
   "be36": {
     "title": "FHSA 供款空间",
@@ -1452,7 +1479,18 @@
     "maturity": "该 FHSA 已达到 15 年参与期。法定转入 RRSP/RRIF 尚未实现，因此该年度不计算任何供款。",
     "limit": "公布的每年 8,000 加元上限、终身 40,000 加元上限以及 8,000 加元的参与额度结转上限均来自 CRA 的 FHSA 页面。年度额度为本年度的 8,000 加元加上至多该结转上限的金额，终身上限约束这一总额，因此往年结转的额度绝不会在剩余终身额度之上再被使用。尚未实现：15 年／71 岁到期时钟、转入 RRSP/RRIF、合格与非合格提款、首次购房资格以及身故事件。FHSA 重新参与额度、指定金额和超额 FHSA 税同样不在范围内，因此本台账只报告公布上限所允许的额度。",
     "scope": "FHSA 空间按人、按年度跟踪。到期、转入、提款和首次购房资格仍不在本估算范围内。",
-    "source": "CRA：向 FHSA 供款"
+    "source": "CRA：向 FHSA 供款",
+    "reason": {
+      "openingYearUnknown": "FHSA 开户年份尚未确认。",
+      "historyUnknown": "至今的 FHSA 供款总额尚未确认。",
+      "openingRoomUnknown": "CRA 账单上的参与额度尚未确认。",
+      "accountNotOpen": "记录的开户年份对这个人来说早得不合理。",
+      "notYetOpen": "{{year}} 年 FHSA 还没有开户，所以这一年没有参与额度。",
+      "transferUnverified": "计划无法核实从 RRSP 转入 FHSA 的款项，所以不把它计入额度。",
+      "ownershipUnknown": "还没有指定 FHSA 的持有人。",
+      "ambiguousAccount": "记录了不止一个有效的 FHSA，而计划每人只计算一个。",
+      "lifetimeExceeded": "至今的供款已经超过终身上限。计划还没有建模超额供款的规则，所以不再计算新的供款。"
+    }
   },
   "be27": {
     "title": "TFSA 供款空间",
@@ -1473,7 +1511,11 @@
     "unknownRoom": "TFSA 供款空间尚未确认，暂时无法核对额度：{{reason}}",
     "limit": "CRA 规定，供款空间由当年 TFSA 年度限额、以前年度未使用空间、以及以前年度的提款（不含直接转移）组成。本账本重算的正是这条规则。年度限额本身未被编码：它按 500 加元档位指数化，且没有已发布的来源规则包，因此对账单年度之后的年份不新增空间，并明确说明而不是猜测。",
     "source": "CRA：向 TFSA 供款",
-    "scope": "尚未建模，因此此处不会据此调配任何现金：用退休期盈余补充 TFSA、现金流盈余政策、RRIF 强制盈余再投资、盈余策略对照，以及账户之间的直接转移。"
+    "scope": "尚未建模，因此此处不会据此调配任何现金：用退休期盈余补充 TFSA、现金流盈余政策、RRIF 强制盈余再投资、盈余策略对照，以及账户之间的直接转移。",
+    "reason": {
+      "roomUnknown": "还没有填写 CRA 账单上的可用供款空间。",
+      "additionUnsourced": "{{year}} 年还没有公布的 TFSA 年度额度。"
+    }
   },
   "benefitCategoryTitle": "GIS 与 Allowance：适用哪一行家庭情况",
   "benefitCategoryNote": "2026 年 7–9 月按家庭情况分别公布最高额与收入上限（{{id}}，{{period}}）。投影按所示那一行计价；金额与上限都来自该行。",
@@ -1520,7 +1562,7 @@
   "ruleAssumptionsTaxPolicyPublished": "已公布数值",
   "ruleAssumptionsTaxPolicyAssumed": "假设：该规则包中可指数化的名义门槛自 {{from}} 税务年度起，每年按 {{rate}} 调整一次",
   "ruleAssumptionsTaxNotModelled": "该税务规则包不按年度切换：",
-  "ruleAssumptionsRefused": "税务规则不可用，因此不计算任何税额：{{reason}}",
+  "ruleAssumptionsRefused": "{{jurisdiction}} 没有 {{year}} 年的已公布税务规则，因此不计算任何税额。",
   "taxUnsupported.federal-age-pension-amounts": "联邦年龄免税额与养老金收入免税额（固定的 2026 年数值）",
   "taxUnsupported.provincial-age-pension-amounts": "各省的年龄免税额、养老金收入免税额及老年人补充额（固定的 2026 年数值）",
   "taxUnsupported.spouse-credit": "配偶／同居伴侣免税额及其收入测试（固定的 2026 年数值）",
@@ -1533,7 +1575,7 @@
   "ruleAssumptionsCcbPolicyPublished": "已公布数值",
   "ruleAssumptionsCcbPolicyAssumed": "假设：该规则包中可指数化的金额自已公布支付期 {{from}} 起，每个福利年度按 {{rate}} 调整一次",
   "ruleAssumptionsCcbNotModelled": "该 CCB 规则包未建模：",
-  "ruleAssumptionsBenefitRefused": "CCB 规则不可用，因此不计算任何儿童福利金额：{{reason}}",
+  "ruleAssumptionsBenefitRefused": "{{period}} 发放期没有已公布的 CCB 规则，因此不计算任何儿童福利金额。",
   "ccbUnsupported.ccb-prior-year-afni": "上一年度调整后家庭净收入：真实测试使用上一年度收入，本计算器使用同一年度收入",
   "ccbUnsupported.ccb-shared-custody": "50% 共同抚养：本计算器不会把一个孩子分摊到两个领取家庭",
   "ccbUnsupported.ccb-child-disability-benefit": "儿童残疾福利：这是一项单独的补助，不会加到此处的任何金额上",
@@ -1680,5 +1722,7 @@
   "analyticsTurnOn": "开启",
   "analyticsSignal": "你的浏览器要求网站不要跟踪你，因此使用统计保持关闭。",
   "storageUnavailable": "此浏览器阻止了网站存储，你的计划不会被保存，关闭页面后就会消失。",
-  "valHbpTaxUnfunded": "{{age}} 岁时，未偿还的购房计划（HBP）分期款所产生的税款比你的储蓄和账户能支付的多 ${{amount}}。"
+  "valHbpTaxUnfunded": "{{age}} 岁时，未偿还的购房计划（HBP）分期款所产生的税款比你的储蓄和账户能支付的多 ${{amount}}。",
+  "githubSource": "在 GitHub 上查看源代码",
+  "close": "关闭"
 }

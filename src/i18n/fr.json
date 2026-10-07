@@ -28,7 +28,13 @@
     "stateIncome": "Enregistré comme budget de revenu. {{detail}}",
     "estimateExcluded": "La base d’épargne que vous avez enregistrée omet un élément que cette projection traite encore comme inclus; le résultat ci-dessous est donc une estimation, et non un chiffre précis, tant que la projection ne peut pas chiffrer la base enregistrée.",
     "fieldDebt": "si les remboursements de prêts inscrits sont déjà déduits",
-    "fieldTax": "si le remboursement d’impôt REER est déjà compté"
+    "fieldTax": "si le remboursement d’impôt REER est déjà compté",
+    "reason": {
+      "debtExcluded": "le montant ne déduit pas encore les remboursements de prêts inscrits dans Logement et prêts, et le plan ne peut pas encore les rajouter; cette base n’est donc pas chiffrée.",
+      "taxBenefitExcluded": "le montant ne tient pas compte du remboursement d’impôt REER, et le plan ne peut pas encore l’ajouter comme encaisse; cette base n’est donc pas chiffrée.",
+      "incomeBudget": "Le plan ne peut pas encore chiffrer un budget de revenu (salaire de chaque personne, retenues sur la paie et retraite progressive).",
+      "invalidAmount": "le montant d’épargne enregistré n’est pas un nombre valide."
+    }
   },
   "be11TaxLimit": "L’impôt par personne n’est pas vérifié pour ce plan. Les graphiques restent des estimations; le tableau fiscal, les classements de stratégies et les comparaisons précises sont masqués.",
   "be11SingleEstimate": "L’impôt, les graphiques et les outils d’une seule personne utilisent encore l’ancienne estimation pendant l’emploi ou pour les événements non pris en charge.",
@@ -78,7 +84,10 @@
     "limit": "Seuls les régimes à prestations déterminées et certains revenus de FERR/FRV sont fractionnables. RPC, SV et REER ordinaire ne le sont pas.",
     "homeOwner": "Propriétaire de la résidence principale",
     "typeSpousalRrsp": "REER de conjoint",
-    "accountOwner": "Titulaire"
+    "accountOwner": "Titulaire",
+    "typeRrsp": "REER",
+    "typeRrif": "FERR",
+    "typeLif": "FRV"
   },
   "be35": {
     "qcSplitTransferor": "Choix québécois de l’annexe Q : qui transfère?",
@@ -1429,7 +1438,25 @@
     "spousalRrifNote": "Le type enregistré est FERR : le minimum obligatoire de l'année est donc imposé au titulaire du régime, et seul l'excédent peut être attribué au cotisant.",
     "spousalSource": "Formulaire T2205 de l'ARC",
     "limit": "Votre propre cotisation REER et une cotisation inscrite à un régime de conjoint sont chiffrées selon le droit du cotisant. Le fractionnement REER de l'épargne volontaire du couple, la conversion REER/FERR à 71 ans et l'affectation entre plusieurs comptes ne sont pas mis en œuvre.",
-    "source": "ARC T4040 REER et autres régimes enregistrés"
+    "source": "ARC T4040 REER et autres régimes enregistrés",
+    "spousalReason": {
+      "lifUnsupported": "un FRV de conjoint ne peut pas encore être attribué, car les retraits minimum et maximum d’un FRV ne sont pas modélisés.",
+      "liraUnsupported": "un CRI de conjoint ne peut pas encore être attribué, car les règles de retrait et de transfert d’un CRI ne sont pas modélisées.",
+      "ordinaryRrspWithHistory": "un historique de cotisations de conjoint est enregistré pour un REER ordinaire. Changez le type de compte pour REER de conjoint ou effacez l’historique.",
+      "holderUnknown": "le titulaire du compte (rentier) n’est pas indiqué.",
+      "spouseMissing": "le plan doit inclure l’époux ou le conjoint de fait du rentier.",
+      "historyMissing": "l’historique des cotisations de conjoint n’est pas enregistré; le retrait n’est donc pas présumé appartenir au rentier.",
+      "invalidPayment": "le retrait doit être un montant valide, égal ou supérieur à zéro.",
+      "invalidPaymentYear": "l’année du retrait doit être une année civile.",
+      "invalidIncomeBefore": "le revenu déjà compté pour le rentier doit être un montant valide, égal ou supérieur à zéro.",
+      "contributorUnknown": "le conjoint cotisant n’est pas enregistré.",
+      "annuitantUnknown": "le titulaire du compte (rentier) n’est pas indiqué.",
+      "invalidHistory": "l’historique de cotisations enregistré est illisible.",
+      "invalidPremium": "une cotisation enregistrée a une année ou un montant invalide, ou un montant attribué supérieur à la cotisation.",
+      "rrifMinimumUnknown": "le minimum du FERR pour cette année n’est pas confirmé. Inscrivez d’abord l’année d’ouverture et la catégorie de facteur du FERR.",
+      "invalidRrifMinimum": "le minimum du FERR pour l’année doit être un montant valide, égal ou supérieur à zéro.",
+      "premiumContributorUnknown": "une cotisation enregistrée n’indique pas de cotisant; l’attribution ne peut donc pas être déterminée."
+    }
   },
   "be36": {
     "title": "Droits de cotisation au CELIAPP",
@@ -1452,7 +1479,18 @@
     "maturity": "Ce CELIAPP a atteint sa période de participation de 15 ans. Le transfert légal vers un REER/FRRV n'est pas encore implémenté, donc aucune cotisation n'est calculée pour cette année.",
     "limit": "Le plafond annuel publié de 8 000 $, le plafond à vie de 40 000 $ et le maximum de report des droits de participation de 8 000 $ proviennent des pages de l'ARC sur le CELIAPP. Les droits de l'année correspondent aux 8 000 $ de l'année plus, au plus, ce maximum reporté, et le plafond à vie limite ce total entier : les droits reportés des années précédentes ne sont donc jamais utilisés en plus des droits à vie restants. Ne sont pas encore implémentés : le délai de 15 ans ou l'âge de 71 ans, le transfert vers un REER/FRRV, les retraits admissibles ou non, l'admissibilité à l'achat d'une première habitation et le décès. Les droits de re-participation, les montants désignés et l'impôt sur l'excédent CELIAPP le sont aussi : ce registre ne déclare donc que les droits que les plafonds publiés autorisent.",
     "source": "ARC : cotiser à son CELIAPP",
-    "scope": "Les droits CELIAPP sont suivis par personne et par année. L'échéance, le transfert, les retraits et l'admissibilité à l'achat d'une première habitation restent hors de cette estimation."
+    "scope": "Les droits CELIAPP sont suivis par personne et par année. L'échéance, le transfert, les retraits et l'admissibilité à l'achat d'une première habitation restent hors de cette estimation.",
+    "reason": {
+      "openingYearUnknown": "L’année d’ouverture du CELIAPP n’est pas confirmée.",
+      "historyUnknown": "Vos cotisations au CELIAPP à ce jour ne sont pas confirmées.",
+      "openingRoomUnknown": "Les droits de participation indiqués sur votre relevé de l’ARC ne sont pas confirmés.",
+      "accountNotOpen": "L’année d’ouverture enregistrée est trop ancienne pour être plausible pour cette personne.",
+      "notYetOpen": "Le CELIAPP n’est pas encore ouvert en {{year}}; cette année n’a donc aucun droit de participation.",
+      "transferUnverified": "Un transfert d’un REER vers le CELIAPP ne peut pas être vérifié à partir de ce plan; il n’est donc pas imputé aux droits.",
+      "ownershipUnknown": "Le titulaire du CELIAPP n’est pas indiqué.",
+      "ambiguousAccount": "Plus d’un CELIAPP actif est enregistré, et le plan n’en chiffre qu’un par personne.",
+      "lifetimeExceeded": "Vos cotisations à ce jour dépassent déjà le plafond à vie. Les règles sur l’excédent ne sont pas modélisées; aucune autre cotisation n’est donc chiffrée."
+    }
   },
   "be27": {
     "title": "Droits de cotisation au CELI",
@@ -1473,7 +1511,11 @@
     "unknownRoom": "Les droits de cotisation au CELI ne sont pas confirmés; la vérification des droits ne peut pas se faire : {{reason}}",
     "limit": "Selon l'ARC, les droits de cotisation sont le plafond annuel du CELI, plus les droits inutilisés des années précédentes, plus les retraits faits lors des années précédentes (à l'exclusion des transferts directs). C'est la règle que ce registre recalcule. Le plafond annuel lui-même n'est pas encodé : il est indexé par tranches de 500 $ et aucun jeu de règles sourcé n'est publié, donc une année postérieure à l'année du relevé n'ajoute aucun droit ici et le dit au lieu de deviner.",
     "source": "ARC : cotiser à un CELI",
-    "scope": "Pas encore modélisé, donc aucun argent n’y est acheminé ici : le remplissage du CELI à partir d’un surplus à la retraite, une politique de surplus de trésorerie, le réinvestissement d’un surplus forcé de FERR, la comparaison des stratégies de surplus et les transferts directs entre comptes."
+    "scope": "Pas encore modélisé, donc aucun argent n’y est acheminé ici : le remplissage du CELI à partir d’un surplus à la retraite, une politique de surplus de trésorerie, le réinvestissement d’un surplus forcé de FERR, la comparaison des stratégies de surplus et les transferts directs entre comptes.",
+    "reason": {
+      "roomUnknown": "Les droits inutilisés indiqués sur votre relevé de l’ARC ne sont pas inscrits.",
+      "additionUnsourced": "Aucun plafond annuel du CELI publié n’est disponible pour {{year}}."
+    }
   },
   "benefitCategoryTitle": "SRG et Allocation : quelle ligne de ménage s'applique",
   "benefitCategoryNote": "Juillet-septembre 2026 publie un maximum et un seuil de revenu différents selon la situation du ménage ({{id}}, {{period}}). La projection chiffre ce plan avec la ligne indiquée; le montant et le seuil viennent tous deux de cette ligne.",
@@ -1520,7 +1562,7 @@
   "ruleAssumptionsTaxPolicyPublished": "montants publiés",
   "ruleAssumptionsTaxPolicyAssumed": "hypothèse : les seuils nominaux admissibles du paquet indexés une fois par an à {{rate}} depuis l’année d’imposition {{from}}",
   "ruleAssumptionsTaxNotModelled": "Ce paquet fiscal ne change pas selon l’année :",
-  "ruleAssumptionsRefused": "Règles fiscales indisponibles, aucun montant d’impôt n’est calculé : {{reason}}",
+  "ruleAssumptionsRefused": "Aucune règle fiscale publiée n’est disponible pour {{jurisdiction}} en {{year}}; aucun montant d’impôt n’est donc calculé.",
   "taxUnsupported.federal-age-pension-amounts": "le montant fédéral pour personnes âgées et le montant pour revenu de pension (valeurs 2026 épinglées)",
   "taxUnsupported.provincial-age-pension-amounts": "le montant pour personnes âgées, le montant pour revenu de pension et le supplément pour aînés de chaque province (valeurs 2026 épinglées)",
   "taxUnsupported.spouse-credit": "les montants pour conjoint ou conjoint de fait et leurs tests de revenu (valeurs 2026 épinglées)",
@@ -1533,7 +1575,7 @@
   "ruleAssumptionsCcbPolicyPublished": "montants publiés",
   "ruleAssumptionsCcbPolicyAssumed": "hypothèse : les montants admissibles du paquet indexés une fois par année de programme à {{rate}} depuis la période publiée {{from}}",
   "ruleAssumptionsCcbNotModelled": "Ce paquet d’ACE ne modélise pas :",
-  "ruleAssumptionsBenefitRefused": "Règles d’ACE indisponibles, aucun montant de prestation pour enfants n’est calculé : {{reason}}",
+  "ruleAssumptionsBenefitRefused": "Aucune règle d’ACE publiée n’est disponible pour la période de versement {{period}}; aucun montant de prestation pour enfants n’est donc calculé.",
   "ccbUnsupported.ccb-prior-year-afni": "le revenu familial net rajusté de l’année précédente : le vrai test utilise le revenu de l’année précédente, ce calculateur utilise celui de la même année",
   "ccbUnsupported.ccb-shared-custody": "la garde partagée à 50 %, donc un enfant n’est jamais réparti entre deux ménages bénéficiaires",
   "ccbUnsupported.ccb-child-disability-benefit": "la Prestation pour enfants handicapés, un supplément distinct qui n’est ajouté à aucun montant ici",
@@ -1680,5 +1722,7 @@
   "analyticsTurnOn": "Les autoriser",
   "analyticsSignal": "Votre navigateur demande aux sites de ne pas vous suivre; les statistiques restent donc désactivées.",
   "storageUnavailable": "Ce navigateur bloque le stockage du site : votre plan n’est pas enregistré et disparaîtra à la fermeture de la page.",
-  "valHbpTaxUnfunded": "À {{age}} ans, l’impôt sur un versement non remboursé du Régime d’accession à la propriété dépasse de {{amount}} $ ce que votre épargne et vos comptes peuvent couvrir."
+  "valHbpTaxUnfunded": "À {{age}} ans, l’impôt sur un versement non remboursé du Régime d’accession à la propriété dépasse de {{amount}} $ ce que votre épargne et vos comptes peuvent couvrir.",
+  "githubSource": "Voir le code source sur GitHub",
+  "close": "Fermer"
 }

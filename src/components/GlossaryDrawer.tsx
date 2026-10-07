@@ -34,7 +34,7 @@ export function GlossaryDrawer() {
             )}
             <h2>{t(`glossary.${term}.title`)}</h2>
           </div>
-          <button type="button" className="drawer-close" onClick={close} aria-label="Close">
+          <button type="button" className="drawer-close" onClick={close} aria-label={t('close')}>
             ×
           </button>
         </header>

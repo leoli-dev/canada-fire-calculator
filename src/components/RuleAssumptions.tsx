@@ -42,7 +42,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
     // priced from another jurisdiction's table or shown as a number.
     return <div className="rule-assumptions" data-testid="rule-assumptions">
       <strong>{t('ruleAssumptionsTitle')}</strong>
-      <p data-testid="rule-assumptions-refusal">{t('ruleAssumptionsRefused', { reason: selection.reason })}</p>
+      <p data-testid="rule-assumptions-refusal">{t('ruleAssumptionsRefused', { jurisdiction: province, year: PLAN_TAX_YEAR })}</p>
     </div>
   }
   const tax = selection.context.pack
@@ -94,7 +94,7 @@ export function RuleAssumptions({ province, inflation }: { province: Province; i
           })}
         </p>
       : <p data-testid="rule-ccb-refusal">
-          {t('ruleAssumptionsBenefitRefused', { reason: ccbSelection.status === 'unsupported' ? ccbSelection.reason : '' })}
+          {t('ruleAssumptionsBenefitRefused', { period: PLAN_BENEFIT_PERIOD })}
         </p>}
     <p>{t('ruleAssumptionsPolicy', { rate: (inflation * 100).toFixed(1) })}</p>
     {/*

@@ -18,8 +18,10 @@ export function budgetStateLabel(budget: BudgetMode): { key: string; params?: Re
   const facts = budgetFacts(budget)
   if (facts.status === 'ready') return { key: 'budget.stateReady' }
   if (facts.status === 'needs-facts') return { key: 'budget.stateUnknown', params: { fields: facts.unconfirmed.map(field => field === 'budget.debtIncluded' ? 'budget.fieldDebt' : 'budget.fieldTax').join(', ') } }
-  if (facts.status === 'income-budget') return { key: 'budget.stateIncome', params: { detail: facts.detail } }
-  return { key: 'budget.stateKnownFalse', params: { detail: facts.detail } }
+  // The engine's `detail` is an English diagnostic; the line shows the
+  // translated reason for the same code instead.
+  if (facts.status === 'income-budget') return { key: 'budget.stateIncome', params: { detail: `budget.reason.${facts.code}` } }
+  return { key: 'budget.stateKnownFalse', params: { detail: `budget.reason.${facts.code}` } }
 }
 
 function TraceAnswer(props: {

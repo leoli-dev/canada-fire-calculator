@@ -118,8 +118,18 @@ export interface SpousalAttributionOk {
   premiumsAfter: SpousalPremium[]
 }
 
+/**
+ * Why a payment cannot be attributed. `reason` is the English diagnostic; the
+ * panel translates `code` instead, so no engine sentence reaches the screen.
+ */
+export type SpousalRefusalCode =
+  | 'lifUnsupported' | 'liraUnsupported' | 'ordinaryRrspWithHistory' | 'holderUnknown' | 'spouseMissing'
+  | 'historyMissing' | 'invalidPayment' | 'invalidPaymentYear' | 'invalidIncomeBefore' | 'contributorUnknown'
+  | 'annuitantUnknown' | 'invalidHistory' | 'invalidPremium' | 'rrifMinimumUnknown' | 'invalidRrifMinimum'
+  | 'premiumContributorUnknown'
+
 export type SpousalAttributionResult = SpousalAttributionOk |
-  { status: 'invalid' | 'unsupported'; reason: string }
+  { status: 'invalid' | 'unsupported'; code: SpousalRefusalCode; reason: string }
 
 /**
  * How much of each recorded spousal premium has already been included in the
@@ -256,7 +266,7 @@ export interface SpousalPlanParties {
 
 export type SpousalPlanRouting =
   | { status: 'notSpousal' }
-  | { status: 'unsupported'; reason: string }
+  | { status: 'unsupported'; code: SpousalRefusalCode; reason: string }
   | { status: 'ok'; parties: SpousalPlanParties }
 
 /** Registered plan name for a concrete refusal reason. */
@@ -302,19 +312,19 @@ export function resolveSpousalPlan(
   // of scope; a recorded spousal history must not turn them into a plain owner
   // answer, and a stray history entry on a LIRA must not be silently dropped.
   if (account.kind === 'lif')
-    return { status: 'unsupported', reason: `a ${name} cannot be attributed yet: LIF minimum and maximum withdrawals need BE-36 rules` }
+    return { status: 'unsupported', code: 'lifUnsupported', reason: `a ${name} cannot be attributed yet: LIF minimum and maximum withdrawals need BE-36 rules` }
   if (account.kind === 'lira')
-    return { status: 'unsupported', reason: `a ${name} cannot be attributed yet: LIRA withdrawal and transfer rules need BE-36 rules` }
+    return { status: 'unsupported', code: 'liraUnsupported', reason: `a ${name} cannot be attributed yet: LIRA withdrawal and transfer rules need BE-36 rules` }
   // A plain RRSP kind together with a recorded spousal premium history is a
   // contradiction in the plan's own facts, not a fact to guess from.
   if (account.kind === 'rrsp')
-    return { status: 'unsupported', reason: `a spousal premium history is recorded for this ordinary RRSP, so a withdrawal cannot be attributed: reclassify the account as a spousal RRSP or clear the history` }
+    return { status: 'unsupported', code: 'ordinaryRrspWithHistory', reason: `a spousal premium history is recorded for this ordinary RRSP, so a withdrawal cannot be attributed: reclassify the account as a spousal RRSP or clear the history` }
   if (!account.ownerId || !people.some(person => person.id === account.ownerId))
-    return { status: 'unsupported', reason: `${name} holder not identified` }
+    return { status: 'unsupported', code: 'holderUnknown', reason: `${name} holder not identified` }
   const spouse = people.find(person => person.id !== account.ownerId)
-  if (!spouse) return { status: 'unsupported', reason: `${name} attribution needs the annuitant's spouse in the plan` }
+  if (!spouse) return { status: 'unsupported', code: 'spouseMissing', reason: `${name} attribution needs the annuitant's spouse in the plan` }
   if (history?.status !== 'complete')
-    return { status: 'unsupported', reason: `${name} contribution history is not recorded, so the payment is not assumed to be the annuitant's` }
+    return { status: 'unsupported', code: 'historyMissing', reason: `${name} contribution history is not recorded, so the payment is not assumed to be the annuitant's` }
   return {
     status: 'ok',
     parties: {
@@ -346,22 +356,22 @@ function sortPremiums(premiums: SpousalPremium[]): SpousalPremium[] {
 export function attributeSpousalPayment(request: SpousalAttributionRequest): SpousalAttributionResult {
   const { payment, paymentYear, contributorId, annuitantId, premiums, rrifMinimum } = request
   const annuitantIncomeBefore = request.annuitantIncomeBefore
-  if (!finiteNonnegative(payment)) return { status: 'invalid', reason: 'a spousal payment must be a finite nonnegative amount' }
-  if (!Number.isInteger(paymentYear)) return { status: 'invalid', reason: 'a spousal payment year must be an integer calendar year' }
-  if (!finiteNonnegative(annuitantIncomeBefore)) return { status: 'invalid', reason: 'amounts already included in the annuitant income must be a finite nonnegative amount' }
-  if (contributorId === null) return { status: 'unsupported', reason: 'the spousal plan contributor is not recorded, so a payment cannot be attributed' }
-  if (annuitantId === null) return { status: 'unsupported', reason: 'the spousal plan holder (annuitant) is not identified, so a payment cannot be attributed' }
-  if (premiums === null) return { status: 'unsupported', reason: SPOUSAL_HISTORY_UNKNOWN_REASON }
-  if (!Array.isArray(premiums)) return { status: 'invalid', reason: 'spousal premium history must be an array or an explicit unknown' }
+  if (!finiteNonnegative(payment)) return { status: 'invalid', code: 'invalidPayment', reason: 'a spousal payment must be a finite nonnegative amount' }
+  if (!Number.isInteger(paymentYear)) return { status: 'invalid', code: 'invalidPaymentYear', reason: 'a spousal payment year must be an integer calendar year' }
+  if (!finiteNonnegative(annuitantIncomeBefore)) return { status: 'invalid', code: 'invalidIncomeBefore', reason: 'amounts already included in the annuitant income must be a finite nonnegative amount' }
+  if (contributorId === null) return { status: 'unsupported', code: 'contributorUnknown', reason: 'the spousal plan contributor is not recorded, so a payment cannot be attributed' }
+  if (annuitantId === null) return { status: 'unsupported', code: 'annuitantUnknown', reason: 'the spousal plan holder (annuitant) is not identified, so a payment cannot be attributed' }
+  if (premiums === null) return { status: 'unsupported', code: 'historyMissing', reason: SPOUSAL_HISTORY_UNKNOWN_REASON }
+  if (!Array.isArray(premiums)) return { status: 'invalid', code: 'invalidHistory', reason: 'spousal premium history must be an array or an explicit unknown' }
   for (const premium of premiums) {
-    if (!Number.isInteger(premium.calendarYear)) return { status: 'invalid', reason: `spousal premium year is not a calendar year: ${premium.id}` }
-    if (!finiteNonnegative(premium.amount)) return { status: 'invalid', reason: `spousal premium amount is not a finite nonnegative figure: ${premium.id}` }
+    if (!Number.isInteger(premium.calendarYear)) return { status: 'invalid', code: 'invalidPremium', reason: `spousal premium year is not a calendar year: ${premium.id}` }
+    if (!finiteNonnegative(premium.amount)) return { status: 'invalid', code: 'invalidPremium', reason: `spousal premium amount is not a finite nonnegative figure: ${premium.id}` }
     if (!finiteNonnegative(premium.attributed) || premium.attributed > premium.amount + RRSP_MONEY_TOLERANCE)
-      return { status: 'invalid', reason: `attributed amount for spousal premium ${premium.id} exceeds the premium` }
+      return { status: 'invalid', code: 'invalidPremium', reason: `attributed amount for spousal premium ${premium.id} exceeds the premium` }
   }
-  if (rrifMinimum && rrifMinimum.status === 'unknown') return { status: 'unsupported', reason: `the RRIF minimum for ${paymentYear} is not confirmed: ${rrifMinimum.reason}` }
+  if (rrifMinimum && rrifMinimum.status === 'unknown') return { status: 'unsupported', code: 'rrifMinimumUnknown', reason: `the RRIF minimum for ${paymentYear} is not confirmed: ${rrifMinimum.reason}` }
   if (rrifMinimum && rrifMinimum.status === 'known' && !finiteNonnegative(rrifMinimum.value))
-    return { status: 'invalid', reason: 'the RRIF minimum for the year must be a finite nonnegative amount' }
+    return { status: 'invalid', code: 'invalidRrifMinimum', reason: 'the RRIF minimum for the year must be a finite nonnegative amount' }
   // The contributor at the time the premium was paid is the annuitant's
   // spouse. A premium the annuitant paid to their own spousal plan is not a
   // spousal premium and attributes nothing (s.146(8.3)(a)).
@@ -375,7 +385,7 @@ export function attributeSpousalPayment(request: SpousalAttributionRequest): Spo
   // A premium whose payer was never recorded is not evidence of the
   // annuitant's own money either; refusing is the only honest answer.
   const unrecorded = premiums.find(premium => premium.contributorId === null)
-  if (unrecorded) return { status: 'unsupported', reason: `spousal premium ${unrecorded.id} has no recorded contributor, so the attribution cannot be determined` }
+  if (unrecorded) return { status: 'unsupported', code: 'premiumContributorUnknown', reason: `spousal premium ${unrecorded.id} has no recorded contributor, so the attribution cannot be determined` }
 
   const minimum = rrifMinimum && rrifMinimum.status === 'known' ? rrifMinimum.value : 0
   // s.146.3(5.1)(c) compares the year's cumulative income inclusion with the
