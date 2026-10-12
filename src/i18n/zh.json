@@ -36,7 +36,8 @@
       "invalidAmount": "记录的储蓄金额不是有效数字。"
     }
   },
-  "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；税表、策略排名和精确比较暂不展示。",
+  "be11TaxLimit": "本计划的逐人税务尚未核实。图表仍是规划估算；逐年税表暂不展示。",
+  "coupleToolsEstimate": "夫妻计划下方的取钱顺序、开领时机和蒙特卡洛按整个家庭估算税额：收入在你们两人之间平均分摊，没有逐人计税。适合用来比较几种选择谁好谁坏；具体税额，以及结果接近的几个选项之间的先后，可能有偏差。",
   "be11SingleEstimate": "单人计划的工作期或未支持事件仍沿用旧税额、图表和规划工具估算。",
   "be11QcLimit": "这里的魁北克税按简化的魁省规则计算。处方药保险状态未知或为公共保险时需要尚未公布的 2026 年附表K，其他不支持的事件也仍是估算，因此下方的表格、排名和对比同样是估算。",
   "be11ComparisonLimit": "精确比较当前计划与方案 A，需要两份计划的逐人税务均已核实。",
@@ -1521,15 +1522,17 @@
       "additionUnsourced": "{{year}} 年还没有公布的 TFSA 年度额度。"
     }
   },
-  "benefitCategoryTitle": "GIS 与 Allowance：适用哪一行家庭情况",
-  "benefitCategoryNote": "2026 年 7–9 月按家庭情况分别公布最高额与收入上限（{{id}}，{{period}}）。投影按所示那一行计价；金额与上限都来自该行。",
-  "benefitCategoryYear": "年份",
+  "benefitCategoryTitle": "GIS 与 Allowance：低收入补助",
+  "benefitCategorySummary": "按这份计划，你家在 {{ages}} 岁能领到这笔补助，合计 {{total}}，免税。",
+  "benefitCategoryMissed": "其余 {{n}} 个领 OAS 的年份，模型算出的家庭收入超过上限，所以领不到。",
+  "benefitCategoryWhat": "GIS 是发给低收入 OAS 领取者的每月免税补助。Allowance 发给 60 到 64 岁、配偶在领 OAS 和 GIS 的人。家庭收入越高，两者越少，到上限就停发。OAS 本身和 TFSA 提款不算收入；RRSP/RRIF 提款、CPP 和工作收入都算。收入上限看家庭情况，例如夫妻中只有一方领 OAS 时用单独的一档。",
+  "benefitCategoryAge": "年龄",
   "benefitCategoryRow": "家庭情况行",
   "benefitCategoryCutoff": "收入上限",
   "benefitCategoryGis": "GIS",
-  "benefitCategoryAllowance": "Allowance（60–64 岁配偶）",
+  "benefitCategoryAllowance": "Allowance",
   "benefitCategoryTotal": "免税合计",
-  "benefitCategoryLimit": "最高额、收入上限与补足收入上限均为官方公布值并完全一致（{{id}}）。两者之间的递减是按官方每月金额表拟合的分段直线：在每个公布的收入分档上，模型金额与官方表格的偏差为：单身不超过 $1.00/月、双养老金领取者 $2.00、Allowance 行 $3.00、配偶两者都不领 $1.81，最多约 $3/月。",
+  "benefitCategoryLimit": "金额取自官方公布的 {{period}} 表格（{{id}}）。最高额和收入上限与官方数字一致；介于两者之间的金额与官方月度表的差距每月不超过约 $3。",
   "benefitCategory": {
     "single": "单身养老金领取者",
     "couple-both-pensioners": "夫妻，双方都领 OAS",

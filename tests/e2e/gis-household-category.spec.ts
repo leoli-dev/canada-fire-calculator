@@ -64,19 +64,19 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   await seed(page)
   const panel = page.getByTestId('benefit-category-panel')
   await panel.locator('summary').click()
-  await expect(page.getByTestId('benefit-category-name'))
+  await expect(page.getByTestId('benefit-category-name-65'))
     .toHaveText('Couple, one pensioner + Allowance spouse')
-  await expect(page.getByTestId('benefit-category-cutoff')).toHaveText('CA$42,768')
+  await expect(page.getByTestId('benefit-category-cutoff-65')).toHaveText('CA$42,768')
   // 685.56/month GIS and 1,448.06/month Allowance, annualized from the
   // published October-December 2026 table (the panel shows rounded dollars).
   await expect(page.getByTestId('benefit-gis-65')).toHaveText('CA$8,227')
   await expect(page.getByTestId('benefit-allowance-65')).toHaveText('CA$17,377')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   // Once the spouse turns 65 the household moves to the both-pensioners row
-  // with its own 30,528 cut-off (the primary is 70 that year).
-  await page.getByTestId('benefit-category-year').selectOption('70')
-  await expect(page.getByTestId('benefit-category-name')).toHaveText('Couple, both receive OAS')
-  await expect(page.getByTestId('benefit-category-cutoff')).toHaveText('CA$30,528')
+  // with its own 30,528 cut-off (the primary is 70 that year). Every paying
+  // year is its own table line, so no picker is needed to reach it.
+  await expect(page.getByTestId('benefit-category-name-70')).toHaveText('Couple, both receive OAS')
+  await expect(page.getByTestId('benefit-category-cutoff-70')).toHaveText('CA$30,528')
   // The published both-pensioners maximum is 2 x 685.56 x 12 = 16,453.44 at
   // zero countable income. This plan's modelled year carries about 490 of
   // countable income, which the 50% reduction prices at about 243 a year; the
@@ -85,7 +85,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   // Reload keeps the same plan and the same priced row.
   await page.reload()
   await panel.locator('summary').click()
-  await expect(page.getByTestId('benefit-category-name')).toHaveText('Couple, one pensioner + Allowance spouse')
+  await expect(page.getByTestId('benefit-category-name-65')).toHaveText('Couple, one pensioner + Allowance spouse')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   // The same recorded plan prices identically in guided mode. Entering guided
   // mode leaves the questionnaire; viewing its results is the flow's explicit
@@ -104,7 +104,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   await guidedPage.goto('/#/guided/results')
   const guidedPanel = guidedPage.getByTestId('benefit-category-panel')
   await guidedPanel.locator('summary').click()
-  await expect(guidedPage.getByTestId('benefit-category-name'))
+  await expect(guidedPage.getByTestId('benefit-category-name-65'))
     .toHaveText('Couple, one pensioner + Allowance spouse')
   await expect(guidedPage.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   await guidedPage.close()

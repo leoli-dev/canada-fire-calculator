@@ -36,7 +36,8 @@
       "invalidAmount": "the recorded savings amount is not a valid number."
     }
   },
-  "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; tax tables, strategy rankings and precise comparisons are withheld.",
+  "be11TaxLimit": "Person-level tax is not verified for this plan. The charts remain planning estimates; the yearly tax tables are withheld.",
+  "coupleToolsEstimate": "For a couple, the withdrawal order, benefit timing and Monte Carlo tools below price tax for the household as a whole, splitting income evenly between the two of you instead of taxing each person. Use them to compare choices against each other; the tax amounts and the order of close options can be off.",
   "be11SingleEstimate": "Single-person tax, charts and planning tools still use the earlier estimate for working years or unsupported events.",
   "be11QcLimit": "Quebec tax here uses simplified Quebec rules. Unknown or public prescription coverage needs the unpublished 2026 Schedule K, and other unsupported events remain estimates, so the tables, rankings and comparisons below are estimates too.",
   "be11ComparisonLimit": "Exact current versus Scenario A comparison requires verified person-level tax for both plans.",
@@ -1512,15 +1513,17 @@
       "additionUnsourced": "No published TFSA annual limit is available for {{year}}."
     }
   },
-  "benefitCategoryTitle": "GIS and Allowance: which household row applies",
-  "benefitCategoryNote": "July-September 2026 publishes a different maximum and income cut-off for each household shape ({{id}}, {{period}}). The projection prices this plan from the row shown; the amount and the cut-off both come from that row.",
-  "benefitCategoryYear": "Year",
+  "benefitCategoryTitle": "GIS and Allowance: low-income top-ups",
+  "benefitCategorySummary": "In this plan your household receives them at age {{ages}}, {{total}} tax-free in total.",
+  "benefitCategoryMissed": "In the other {{n}} OAS year(s), the modelled household income is above the cut-off, so they pay nothing.",
+  "benefitCategoryWhat": "GIS is a tax-free monthly top-up for OAS recipients with low income. The Allowance is paid to a 60 to 64 year old whose spouse receives OAS and GIS. Both shrink as household income rises and stop at the cut-off. OAS itself and TFSA withdrawals do not count as income; RRSP/RRIF withdrawals, CPP and work income do. The cut-off depends on the household row, for example a couple where only one receives OAS.",
+  "benefitCategoryAge": "Age",
   "benefitCategoryRow": "Household row",
   "benefitCategoryCutoff": "Income cut-off",
   "benefitCategoryGis": "GIS",
-  "benefitCategoryAllowance": "Allowance (60-64 spouse)",
+  "benefitCategoryAllowance": "Allowance",
   "benefitCategoryTotal": "Tax-free total",
-  "benefitCategoryLimit": "The maximum, the income cut-off and the top-up income cut-off are the published figures, reproduced exactly ({{id}}). The reduction between them is a piecewise-linear fit to the published table of monthly amounts: at every published income bracket the modelled amount is within $1.00/month for a single pensioner, $2.00 for two pensioners, $3.00 for the Allowance row and $1.81 for the spouse with neither, so about $3/month at most against the official table.",
+  "benefitCategoryLimit": "Amounts come from the {{period}} published table ({{id}}). Maximums and cut-offs match the official figures; amounts in between follow the official monthly table to within about $3 a month.",
   "benefitCategory": {
     "single": "Single pensioner",
     "couple-both-pensioners": "Couple, both receive OAS",
