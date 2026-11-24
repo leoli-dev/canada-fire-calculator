@@ -16,7 +16,8 @@ export interface AnnualOas {
   source: 'manual' | 'statement'
   ageBasis: number | null
   evidence: NonNullable<InputsV2['annualBenefitsEvidence']>[string]
-  policy: 'annual-estimate-full-year-anchor-real'
+  age75Uplift?: { evidence: NonNullable<NonNullable<InputsV2['annualBenefitsEvidence']>[string]['oasAge75']>; increasedMonths: number; baseGrossReal: number; policy: 'annual-estimate-month-weighted-anchor-real' }
+  policy: 'annual-estimate-full-year-anchor-real' | 'annual-estimate-month-weighted-anchor-real'
 }
 /** A full-year amount at start CPI. No entitlement, monthly withholding,
  * quarterly rate changes or GIS/Allowance eligibility is inferred.
@@ -28,7 +29,7 @@ export interface AnnualOas {
 function validateAnnualOas(plan: InputsV2, person: Person, age: number, household: boolean, retiredContinuation = false): AnnualOas {
   const stop = (reason: string): never => { throw { status: 'unsupported', reason } }
   if (!Number.isInteger(age) || age < 0) throw { status: 'invalid', reason: 'invalid OAS annual age' }
-  if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || age > (retiredContinuation ? 74 : 69))
+  if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || (!retiredContinuation && age > 69))
     stop('OAS annual settlement supports one or two Ontario people through age 69 at 2026 anchor')
   const evidence = plan.annualBenefitsEvidence?.[person.id]
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || ![evidence.allowance, evidence.otherBenefits].every(e => e && typeof e === 'object' && !Array.isArray(e) && ['excluded', 'not-applicable'].includes(e.status) && typeof e.reason === 'string' && e.reason.trim().length > 0 && e.provenance?.origin === 'user' && Number.isSafeInteger(e.provenance.sourceYear) && e.provenance.sourceYear! >= 0))
@@ -87,13 +88,42 @@ export function annualHouseholdOas(plan: InputsV2, person: Person, age: number):
 
 /** Generated solo retirement only; public/provider quotes keep their existing boundary.
  * ESDC: the 10% uplift starts the month after the 75th birthday.
+ * This annual forecast weights the existing pinned anchor amount by increased
+ * months / 12; it does not quote actual monthly or quarterly payment rates.
+ * The 10% applies to the existing partial/deferred pension too (ss.7.1(5)-(6)).
+ * https://laws-lois.justice.gc.ca/eng/acts/O-9/section-7.html (s.7(5))
+ * https://laws-lois.justice.gc.ca/eng/acts/O-9/section-7.1.html
  * https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/benefit-amount.html
  */
 export function annualGeneratedRetirementOas(plan: InputsV2, person: Person, age: number, state: AnnualState): AnnualOas {
   if (!isCanonicalGeneratedState(plan, state) || plan.people.length !== 1 || plan.people[0] !== person || state.byPerson[person.id]?.age !== age || age < person.retirementAge)
     throw { status: "unsupported", reason: "OAS continuation requires authenticated solo retirement" }
-  if (age >= 75) throw { status: "unsupported", reason: "OAS: reached age 75 requires separate monthly uplift modeling; no claim month inferred" }
   if (age >= 70 && plan.annualBenefitsEvidence?.[person.id]?.gis.status === "annual-estimate")
     throw { status: "unsupported", reason: "GIS: continuation beyond age 69 requires explicit exclusion" }
-  return validateAnnualOas(plan, person, age, false, true)
+  const benefit = validateAnnualOas(plan, person, age, false, true)
+  if (age < 75) return benefit
+  const evidence = plan.annualBenefitsEvidence?.[person.id]?.oasAge75
+  const reachedYear = plan.baseYear + 75 - person.ageInBaseYear
+  // Directly evidenced first uplift year/month avoids inferring personal dates.
+  // The increase begins the month after attaining 75, including a January 1
+  // birthday (February uplift); no DOB is collected.
+  const valid = evidence && typeof evidence === 'object' && !Array.isArray(evidence) &&
+    Number.isSafeInteger(evidence.firstUpliftYear) && Number.isInteger(evidence.firstUpliftMonth) &&
+    evidence.firstUpliftMonth >= 1 && evidence.firstUpliftMonth <= 12 &&
+    ((evidence.firstUpliftYear === reachedYear && evidence.firstUpliftMonth >= 2) ||
+      (evidence.firstUpliftYear === reachedYear + 1 && evidence.firstUpliftMonth === 1)) &&
+    evidence.provenance && typeof evidence.provenance === 'object' && !Array.isArray(evidence.provenance) &&
+    evidence.provenance.origin === 'user' && Number.isSafeInteger(evidence.provenance.sourceYear) && evidence.provenance.sourceYear! >= 0
+  if (evidence === undefined && benefit.grossReal > 0)
+    throw { status: 'unsupported', reason: 'OAS: reached age 75 requires separate monthly uplift modeling; no claim month inferred' }
+  if (evidence !== undefined && !valid)
+    throw { status: 'unsupported', reason: 'OAS: reached age 75 requires verified user first uplift year and month compatible with reached age; no date inferred' }
+  // Confirmed absence has no uplift cash or invented date receipt.
+  if (benefit.grossReal === 0) return benefit
+  const increasedMonths = state.year < evidence!.firstUpliftYear ? 0 : state.year === evidence!.firstUpliftYear ? 13 - evidence!.firstUpliftMonth : 12
+  const grossReal = benefit.grossReal * (1 + 0.1 * increasedMonths / 12)
+  if (!Number.isFinite(grossReal) || grossReal > Number.MAX_SAFE_INTEGER / 100)
+    throw { status: 'invalid', reason: 'unsafe OAS age-75 uplift amount' }
+  return { ...benefit, grossReal, netReal: grossReal, policy: 'annual-estimate-month-weighted-anchor-real',
+    age75Uplift: { evidence: structuredClone(evidence!), increasedMonths, baseGrossReal: benefit.grossReal, policy: 'annual-estimate-month-weighted-anchor-real' } }
 }
