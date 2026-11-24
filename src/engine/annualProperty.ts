@@ -99,7 +99,7 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
     return 'mortgage requires recorded debt provenance'
   const homeProblem = (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
   if (homeProblem) return homeProblem
-  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomeSaleEvidence || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || plan.annualGisEvidence))
+  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || plan.annualGisEvidence))
     return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)

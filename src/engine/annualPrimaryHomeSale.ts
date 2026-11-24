@@ -62,7 +62,7 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState, household 
         !own(held.acb, 'status') || !own(held.acb, 'value') || !own(e!.sellingCostsNominal, 'status') || !own(e!.sellingCostsNominal, 'value') || !own(e!.postSaleAnnualSpendingReal, 'status') || !own(e!.postSaleAnnualSpendingReal, 'value') ||
         plan.people.some(p => opening.byPerson[p.id].age < p.retirementAge || p.pension || p.pensionAnnual !== 0 || p.cppWork || p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) ||
         plan.accounts.filter(a => a.kind === 'tfsa' && a.balance > 0).length !== 1 || plan.accounts.some(a => a.kind !== 'tfsa' || a.jurisdiction || a.accessibleAge !== undefined) ||
-        plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || e!.mortgagePayoff || plan.strategy === 'meltdownPaced')
+        plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || (!plan.debts.length && e!.mortgagePayoff) || plan.strategy === 'meltdownPaced')
       refuse('requires dated complete owner exclusions and authorization of all cash for joint living in a both-retired ordinary TFSA household')
   }
   if (held.acb.status !== 'known' || !money(held.acb.value) || !money(held.value)) refuse('requires known nominal ACB and opening value')
@@ -73,7 +73,7 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState, household 
     exactGross = mortgageDecimal(p.value)
     const factor = mortgageMultiply(mortgageAdd(mortgageDecimal(1), mortgageDecimal(p.appreciation)), mortgageAdd(mortgageDecimal(1), mortgageDecimal(plan.inflation)))
     for (let y = plan.baseYear; y < opening.year; y++) exactGross = mortgageMultiply(exactGross, factor)
-    if (!money(mortgageNumber(exactGross))) refuse('modeled sale valuation outside supported nominal range')
+    if (!money(mortgageNumber(exactGross)) || household && mortgageNegative(mortgageSubtract(mortgageDecimal(Number.MAX_SAFE_INTEGER / 100), exactGross))) refuse('modeled sale valuation outside supported nominal range')
   }
   const exactNet = mortgageSubtract(exactGross, mortgageDecimal(sellingCosts))
   const exactGain = mortgageSubtract(exactNet, mortgageDecimal(acb))
@@ -89,7 +89,7 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState, household 
         !own(terms, 'timing') || terms.timing !== 'start-of-sale-year' || !own(terms, 'effectiveYear') || terms.effectiveYear !== opening.year ||
         !own(terms, 'provenance') || !terms.provenance || !own(terms.provenance, 'origin') || terms.provenance.origin !== 'user' ||
         !own(terms.provenance, 'sourceYear') || !Number.isInteger(terms.provenance.sourceYear) || terms.provenance.sourceYear! < 0 || terms.provenance.sourceYear! > plan.baseYear ||
-        !(['additionalAccruedInterestNominal', 'prepaymentPenaltyNominal', 'dischargeFeesNominal'] as const).every(key => own(terms, key) && terms[key]?.status === 'known' && own(terms[key], 'value') && terms[key].value === 0))
+        !(['additionalAccruedInterestNominal', 'prepaymentPenaltyNominal', 'dischargeFeesNominal'] as const).every(key => own(terms, key) && terms[key]?.status === 'known' && own(terms[key], 'status') && own(terms[key], 'value') && terms[key].value === 0))
       refuse('requires explicit matching user start-of-sale-year payoff terms with known zero accrued interest, penalty and discharge fees')
     const quote = terms!.openingPrincipalNominal
     if (!own(terms!, 'openingPrincipalNominal') || !quote || !own(quote, 'status') || quote.status !== 'known' || !own(quote, 'value') || !money(quote.value))
