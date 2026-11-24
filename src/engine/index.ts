@@ -91,9 +91,9 @@ export { buildDebtStream, impliedRate, rollDebtsForward } from './debts'
 export { pensionPaid, pensionStartAge, runProjection, type ReturnSampler } from './projection'
 // BE-14 A state API; UI, solvers, strategy and MC consumers move in BE-14 B.
 export {
-  initializeState, annualStep, projectFromState, fixedReturnProvider,
+  initializeState, annualStep, projectFromState, projectAnnualCoverage, fixedReturnProvider,
   sumInvestableAssets, sumNetWorth, sumWithdrawals,
-  type AnnualState, type AnnualProviders, type AnnualEvaluation, type AnnualContext,
+  type AnnualState, type AnnualCoverage, type AnnualStopCause, type AnnualProviders, type AnnualEvaluation, type AnnualContext,
   type AnnualIssue, type AnnualStepValue, type KernelResult, type YearRow as AnnualStateYearRow,
 } from './annualState'
 export {

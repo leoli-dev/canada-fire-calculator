@@ -439,7 +439,10 @@ function fhsaAccountYearRequest(args: {
  * its recorded recurring plan. The kernel and the panel preview both build their
  * request here, so they price the same lines and cannot drift apart.
  */
-export function fhsaPlannedYearRequest(args: { plan: InputsV2; account: Account; year: number }): FhsaPlannedRequest {
+/** Scheduled and recurring-plan slices may share an ID; origin never uses ID lookup. */
+export function fhsaPlannedYearRequestWithOrigins(args: { plan: InputsV2; account: Account; year: number }): {
+  planned: FhsaPlannedRequest; origins: ('scheduled' | 'voluntary')[]
+} {
   const { plan, account, year } = args
   const scheduled = fhsaScheduledContributions(plan, account.id, year)
   const recordedPlan = plannedFhsaContribution(plan, account.id)
@@ -447,16 +450,20 @@ export function fhsaPlannedYearRequest(args: { plan: InputsV2; account: Account;
   // The recorded plan is the account's total annual plan; a scheduled row for
   // the same year is already part of it, so it is never added twice.
   const savingsShare = roundCents(Math.max(0, recordedPlan - scheduledPlanned))
+  const slices = [
+    ...scheduled.map(contribution => ({ origin: 'scheduled' as const,
+      line: { id: contribution.id, calendarYear: year, amount: contribution.amount, kind: 'ordinary' as const } })),
+    ...plannedFhsaLines({ year, savingsShare }).map(line => ({ origin: 'voluntary' as const, line })),
+  ]
   return {
-    savingsShare,
-    request: fhsaAccountYearRequest({
-      plan, account, year,
-      lines: [
-        ...scheduled.map(contribution => ({ id: contribution.id, calendarYear: year, amount: contribution.amount, kind: 'ordinary' as const })),
-        ...plannedFhsaLines({ year, savingsShare }),
-      ],
-    }),
+    origins: slices.map(slice => slice.origin),
+    planned: { savingsShare, request: fhsaAccountYearRequest({ plan, account, year, lines: slices.map(slice => slice.line) }) },
   }
+}
+
+/** Compatibility view: no metadata is added to the original planned request. */
+export function fhsaPlannedYearRequest(args: Parameters<typeof fhsaPlannedYearRequestWithOrigins>[0]): FhsaPlannedRequest {
+  return fhsaPlannedYearRequestWithOrigins(args).planned
 }
 
 export interface FhsaPlannedRequest {

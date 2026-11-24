@@ -4,12 +4,12 @@ import { assertCanonicalPlan } from './modelValidation'
 import { resolveYearAllocation, type FundingGap } from './funding'
 import { impliedRate } from './debts'
 import {
-  RRSP_ADDITION_RULE_MISSING, plannedRrspLines, rrspRoomYear, statementOpeningRoom,
+  RRSP_ADDITION_RULE_MISSING, plannedRrspSlices, rrspRoomYear, statementOpeningRoom,
   type RrspRoomLimitation, type RrspRoomYear,
 } from './rrspRoom'
 import {
-  FHSA_BLOCKING, FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_OPENING_YEAR_MISSING,
-  activeFhsaAccounts, fhsaOpeningRoom, fhsaPlannedYearRequest, fhsaRoomYear,
+  FHSA_BLOCKING, FHSA_MATURITY_UNSUPPORTED, FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_OPENING_YEAR_MISSING,
+  activeFhsaAccounts, fhsaOpeningRoom, fhsaPlannedYearRequestWithOrigins, fhsaRoomYear,
   fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
 import { plannedFhsaContribution } from './fhsaPlan'
@@ -57,7 +57,24 @@ export interface YearRow {
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  /** Recorded at settlement, never reconstructed from rounded presentation values. */
+  byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
+  byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
   cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
+  /** Budget reservation and final-posting bridge. Final postings and retained
+   * amounts are memo facts, not additional budget uses. Ownership and
+   * contributor attribution are intentionally separate. */
+  contributionLedger: {
+    /** Exact canonical net-savings budget used by the allocator, not supplied net cash. */
+    allocationCashBasis: number
+    /** Allocation-time RRSP/spousal cash reservation only; scheduled FHSA is
+     * already reserved in cashLedger.fhsaContributions. This is requested,
+     * not the room-clipped amount eventually posted to registered accounts. */
+    scheduledRrspBudgeted: number
+    scheduledPlanned: number; scheduledApplied: number; scheduledRetained: number; appliedTotal: number
+    postings: { id: string; accountId: string; ownerId: string; contributorId: string | null; amount: number }[]
+    retained: { personId: string; kind: 'rrsp' | 'fhsa' | 'tfsa'; amount: number }[]
+  }
   taxLedger: Record<string, { taxableIncome: number; tax: number }>
   /** BE-12 A per-person room ledger; every year is recomputable from its parts. */
   rrspLedger: Record<string, RrspRoomYear>
@@ -287,6 +304,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const cash = cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
+  const debtRows: YearRow['byDebt'] = Object.fromEntries(Object.entries(state.byDebt).map(([id, debt]) => [id,
+    { opening: debt.principal, interest: 0, principal: 0, payment: 0, closing: debt.principal, propertyId: debt.propertyId }]))
   let debtPayments = 0
   for (const [id, debt] of Object.entries(state.byDebt)) {
     if (debt.principal <= 0 || debt.yearsRemaining <= 0) continue
@@ -294,6 +313,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (debt.annualPayment * debt.yearsRemaining + 1e-8 < debt.principal) return fail('invalid', `debt cannot amortize: ${id}`)
     const accrued = debt.principal * (1 + rate)
     const due = Math.min(debt.annualPayment, accrued)
+    debtRows[id].interest = accrued - debt.principal
+    debtRows[id].payment = due
     debtPayments += due
     const remaining = Math.max(0, accrued - due)
     // Settle only representational noise on the final payment. The cash ledger
@@ -301,6 +322,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const numericalResidue = Math.min(0.005, 64 * Number.EPSILON * Math.max(1, accrued, due))
     if (debt.yearsRemaining === 1 && remaining > numericalResidue) return fail('invalid', `debt unpaid at maturity: ${id}`)
     debt.principal = debt.yearsRemaining === 1 ? 0 : remaining
+    debtRows[id].closing = debt.principal
+    debtRows[id].principal = debtRows[id].opening - debt.principal
     debt.yearsRemaining -= 1
   }
   const evaluatedCash = income + benefits - tax - spending - debtPayments
@@ -342,6 +365,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // participation room — the recorded rows for this account plus the FHSA share
   // of the resolved savings split. RRSP transfers stay out until the plan can
   // verify them.
+  // Origin accompanies the exact request slice through pricing; result arrays
+  // preserve input order. IDs are source facts and need not be disjoint from
+  // generated voluntary IDs, so they must never select memo amounts.
+  const scheduledResults: { applied: number; retained: number }[] = []
   const fhsaLedger: Record<string, FhsaRoomYear> = {}
   if (fhsaAccount) {
     const owner = plan.people.find(person => person.id === fhsaAccount.ownerId)!
@@ -369,7 +396,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     // One request builder serves the kernel and the panel preview, so both price
     // the same recorded plan and the same line set. A second, stale row for the
     // account is never priced on top of the recorded row.
-    const planned = fhsaPlannedYearRequest({ plan, account, year })
+    const { planned, origins } = fhsaPlannedYearRequestWithOrigins({ plan, account, year })
     const ledger = fhsaRoomYear({
       personId: owner.id,
       accountId: activeFhsaId!,
@@ -386,6 +413,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     // Persisted for the next year's opening room, and returned for the panel.
     fhsaLedgerByPerson[owner.id] = ledger
     fhsaLedger[owner.id] = ledger
+    ledger.lines.forEach((line, index) => { if (origins[index] === 'scheduled') scheduledResults.push(line) })
     const blocking = ledger.limitations.filter(limitation => FHSA_BLOCKING.has(limitation.code))
     // An unconfirmed statement with nothing planned prices nothing, so it does
     // not have to stop the whole year: the panel says the same thing. A year
@@ -448,7 +476,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const voluntary = plan.people.length === 1 ? allocation.voluntary.rrsp : 0
     // The same line set `previewRrspRoomYear` prices for the panel: recorded
     // rows plus the resolved savings-split RRSP share.
-    const lines = plannedRrspLines({ accounts: plan.accounts, contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
+    const slices = plannedRrspSlices({ accounts: plan.accounts, contributions: plan.contributions, personId: person.id, year, savingsShare: voluntary })
+    const lines = slices.map(slice => slice.line)
     const statementYear = year === plan.baseYear
     let openingRoom = facts.rrspRoom
     let mismatch: RrspRoomLimitation | null = null
@@ -470,6 +499,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       unusedUndeducted: facts.rrspUnusedUndeducted, deductionLimit: facts.rrspDeductionLimit, mismatch, lines,
     })
     rrspLedger[person.id] = row
+    row.lines.forEach((line, index) => { if (slices[index].origin === 'scheduled') scheduledResults.push(line) })
     const blocking = row.limitations.filter(limitation => limitation.code !== 'deductionYearBeforeContribution')
     if (row.planned > 0 && blocking.length) return fail('unsupported', `RRSP room not verified for ${person.id}: ${blocking.map(item => item.detail).join('; ')}`)
     const backdated = row.limitations.find(limitation => limitation.code === 'deductionYearBeforeContribution')
@@ -519,11 +549,15 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
+  const propertyRows: YearRow['byProperty'] = Object.fromEntries(Object.entries(state.byProperty).map(([id, property]) => [id,
+    { held: property.held, opening: property.value, growth: 0, closing: property.value }]))
   for (const property of plan.properties) if (state.byProperty[property.id].held) {
     const growthFactor = (1 + property.appreciation) * (1 + plan.inflation)
     if (!Number.isFinite(growthFactor)) return fail('invalid', `property growth is not finite: ${property.id}`)
     if (property.appreciation < -1 || plan.inflation < -1 || growthFactor < 0) return fail('unsupported', `property growth outside nonnegative value model: ${property.id}`)
     state.byProperty[property.id].value *= growthFactor
+    propertyRows[property.id].closing = state.byProperty[property.id].value
+    propertyRows[property.id].growth = propertyRows[property.id].closing - propertyRows[property.id].opening
   }
   for (const [id, person] of Object.entries(state.byPerson)) {
     person.age += 1
@@ -534,7 +568,21 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   state.year += 1
   const committedProblem = snapshotProblem(plan, state)
   if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
-  const row: YearRow = { year, byPerson: personRows, byAccount: accountRows,
+  const contributionLedger: YearRow['contributionLedger'] = {
+    allocationCashBasis: cash,
+    scheduledRrspBudgeted: scheduledPlanned,
+    scheduledPlanned: sum(scheduled.map(line => line.amount)),
+    scheduledApplied: sum(scheduledResults.map(line => line.applied)),
+    scheduledRetained: sum(scheduledResults.map(line => line.retained)),
+    appliedTotal: totalContributions,
+    postings: state.contributionHistory.slice(opening.contributionHistory.length).map(line => ({
+      id: line.id, accountId: line.accountId, ownerId: state.byAccount[line.accountId].ownerId,
+      contributorId: line.contributorId, amount: line.amount,
+    })),
+    retained: ([['rrsp', rrspLedger], ['fhsa', fhsaLedger], ['tfsa', tfsaLedger]] as const).flatMap(([kind, ledger]) =>
+      Object.entries(ledger).filter(([, row]) => row.retained > 0).map(([personId, row]) => ({ personId, kind, amount: row.retained }))),
+  }
+  const row: YearRow = { year, byPerson: personRows, byAccount: accountRows, byDebt: debtRows, byProperty: propertyRows, contributionLedger,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
@@ -546,7 +594,52 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
   catch { return fail('invalid', 'damaged annual snapshot or provider result') }
 }
 
-export function projectFromState(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<{ state: AnnualState; rows: YearRow[] }> {
+/** An internal canonical run, with provider-supplied evaluation, not production tax pricing.
+ * Only rows successfully returned by annualStep are settled. state is never advanced
+ * through a blocked year; its year is the first year that remains to be evaluated.
+ */
+export type AnnualStopCause = 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+  | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
+  | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
+
+/** Diagnostic classification stays internal: detail strings never become display text.
+ * The strict API returns its original issue objects, without extra fields. */
+function annualStopCause(issue: AnnualIssue): AnnualStopCause {
+  const detail = issue.detail
+  if (issue.code === 'unfunded') return 'contributionFunding'
+  if (detail === 'retirement withdrawals and benefit rules not yet wired') return 'retirement'
+  if (detail.startsWith('planned purchase funding')) return 'propertyPurchase'
+  if (detail.startsWith('property sale funding')) return 'propertySale'
+  if (/^(RRIF|LIF) minimum withdrawal/.test(detail)) return 'registeredWithdrawal'
+  if (/^(RRSP|LIRA|FHSA) age-71/.test(detail)) return 'registeredConversion'
+  if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
+  if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
+  if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
+  if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule') return 'withdrawalFunding'
+  if (detail === 'evaluated cash disagrees with canonical net savings budget') return 'cashMismatch'
+  if (detail.startsWith('scheduled RRSP contribution exceeds')) return 'contributionFunding'
+  if (/^(couple |ambiguous |scheduled RRSP contributor|RRSP contributor differs|one person has scheduled)/.test(detail)) return 'contributionAttribution'
+  if (/^(tax\/benefit evaluator|evaluator )/.test(detail)) return 'invalidEvaluation'
+  if (/^(return provider|return rate)/.test(detail)) return 'invalidReturn'
+  return issue.code === 'invalid' ? 'invalidState' : 'unsupported'
+}
+
+export interface AnnualCoverage {
+  baseYear: number
+  inflation: number
+  terminalYear: number
+  requestedStartYear: number
+  requestedYears: number
+  state: AnnualState
+  rows: YearRow[]
+  blocked: { year: number; status: 'invalid' | 'unsupported'; issues: AnnualIssue[]; causes: AnnualStopCause[] } | null
+  /** Requested years strictly after the first blocked year. */
+  uncomputedYears: number[]
+  overallConclusionAvailable: boolean
+  evaluationBasis: 'provider-supplied'
+}
+
+export function projectAnnualCoverage(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<AnnualCoverage> {
   if (!Number.isInteger(years) || years < 0 || years > 120) return fail('invalid', 'projection years')
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
   const gate = pricingGate(plan)
@@ -556,12 +649,31 @@ export function projectFromState(plan: InputsV2, opening: AnnualState, years: nu
   let state: AnnualState
   try { state = clone(opening) } catch { return fail('invalid', 'snapshot cannot be cloned') }
   const rows: YearRow[] = []
+  let blocked: AnnualCoverage['blocked'] = null
   for (let index = 0; index < years; index++) {
     const next = annualStep(plan, state, providers)
-    if (next.status !== 'ok') return next
+    if (next.status !== 'ok') {
+      blocked = { year: state.year, status: next.status, issues: next.issues, causes: [...new Set(next.issues.map(annualStopCause))] }
+      break
+    }
     state = next.value.state
     rows.push(next.value.row)
   }
+  return { status: 'ok', value: {
+    baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(person => person.role === 'self')!.ageInBaseYear, requestedStartYear: opening.year,
+    requestedYears: years, state, rows, blocked,
+    uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [],
+    // A completed requested window is not a verified retirement/estate conclusion.
+    overallConclusionAvailable: false, evaluationBasis: 'provider-supplied',
+  } }
+}
+
+/** Strict compatibility API: a blocked step still fails the entire requested run. */
+export function projectFromState(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<{ state: AnnualState; rows: YearRow[] }> {
+  const result = projectAnnualCoverage(plan, opening, years, providers)
+  if (result.status !== 'ok') return result
+  const { state, rows, blocked } = result.value
+  if (blocked) return { status: blocked.status, issues: blocked.issues }
   return { status: 'ok', value: { state, rows } }
 }
 
