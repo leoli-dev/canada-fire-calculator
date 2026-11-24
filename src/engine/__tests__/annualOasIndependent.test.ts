@@ -231,9 +231,13 @@ describe('independent annual OAS settlement vectors', () => {
 
   it.each([
     { label: 'claiming OAS while working at age 65', retirementAge: 66, years: 3, committed: 1, reason: /working OAS/i },
-    { label: 'retired at age 70', retirementAge: 65, years: 8, committed: 6, reason: /through age 69/i },
+    { label: 'retired at age 75', retirementAge: 65, years: 13, committed: 11, reason: /75.*monthly/i },
   ])('keeps a committed prefix for an out-of-scope recipient $label', ({ retirementAge, years, committed, reason }) => {
     const { plan, evidence } = scenario({ spending: 20_000, retirementAge, rrsp: 0 })
+    if (committed > 1) {
+      plan.lifeExpectancy = 76
+      plan.accounts.find(account => account.id === TFSA)!.balance = 250_000
+    }
     const prefix = ok(projectCanonicalCoverage(plan, evidence, committed))
     expect(prefix.blocked).toBeNull()
     const result = ok(projectCanonicalCoverage(plan, evidence, years))

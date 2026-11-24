@@ -1,6 +1,6 @@
 import { minimumForRrif } from "./rrif"
 import { annualGis, gisAssessmentReceipt, GIS_OAS_RECOVERY_UNSUPPORTED } from './annualGis'
-import { annualOas } from './annualOas'
+import { annualGeneratedRetirementOas } from './annualOas'
 import { oasAfterClawback, OAS_CLAWBACK_THRESHOLD } from './benefits'
 import { annualCpp } from './annualCpp'
 import type { InputsV2 } from './model'
@@ -56,15 +56,21 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (!generated && age >= 71 && plan.accounts.some(a => a.kind === 'rrsp' && opening.byAccount[a.id].balance > 0)) return fail('unsupported', 'RRSP age-71 conversion rule not yet wired')
     if (age > plan.lifeExpectancy) return fail('invalid', 'year beyond plan horizon')
     if (!generated && (person.earnedIncome.status !== 'known' || person.earnedIncome.value !== 0)) return fail('unsupported', 'retirement wage evidence must be known zero')
-    // Recorded OAS/GIS settlement evidence, including an opted-in zero
-    // profile, still uses the existing age gate and is outside the zero-benefit
-    // RRIF slice. Explicit zero amounts without that opt-in remain eligible.
-    const oas = generated && plan.annualBenefitsEvidence ? annualOas(plan, person, age) : undefined
+    // Only authenticated retired solo state extends verified CPP/OAS to 74.
+    // Annual GIS retains its existing gate; opt-out zero benefits need no claim.
+    const oas = generated && plan.annualBenefitsEvidence ? annualGeneratedRetirementOas(plan, person, age, opening) : undefined
     if ((!generated && person.cppAnnualAt65 !== 0) || (!oas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'retirement pension or CPP work rules not yet wired')
     if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'retirement tax election not supported')
-    const cpp = generated && person.cppAnnualAt65 > 0 ? annualCpp(plan, person, age) : undefined
+    const cpp = generated && person.cppAnnualAt65 > 0 ? annualCpp(plan, person, age, opening) : undefined
+    // The newly admitted opted-in years must validate recorded absence too:
+    // a zero statement can be stale, and zero source rows still need unique,
+    // matching claim/provenance facts. Discard the validation-only quote so
+    // known-zero CPP keeps its existing no-receipt/no-cash settlement shape.
+    // Earlier years and the bare non-opt-in zero path retain their contract.
+    if (generated && oas && age >= 70 && age <= 74 && person.cppAnnualAt65 === 0)
+      annualCpp(plan, person, age, opening)
     if (plan.incomeSources.some(source => !(cpp && source.kind === 'cpp' && source.recipientId === person.id) && !(oas && source.kind === 'oas' && source.id === oas.sourceId) && (source.fromAge ?? -Infinity) <= age && (source.startAge ?? -Infinity) <= age && (source.toAge ?? Infinity) >= age && (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0))) return fail('unsupported', 'active retirement income source not yet wired')
     if (person.rrspUnusedUndeducted.status !== 'known' || person.rrspUnusedUndeducted.value !== 0) return fail('unsupported', 'retirement undeducted RRSP premiums require explicit zero evidence')
     if (plan.contributions.some(c => c.calendarYear < opening.year && c.deductionYear !== null && c.deductionYear >= opening.year && c.amount > 0)) return fail('unsupported', 'deferred retirement RRSP deductions not yet wired')
@@ -87,8 +93,16 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
           return fail('invalid', 'RRIF: malformed unknown pre-conversion factor metadata')
       }
     }
-    if (rrifSlice && (!generated || person.cppAnnualAt65 !== 0 || person.oasAnnualAt65 !== 0 || oas || cpp || plan.incomeSources.some(i => i.annualAmount.status !== "known" || i.annualAmount.value !== 0) || plan.accounts.some(a => !["rrsp", "tfsa"].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))) return fail("unsupported", "RRIF: requires generated ordinary owner accounts and explicit zero benefits without additional rules")
+    if (rrifSlice && (!generated || plan.incomeSources.some(i => !(cpp && i.kind === "cpp" && i.id === cpp.sourceId) && !(oas && i.kind === "oas" && i.id === oas.sourceId) && (i.annualAmount.status !== "known" || i.annualAmount.value !== 0)) || plan.accounts.some(a => !["rrsp", "tfsa"].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))) return fail("unsupported", "RRIF: requires generated ordinary owner accounts and verified excluded or supported public benefits without additional rules")
     if (registered && age > 71 && !conversion && opening.byAccount[registered.id].balance > 0) return fail("unsupported", "RRIF: missing generated age-71 rollover")
+    // Verified CRA rules (2026-11-24): direct transfer by end of age 71,
+    // no minimum in establishment year; following minimum uses opening FMV
+    // and owner age on January 1. RRIF payments at 65+ qualify for pension
+    // income credits; ordinary RRSP draws at 71 do not. Existing tax rules
+    // price those credits and candidate OAS recovery before nominal posting.
+    // https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/rrsps-related-plans/rrsp-options-when-you-turn-71/options-your-rrsps.html
+    // https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/registered-retirement-income-fund-rrif/receiving-income-a-rrif.html
+    // https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/completing-slips-summaries/t4rsp-t4rif-information-returns/payments/minimum-amount-a-rrif.html
     const taxPlan = conversion ? { ...plan, accounts: plan.accounts.map(a => a.id === registered!.id ? { ...a, kind: "rrif" as const, openedYear: { status: "known" as const, value: conversion.year }, rrifFactorCategory: { status: "known" as const, value: "allOther" as const }, rrifAgeElection: null } : a) } : plan
     const minimumReceipt = conversion ? minimumForRrif(taxPlan.accounts.find(a => a.id === registered!.id)!, plan.people, plan.baseYear, opening.year, opening.byAccount[registered!.id].balance) : undefined
     if (minimumReceipt && minimumReceipt.status !== "ok") return fail(minimumReceipt.status, minimumReceipt.reason)
