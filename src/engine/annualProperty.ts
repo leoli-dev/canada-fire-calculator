@@ -2,6 +2,41 @@ import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
 import type { AnnualState, YearRow } from './annualState'
 
+/** Only the authenticated household runner calls this guard. Title shares are
+ * recorded facts; no ownership is inferred from array order or account owners. */
+export function householdPassiveHomeProblem(plan: InputsV2): string | null {
+  if (!plan.properties.length) return null
+  const p = plan.properties[0]
+  const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
+  const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+  const source = own(p, 'provenance') && record(p.provenance) && own(p.provenance, 'value') ? p.provenance.value : undefined
+  if (!record(source) || !own(source, 'origin') || !['user', 'legacy'].includes(source.origin as string) ||
+      !own(source, 'sourceYear') || !(source.sourceYear === null || typeof source.sourceYear === 'number' && Number.isInteger(source.sourceYear)) ||
+      !(source.note === undefined || own(source, 'note') && typeof source.note === 'string'))
+    return 'household passive home requires recorded property value provenance'
+  const title = p.taxableOwnerShares
+  const owners = plan.people.map(person => person.id)
+  const shares = record(title) && own(p, 'taxableOwnerShares') && own(title, 'status') && title.status === 'known' && own(title, 'shares') && record(title.shares)
+    ? Object.entries(title.shares) : []
+  // The split form divides each recorded amount independently. Permit only
+  // floating-point roundoff around a normalized two-person split; retain the
+  // recorded shares unchanged. A whole owner cannot have a positive co-owner,
+  // even if their combined share rounds back to one.
+  const total = shares.reduce((sum, [, share]) => sum + (share as number), 0)
+  const soleOwner = shares.filter(([, share]) => share === 1).length === 1 && shares.every(([, share]) => share === 0 || share === 1)
+  const splitOwners = shares.length === 2 && shares.every(([, share]) => typeof share === 'number' && share > 0 && share < 1) && Math.abs(total - 1) <= Number.EPSILON
+  if (plan.people.length !== 2 || plan.people.filter(person => person.role === 'self').length !== 1 ||
+      plan.people.filter(person => person.role === 'partner').length !== 1 || plan.province !== 'ON' ||
+      plan.properties.length !== 1 || plan.debts.length || p.kind !== 'principal' ||
+      p.plannedPurchaseAge !== null || p.plannedDownPayment !== null || p.plannedMortgage !== null || p.mortgageDebtId !== null ||
+      p.annualHoldingCostChange !== 0 || !own(p, 'annualRent') || !record(p.annualRent) ||
+      !own(p.annualRent, 'status') || !own(p.annualRent, 'value') || p.annualRent.status !== 'known' || p.annualRent.value !== 0 ||
+      !shares.length || shares.some(([id, share]) => !owners.includes(id) || typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) ||
+      !(soleOwner || splitOwners))
+    return 'household passive home requires one wholly household-owned held primary residence without debt, rent, purchase or holding cost changes'
+  return null
+}
+
 /** Passive home only. Current housing costs remain in verified total spending. */
 export function passiveHomeProblem(plan: InputsV2): string | null {
   if (!plan.properties.length) return null
