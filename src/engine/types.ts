@@ -392,7 +392,18 @@ export interface TaxBySource {
   pension: number
 }
 
+/** Year-scoped capability facts, independent of the accepted tax pricing method. */
+export type AnnualTaxLimitationCode = 'nonRegLoss' | 'investmentPropertySale'
+  | 'saleExpensesExceedValue' | 'propertyDisposalBasis' | 'workingRrifMinimum'
+  | 'rrifMinimumUnconfirmed' | 'multipleRegisteredAccounts' | 'personTaxUnsupported'
+  | 'propertyCashSettlement' | 'saleLienTaxEstimate'
+export interface AnnualTaxLimitation {
+  code: AnnualTaxLimitationCode
+  eventId?: string
+  field?: string
+}
 export interface LegacyAnnualDetails {
+  taxLimitations: AnnualTaxLimitation[]
   year: number
   factor: number
   openingFactor: number

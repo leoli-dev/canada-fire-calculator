@@ -1,6 +1,7 @@
 import {
   ACCOUNT_TYPES,
   type AccountType,
+  type AnnualTaxLimitationCode,
   type Inputs,
   type Phase,
   type ProjectionResult,
@@ -528,6 +529,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     const positions = () => ({ ...bal, fhsa: fhsaBal, locked: lockedBal,
       property: prValue + ips.reduce((sum, p) => sum + p.value, 0) })
     const detail = options?.captureAnnualDetails ? {
+      taxLimitations: [] as NonNullable<YearRow['annualDetails']>['taxLimitations'],
       year: baseCalendarYear + yearIdx, factor,
       taxRules: taxRuleProvenance(rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
       openingFactor: nominalFactor(inflation, Math.max(0, yearIdx - 1)),
@@ -542,6 +544,14 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       cash: null as NonNullable<YearRow['annualDetails']>['cash'],
       hbp: { due: 0, repaid: 0, unpaidTax: 0 }, workingSavings: null as number | null,
     } : undefined
+    const noteTaxLimit = (code: AnnualTaxLimitationCode, source?: { eventId?: string; field?: string }) => {
+      if (detail && !detail.taxLimitations.some(item => item.code === code && item.eventId === source?.eventId && item.field === source?.field))
+        detail.taxLimitations.push({ code, ...source })
+    }
+    // The run summary retains its original first-failure semantics. Only
+    // an actual working year with a live RRIF pool gets this annual fact.
+    if (detail && phase === 'accumulation' && bal.rrsp > 0 && canonical?.accounts.some(account => account.kind === 'rrif' && account.balance > 0))
+      noteTaxLimit('workingRrifMinimum')
     const propertyHeldAtOpening = detail ? { residence: prValue > 0, investments: ips.map(p => p.value > 0) } : undefined
     const recordFunding = (eventId: string, field: string, allocation: PurchaseAllocation) => {
       if (detail) detail.funding.push({ eventId, field, allocation: { ...allocation, balances: { ...allocation.balances }, grossWithdrawals: { ...allocation.grossWithdrawals } } })
@@ -568,8 +578,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     // A purchase or housing-funding disposal can realize an unverified loss in
     // either phase; the funding planner reports it so no year's tax is called
     // exact when the loss treatment is unknown.
-    const noteFundingLoss = (allocation: { nonRegLossRealized?: boolean } | null | undefined) => {
+    const noteFundingLoss = (allocation: { nonRegLossRealized?: boolean } | null | undefined, source: { eventId: string; field: string }) => {
       if (!allocation?.nonRegLossRealized) return
+      noteTaxLimit('nonRegLoss', source)
       taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
       nonRegLossTaxUnverified = true
     }
@@ -617,7 +628,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         else if (plan.allocation) {
           recordFunding(`purchase:${age}`, 'principalResidence.downPayment', plan.allocation)
           Object.assign(bal, plan.allocation.balances)
-          noteFundingLoss(plan.allocation)
+          noteFundingLoss(plan.allocation, { eventId: `purchase:${age}`, field: 'principalResidence.downPayment' })
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax = plan.allocation.withdrawalTax
           purchaseNonRegTaxable = plan.allocation.nonRegTaxable
@@ -650,7 +661,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         else if (plan.allocation) {
           recordFunding(`purchase:${age}`, 'principalResidence.downPayment', plan.allocation)
           Object.assign(bal, plan.allocation.balances)
-          noteFundingLoss(plan.allocation)
+          noteFundingLoss(plan.allocation, { eventId: `purchase:${age}`, field: 'principalResidence.downPayment' })
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           purchaseTaxable = plan.allocation.taxableWithdrawal
           purchaseTaxPaid = plan.allocation.withdrawalTax
@@ -708,7 +719,9 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (plan.allocation) {
           recordFunding(`sale:${age}:${field}`, field, plan.allocation)
           Object.assign(bal, plan.allocation.balances)
-          noteFundingLoss(plan.allocation)
+          noteFundingLoss(plan.allocation, { eventId: `sale:${age}:${field}`, field })
+          if (phase !== 'accumulation' && plan.allocation.taxableWithdrawal > 0)
+            noteTaxLimit('saleLienTaxEstimate', { eventId: `sale:${age}:${field}`, field })
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           if (phase === 'accumulation') dpAccumTax += plan.allocation.withdrawalTax
           else {
@@ -736,15 +749,21 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     for (let propertyIdx = 0; propertyIdx < ips.length; propertyIdx++) {
       const p = ips[propertyIdx]
       if (p.sellAtAge !== null && age >= p.sellAtAge && p.value > 0) {
+        noteTaxLimit('investmentPropertySale', { eventId: `sale:${age}:investmentProperties.${propertyIdx}.sellAtAge`, field: `investmentProperties.${propertyIdx}.sellAtAge` })
         investmentSaleTaxUnsupported = true
         taxUnsupportedReason ??= 'investment-property sale requires verified building/land and CCA tax facts'
-        if (p.saleExpenses > p.value)
+        if (p.saleExpenses > p.value) {
+          noteTaxLimit('saleExpensesExceedValue', { field: `investmentProperties.${propertyIdx}.saleExpenses` })
           taxUnsupportedReason ??= 'projected selling expenses exceed property value'
+        }
         const effectiveExpenses = Math.min(p.saleExpenses, p.value)
         const sale = yearStartSale(p.value - effectiveExpenses, p.mortgage, yearIdx)
         const disposal = disposeHolding({ marketValue: toNominal(p.value, factor), acb: p.acb },
           toNominal(p.value, factor), toNominal(effectiveExpenses, factor))
-        if (disposal.status !== 'ok') taxUnsupportedReason ??= disposal.reason
+        if (disposal.status !== 'ok') {
+          noteTaxLimit('propertyDisposalBasis', { field: `investmentProperties.${propertyIdx}.acb` })
+          taxUnsupportedReason ??= disposal.reason
+        }
         // The legacy cash preview can still run, but a loss without verified
         // CCA/land-building and superficial-loss facts is not a tax deduction.
         const gain = disposal.status === 'ok' ? toReal(disposal.value.gain * CAPITAL_GAINS_INCLUSION, factor) : 0
@@ -786,7 +805,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       if (plan.allocation) {
         recordFunding(`sale:${age}:tax:${obligation.propertyIdx}`, `investmentProperties.${obligation.propertyIdx}.sellAtAge`, plan.allocation)
         Object.assign(bal, plan.allocation.balances)
-        noteFundingLoss(plan.allocation)
+        noteFundingLoss(plan.allocation, { eventId: `sale:${age}:tax:${obligation.propertyIdx}`, field: `investmentProperties.${obligation.propertyIdx}.sellAtAge` })
         nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
         savingsAfterSaleTax -= plan.allocation.firstYearCostFromSavings
         freeSavingsForSaleTax -= plan.allocation.firstYearCostFromSavings
@@ -913,7 +932,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         })
         if (plan.allocation) {
           Object.assign(bal, plan.allocation.balances)
-          noteFundingLoss(plan.allocation)
+          noteFundingLoss(plan.allocation, { eventId: `purchase:${age}`, field: 'principalResidence.annualMortgagePayment' })
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
           dpAccumTax += plan.allocation.withdrawalTax
           purchaseNonRegTaxable += plan.allocation.nonRegTaxable
@@ -955,7 +974,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (funding.allocation) {
           recordFunding(`hbp:${age}`, 'principalResidence.hbp', funding.allocation)
           Object.assign(bal, funding.allocation.balances)
-          noteFundingLoss(funding.allocation)
+          noteFundingLoss(funding.allocation, { eventId: `hbp:${age}`, field: 'principalResidence.hbp' })
           nonRegBook = toNominal(funding.allocation.nonRegBook, factor)
           dpAccumTax += funding.allocation.withdrawalTax
           purchaseNonRegTaxable += funding.allocation.nonRegTaxable
@@ -1058,6 +1077,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
             canonical.baseYear + yearIdx, bal.rrsp)
           if (minimum.status === 'ok') rrifMin = minimum.amount
           else {
+            noteTaxLimit('rrifMinimumUnconfirmed')
             taxUnsupportedReason ??= minimum.reason
             // Do not invent a mandatory withdrawal from the legacy factor
             // when the actual RRIF category/factor is unconfirmed.
@@ -1067,7 +1087,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           // Keep the old cash preview until the user confirms a legal
           // conversion. The person-tax capability gate rejects age 72+.
         }
-        else if (registered.length > 1) taxUnsupportedReason ??= 'multiple registered accounts need BE-14 B funding allocation'
+        else if (registered.length > 1) {
+          noteTaxLimit('multipleRegisteredAccounts')
+          taxUnsupportedReason ??= 'multiple registered accounts need BE-14 B funding allocation'
+        }
       }
       const forcedRrsp = Math.min(bal.rrsp, rrifMin)
       // bracket-capped meltdown: the RRSP funds spending first, but only as
@@ -1133,14 +1156,20 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       // double-count. An unsupported year returns no ledger and leaves it
       // untouched rather than fabricating an attribution.
       if (out.spousalAttribution) spousalAttribution = out.spousalAttribution
-      if (out.taxUnsupportedReason) taxUnsupportedReason ??= out.taxUnsupportedReason
+      if (out.taxUnsupportedReason) {
+        noteTaxLimit('personTaxUnsupported')
+        taxUnsupportedReason ??= out.taxUnsupportedReason
+      }
       byPersonTax = out.byPersonTax
       if (nonRegLossPreview && out.withdrawals.nonReg > 1) {
+        noteTaxLimit('nonRegLoss', { field: 'balances.nonReg' })
         taxUnsupportedReason ??= 'non-registered capital loss needs superficial-loss confirmation and owner-specific carry'
         nonRegLossTaxUnverified = true
       }
-      if (canonical && (saleGainsTaxable || purchaseTaxable || purchaseNonRegTaxable || rentMortgageInterest))
+      if (canonical && (saleGainsTaxable || purchaseTaxable || purchaseNonRegTaxable || rentMortgageInterest)) {
+        noteTaxLimit('propertyCashSettlement')
         taxUnsupportedReason ??= 'property sale, purchase or rental mortgage tax needs BE-14 B event settlement'
+      }
       withdrawals = out.withdrawals
       yearTaxPeople = out.taxPeople
       tax = out.tax

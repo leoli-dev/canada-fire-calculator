@@ -10,6 +10,7 @@ import households from './fixtures/households.json'
 import audit from './fixtures/pending-audit.json'
 import propertySales from './fixtures/property-sales.json'
 import { annualSheetUnderwaterSale } from './fixtures/annualSheetUnderwaterSale'
+import { annualSheetLossPurchase, annualSheetLossWithdrawal, annualSheetZeroGainPropertySale } from './fixtures/annualSheetCapitalLimits'
 
 const cash = households.households[1].inputs as Inputs
 const purchase = audit.cases.find((entry) => entry.id === 'P03')!.inputs as Inputs
@@ -350,9 +351,12 @@ describe('FE-53 household annual telemetry', () => {
     expect(result.taxCapability?.status).toBe('legacyEstimate')
     const saleYear = sheet.baseYear
     const eventId = 'sale:60:principalResidence.sellAtAge'
-    expect(result.rows[0].annualDetails?.funding).toContainEqual(expect.objectContaining({
-      eventId, field: 'principalResidence.sellAtAge',
-    }))
+    const saleFunding = result.rows[0].annualDetails?.funding.find(entry => entry.eventId === eventId)
+    expect(saleFunding?.field).toBe('principalResidence.sellAtAge')
+    expect(saleFunding?.allocation.taxableWithdrawal).toBeGreaterThan(0)
+    expect(result.rows[0].annualDetails?.taxLimitations).toContainEqual({
+      code: 'saleLienTaxEstimate', eventId, field: 'principalResidence.sellAtAge',
+    })
     const funding = row(`funding.${eventId}.withdrawalTax`).cells![saleYear]
     const eventExplanation = sheet.resolveExplanation?.(funding.explanationRefs![0])
     expect(eventExplanation?.sources).toContainEqual(expect.objectContaining({
@@ -365,9 +369,29 @@ describe('FE-53 household annual telemetry', () => {
       expect(result.rows[index].tax).toBeCloseTo(9_171.64, 2)
       expect(Object.values(result.rows[index].byPersonTax ?? {}).map(person => person.tax))
         .toEqual([expect.closeTo(9_171.64, 2)])
+      expect(result.rows[index].annualDetails?.taxLimitations).toEqual([])
       expect(limitations(saleYear + index)).not.toMatch(/household tax estimate|sale|lien/i)
     }
     expect(limitations(saleYear)).toMatch(/sale-lien funding.*legacy household tax estimate/i)
+  })
+
+  it('omits the sale-lien tax caveat when the same underwater lien is funded from TFSA', () => {
+    const inputs: Inputs = {
+      ...annualSheetUnderwaterSale,
+      balances: { ...annualSheetUnderwaterSale.balances, tfsa: 100_000 },
+    }
+    const { result, sheet, row } = observe(inputs, refreshCanonicalFromLegacy(null, inputs))
+    expect(validateInputs(inputs).filter(issue => issue.severity === 'error')).toEqual([])
+    const saleYear = result.rows[0]
+    expect(saleYear.annualDetails?.funding).toContainEqual(expect.objectContaining({
+      eventId: 'sale:60:principalResidence.sellAtAge',
+      allocation: expect.objectContaining({ grossWithdrawals: { tfsa: 100_000, rrsp: 0, nonReg: 0 }, taxableWithdrawal: 0 }),
+    }))
+    expect(saleYear.withdrawals.rrsp).toBeGreaterThan(0)
+    expect(saleYear.annualDetails?.taxLimitations).toEqual([])
+    const tax = row('tax').cells![sheet.baseYear]
+    const explanation = sheet.resolveExplanation?.(tax.explanationRefs![0])!
+    expect(explanation.limitations ?? []).toEqual([])
   })
 
   it('omits the simplified Quebec estimate notice when a couple estate is unsupported', () => {
@@ -385,6 +409,63 @@ describe('FE-53 household annual telemetry', () => {
       expect(explanation).toBeDefined()
       expect(explanation?.limitations?.map(limit => annualSheetText(limit, 'en')).join(' ') ?? '')
         .not.toMatch(/simplified Quebec rules/i)
+    }
+  })
+
+  it.each([
+    { name: 'retirement withdrawal realizing a non-registered capital loss', inputs: annualSheetLossWithdrawal, affected: 60, clean: 65,
+      limit: 'nonRegisteredLoss', fact: { code: 'nonRegLoss', field: 'balances.nonReg' },
+      labels: [/non-registered disposal.*loss/i, /cession non enregistrée.*perte/i, /非注册资产处置.*亏损/] },
+    { name: 'purchase funded from non-registered assets at a loss', inputs: annualSheetLossPurchase, affected: 61, clean: 62,
+      limit: 'nonRegisteredLoss', fact: { code: 'nonRegLoss', eventId: 'purchase:61', field: 'principalResidence.downPayment' },
+      labels: [/non-registered disposal.*loss/i, /cession non enregistrée.*perte/i, /非注册资产处置.*亏损/] },
+    { name: 'investment-property sale without a taxable gain', inputs: annualSheetZeroGainPropertySale, affected: 61, clean: 62,
+      limit: 'investmentPropertySale', fact: { code: 'investmentPropertySale', eventId: 'sale:61:investmentProperties.0.sellAtAge', field: 'investmentProperties.0.sellAtAge' },
+      labels: [/building|land|CCA/i, /bâtiment|terrain|DPA/i, /土地|建筑|CCA/] },
+  ] as const)('keeps the annual caveat for $name with accepted person tax', ({ inputs, affected, clean, limit, fact, labels }) => {
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    const defaultRun = runProjection(inputs, undefined, canonical)
+    const { result, sheet, row } = observe(inputs, canonical)
+    expect(validateInputs(inputs).filter(issue => issue.severity === 'error')).toEqual([])
+    expect(result.capitalTaxLimit).toBe(limit)
+    expect({ ...result, rows: result.rows.map(({ annualDetails: _details, ...year }) => year) }).toStrictEqual(defaultRun)
+    const finding = result.rows.find(year => year.age === affected)!
+    const following = result.rows.find(year => year.age === clean)!
+    expect(finding.annualDetails?.taxLimitations).toContainEqual(fact)
+    expect(following.annualDetails?.taxLimitations).toEqual([])
+    for (const year of [finding, following]) {
+      const ledger = Object.values(year.byPersonTax ?? {})
+      expect(ledger).toHaveLength(1)
+      expect(ledger[0].tax).toBeCloseTo(year.tax, 2)
+    }
+    if (inputs === annualSheetLossWithdrawal) {
+      expect(finding.withdrawals.nonReg).toBeCloseTo(40_000, 2)
+      expect(following.withdrawals.nonReg).toBe(0)
+      expect(following.withdrawals.rrsp).toBeGreaterThan(40_000)
+    } else if (inputs === annualSheetLossPurchase) {
+      expect(finding.purchaseFunding?.grossWithdrawals.nonReg).toBeCloseTo(100_000, 2)
+      expect(following.withdrawals.nonReg).toBe(0)
+    } else {
+      expect(finding.annualDetails?.sales[0]?.proceeds).toBeCloseTo(200_000, 2)
+      expect(finding.taxableBySource.property).toBe(0)
+      expect(following.annualDetails?.sales).toEqual([])
+    }
+    const explainTax = (age: number) => {
+      const year = sheet.baseYear + age - inputs.currentAge
+      const tax = row('tax').cells![year]
+      return sheet.resolveExplanation?.(tax.explanationRefs![0])!
+    }
+    const affectedTax = explainTax(affected)
+    const source = affectedTax.sources?.find(item => item.code === fact.code)
+    expect(source?.field).toBe(fact.field)
+    if ('eventId' in fact) expect(source?.id).toBe(fact.eventId)
+    expect(explainTax(clean).limitations ?? []).toEqual([])
+    if (affected > inputs.currentAge) expect(explainTax(inputs.currentAge).limitations ?? []).toEqual([])
+    for (const [index, language] of ['en', 'fr', 'zh'].entries()) {
+      const localized = affectedTax.limitations?.map(item => annualSheetText(item, language)).join(' ') ?? ''
+      expect(localized).toMatch(labels[index])
+      expect(localized).not.toMatch(/nonRegLoss|nonRegisteredLoss|investmentPropertySale|BE-\d+/)
+      expect(localized).not.toContain(result.taxCapability!.reason!)
     }
   })
 

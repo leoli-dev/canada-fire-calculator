@@ -104,14 +104,48 @@ test('French underwater-sale details show the event label without its technical 
   const technicalId = 'sale:60:principalResidence.sellAtAge'
   const event = dialog.getByRole('button', { name: /Résidence principale.*Financement d’événement enregistré/ })
   await expect(event).toHaveAttribute('aria-expanded', 'false')
-  await expect(event).toHaveAccessibleName("Résidence principale: Financement d’événement enregistré")
+  await expect(event).toHaveAccessibleName('Résidence principale: Financement d’événement enregistré: Année 2026')
   await event.click()
   await dialog.getByRole('button', { name: /Examiner la ligne:.*Financement de libération à la vente.*Impôt sur retraits/ }).click()
   const detail = dialog.getByRole('complementary', { name: 'Détails de la cellule' })
   await expect(detail.getByText(/^Sources:/)).toContainText('Résidence principale (Événement)')
+  await expect(detail.getByText(/^Limites:.*financement de libération.*estimation fiscale héritée/i)).toBeVisible()
   await expect(dialog).not.toContainText(technicalId)
   await expect(dialog.locator(`[title*="${technicalId}"]`)).toHaveCount(0)
 })
+
+for (const locale of [
+  { button: 'FR', opener: 'Détails financiers annuels', dialog: 'Estimation annuelle du ménage',
+    year: 'Aller à une année', tax: 'Examiner la ligne: Impôt modélisé', details: 'Détails de la cellule',
+    hide: 'Masquer les détails', caveat: /^Limites:.*(?:bâtiment|terrain|DPA)/i },
+  { button: '中文', opener: '逐年财务明细', dialog: '家庭汇总年度估算',
+    year: '跳转年份', tax: '查看行详情: 模型税额', details: '单元格详情',
+    hide: '收起详情', caveat: /^已知限制:.*(?:土地|建筑|CCA)/ },
+]) {
+  test(`zero-gain property sale caveat applies only to the sale year in ${locale.button}`, async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(async () => {
+      const { annualSheetZeroGainPropertySale: inputs } = await import('/src/engine/__tests__/fixtures/annualSheetCapitalLimits.ts')
+      const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+      const canonical = refreshCanonicalFromLegacy(null, inputs)
+      localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
+    })
+    await page.reload()
+    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await page.getByRole('button', { name: locale.opener, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: locale.dialog })
+    const year = dialog.getByRole('combobox', { name: locale.year })
+    const detail = dialog.getByRole('complementary', { name: locale.details })
+    await year.selectOption('2027')
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.tax}.*2027$`) }).click()
+    await expect(detail.getByText(locale.caveat)).toBeVisible()
+    await expect(detail).not.toContainText(/investment-property sale requires|investmentPropertySale|BE-\d+/)
+    await detail.getByRole('button', { name: locale.hide, exact: true }).click()
+    await year.selectOption('2028')
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.tax}.*2028$`) }).click()
+    await expect(detail.getByText(locale.caveat)).toHaveCount(0)
+  })
+}
 
 async function openSheet(page: Page, query = '') {
   await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html${query}`)
