@@ -23,7 +23,12 @@ import { budgetFacts, cashBudget } from './budgetSemantics'
 import { annualTfsaAdditionFor, plannedTfsaLines, tfsaRoomYear, tfsaStatement, type TfsaRoomYear } from './tfsaRoom'
 
 /** Nominal CAD throughout. A snapshot is an owned value; evaluators receive copies. */
+export interface RrifConversion { year: number; ownerId: string; amount: number; factorCategory: "allOther"; ageBasis: "owner"; provenance: "generated-owner-rrsp-rollover" }
+export interface RrifSettlement { accountId: string; conversion: RrifConversion; openingBalance: number; ageAtYearStart: number; factor: number; minimum: number; withdrawal: number; discretionary: number; incomeKind: "rrspWithdrawal" | "rrifWithdrawal" }
+export const rrifConversionFor = (state: AnnualState, id: string): RrifConversion | undefined =>
+  state.rrifConversions && Object.prototype.hasOwnProperty.call(state.rrifConversions, id) ? state.rrifConversions[id] : undefined
 export interface AnnualState {
+  rrifConversions?: Record<string, RrifConversion>
   year: number
   baseYear: number
   byPerson: Record<string, { age: number; retirementAge: number; previousYearEarnedIncome: Known<number>; rrspRoom: Known<number>; tfsaRoom: Known<number>
@@ -67,10 +72,10 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
-  byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  byAccount: Record<string, { openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
@@ -145,10 +150,16 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
 }
 
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
-export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
+export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedBasis?: AnnualState): string | null {
   try {
     if (opening.gisAssessmentLag && (Object.keys(opening.gisAssessmentLag).some(id => !plan.people.some(p => p.id === id)) || Object.values(opening.gisAssessmentLag).some(fact => !validGisBasis(fact, opening.year)))) return 'GIS assessment snapshot year or evidence'
     if (opening.year === plan.baseYear && opening.gisAssessmentLag && Object.keys(opening.gisAssessmentLag).length) return 'GIS initial historical assessment unsupported'
+    if (opening.rrifConversions !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis))) return 'RRIF conversion receipts require authenticated generated retirement'
+    for (const [id, receipt] of Object.entries(opening.rrifConversions ?? {})) {
+      const account = plan.accounts.find(a => a.id === id)
+      const owner = plan.people.find(p => p.id === receipt.ownerId)
+      if (!account || account.kind !== "rrsp" || account.ownerId !== receipt.ownerId || !owner || receipt.year !== plan.baseYear + 71 - owner.ageInBaseYear || receipt.year >= opening.year || receipt.year < plan.baseYear || !finiteNonnegative(receipt.amount) || receipt.factorCategory !== "allOther" || receipt.ageBasis !== "owner" || receipt.provenance !== "generated-owner-rrsp-rollover") return "RRIF conversion receipt"
+    }
     const self = plan.people.find(person => person.role === 'self')!
     if (!Number.isInteger(opening.year) || opening.year < plan.baseYear || opening.baseYear !== plan.baseYear) return 'snapshot year/base mismatch'
     if (opening.year > plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return 'year beyond plan horizon'
@@ -171,14 +182,14 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | 
     if (plan.people.some(person => opening.byPerson[person.id].age !== ageReachedInYear(person, plan.baseYear, opening.year) ||
         opening.byPerson[person.id].retirementAge !== person.retirementAge) ||
         plan.dependents.some(dependent => opening.byDependent[dependent.id].age !== dependent.ageInBaseYear + opening.year - plan.baseYear) ||
-        plan.accounts.some(account => opening.byAccount[account.id].kind !== account.kind || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
+        plan.accounts.some(account => opening.byAccount[account.id].kind !== (rrifConversionFor(opening, account.id) ? "rrif" : account.kind) || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
     // A never executes purchase/sale or changes opening-year facts. A candidate
     // cannot claim the property was acquired or a missing statement was verified.
     if (plan.properties.some(property => opening.byProperty[property.id].held !== (property.plannedPurchaseAge === null) ||
         !sameKnown(opening.byProperty[property.id].acb, property.acb)) ||
         plan.debts.some(debt => opening.byDebt[debt.id].annualPayment !== debt.annualPayment ||
           opening.byDebt[debt.id].propertyId !== debt.propertyId) ||
-        plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].openedYear, account.openedYear))) return 'snapshot event or opening fact'
+        plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].openedYear, rrifConversionFor(opening, account.id) ? { status: "known", value: rrifConversionFor(opening, account.id)!.year } : account.openedYear))) return 'snapshot event or opening fact'
     const priorContributions = plan.contributions.filter(contribution => contribution.calendarYear < plan.baseYear)
     if (opening.year === plan.baseYear && (
       plan.accounts.some(account => opening.byAccount[account.id].balance !== account.balance ||
@@ -476,8 +487,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const rrspDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'rrsp')
   if (allocation.voluntary.rrsp > 0 && rrspDestinations.length !== 1) return fail('unsupported', 'ambiguous rrsp contribution destination')
   const nonRegDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'nonReg')
-  const accountRows: YearRow['byAccount'] = {}
-  for (const [id, account] of Object.entries(state.byAccount)) accountRows[id] = { opening: account.balance, contribution: 0, withdrawal: 0, returnAmount: 0, closing: account.balance, acb: clone(account.acb), ownerId: account.ownerId }
+  const accountRows: YearRow['byAccount'] = Object.fromEntries(Object.entries(state.byAccount).map(([id, account]) => [id, {
+    opening: account.balance, contribution: 0, withdrawal: 0, returnAmount: 0, closing: account.balance, acb: clone(account.acb), ownerId: account.ownerId,
+  }]))
   for (const contribution of recurring) {
     // An FHSA recurring row is not paid here: `resolveYearAllocation` already
     // carved it out of the year's savings, and the participation-room ledger
