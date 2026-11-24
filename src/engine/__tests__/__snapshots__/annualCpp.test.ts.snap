@@ -1,0 +1,225 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`canonical Ontario CPP starts > keeps a true zero-CPP plan on the pre-S2 cash, account and tax baseline 1`] = `
+[
+  {
+    "byAccount": {
+      "retiree-rrsp": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 61200,
+        "contribution": 0,
+        "opening": 60000,
+        "ownerId": "retiree",
+        "returnAmount": 1200.0000000000011,
+        "withdrawal": 0,
+      },
+      "retiree-tfsa": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 1020,
+        "contribution": 0,
+        "opening": 1000,
+        "ownerId": "retiree",
+        "returnAmount": 20.000000000000018,
+        "withdrawal": 0,
+      },
+    },
+    "byPerson": {
+      "retiree": {
+        "age": 59,
+        "benefits": 0,
+        "earnedIncome": 40000,
+        "income": 40000,
+        "spending": 0,
+        "tax": 4362.711125,
+        "taxableIncome": 39635,
+      },
+      "working-partner": {
+        "age": 59,
+        "benefits": 0,
+        "earnedIncome": 80000,
+        "income": 80000,
+        "spending": 0,
+        "tax": 14127.853939999999,
+        "taxableIncome": 79073,
+      },
+    },
+    "cashLedger": {
+      "benefits": 0,
+      "debtPayments": 0,
+      "employeeContributions": 0,
+      "employerContributions": 0,
+      "fhsaContributions": 0,
+      "income": 120000,
+      "retainedContributions": 0,
+      "spending": 93116.164935,
+      "tax": 18490.565065,
+      "unallocated": 0,
+      "voluntaryContributions": 0,
+    },
+    "payrollContributions": 8393.27,
+    "taxLedger": {
+      "retiree": {
+        "tax": 4362.711125,
+        "taxableIncome": 39635,
+      },
+      "working-partner": {
+        "tax": 14127.853939999999,
+        "taxableIncome": 79073,
+      },
+    },
+    "year": 2026,
+  },
+  {
+    "byAccount": {
+      "retiree-rrsp": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 47858.4,
+        "contribution": 0,
+        "opening": 61200,
+        "ownerId": "retiree",
+        "returnAmount": 938.4000000000009,
+        "withdrawal": 14279.999999999998,
+      },
+      "retiree-tfsa": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 1040.4,
+        "contribution": 0,
+        "opening": 1020,
+        "ownerId": "retiree",
+        "returnAmount": 20.40000000000002,
+        "withdrawal": 0,
+      },
+    },
+    "byPerson": {
+      "retiree": {
+        "age": 60,
+        "benefits": 0,
+        "earnedIncome": 0,
+        "income": 0,
+        "spending": 0,
+        "tax": 52.07660999999994,
+        "taxableIncome": 14279.999999999998,
+      },
+      "working-partner": {
+        "age": 60,
+        "benefits": 0,
+        "earnedIncome": 81600,
+        "income": 81600,
+        "spending": 0,
+        "tax": 14410.4110188,
+        "taxableIncome": 80654.46,
+      },
+    },
+    "cashLedger": {
+      "benefits": 0,
+      "debtPayments": 0,
+      "employeeContributions": 0,
+      "employerContributions": 0,
+      "fhsaContributions": 0,
+      "income": 81600,
+      "retainedContributions": 0,
+      "spending": 75736.6019712,
+      "tax": 14462.4876288,
+      "unallocated": 0,
+      "voluntaryContributions": 0,
+    },
+    "payrollContributions": 5680.9104,
+    "taxLedger": {
+      "retiree": {
+        "tax": 52.07660999999994,
+        "taxableIncome": 14279.999999999998,
+      },
+      "working-partner": {
+        "tax": 14410.4110188,
+        "taxableIncome": 80654.46,
+      },
+    },
+    "year": 2027,
+  },
+  {
+    "byAccount": {
+      "retiree-rrsp": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 20839.037194806675,
+        "contribution": 0,
+        "opening": 47858.4,
+        "ownerId": "retiree",
+        "returnAmount": 408.6085724471901,
+        "withdrawal": 27427.971377640515,
+      },
+      "retiree-tfsa": {
+        "acb": {
+          "status": "known",
+          "value": 0,
+        },
+        "closing": 1061.208,
+        "contribution": 0,
+        "opening": 1040.4,
+        "ownerId": "retiree",
+        "returnAmount": 20.80800000000002,
+        "withdrawal": 0,
+      },
+    },
+    "byPerson": {
+      "retiree": {
+        "age": 61,
+        "benefits": 0,
+        "earnedIncome": 0,
+        "income": 0,
+        "spending": 0,
+        "tax": 2458.371377640518,
+        "taxableIncome": 27427.971377640515,
+      },
+      "working-partner": {
+        "age": 61,
+        "benefits": 0,
+        "earnedIncome": 0,
+        "income": 0,
+        "spending": 0,
+        "tax": 0,
+        "taxableIncome": 0,
+      },
+    },
+    "cashLedger": {
+      "benefits": 0,
+      "debtPayments": 0,
+      "employeeContributions": 0,
+      "employerContributions": 0,
+      "fhsaContributions": 0,
+      "income": 0,
+      "retainedContributions": 0,
+      "spending": 24969.6,
+      "tax": 2458.371377640518,
+      "unallocated": 0,
+      "voluntaryContributions": 0,
+    },
+    "payrollContributions": 0,
+    "taxLedger": {
+      "retiree": {
+        "tax": 2458.371377640518,
+        "taxableIncome": 27427.971377640515,
+      },
+      "working-partner": {
+        "tax": 0,
+        "taxableIncome": 0,
+      },
+    },
+    "year": 2028,
+  },
+]
+`;
