@@ -12,6 +12,8 @@ import { PLAN_TAX_YEAR, type TaxRuleProvenance } from './tax'
 export interface WorkingSpendingEvidence {
   workingSpending: Known<number>
   retirementSpending: Known<number>
+  /** Explicit household total for years with one retired and one working member. */
+  transitionSpending?: Known<number>
 }
 
 export interface CanonicalWorkingEvaluation {
@@ -32,6 +34,92 @@ export interface CanonicalWorkingEvaluation {
    * Net allocation cash is netCash, after BOTH income tax and payroll. */
   evaluation: AnnualEvaluation
   overallConclusionAvailable: false
+}
+
+export interface CanonicalHouseholdWorkingEvaluation extends Omit<CanonicalWorkingEvaluation, 'personId' | 'age' | 'payrollReal' | 'suppliedInputs'> {
+  household: {
+    phase: 'both-working' | 'mixed'
+    spending: number
+    spendingReal: number
+    spendingSource: 'workingSpending' | 'transitionSpending'
+    byPerson: Record<string, { phase: 'working' | 'retired'; grossWagesReal: number; payrollReal: PayrollDeductions | null }>
+  }
+}
+export type ContinuousWorkingEvaluation = CanonicalWorkingEvaluation | CanonicalHouseholdWorkingEvaluation
+
+/** Internal household pricing companion. No withdrawal or contribution recipient
+ * is inferred: this first settlement scope accepts genuine zero residual only. */
+export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: WorkingSpendingEvidence, year: number): KernelResult<CanonicalHouseholdWorkingEvaluation> {
+  try {
+    const initialized = initializeState(plan)
+    if (initialized.status !== 'ok') return initialized
+    if (plan.people.length !== 2 || plan.province !== 'ON' || plan.baseYear !== PLAN_TAX_YEAR || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'household working pricing requires two-person Ontario incomeBudget at tax anchor')
+    if (!Number.isInteger(year) || year < plan.baseYear) return fail('invalid', 'household working year')
+    const active = plan.people.filter(p => ageReachedInYear(p, plan.baseYear, year) < p.retirementAge)
+    if (!active.length) return fail('unsupported', 'both-retired household settlement not yet wired')
+    for (const key of ['workingSpending', 'retirementSpending'] as const) {
+      const fact = evidence[key]
+      if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${key}`)
+      if (!safeMoney(fact.value) || fact.value !== plan.budget[key]) return fail('invalid', `working spending evidence disagrees with plan: ${key}`)
+    }
+    const phase = active.length === 2 ? 'both-working' : 'mixed'
+    const spendingSource = phase === 'mixed' ? 'transitionSpending' : 'workingSpending'
+    const fact = evidence[spendingSource]
+    if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${spendingSource}`)
+    if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
+    if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
+    if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
+    const support = plan.taxProfile?.spouseSupported
+    if (support && (support.status === 'known' ? typeof support.value !== 'boolean' : support.status !== 'unknown' || typeof support.reason !== 'string' || !support.reason)) return fail('invalid', 'household spouse support evidence')
+    if (plan.contributions.some(c => c.amount !== 0) || plan.recurringContributions.some(c => c.annualAmount !== 0)) return fail('unsupported', 'working registered contributions and deductions not yet wired')
+    if (plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || !plan.people.some(p => p.id === a.ownerId)) || plan.people.some(p => ['tfsa', 'rrsp'].some(k => plan.accounts.filter(a => a.ownerId === p.id && a.kind === k).length > 1))) return fail('unsupported', 'working supports one owned ordinary RRSP and one TFSA per person')
+    const byPerson: CanonicalHouseholdWorkingEvaluation['household']['byPerson'] = {}
+    const payroll: Record<string, PayrollDeductions> = {}
+    const events: import('./personIncome').IncomeEvent[] = []
+    for (const p of plan.people) {
+      const age = ageReachedInYear(p, plan.baseYear, year)
+      if (![p.ageInBaseYear, p.retirementAge, plan.lifeExpectancy].every(Number.isInteger)) return fail('invalid', 'working age clocks must use whole years')
+      if (p.role === 'self' && age >= plan.lifeExpectancy) return fail('unsupported', 'household end-life settlement not yet wired')
+      if (age < 19 || age >= 70) return fail('unsupported', 'household working chain supports ages 19 through 69')
+      if (p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
+      if (p.pension || p.pensionAnnual !== 0 || p.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
+      if (p.rrspUnusedUndeducted.status !== 'known' || p.rrspUnusedUndeducted.value !== 0) return fail('unsupported', 'working registered contributions and deductions not yet wired')
+      const working = active.includes(p)
+      if (working && p.earnedIncome.status !== 'known') return fail('unsupported', 'working wage evidence unknown')
+      const gross = working && p.earnedIncome.status === 'known' ? p.earnedIncome.value : 0
+      if (!safeMoney(gross)) return fail('invalid', 'working wage amount')
+      if (working) {
+        payroll[p.id] = sideIncomeDeductions(gross, 'employment', plan.province, age)
+        events.push({ id: `annual:${year}:wage:${p.id}`, personId: p.id, kind: 'employment', amount: gross })
+      }
+      byPerson[p.id] = { phase: working ? 'working' : 'retired', grossWagesReal: gross, payrollReal: payroll[p.id] ?? null }
+    }
+    for (const source of plan.incomeSources) {
+      const recipient = plan.people.find(p => p.id === source.recipientId)
+      if (!recipient) return fail('unsupported', `income recipient unknown: ${source.id}`)
+      const age = ageReachedInYear(recipient, plan.baseYear, year)
+      if ((source.fromAge ?? -Infinity) > age || (source.startAge ?? -Infinity) > age || (source.toAge ?? Infinity) < age) continue
+      if (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0) return fail('unsupported', 'additional active working income source not yet wired')
+    }
+    const priced = calculateHouseholdTax(plan, year, events, { payroll })
+    if (priced.status !== 'ok') return fail(priced.status, priced.reason)
+    const startCpi = (1 + plan.inflation) ** (year - plan.baseYear)
+    if (1 + plan.inflation <= 0 || !Number.isFinite(startCpi) || startCpi <= 0 || !Number.isFinite(1 / startCpi)) return fail('invalid', 'working CPI ratio')
+    const gross = events.reduce((s, e) => s + e.amount, 0)
+    const deductions = Object.values(payroll).reduce((s, p) => s + p.contributions, 0)
+    const residual = gross - deductions - priced.total - fact.value
+    const bound = Math.min(0.004, 0.004 / startCpi, 4 * Number.EPSILON * (gross + deductions + priced.total + fact.value))
+    if (residual < -bound) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
+    if (residual > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
+    const evaluation: AnnualEvaluation = { byPerson: {} }
+    for (const p of plan.people) {
+      const tax = priced.byPerson[p.id]
+      evaluation.byPerson[p.id] = { income: tax.grossIncome * startCpi, earnedIncome: byPerson[p.id].grossWagesReal * startCpi, benefits: 0, tax: tax.tax * startCpi, spending: 0, taxableIncome: tax.taxableIncome * startCpi, benefitIncomeForNextYear: { status: 'known', value: tax.netIncome * startCpi } }
+    }
+    if (![gross, deductions, priced.total, fact.value, gross * startCpi, deductions * startCpi, priced.total * startCpi, fact.value * startCpi].every(safeMoney)) return fail('invalid', 'working nominal pricing amount')
+    const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = priced
+    return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage }, payrollContributions: deductions * startCpi, netCash: 0, evaluation, household: { phase, spending: fact.value * startCpi, spendingReal: fact.value, spendingSource, byPerson }, overallConclusionAvailable: false } }
+  } catch { return fail('invalid', 'damaged household working plan or evidence') }
 }
 
 const fail = (status: 'invalid' | 'unsupported', detail: string): KernelResult<never> => ({ status, issues: [{ code: status, detail }] })

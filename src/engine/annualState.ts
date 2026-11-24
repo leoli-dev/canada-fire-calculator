@@ -1,4 +1,4 @@
-import { evaluateCanonicalWorkingYear, type CanonicalWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
+import { evaluateCanonicalWorkingYear, evaluateCanonicalHouseholdWorkingYear, type ContinuousWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
 import { annualRetirementContinuation } from './annualRetirement'
 import type { InputsV2, Known, AccountKind } from './model'
 import { ageReachedInYear, pricingGate } from './model'
@@ -57,7 +57,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
-  workingSettlement?: CanonicalWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
+  workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
   retirementSettlement?: { evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
@@ -195,7 +195,7 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | 
   } catch { return 'damaged annual snapshot' }
 }
 
-function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders, working?: CanonicalWorkingEvaluation): KernelResult<AnnualStepValue> {
+function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders, working?: ContinuousWorkingEvaluation): KernelResult<AnnualStepValue> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
   const gate = pricingGate(plan)
   if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
@@ -234,7 +234,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (ownerAge >= 71 && ['rrsp', 'spousalRrsp', 'lira'].includes(account.kind)) return fail('unsupported', `${account.kind === 'lira' ? 'LIRA' : 'RRSP'} age-71 conversion rule not yet wired: ${account.id}`)
     if (ownerAge >= 71 && account.kind === 'fhsa') return fail('unsupported', `FHSA age-71 closure rule not yet wired: ${account.id}`)
   }
-  if (plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
+  if (!working && plan.people.some(person => state.byPerson[person.id]?.age >= person.retirementAge)) return fail('unsupported', 'retirement withdrawals and benefit rules not yet wired')
   if (plan.properties.some(property => property.plannedPurchaseAge !== null && state.byPerson[self.id].age >= property.plannedPurchaseAge && !state.byProperty[property.id]?.held)) return fail('unsupported', 'planned purchase funding and tax integration not yet wired')
   if (plan.properties.some(property => property.sellAtAge !== null && state.byPerson[self.id].age >= property.sellAtAge && state.byProperty[property.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
   // A held balance, a recorded plan, or a scheduled row all make an FHSA active
@@ -307,7 +307,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const income = sum(Object.values(personRows).map(p => p.income))
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
   const tax = sum(Object.values(personRows).map(p => p.tax))
-  const spending = sum(Object.values(personRows).map(p => p.spending))
+  const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
   const cash = working ? working.netCash : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
@@ -600,6 +600,11 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
+  if (working) {
+    const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
+    if (Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) ||
+        Object.values(tfsaLedger).some(r => [r.availableRoom, r.closingRoom].some(f => f.status === 'known' && !safeMoney(f.value)))) return fail('invalid', 'working unsafe closing balance or TFSA room')
+  }
   return { status: 'ok', value: { state, row } }
 }
 
@@ -629,7 +634,7 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
   if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
   if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
-  if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule') return 'withdrawalFunding'
+  if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule' || detail === 'negative working cash requires withdrawal funding rule') return 'withdrawalFunding'
   if (detail === 'evaluated cash disagrees with canonical net savings budget') return 'cashMismatch'
   if (detail.startsWith('scheduled RRSP contribution exceeds')) return 'contributionFunding'
   if (/^(couple |ambiguous |scheduled RRSP contributor|RRSP contributor differs|one person has scheduled)/.test(detail)) return 'contributionAttribution'
@@ -707,20 +712,23 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
     plan = clone(plan)
     const initialized = initializeState(plan)
     if (initialized.status !== 'ok') return initialized
-    if (plan.baseYear !== 2026 || plan.people.length !== 1 || plan.province !== 'ON' || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'continuous projection requires solo Ontario incomeBudget at 2026 anchor')
-    if (plan.people[0].ageInBaseYear >= plan.people[0].retirementAge) return fail('unsupported', 'continuous projection requires an initial working year; use strict standalone retirement')
+    if (plan.baseYear !== 2026 || ![1, 2].includes(plan.people.length) || plan.province !== 'ON' || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'continuous projection requires one or two Ontario people with incomeBudget at 2026 anchor')
+    if (plan.people.some(p => p.ageInBaseYear >= p.retirementAge)) return fail('unsupported', 'continuous projection requires an initial working year for each person; use strict standalone retirement')
+    evidence = clone(evidence)
     let state = initialized.value
     let committedWorking = false
     const rows: YearRow[] = []
     let blocked: AnnualCoverage['blocked'] = null
     for (let i = 0; i < years; i++) {
       let result: KernelResult<AnnualStepValue>
-      const person = plan.people[0]
-      if (state.byPerson[person.id].age < person.retirementAge) {
-        const quote = evaluateCanonicalWorkingYear(plan, evidence, state.year)
+      const person = plan.people.find(p => p.role === 'self')!
+      if (plan.people.length === 2 || state.byPerson[person.id].age < person.retirementAge) {
+        const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
+        const unsafe = Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) || Object.values(state.byPerson).some(p => p.tfsaRoom.status === 'known' && !safeMoney(p.tfsaRoom.value))
+        const quote = unsafe ? fail('invalid', 'working unsafe monetary amount or TFSA room') : plan.people.length === 2 ? evaluateCanonicalHouseholdWorkingYear(plan, evidence, state.year) : evaluateCanonicalWorkingYear(plan, evidence, state.year)
         if (quote.status !== 'ok') result = quote
-        else if (quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')
-        else if (tfsaStatement(plan, person.id)?.withdrawals.some(h => h.amount > 0 && h.calendarYear >= plan.baseYear)) result = fail('unsupported', 'recorded active TFSA withdrawal events not modeled in working chain')
+        else if ('age' in quote.value && quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')
+        else if (plan.people.some(p => tfsaStatement(plan, p.id)?.withdrawals.some(h => h.amount > 0 && h.calendarYear >= plan.baseYear))) result = fail('unsupported', 'recorded active TFSA withdrawal events not modeled in working chain')
         else if (quote.value.netCash > 0 && Object.entries(plan.savingsAllocation.shares).some(([kind, share]) => share !== (kind === 'tfsa' ? 1 : 0))) result = fail('unsupported', 'continuous working allocation supports TFSA only')
         else result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value)
         if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory = []; committedWorking = true }
@@ -734,6 +742,6 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       state = result.value.state
       rows.push(result.value.row)
     }
-    return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people[0].ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, evaluationBasis: 'canonical-continuous' } }
+    return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, evaluationBasis: 'canonical-continuous' } }
   } catch { return fail('invalid', 'damaged canonical continuous plan') }
 }
