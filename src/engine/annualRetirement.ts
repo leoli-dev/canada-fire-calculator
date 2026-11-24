@@ -1,3 +1,4 @@
+import { annualCpp } from './annualCpp'
 import type { InputsV2 } from './model'
 import { pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
@@ -50,11 +51,12 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (age >= 71 && plan.accounts.some(a => a.kind === 'rrsp' && opening.byAccount[a.id].balance > 0)) return fail('unsupported', 'RRSP age-71 conversion rule not yet wired')
     if (age > plan.lifeExpectancy) return fail('invalid', 'year beyond plan horizon')
     if (!generated && (person.earnedIncome.status !== 'known' || person.earnedIncome.value !== 0)) return fail('unsupported', 'retirement wage evidence must be known zero')
-    if (person.cppAnnualAt65 !== 0 || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
+    if ((!generated && person.cppAnnualAt65 !== 0) || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'retirement pension or CPP work rules not yet wired')
     if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'retirement tax election not supported')
-    if (plan.incomeSources.some(source => (source.fromAge ?? -Infinity) <= age && (source.startAge ?? -Infinity) <= age && (source.toAge ?? Infinity) >= age && (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0))) return fail('unsupported', 'active retirement income source not yet wired')
+    const cpp = generated && person.cppAnnualAt65 > 0 ? annualCpp(plan, person, age) : undefined
+    if (plan.incomeSources.some(source => !(cpp && source.kind === 'cpp' && source.recipientId === person.id) && (source.fromAge ?? -Infinity) <= age && (source.startAge ?? -Infinity) <= age && (source.toAge ?? Infinity) >= age && (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0))) return fail('unsupported', 'active retirement income source not yet wired')
     if (person.rrspUnusedUndeducted.status !== 'known' || person.rrspUnusedUndeducted.value !== 0) return fail('unsupported', 'retirement undeducted RRSP premiums require explicit zero evidence')
     if (plan.contributions.some(c => c.calendarYear < opening.year && c.deductionYear !== null && c.deductionYear >= opening.year && c.amount > 0)) return fail('unsupported', 'deferred retirement RRSP deductions not yet wired')
     if (plan.recurringContributions.some(c => c.annualAmount !== 0) || plan.contributions.some(c => c.calendarYear >= opening.year && c.amount !== 0)) return fail('unsupported', 'scheduled retirement contributions not yet wired')
@@ -66,6 +68,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const startCpi = (1 + plan.inflation) ** (year - plan.baseYear)
     const spendingDue = plan.budget.retirementSpending * startCpi
     if (!Number.isFinite(startCpi) || startCpi <= 0 || !safeMoney(spendingDue)) return fail('invalid', 'retirement CPI/spending')
+    if (cpp && !safeMoney(cpp.amountReal * startCpi)) return fail('invalid', 'retirement CPP nominal amount unsafe')
     const balances = { tfsa: 0, rrsp: 0, nonReg: 0 }
     for (const a of plan.accounts) balances[a.kind as 'tfsa' | 'rrsp'] += state.byAccount[a.id].balance
     if (!Number.isFinite(balances.tfsa + balances.rrsp)) return fail('invalid', 'retirement aggregate balances')
@@ -80,11 +83,19 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         if (remaining > 0 && remaining <= bound) withdrawals[kind] = balances[kind]
       }
       const rrsp = plan.accounts.find(a => a.kind === 'rrsp')
-      const tax = calculateHouseholdTax(plan, year, rrsp ? [{ id: `annual:${year}:withdrawal:${rrsp.id}`, kind: 'rrspWithdrawal', accountId: rrsp.id, amount: withdrawals.rrsp / startCpi }] : [])
+      const tax = calculateHouseholdTax(plan, year, [...(cpp ? [{ id: `annual:${year}:cpp:${person.id}`, personId: person.id, kind: 'cpp' as const, amount: cpp.amountReal }] : []), ...(rrsp ? [{ id: `annual:${year}:withdrawal:${rrsp.id}`, kind: 'rrspWithdrawal' as const, accountId: rrsp.id, amount: withdrawals.rrsp / startCpi }] : [])])
       if (tax.status !== 'ok') throw tax
       const nominalTax = tax.total * startCpi
       if (!Number.isFinite(nominalTax) || nominalTax < 0 || !Number.isFinite(tax.byPerson[person.id]?.taxableIncome)) throw new Error('invalid canonical tax')
-      return { withdrawals, tax, nominalTax, netCash: withdrawals.rrsp + withdrawals.tfsa - nominalTax }
+      return { withdrawals, tax, nominalTax, netCash: (cpp?.amountReal ?? 0) * startCpi + withdrawals.rrsp + withdrawals.tfsa - nominalTax }
+    }
+    // No persistent cash account exists in this slice. Refuse a genuine CPP
+    // surplus atomically rather than dropping it from the next year's state.
+    if (cpp) {
+      const baseline = run(0)
+      const bound = Math.min(0.004, 0.004 * startCpi,
+        4 * Number.EPSILON * (cpp.amountReal * startCpi + baseline.nominalTax + spendingDue))
+      if (baseline.netCash - spendingDue > bound) return fail('unsupported', 'CPP surplus requires a persistent cash destination')
     }
     const final = searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run)
     const spendingFunded = Math.min(spendingDue, Math.max(0, final.netCash))
@@ -130,10 +141,10 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = final.tax
     const taxableIncome = final.tax.byPerson[person.id].taxableIncome * startCpi
-    const row: YearRow = { year, byPerson: { [person.id]: { age, income: 0, earnedIncome: 0, benefits: 0, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
-      cashLedger: { income: 0, benefits: 0, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
+    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, benefits: 0, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
+      cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: 0, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
-      retirementSettlement: { evaluationBasis: 'canonical-retirement', spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      retirementSettlement: { evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))

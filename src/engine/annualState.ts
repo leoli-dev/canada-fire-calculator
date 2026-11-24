@@ -1,3 +1,4 @@
+import { cppInputProblem } from './annualCpp'
 import { calculateHouseholdTax } from './householdTax'
 import { searchWithdrawalTarget } from './withdrawalSearch'
 import { evaluateCanonicalWorkingYear, evaluateCanonicalHouseholdWorkingYear, type ContinuousWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
@@ -45,7 +46,7 @@ export interface AnnualState {
 
 export interface AnnualEvaluation {
   /** Explicit external cash/tax facts for this year. No legacy household tax split is inferred here. */
-  byPerson: Record<string, { income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number; benefitIncomeForNextYear: Known<number> }>
+  byPerson: Record<string, { income: number; earnedIncome: number; cpp?: number; benefits: number; tax: number; spending: number; taxableIncome: number; benefitIncomeForNextYear: Known<number> }>
 }
 export interface AnnualContext { plan: InputsV2; state: AnnualState }
 export type TaxBenefitEvaluator = (context: AnnualContext) => AnnualEvaluation
@@ -63,9 +64,9 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
-  byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
+  byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
@@ -304,7 +305,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const entry = evaluation.byPerson[id]
     if (!entry || ![entry.income, entry.earnedIncome, entry.benefits, entry.tax, entry.spending, entry.taxableIncome].every(finiteNonnegative) ||
         !validKnownAmount(entry.benefitIncomeForNextYear)) return fail('invalid', `evaluator amounts: ${id}`)
-    personRows[id] = { age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
+    personRows[id] = { age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, ...(working && entry.cpp !== undefined ? { cpp: entry.cpp } : {}), benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
   }
   for (const dependent of Object.values(state.byDependent)) dependent.age += 1
   const income = sum(Object.values(personRows).map(p => p.income))
@@ -322,6 +323,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (deficit > 0 && plan.strategy === 'meltdownPaced') return fail('unsupported', 'household withdrawal order requires unsupported registered funding')
     const order = plan.strategy === 'tfsaFirst' ? ['tfsa', 'rrsp'] as const : ['rrsp', 'tfsa'] as const
     const events: import('./personIncome').IncomeEvent[] = Object.entries(working.household.byPerson).filter(([, p]) => p.phase === 'working').map(([id, p]) => ({ id: `annual:${year}:wage:${id}`, personId: id, kind: 'employment', amount: p.grossWagesReal }))
+    for (const [id, p] of Object.entries(working.household.byPerson)) if (p.cpp) events.push({ id: `annual:${year}:cpp:${id}`, personId: id, kind: 'cpp', amount: p.cpp.amountReal })
     const payroll = Object.fromEntries(Object.entries(working.household.byPerson).flatMap(([id, p]) => p.payrollReal ? [[id, p.payrollReal]] : []))
     const baselineTax = tax
     const cpi = working.startCpi
@@ -825,6 +827,10 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
     plan = clone(plan)
     const initialized = initializeState(plan)
     if (initialized.status !== 'ok') return initialized
+    for (const person of plan.people) {
+      const problem = cppInputProblem(person)
+      if (problem) return fail('invalid', problem)
+    }
     if (plan.baseYear !== 2026 || ![1, 2].includes(plan.people.length) || plan.province !== 'ON' || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'continuous projection requires one or two Ontario people with incomeBudget at 2026 anchor')
     if (plan.people.some(p => p.ageInBaseYear >= p.retirementAge)) return fail('unsupported', 'continuous projection requires an initial working year for each person; use strict standalone retirement')
     evidence = clone(evidence)
@@ -839,7 +845,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
         const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
         const unsafe = Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) || Object.values(state.byPerson).some(p => p.tfsaRoom.status === 'known' && !safeMoney(p.tfsaRoom.value))
         generatedStates.set(state, plan)
-        const quote = unsafe ? fail('invalid', 'working unsafe monetary amount or TFSA room') : plan.people.length === 2 ? evaluateCanonicalHouseholdWorkingYear(plan, evidence, state.year, state) : evaluateCanonicalWorkingYear(plan, evidence, state.year)
+        const quote = unsafe ? fail('invalid', 'working unsafe monetary amount or TFSA room') : plan.people.length === 2 ? evaluateCanonicalHouseholdWorkingYear(plan, evidence, state.year, state) : evaluateCanonicalWorkingYear(plan, evidence, state.year, state)
         generatedStates.delete(state)
         if (quote.status !== 'ok') result = quote
         else if ('age' in quote.value && quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')

@@ -1,3 +1,4 @@
+import { annualCpp, type AnnualCpp } from './annualCpp'
 import type { InputsV2, Known } from './model'
 import { ageReachedInYear } from './model'
 import { initializeState, isCanonicalGeneratedState, type AnnualState, type AnnualEvaluation, type KernelResult } from './annualState'
@@ -18,6 +19,7 @@ export interface WorkingSpendingEvidence {
 
 export interface CanonicalWorkingEvaluation {
   evaluationBasis: 'canonical-working'
+  cpp?: AnnualCpp
   year: number
   personId: string
   age: number
@@ -44,7 +46,7 @@ export interface CanonicalHouseholdWorkingEvaluation extends Omit<CanonicalWorki
     spendingSource: 'workingSpending' | 'transitionSpending' | 'retirementSpending'
     /** Explicit year-specific omission; never a claim of complete household tax. */
     taxLimitations?: 'spouse-age-credit-transfer-unmodeled'[]
-    byPerson: Record<string, { phase: 'working' | 'retired'; grossWagesReal: number; payrollReal: PayrollDeductions | null }>
+    byPerson: Record<string, { phase: 'working' | 'retired'; grossWagesReal: number; cpp?: AnnualCpp; payrollReal: PayrollDeductions | null }>
   }
 }
 export type ContinuousWorkingEvaluation = CanonicalWorkingEvaluation | CanonicalHouseholdWorkingEvaluation
@@ -87,7 +89,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
       if (![p.ageInBaseYear, p.retirementAge, plan.lifeExpectancy].every(Number.isInteger)) return fail('invalid', 'working age clocks must use whole years')
       if (p.role === 'self' && age >= plan.lifeExpectancy) return fail('unsupported', 'household end-life settlement not yet wired')
       if (age < 19 || age >= 70) return fail('unsupported', 'household working chain supports ages 19 through 69')
-      if (p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
+      if ((!generated && p.cppAnnualAt65 !== 0) || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
       if (p.pension || p.pensionAnnual !== 0 || p.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
       if (p.rrspUnusedUndeducted.status !== 'known' || p.rrspUnusedUndeducted.value !== 0) return fail('unsupported', 'working registered contributions and deductions not yet wired')
       const working = active.includes(p)
@@ -98,12 +100,15 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
         payroll[p.id] = sideIncomeDeductions(gross, 'employment', plan.province, age)
         events.push({ id: `annual:${year}:wage:${p.id}`, personId: p.id, kind: 'employment', amount: gross })
       }
-      byPerson[p.id] = { phase: working ? 'working' : 'retired', grossWagesReal: gross, payrollReal: payroll[p.id] ?? null }
+      const cpp = generated && plan.people.some(p => p.cppAnnualAt65 > 0) ? annualCpp(plan, p, age) : undefined
+      if (cpp) events.push({ id: `annual:${year}:cpp:${p.id}`, personId: p.id, kind: 'cpp', amount: cpp.amountReal })
+      byPerson[p.id] = { phase: working ? 'working' : 'retired', grossWagesReal: gross, ...(cpp ? { cpp } : {}), payrollReal: payroll[p.id] ?? null }
     }
     for (const source of plan.incomeSources) {
       const recipient = plan.people.find(p => p.id === source.recipientId)
       if (!recipient) return fail('unsupported', `income recipient unknown: ${source.id}`)
       const age = ageReachedInYear(recipient, plan.baseYear, year)
+      if (generated && source.kind === 'cpp' && byPerson[recipient.id].cpp) continue
       if ((source.fromAge ?? -Infinity) > age || (source.startAge ?? -Infinity) > age || (source.toAge ?? Infinity) < age) continue
       if (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0) return fail('unsupported', 'additional active working income source not yet wired')
     }
@@ -120,12 +125,12 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const evaluation: AnnualEvaluation = { byPerson: {} }
     for (const p of plan.people) {
       const tax = priced.byPerson[p.id]
-      evaluation.byPerson[p.id] = { income: tax.grossIncome * startCpi, earnedIncome: byPerson[p.id].grossWagesReal * startCpi, benefits: 0, tax: tax.tax * startCpi, spending: 0, taxableIncome: tax.taxableIncome * startCpi, benefitIncomeForNextYear: { status: 'known', value: tax.netIncome * startCpi } }
+      evaluation.byPerson[p.id] = { income: tax.grossIncome * startCpi, earnedIncome: byPerson[p.id].grossWagesReal * startCpi, benefits: 0, ...(byPerson[p.id].cpp ? { cpp: byPerson[p.id].cpp!.amountReal * startCpi } : {}), tax: tax.tax * startCpi, spending: 0, taxableIncome: tax.taxableIncome * startCpi, benefitIncomeForNextYear: { status: 'known', value: tax.netIncome * startCpi } }
     }
     if (![gross, deductions, priced.total, fact.value, gross * startCpi, deductions * startCpi, priced.total * startCpi, fact.value * startCpi].every(safeMoney)) return fail('invalid', 'working nominal pricing amount')
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = priced
     return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage }, payrollContributions: deductions * startCpi, netCash: residual < -bound ? residual * startCpi : 0, evaluation, household: { phase, spending: fact.value * startCpi, spendingReal: fact.value, spendingSource, byPerson, ...(plan.people.some(p => ageReachedInYear(p, plan.baseYear, year) >= 65) ? { taxLimitations: ['spouse-age-credit-transfer-unmodeled' as const] } : {}) }, overallConclusionAvailable: false } }
-  } catch { return fail('invalid', 'damaged household working plan or evidence') }
+  } catch (e) { if (e && typeof e === 'object' && 'reason' in e && 'status' in e) return fail(e.status === 'invalid' ? 'invalid' : 'unsupported', String(e.reason)); return fail('invalid', 'damaged household working plan or evidence') }
 }
 
 const fail = (status: 'invalid' | 'unsupported', detail: string): KernelResult<never> => ({ status, issues: [{ code: status, detail }] })
@@ -138,7 +143,7 @@ const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX
  * Wages/spending are anchor-real, CPI is the year's START factor, tax/payroll
  * use the anchor pack, and every posted evaluation amount is nominal CAD.
  */
-export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSpendingEvidence, year?: number): KernelResult<CanonicalWorkingEvaluation> {
+export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSpendingEvidence, year?: number, generatedState?: AnnualState): KernelResult<CanonicalWorkingEvaluation> {
   try {
     // Validate the canonical base, even for a later year's stateless quote.
     const base = initializeState(plan)
@@ -149,6 +154,7 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     if (plan.baseYear !== PLAN_TAX_YEAR) return fail('unsupported', 'working pricing requires baseYear equal to tax/payroll anchor year')
     if (!Number.isInteger(year) || year < plan.baseYear) return fail('invalid', 'working evaluation year')
     if (plan.people.length !== 1 || plan.people[0].role !== 'self' || plan.province !== 'ON') return fail('unsupported', 'working pricing requires a single Ontario person')
+    const generated = !!generatedState && generatedState.year === year && isCanonicalGeneratedState(plan, generatedState)
     const person = plan.people[0]
     const age = ageReachedInYear(person, plan.baseYear, year)
     if (![person.ageInBaseYear, person.retirementAge, plan.lifeExpectancy].every(Number.isInteger)) return fail('invalid', 'working age clocks must use whole years')
@@ -165,11 +171,12 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     }
     if (person.earnedIncome.status !== 'known') return fail('unsupported', 'working wage evidence unknown')
     if (!safeMoney(person.earnedIncome.value)) return fail('invalid', 'working wage amount')
-    if (person.cppAnnualAt65 !== 0 || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
+    if ((!generated && person.cppAnnualAt65 !== 0) || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
     if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
-    if (plan.incomeSources.some(s => (s.fromAge ?? -Infinity) <= age && (s.startAge ?? -Infinity) <= age && (s.toAge ?? Infinity) >= age && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0))) return fail('unsupported', 'additional active working income source not yet wired')
+    const cpp = generated && person.cppAnnualAt65 !== 0 ? annualCpp(plan, person, age) : undefined
+    if (plan.incomeSources.some(s => !(cpp && s.kind === 'cpp' && s.recipientId === person.id) && (s.fromAge ?? -Infinity) <= age && (s.startAge ?? -Infinity) <= age && (s.toAge ?? Infinity) >= age && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0))) return fail('unsupported', 'additional active working income source not yet wired')
     if (person.rrspUnusedUndeducted.status !== 'known' || person.rrspUnusedUndeducted.value !== 0 || plan.contributions.some(c => c.amount !== 0) || plan.recurringContributions.some(c => c.annualAmount !== 0)) return fail('unsupported', 'working registered contributions and deductions not yet wired')
     // Even a zero nonReg placeholder is deliberately outside this quote's
     // scope: zero balance alone does not verify absence of active tax facts.
@@ -178,10 +185,10 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     if (1 + plan.inflation <= 0 || !Number.isFinite(startCpi) || startCpi <= 0 || !Number.isFinite(1 / startCpi)) return fail('invalid', 'working CPI ratio')
     const gross = person.earnedIncome.value
     const payroll = sideIncomeDeductions(gross, 'employment', plan.province, age)
-    const priced = calculateHouseholdTax(plan, year, [{ id: `annual:${year}:wage:${person.id}`, personId: person.id, kind: 'employment', amount: gross }], { payroll: { [person.id]: payroll } })
+    const priced = calculateHouseholdTax(plan, year, [{ id: `annual:${year}:wage:${person.id}`, personId: person.id, kind: 'employment', amount: gross }, ...(cpp ? [{ id: `annual:${year}:cpp:${person.id}`, personId: person.id, kind: 'cpp' as const, amount: cpp.amountReal }] : [])], { payroll: { [person.id]: payroll } })
     if (priced.status !== 'ok') return fail(priced.status, priced.reason)
     const taxPerson = priced.byPerson[person.id]
-    const income = gross * startCpi
+    const income = (gross + (cpp?.amountReal ?? 0)) * startCpi
     const tax = priced.total * startCpi
     const payrollContributions = payroll.contributions * startCpi
     const spending = plan.budget.workingSpending * startCpi
@@ -190,7 +197,7 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     // full cash payroll is subtracted here once, never hidden inside tax.
     // Net in the common anchor basis before indexing. Separately indexing
     // each cash leg can turn exact exhaustion into a tiny nominal deficit.
-    const cashResidualReal = gross - payroll.contributions - priced.total - plan.budget.workingSpending
+    const cashResidualReal = gross + (cpp?.amountReal ?? 0) - payroll.contributions - priced.total - plan.budget.workingSpending
     // Normalize only operand-scale floating-point residue, symmetrically for
     // surplus and deficit. Do not impose a minimum scale: a zero-wage 1e-12
     // expense is a real deficit. Cap below half a cent in BOTH anchor and
@@ -202,10 +209,10 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     if (![income, tax, payrollContributions, spending, taxableIncome].every(safeMoney) || !Number.isFinite(netCash)) return fail('invalid', 'working nominal pricing amount')
     if (netCashReal < 0) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = priced
-    return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, personId: person.id, age, startCpi,
+    return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, personId: person.id, age, startCpi, ...(cpp ? { cpp } : {}),
       suppliedInputs: { basis: 'supplied-known', grossWagesReal: gross, workingSpendingReal: plan.budget.workingSpending, retirementSpendingReal: plan.budget.retirementSpending },
       taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage }, payrollReal: payroll, payrollContributions, netCash,
-      evaluation: { byPerson: { [person.id]: { income, earnedIncome: income, benefits: 0, tax, spending, taxableIncome, benefitIncomeForNextYear: { status: 'known', value: taxPerson.netIncome * startCpi } } } },
+      evaluation: { byPerson: { [person.id]: { income, earnedIncome: gross * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), benefits: 0, tax, spending, taxableIncome, benefitIncomeForNextYear: { status: 'known', value: taxPerson.netIncome * startCpi } } } },
       overallConclusionAvailable: false } }
-  } catch { return fail('invalid', 'damaged working plan or spending evidence') }
+  } catch (e) { if (e && typeof e === 'object' && 'reason' in e && 'status' in e) return fail(e.status === 'invalid' ? 'invalid' : 'unsupported', String(e.reason)); return fail('invalid', 'damaged working plan or spending evidence') }
 }
