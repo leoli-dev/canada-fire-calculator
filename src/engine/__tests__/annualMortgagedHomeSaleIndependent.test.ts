@@ -212,6 +212,42 @@ describe('independent verified sale with a linked mortgage', () => {
     expect(get('netWorth').cells![SALE_YEAR].value).toBeCloseTo(38_576.06568904, 6)
   })
 
+  it('preserves the debt-free sale group from 981b187 in each language and display mode', () => {
+    const { plan, evidence } = fixture()
+    plan.debts = []
+    plan.properties[0].mortgageDebtId = null
+    delete plan.annualPrimaryHomeSaleEvidence![HOME].mortgagePayoff
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 5))
+    expect(coverage.blocked).toBeNull()
+    const sheet = canonicalAnnualSheet(coverage, CONTEXT)
+    const saleGroup = findRow(sheet.rows, canonicalSheetId('group', 'primaryHomeSale'))!
+    const baselineSaleRows = ['grossProceeds', 'sellingCosts', 'netProceeds', 'acb', 'realizedGain', 'taxableGain']
+    const baselineCashRows = ['opening', 'proceedsAdded', 'spendingUsed', 'closing']
+    expect(saleGroup.children?.map(row => row.id)).toEqual([
+      ...baselineSaleRows.map(field => canonicalSheetId('value', 'primaryHomeSale', field)),
+      ...baselineCashRows.map(field => canonicalSheetId('value', 'primaryHomeSaleCash', field)),
+    ])
+    const net = findRow(sheet.rows, canonicalSheetId('value', 'primaryHomeSale', 'netProceeds'))!
+    expect(annualSheetText(net.label, 'en')).toBe('Net proceeds added to cash (memo)')
+    expect(annualSheetText(net.label, 'fr')).toBe('Produit net ajouté (mémo)')
+    expect(annualSheetText(net.label, 'zh')).toBe('转入现金的净所得（备忘）')
+    const saleCell = net.cells![SALE_YEAR]
+    const column = sheet.years.find(year => year.year === SALE_YEAR)!
+    expect(saleCell).toMatchObject({ value: close(51_264.832), basis: 'nominal-CAD', timing: 'during-year' })
+    expect(annualSheetDisplayValue(saleCell, column, 'nominal')).toBeCloseTo(51_264.832, 6)
+    expect(annualSheetDisplayValue(saleCell, column, 'real')).toBeCloseTo(51_264.832 / 1.0404, 6)
+    for (const year of [2027, 2029]) expect(net.cells![year]).toMatchObject({ status: 'not-applicable', value: null })
+    const sold = coverage.rows.find(row => row.year === SALE_YEAR)!
+    expect(sold.retirementSettlement?.primaryHomeSale).toMatchObject({
+      grossProceeds: close(56_264.832), netProceeds: close(51_264.832), acb: 20_000,
+      realizedGain: close(31_264.832), taxableGain: 0,
+    })
+    expect(sold.retirementSettlement?.primaryHomeSale?.mortgagePayoff).toBeUndefined()
+    expect(sold.retirementSettlement?.primaryHomeSaleCash).toMatchObject({
+      proceedsAdded: close(51_264.832), spendingUsed: close(20_808), closing: close(30_456.832),
+    })
+  })
+
   it.each([
     ['absent terms', { mortgagePayoff: undefined }],
     ['wrong debt ID', { debtId: 'other-debt' }],
