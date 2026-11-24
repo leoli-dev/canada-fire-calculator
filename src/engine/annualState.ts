@@ -1,3 +1,4 @@
+import { MortgagePrecisionError, mortgageDecimal, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
 import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
@@ -10,7 +11,7 @@ import type { InputsV2, Known, AccountKind } from './model'
 import { ageReachedInYear, pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
 import { allocateContributions, resolveYearAllocation, type FundingGap } from './funding'
-import { impliedRate } from './debts'
+import { settleAnnualDebt } from './annualDebt'
 import {
   RRSP_ADDITION_RULE_MISSING, plannedRrspSlices, rrspRoomYear, statementOpeningRoom,
   type RrspRoomLimitation, type RrspRoomYear,
@@ -30,6 +31,8 @@ export interface RrifSettlement { accountId: string; conversion: RrifConversion;
 export const rrifConversionFor = (state: AnnualState, id: string): RrifConversion | undefined =>
   state.rrifConversions && Object.prototype.hasOwnProperty.call(state.rrifConversions, id) ? state.rrifConversions[id] : undefined
 export interface AnnualState {
+  /** Exact decimal-CAD balances for the authenticated mortgage model only. */
+  mortgageExactBalances?: Record<string, MortgageDecimal>
   rrifConversions?: Record<string, RrifConversion>
   year: number
   baseYear: number
@@ -74,10 +77,10 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { mortgageCashReconciliation?: { amount: number; basis: "decimal-CAD" }; cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
-  byAccount: Record<string, { nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  byAccount: Record<string, { mortgageArithmeticReconciliation?: number; mortgageExactWithdrawal?: MortgageDecimal; nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
@@ -159,6 +162,7 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
       const problem = nonRegProblem(plan, opening)
       if (problem) return problem
     }
+    if (opening.mortgageExactBalances !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis) || !plan.debts.length || Object.entries(opening.mortgageExactBalances).some(([id, d]) => !opening.byAccount[id] || !validMortgageDecimal(d) || mortgageNegative(d) || mortgageNumber(d) !== opening.byAccount[id].balance))) return "mortgage decimal balances require authenticated generated state"
     if (opening.gisAssessmentLag && (Object.keys(opening.gisAssessmentLag).some(id => !plan.people.some(p => p.id === id)) || Object.values(opening.gisAssessmentLag).some(fact => !validGisBasis(fact, opening.year)))) return 'GIS assessment snapshot year or evidence'
     if (opening.year === plan.baseYear && opening.gisAssessmentLag && Object.keys(opening.gisAssessmentLag).length) return 'GIS initial historical assessment unsupported'
     if (opening.rrifConversions !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis))) return 'RRIF conversion receipts require authenticated generated retirement'
@@ -447,28 +451,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const cash = working ? Math.max(0, working.netCash) : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
-  const debtRows: YearRow['byDebt'] = Object.fromEntries(Object.entries(state.byDebt).map(([id, debt]) => [id,
-    { opening: debt.principal, interest: 0, principal: 0, payment: 0, closing: debt.principal, propertyId: debt.propertyId }]))
-  let debtPayments = 0
-  for (const [id, debt] of Object.entries(state.byDebt)) {
-    if (debt.principal <= 0 || debt.yearsRemaining <= 0) continue
-    const rate = impliedRate(debt.principal, debt.annualPayment, debt.yearsRemaining)
-    if (debt.annualPayment * debt.yearsRemaining + 1e-8 < debt.principal) return fail('invalid', `debt cannot amortize: ${id}`)
-    const accrued = debt.principal * (1 + rate)
-    const due = Math.min(debt.annualPayment, accrued)
-    debtRows[id].interest = accrued - debt.principal
-    debtRows[id].payment = due
-    debtPayments += due
-    const remaining = Math.max(0, accrued - due)
-    // Settle only representational noise on the final payment. The cash ledger
-    // retains the actual due; a cent-scale shortfall must never disappear.
-    const numericalResidue = Math.min(0.005, 64 * Number.EPSILON * Math.max(1, accrued, due))
-    if (debt.yearsRemaining === 1 && remaining > numericalResidue) return fail('invalid', `debt unpaid at maturity: ${id}`)
-    debt.principal = debt.yearsRemaining === 1 ? 0 : remaining
-    debtRows[id].closing = debt.principal
-    debtRows[id].principal = debtRows[id].opening - debt.principal
-    debt.yearsRemaining -= 1
-  }
+  const debtSettlement = settleAnnualDebt(state, working && isCanonicalGeneratedState(plan, opening) && plan.debts.length ? plan.debts : undefined)
+  if (debtSettlement.status !== 'ok') return fail(debtSettlement.status, debtSettlement.reason)
+  const { debtRows, debtPayments } = debtSettlement.value
   // The private working quote already validated and normalized its cash in
   // the common anchor basis. Reordering those operands can invent a deficit.
   const evaluatedCash = householdWithdrawalSettlement ? 0 : working ? working.netCash : income + benefits - tax - spending - debtPayments
@@ -707,6 +692,15 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   for (const [id, account] of Object.entries(state.byAccount)) {
     accountRows[id].returnAmount = account.balance * rates[id]
     account.balance += accountRows[id].returnAmount
+    if (working && isCanonicalGeneratedState(plan, opening) && plan.debts.length) {
+      const exact = mortgageClosing(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
+      const precise = mortgageNumber(exact)
+      const correction = precise - account.balance
+      if (!Number.isFinite(precise) || mortgageNegative(exact) || Math.abs(correction) >= Math.min(0.005, 0.005 * working.startCpi)) return fail("unsupported", "mortgage decimal balance precision boundary")
+      ;(state.mortgageExactBalances ??= {})[id] = exact
+      if (correction !== 0) accountRows[id].mortgageArithmeticReconciliation = correction
+      account.balance = precise
+    }
     accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
@@ -768,7 +762,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
 
 export function annualStep(plan: InputsV2, opening: AnnualState, providers: AnnualProviders): KernelResult<AnnualStepValue> {
   try { return annualStepUnchecked(plan, opening, providers) }
-  catch { return fail('invalid', 'damaged annual snapshot or provider result') }
+  catch (error) { if (error instanceof MortgagePrecisionError) return fail(error.status, error.reason); return fail('invalid', 'damaged annual snapshot or provider result') }
 }
 
 /** An internal canonical run, with provider-supplied evaluation, not production tax pricing.
@@ -915,7 +909,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       } else {
         if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')
         generatedStates.set(state, plan)
-        result = annualRetirementContinuation(plan, state)
+        result = annualRetirementContinuation(plan, state, evidence)
         generatedStates.delete(state)
       }
       if (result.status !== 'ok') { blocked = { year: state.year, status: result.status, issues: result.issues, causes: [...new Set(result.issues.map(annualStopCause))] }; break }
@@ -923,5 +917,5 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       rows.push(result.value.row)
     }
     return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, ...(plan.people.length === 1 && plan.annualBenefitsEvidence?.[plan.people[0].id]?.gis?.status === 'annual-estimate' ? { gisOptInPersonIds: [plan.people[0].id] } : {}), evaluationBasis: 'canonical-continuous' } }
-  } catch { return fail('invalid', 'damaged canonical continuous plan') }
+  } catch (error) { if (error instanceof MortgagePrecisionError) return fail(error.status, error.reason); return fail('invalid', 'damaged canonical continuous plan') }
 }

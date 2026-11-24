@@ -1,3 +1,4 @@
+import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
 import type { AnnualState, YearRow } from './annualState'
 
@@ -40,4 +41,26 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
     current.value = closing
   }
   return rows
+}
+
+/** Narrow generated mortgage extension; a linked primary home is personal use.
+ * CRA personal borrowing interest is not deductible (verified 2026-11-24):
+ * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
+ */
+export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence): string | null {
+  if (!plan.debts.length) return passiveHomeProblem(plan)
+  const p = plan.properties[0], d = plan.debts[0]
+  if (!p || plan.properties.length !== 1 || plan.debts.length !== 1 || d.kind !== 'mortgage' || d.propertyId !== p.id || p.mortgageDebtId !== d.id || p.sellAtAge !== null)
+    return 'mortgage requires one bidirectionally linked held primary home'
+  const source = d.provenance
+  if (!source || typeof source !== 'object' || Array.isArray(source) || !Object.prototype.hasOwnProperty.call(source, 'origin') || !Object.prototype.hasOwnProperty.call(source, 'sourceYear') || !['user', 'legacy'].includes(source.origin) || !(source.sourceYear === null || Number.isInteger(source.sourceYear)) || !(source.note === undefined || typeof source.note === 'string'))
+    return 'mortgage requires recorded debt provenance'
+  const homeProblem = passiveHomeProblem({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
+  if (homeProblem) return homeProblem
+  const fact = evidence?.scheduledMortgagePaymentsExcluded
+  if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
+    return 'mortgage spending evidence must explicitly exclude scheduled payments'
+  if (plan.people.some(p => p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0) || plan.annualBenefitsEvidence || plan.annualNonRegEvidence || plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))
+    return 'mortgage supports ordinary TFSA/RRSP accounts and explicitly excluded benefits only'
+  return null
 }

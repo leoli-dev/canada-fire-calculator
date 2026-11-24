@@ -1,4 +1,7 @@
-import { growHeldProperties, passiveHomeProblem } from './annualProperty'
+import { mortgageDecimal, mortgageAdd, mortgageSubtract, mortgageMultiply, mortgageNegative, mortgageNumber, type MortgageDecimal } from "./mortgageDecimal"
+import { settleAnnualDebt } from './annualDebt'
+import type { WorkingSpendingEvidence } from './annualWorking'
+import { growHeldProperties, heldMortgageProblem } from './annualProperty'
 import { nonRegProblem, quoteNonRegSale, acceptedNonRegProblem } from "./annualNonReg"
 import { minimumForRrif } from "./rrif"
 import { annualGis, gisAssessmentReceipt, GIS_OAS_RECOVERY_UNSUPPORTED } from './annualGis'
@@ -54,7 +57,7 @@ function retirementSnapshotProblem(plan: InputsV2, state: AnnualState, generated
 /** Internal only: ordered draws, no external cash or mandatory registered rules.
  * Tax events enter the existing anchor-real tax engine; settlement is nominal.
  */
-function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider, generated = false): KernelResult<AnnualStepValue> {
+function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider, generated = false, evidence?: WorkingSpendingEvidence): KernelResult<AnnualStepValue> {
   try {
     assertCanonicalPlan(plan)
     if (!generated && opening.rrifConversions) return fail("unsupported", "RRIF continuation requires internally generated state")
@@ -75,7 +78,9 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const oas = generated && plan.annualBenefitsEvidence ? annualGeneratedRetirementOas(plan, person, age, opening) : undefined
     if ((!generated && person.cppAnnualAt65 !== 0) || (!oas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'retirement pension or CPP work rules not yet wired')
-    if (plan.dependents.length || plan.debts.length || (plan.properties.length && (!generated || passiveHomeProblem(plan)))) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
+    const housingProblem = generated ? heldMortgageProblem(plan, evidence) : null
+    if (housingProblem) return fail('unsupported', housingProblem)
+    if (plan.dependents.length || (!generated && (plan.debts.length || plan.properties.length))) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
     if (plan.properties.some(p => p.sellAtAge !== null && age >= p.sellAtAge && opening.byProperty[p.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'retirement tax election not supported')
     const cpp = generated && person.cppAnnualAt65 > 0 ? annualCpp(plan, person, age, opening) : undefined
@@ -98,6 +103,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const registered = plan.accounts.find(a => a.kind === "rrsp")
     const conversion = registered ? rrifConversionFor(opening, registered.id) : undefined
     const rrifSlice = generated && !!registered && (!!conversion || age >= 71 && opening.byAccount[registered.id].balance > 0)
+    if (plan.debts.length && (rrifSlice || conversion)) return fail('unsupported', 'mortgage RRIF combination not yet supported')
     if (rrifSlice) {
       if (plan.accounts.some(a => a.rrifAgeElection !== undefined && a.rrifAgeElection !== null))
         return fail('unsupported', 'RRIF: pre-conversion age elections are not supported')
@@ -127,7 +133,11 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const state = structuredClone(opening)
     const year = state.year
     const startCpi = (1 + plan.inflation) ** (year - plan.baseYear)
+    const debtSettlement = settleAnnualDebt(state, generated && plan.debts.length ? plan.debts : undefined)
+    if (debtSettlement.status !== 'ok') return fail(debtSettlement.status, debtSettlement.reason)
+    const { debtRows, debtPayments } = debtSettlement.value
     const spendingDue = plan.budget.retirementSpending * startCpi
+    const fundingDue = spendingDue + debtPayments
     if (!Number.isFinite(startCpi) || startCpi <= 0 || !safeMoney(spendingDue)) return fail('invalid', 'retirement CPI/spending')
     if (oas && !safeMoney(oas.grossReal * startCpi)) return fail('invalid', 'retirement OAS nominal amount unsafe')
     if (cpp && !safeMoney(cpp.amountReal * startCpi)) return fail('invalid', 'retirement CPP nominal amount unsafe')
@@ -141,7 +151,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       // Exact exhaustion is a canonical settlement invariant. Leave the shared
       // legacy allocator's subtraction order and all search calls untouched.
       const withdrawals = chosen ? { ...chosen } : gross === balances.tfsa + balances.rrsp + balances.nonReg ? { ...balances } : allocateOrderedWithdrawals(gross, balances, floor, order.map(account => ({ account })))
-      if (generated) for (const kind of ['tfsa', 'rrsp', 'nonReg'] as const) {
+      if (generated && !plan.debts.length) for (const kind of ['tfsa', 'rrsp', 'nonReg'] as const) {
         const remaining = balances[kind] - withdrawals[kind]
         const bound = Math.min(0.004, 4 * Number.EPSILON * (balances[kind] + withdrawals[kind]))
         if (remaining > 0 && remaining <= bound) withdrawals[kind] = balances[kind]
@@ -205,12 +215,71 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         : benefitCash + withdrawals.rrsp + withdrawals.tfsa + withdrawals.nonReg - nominalTax
       return { sale, withdrawals, tax, nominalTax, settledOas, gisRecoveryUnsupported, netCash }
     }
+    const mortgagePrecision = generated && plan.debts.length > 0
+    const exactMortgageQuote = (quote: ReturnType<typeof run>) => {
+      const exactDraws: Record<string, MortgageDecimal> = {}
+      let exactCash = mortgageDecimal(-quote.nominalTax)
+      for (const account of plan.accounts) {
+        const withdrawal = quote.withdrawals[account.kind as AccountType]
+        const exactOpening = opening.mortgageExactBalances?.[account.id] ?? mortgageDecimal(opening.byAccount[account.id].balance)
+        const quoteDraw = mortgageDecimal(withdrawal)
+        // An exhaustion posting displays the rounded balance but carries its
+        // exact nominal amount explicitly. No unsigned error grants extra cash.
+        const exhausted = withdrawal > 0 && withdrawal === opening.byAccount[account.id].balance
+        const draw = exhausted && account.kind === "tfsa" ? exactOpening : quoteDraw
+        if (mortgageNegative(mortgageSubtract(exactOpening, draw)))
+          return { cash: exactCash, draws: exactDraws, problem: "mortgage decimal withdrawal precision boundary" }
+        if (exhausted && account.kind === "rrsp" && mortgageSubtract(exactOpening, quoteDraw).coefficient !== "0")
+          return { cash: exactCash, draws: exactDraws, problem: "mortgage cash precision cannot prove registered withdrawal tax" }
+        exactDraws[account.id] = draw
+        exactCash = mortgageAdd(exactCash, draw)
+      }
+      return { cash: exactCash, draws: exactDraws, problem: null }
+    }
+    const searchMortgageTranches = () => {
+      const target = mortgageAdd(mortgageDecimal(spendingDue), mortgageDecimal(debtPayments))
+      const exhausted: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
+      let accepted = run(0, exhausted)
+      const enough = (quote: ReturnType<typeof run>) => {
+        const proof = exactMortgageQuote(quote)
+        return !proof.problem && !mortgageNegative(mortgageSubtract(proof.cash, target))
+      }
+      if (enough(accepted)) return accepted
+      for (const kind of order) {
+        const capacity = balances[kind]
+        if (capacity <= 0) continue
+        const trial = (amount: number) => run(0, { ...exhausted, [kind]: amount })
+        const endpoint = trial(capacity)
+        const endpointProof = exactMortgageQuote(endpoint)
+        if (!endpointProof.problem && !enough(endpoint)) {
+          exhausted[kind] = capacity
+          accepted = endpoint
+          continue
+        }
+        // Search the actual account posting, not a gross sum whose allocation
+        // subtraction can erase the feasible next decimal quote. Every trial
+        // reprices tax and uses exactly the final settlement proof/target.
+        let lo = 0, hi = capacity
+        for (let i = 0; i < 2048; i++) {
+          const mid = lo + (hi - lo) / 2
+          if (mid === lo || mid === hi) return trial(hi)
+          const quote = trial(mid)
+          const proof = exactMortgageQuote(quote)
+          // An unprovable exhausted registered endpoint bounds refinement,
+          // but can never be accepted as funded or posted without proof.
+          if (proof.problem || enough(quote)) hi = mid
+          else lo = mid
+        }
+        throw { status: "unsupported", reason: "mortgage withdrawal search precision boundary" }
+      }
+      return accepted
+    }
     // No persistent cash account exists in this slice. Refuse a genuine CPP
     // surplus atomically rather than dropping it from the next year's state.
     if (floor > 0) {
       const baseline = run(floor)
-      const bound = Math.min(0.004, 4 * Number.EPSILON * (floor + baseline.nominalTax + spendingDue))
-      if (baseline.netCash - spendingDue > bound) return fail("unsupported", "RRIF: surplus requires a persistent cash destination")
+      const bound = Math.min(0.004, 4 * Number.EPSILON * (floor + baseline.nominalTax + fundingDue))
+      if (baseline.netCash - fundingDue > bound) return fail("unsupported", "RRIF: surplus requires a persistent cash destination")
     }
     if (cpp || oas) {
       const baseline = run(0)
@@ -219,8 +288,8 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       // a withdrawal; stop before surplus handling or any persistent posting.
       if (baseline.gisRecoveryUnsupported) return fail('unsupported', GIS_OAS_RECOVERY_UNSUPPORTED)
       const bound = Math.min(0.004, 0.004 * startCpi,
-        4 * Number.EPSILON * (((cpp?.amountReal ?? 0) + (oas?.grossReal ?? 0)) * startCpi + baseline.nominalTax + spendingDue))
-      if (baseline.netCash - spendingDue > bound) return fail('unsupported', gis && gis.amountReal > 0 ? 'GIS: surplus requires a persistent cash destination' : oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
+        4 * Number.EPSILON * (((cpp?.amountReal ?? 0) + (oas?.grossReal ?? 0)) * startCpi + baseline.nominalTax + fundingDue))
+      if (baseline.netCash - fundingDue > bound) return fail('unsupported', gis && gis.amountReal > 0 ? 'GIS: surplus requires a persistent cash destination' : oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
     }
     const searchPoolTranches = () => {
       // Private pool slice only: never quote a later source when the reached
@@ -228,12 +297,12 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       // candidate first, while all discretionary capacities keep their order.
       const exhausted: Record<AccountType, number> = { tfsa: 0, rrsp: floor, nonReg: 0 }
       let final = run(0, exhausted)
-      if (final.netCash >= spendingDue) return final
+      if (final.netCash >= fundingDue) return final
       for (const kind of order) {
         const capacity = balances[kind] - exhausted[kind]
         if (capacity <= 0) continue
         const prior = final
-        const residualTarget = spendingDue - prior.netCash
+        const residualTarget = fundingDue - prior.netCash
         const trial = (amount: number) => {
           const quote = run(0, { ...exhausted, [kind]: amount === capacity ? balances[kind] : exhausted[kind] + amount })
           // Search the incremental cash directly. Re-adding a large already
@@ -248,9 +317,9 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       }
       return final
     }
-    const final = poolAllowed ? searchPoolTranches() : gis && gis.amountReal > 0
-      ? searchWithdrawalTarget(spendingDue, floor, balances.tfsa + balances.rrsp + balances.nonReg, run, 120)
-      : searchWithdrawalTarget(spendingDue, floor, balances.tfsa + balances.rrsp + balances.nonReg, run)
+    const final = mortgagePrecision ? searchMortgageTranches() : poolAllowed ? searchPoolTranches() : gis && gis.amountReal > 0
+      ? searchWithdrawalTarget(fundingDue, floor, balances.tfsa + balances.rrsp + balances.nonReg, run, 120)
+      : searchWithdrawalTarget(fundingDue, floor, balances.tfsa + balances.rrsp + balances.nonReg, run)
     // Acceptance proof for this guarded model: with positive GIS, the
     // accepted eligible income + gross OAS + GIS must be <= the pinned
     // threshold after only the operand-scale residue normalization above.
@@ -264,10 +333,23 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (final.gisRecoveryUnsupported) return fail('unsupported', GIS_OAS_RECOVERY_UNSUPPORTED)
     if (final.sale) { const problem = acceptedNonRegProblem(final.sale, startCpi); if (problem) return fail('unsupported', problem) }
     if (poolAllowed) {
-      const bound = Math.min(0.004, 4 * Number.EPSILON * (final.withdrawals.nonReg + final.withdrawals.rrsp + final.withdrawals.tfsa + final.nominalTax + spendingDue))
-      if (final.netCash - spendingDue > bound) return fail('unsupported', 'nonReg: surplus requires a persistent cash destination')
+      const bound = Math.min(0.004, 4 * Number.EPSILON * (final.withdrawals.nonReg + final.withdrawals.rrsp + final.withdrawals.tfsa + final.nominalTax + fundingDue))
+      if (final.netCash - fundingDue > bound) return fail('unsupported', 'nonReg: surplus requires a persistent cash destination')
     }
-    const spendingFunded = Math.min(spendingDue, Math.max(0, final.netCash))
+    const finalMortgageProof = mortgagePrecision ? exactMortgageQuote(final) : { cash: mortgageDecimal(-final.nominalTax), draws: {} as Record<string, MortgageDecimal>, problem: null }
+    if (finalMortgageProof.problem) return fail("unsupported", finalMortgageProof.problem)
+    const { cash: exactCash, draws: exactDraws } = finalMortgageProof
+    const exactAfterDebt = mortgageSubtract(exactCash, mortgageDecimal(debtPayments))
+    if (debtPayments > 0 && (mortgagePrecision ? mortgageNegative(exactAfterDebt) : final.netCash < debtPayments))
+      return fail("unsupported", "mortgage scheduled payment cannot be fully funded")
+    const provedNetCash = mortgagePrecision ? mortgageNumber(exactCash) : final.netCash
+    const cashCorrection = provedNetCash - final.netCash
+    if (mortgagePrecision && Math.abs(cashCorrection) >= Math.min(0.005, 0.005 * startCpi))
+      return fail("unsupported", "mortgage decimal cash precision boundary")
+    const mortgageCashReconciliation = mortgagePrecision && cashCorrection !== 0
+      ? { amount: cashCorrection, basis: "decimal-CAD" as const } : undefined
+    const availableLiving = mortgagePrecision ? mortgageNumber(exactAfterDebt) : final.netCash - debtPayments
+    const spendingFunded = Math.min(spendingDue, Math.max(0, availableLiving))
     const spendingUnmet = Math.max(0, spendingDue - spendingFunded)
     const accountRows: YearRow['byAccount'] = {}
     for (const account of plan.accounts) {
@@ -281,6 +363,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         accountRows[account.id].acb = structuredClone(current.acb)
         current.nonRegPool!.units = sale.closingUnits
       }
+      if (mortgagePrecision) accountRows[account.id].mortgageExactWithdrawal = exactDraws[account.id]
       current.balance -= withdrawal
     }
     const history = state.tfsaWithdrawalHistory ?? []
@@ -307,6 +390,17 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       const row = accountRows[account.id]
       row.returnAmount = current.balance * rates[account.id]
       current.balance += row.returnAmount
+      if (mortgagePrecision) {
+        const exactOpening = opening.mortgageExactBalances?.[account.id] ?? mortgageDecimal(opening.byAccount[account.id].balance)
+        const exact = mortgageMultiply(mortgageSubtract(exactOpening, exactDraws[account.id]), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[account.id])))
+        const precise = mortgageNumber(exact)
+        const correction = precise - current.balance
+        if (!Number.isFinite(precise) || mortgageNegative(exact) || Math.abs(correction) >= Math.min(0.005, 0.005 * startCpi))
+          return fail("unsupported", "mortgage decimal balance precision boundary")
+        ;(state.mortgageExactBalances ??= {})[account.id] = exact
+        if (correction !== 0) row.mortgageArithmeticReconciliation = correction
+        current.balance = precise
+      }
       row.closing = current.balance
     }
     if (generated && registered && age === 71 && !conversion && state.byAccount[registered.id].balance > 0) {
@@ -332,10 +426,10 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const oasColumns = final.settledOas ? { oasGross: final.settledOas.grossReal * startCpi, oasRecovery: final.settledOas.recoveryReal * startCpi, oasNet: final.settledOas.netReal * startCpi } : {}
     const gisCash = (gis?.amountReal ?? 0) * startCpi
     const oasCash = (final.settledOas?.netReal ?? 0) * startCpi
-    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: propertyRows,
-      cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
+    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: debtRows, byProperty: propertyRows,
+      cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, mortgagePrecision ? mortgageNumber(mortgageSubtract(exactAfterDebt, mortgageDecimal(spendingFunded))) : availableLiving - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
-      retirementSettlement: { ...(poolAllowed ? { cashBridge: { method: 'compensated-signed-cash' as const, netCash: final.netCash } } : {}), ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      retirementSettlement: { ...(mortgageCashReconciliation ? { mortgageCashReconciliation } : {}), ...(poolAllowed ? { cashBridge: { method: 'compensated-signed-cash' as const, netCash: final.netCash } } : {}), ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))
@@ -368,7 +462,7 @@ export function annualRetirementStep(plan: InputsV2, opening: AnnualState, retur
   return retirementStep(plan, opening, returns)
 }
 /** Only the initializing continuous runner can issue a live state identity. */
-export function annualRetirementContinuation(plan: InputsV2, opening: AnnualState): KernelResult<AnnualStepValue> {
+export function annualRetirementContinuation(plan: InputsV2, opening: AnnualState, evidence?: WorkingSpendingEvidence): KernelResult<AnnualStepValue> {
   if (!isCanonicalGeneratedState(plan, opening)) return fail('invalid', 'retirement continuation requires internally generated state')
-  return retirementStep(plan, opening, fixedReturnProvider, true)
+  return retirementStep(plan, opening, fixedReturnProvider, true, evidence)
 }
