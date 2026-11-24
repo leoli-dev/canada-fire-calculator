@@ -169,6 +169,12 @@ function tablesFor(context: TaxRuleContext, province: Province): { federal: TaxT
 }
 
 export interface PersonCredits {
+  /** Explicit line-23600 net-income basis for federal/ON age amounts only.
+   * Absent preserves all legacy callers. GIS is deducted at line 25000,
+   * after net income, so taxable income is not this credit phaseout basis.
+   * https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-30100-amount.html
+   */
+  ageAmountNetIncome?: number
   /** the taxpayer's age — 65+ unlocks the age amount */
   age?: number
   /**
@@ -220,7 +226,7 @@ export function federalIncomeTax(taxable: number, rules: TaxRuleContext, credits
   if (credits?.spouseNetIncome !== undefined)
     credit += federalSpouseAmount2026(credits.spouseNetIncome, enhancedBpa(federal, taxable)) * federal.brackets[0].rate
   if ((credits?.age ?? 0) >= 65)
-    credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold)) * federal.brackets[0].rate
+    credit += Math.max(0, FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, (credits?.ageAmountNetIncome ?? taxable) - FED_AGE_AMOUNT.threshold)) * federal.brackets[0].rate
   // BE-46: base CPP/QPP, EI and QPIP contributions and the Canada employment amount.
   credit += ((credits?.payrollCredit ?? 0) + (credits?.employmentAmount ?? 0)) * federal.brackets[0].rate
   const amount = Math.max(0, bracketTax(taxable, federal.brackets) - credit)
@@ -282,7 +288,7 @@ export function incomeTax(
   if (senior) {
     const ageAmt = Math.max(
       0,
-      FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, taxable - FED_AGE_AMOUNT.threshold),
+      FED_AGE_AMOUNT.max - FED_AGE_AMOUNT.rate * Math.max(0, (credits?.ageAmountNetIncome ?? taxable) - FED_AGE_AMOUNT.threshold),
     )
     fedCredit += ageAmt * federal.brackets[0].rate
   }
@@ -320,7 +326,7 @@ export function incomeTax(
     } else {
       const ageAmt = Math.max(
         0,
-        ap.ageMax - ap.ageRate * Math.max(0, taxable - ap.ageThreshold),
+        ap.ageMax - ap.ageRate * Math.max(0, (province === 'ON' ? credits?.ageAmountNetIncome ?? taxable : taxable) - ap.ageThreshold),
       )
       provCredit += ageAmt * lowRate
     }

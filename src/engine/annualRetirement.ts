@@ -1,6 +1,6 @@
-import { annualGis, gisAssessmentReceipt } from './annualGis'
+import { annualGis, gisAssessmentReceipt, GIS_OAS_RECOVERY_UNSUPPORTED } from './annualGis'
 import { annualOas } from './annualOas'
-import { oasAfterClawback } from './benefits'
+import { oasAfterClawback, OAS_CLAWBACK_THRESHOLD } from './benefits'
 import { annualCpp } from './annualCpp'
 import type { InputsV2 } from './model'
 import { pricingGate } from './model'
@@ -94,26 +94,79 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       const before = calculateHouseholdTax(plan, year, events)
       if (before.status !== 'ok') throw before
       const recoveryIncomeReal = before.byPerson[person.id].netIncome + (oas?.grossReal ?? 0)
-      const netReal = oas ? oasAfterClawback(oas.grossReal, before.byPerson[person.id].netIncome) : 0
+      // Same anchor-real threshold as ordinary OAS. GIS is not an ordinary
+      // taxable event here, but is included in the statutory repayment test.
+      // Mark trials without throwing: a full-account probe can cross even
+      // when a smaller, safely fundable accepted withdrawal does not.
+      const gisReal = gis?.amountReal ?? 0
+      const recoveryExcessReal = recoveryIncomeReal + gisReal - OAS_CLAWBACK_THRESHOLD
+      // Original-clock division and sequential account growth can leave an
+      // exact-boundary sum one ULP above the threshold. Normalize only that
+      // operand-scale residue, symmetrically, never a financial tolerance:
+      // 4 × epsilon × sum of absolute operands, capped at CAD 0.0001
+      // (one hundredth of a cent) in BOTH anchor and nominal dollars.
+      // The 2028 equality vector leaves 1.46e-11 CAD against a 1.69e-10
+      // anchor bound; a genuine one-cent excess remains far outside it.
+      const recoveryArithmeticBoundReal = Math.min(0.0001, 0.0001 / startCpi,
+        4 * Number.EPSILON * (Math.abs(recoveryIncomeReal) + gisReal + OAS_CLAWBACK_THRESHOLD))
+      const normalizedRecoveryExcessReal = Math.abs(recoveryExcessReal) <= recoveryArithmeticBoundReal ? 0 : recoveryExcessReal
+      const gisRecoveryUnsupported = gisReal > 0 && normalizedRecoveryExcessReal > 0
+      // Supported positive-GIS classification establishes zero repayment.
+      // Preserve that exact invariant even when the ordinary OAS-only sum
+      // has sub-ULP residue. Zero GIS and unsupported speculative trials keep
+      // the existing OAS formula unchanged.
+      const netReal = oas ? gisReal > 0 && !gisRecoveryUnsupported
+        ? oas.grossReal : oasAfterClawback(oas.grossReal, before.byPerson[person.id].netIncome) : 0
       const settledOas = oas ? { ...oas, recoveryIncomeReal, netReal, recoveryReal: oas.grossReal - netReal } : undefined
       // Net OAS is the gross inclusion less line-23500 repayment; recovery
       // has already reduced benefit cash, so it is never debited as tax too.
       if (settledOas) events.push({ id: `annual:${year}:oas:${person.id}`, personId: person.id, kind: 'oas', amount: netReal })
-      const tax = settledOas ? calculateHouseholdTax(plan, year, events) : before
+      // GIS enters line 23600 before its line-25000 deduction. Price age
+      // amounts with that separate net-income basis on supported candidates;
+      // brackets and the ON health premium retain taxable income excluding
+      // GIS. Keep the fixed benefit out of events/cash and assessment lags.
+      // Outside the guarded domain only a finite provisional ordinary quote
+      // is needed for bisection, never a GIS credit override or posting. At
+      // the pivot, removing GIS from the credit phaseout basis can only lower
+      // age-credit tax, hence increase cash: there is no downward jump that
+      // could conceal a safely funded target on the supported segment. The
+      // ordinary ON quote then retains its existing monotone withdrawal
+      // curve. Any final result on this provisional branch is rejected below.
+      const ageAmountContext = gisReal > 0 && !gisRecoveryUnsupported ? { ageAmountNetIncome: {
+        [person.id]: before.byPerson[person.id].netIncome + netReal + gisReal,
+      } } : undefined
+      const tax = settledOas ? calculateHouseholdTax(plan, year, events, ageAmountContext) : before
       if (tax.status !== 'ok') throw tax
       const nominalTax = tax.total * startCpi
       if (!Number.isFinite(nominalTax) || nominalTax < 0 || !Number.isFinite(tax.byPerson[person.id]?.taxableIncome)) throw new Error('invalid canonical tax')
-      return { withdrawals, tax, nominalTax, settledOas, netCash: ((cpp?.amountReal ?? 0) + netReal + (gis?.amountReal ?? 0)) * startCpi + withdrawals.rrsp + withdrawals.tfsa - nominalTax }
+      return { withdrawals, tax, nominalTax, settledOas, gisRecoveryUnsupported, netCash: ((cpp?.amountReal ?? 0) + netReal + (gis?.amountReal ?? 0)) * startCpi + withdrawals.rrsp + withdrawals.tfsa - nominalTax }
     }
     // No persistent cash account exists in this slice. Refuse a genuine CPP
     // surplus atomically rather than dropping it from the next year's state.
     if (cpp || oas) {
       const baseline = run(0)
+      // Eligible income cannot decrease as this slice adds ordinary RRSP
+      // withdrawals. A baseline already in the domain cannot be repaired by
+      // a withdrawal; stop before surplus handling or any persistent posting.
+      if (baseline.gisRecoveryUnsupported) return fail('unsupported', GIS_OAS_RECOVERY_UNSUPPORTED)
       const bound = Math.min(0.004, 0.004 * startCpi,
         4 * Number.EPSILON * (((cpp?.amountReal ?? 0) + (oas?.grossReal ?? 0)) * startCpi + baseline.nominalTax + spendingDue))
       if (baseline.netCash - spendingDue > bound) return fail('unsupported', gis && gis.amountReal > 0 ? 'GIS: surplus requires a persistent cash destination' : oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
     }
-    const final = searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run)
+    const final = gis && gis.amountReal > 0
+      ? searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run, 120)
+      : searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run)
+    // Acceptance proof for this guarded model: with positive GIS, the
+    // accepted eligible income + gross OAS + GIS must be <= the pinned
+    // threshold after only the operand-scale residue normalization above.
+    // Actual modeled repayment is then zero (including equality),
+    // and ordinary OAS-only repayment in run() is also zero. Thus the
+    // provisional funding quote is unchanged by the missing repayment
+    // interaction for every accepted result. Above threshold we make no
+    // funding/repayment claim, even for an account-exhaustion shortfall.
+    // All candidate computations above use cloned state; stop atomically
+    // before account, room, history, return or next-year basis postings.
+    if (final.gisRecoveryUnsupported) return fail('unsupported', GIS_OAS_RECOVERY_UNSUPPORTED)
     const spendingFunded = Math.min(spendingDue, Math.max(0, final.netCash))
     const spendingUnmet = Math.max(0, spendingDue - spendingFunded)
     const accountRows: YearRow['byAccount'] = {}
@@ -166,7 +219,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
       cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
-      retirementSettlement: { ...(gis ? { gis } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      retirementSettlement: { ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))

@@ -5,6 +5,9 @@ import type { SpousalAttributionLedger } from './spousalAttribution'
 import { calculateQuebecTax } from './quebecTax'
 
 export interface PersonTaxRow {
+  /** Optional memo for the internal solo ON GIS age-credit quote. netIncome
+   * below remains the source-event subtotal, preserving assessment lags. */
+  ageAmountNetIncome?: number
   personId: string
   grossIncome: number
   netIncome: number
@@ -43,6 +46,13 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
   const provenance = taxRuleProvenance(rules)
   const income = calculatePersonIncome(plan, year, events, context)
   if (income.status !== 'ok') return income
+  const ageAmountBasis = context?.ageAmountNetIncome
+  if (ageAmountBasis !== undefined && (plan.province !== 'ON' || plan.people.length !== 1 ||
+      !ageAmountBasis || typeof ageAmountBasis !== 'object' || Array.isArray(ageAmountBasis) ||
+      Object.keys(ageAmountBasis).length !== 1 || Object.entries(ageAmountBasis).some(([id, amount]) =>
+        !income.byPerson[id] || typeof amount !== 'number' || !Number.isFinite(amount) ||
+        amount < income.byPerson[id].netIncome || amount > Number.MAX_SAFE_INTEGER / 100)))
+    return { status: 'unsupported', reason: 'GIS age-amount net income requires a safe explicit solo Ontario basis' }
   const people = structuredClone(income.byPerson)
   const election = plan.taxProfile?.pensionSplit
   if (election) {
@@ -104,14 +114,16 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     const person = people[id]
     const other = ids.find(item => item !== id)
     const spouseNetIncome = claimant === id && other ? people[other].netIncome : undefined
+    const ageAmountNetIncome = ageAmountBasis?.[id]
     const tax = incomeTax(person.taxableIncome, plan.province, { age: person.age,
+      ...(ageAmountNetIncome !== undefined ? { ageAmountNetIncome } : {}),
       pensionIncome: person.federalPensionEligible,
       provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome,
       payrollCredit: person.payrollCredit, employmentAmount: person.employmentAmount }, rules)
     byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
       taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
       provincialPensionEligible: person.provincialPensionEligible,
-      tax, bySource: person.bySource }
+      tax, bySource: person.bySource, ...(ageAmountNetIncome !== undefined ? { ageAmountNetIncome } : {}) }
   }
   return { status: 'ok', total: Object.values(byPerson).reduce((sum, row) => sum + row.tax, 0),
     byPerson, ...provenance, spousalAttribution: income.spousalAttribution }

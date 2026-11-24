@@ -2,6 +2,14 @@ import { benefitIncomeBasis, gisWorkExemption, OAS_GIS_ALLOWANCE_2026_Q4 } from 
 import type { InputsV2, Known } from './model'
 import type { AnnualOas } from './annualOas'
 
+/** Explicit model boundary, not a quote of combined benefit repayment.
+ * ITA ss.56(1)(a)(i)(A), 180.2 include GIS in adjusted income and the
+ * repayment cap. The ordinary OAS-only settlement cannot price this domain.
+ * https://laws-lois.justice.gc.ca/eng/acts/I-3.3/section-56.html
+ * https://laws-lois.justice.gc.ca/eng/acts/I-3.3/section-180.2.html
+ */
+export const GIS_OAS_RECOVERY_UNSUPPORTED = 'GIS: combined OAS/GIS recovery interaction not supported'
+
 /** Additive receipt. The legacy lag is not evidence of exemption-eligible work.
  * Only canonical settled employment/CPP/ordinary RRSP events produce this fact.
  * Self-employment, business expenses and other benefit income are unsupported.

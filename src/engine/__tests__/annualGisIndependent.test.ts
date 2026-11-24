@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { annualSheetDisplayValue } from '../../annualSheet'
+import { annualSheetDisplayValue, annualSheetText } from '../../annualSheet'
 import { canonicalAnnualSheet, canonicalSheetId } from '../../canonicalAnnualSheet'
 import { initializeState, projectAnnualCoverage, projectCanonicalCoverage, type AnnualCoverage, type KernelResult } from '../annualState'
 import { annualGis } from '../annualGis'
@@ -38,15 +38,15 @@ function ok<T>(result: KernelResult<T>): T {
   return result.value
 }
 
-function scenario({ rrsp = 0, tfsa = 0, spending = 40_000, claimAge = 65, oas = OAS, wages = wage, baseAge = 63 }: {
-  rrsp?: number; tfsa?: number; spending?: number; claimAge?: number; oas?: number; wages?: number; baseAge?: number
+function scenario({ rrsp = 0, tfsa = 0, spending = 40_000, claimAge = 65, oas = OAS, cpp = CPP, wages = wage, baseAge = 63 }: {
+  rrsp?: number; tfsa?: number; spending?: number; claimAge?: number; oas?: number; cpp?: number; wages?: number; baseAge?: number
 } = {}) {
   const plan = retirementPlan({ age: baseAge, rrsp, tfsa, spending, inflation })
   const self = plan.people[0]
-  Object.assign(self, { retirementAge: 65, cppAnnualAt65: CPP, oasAnnualAt65: oas, earnedIncome: known(wages) })
+  Object.assign(self, { retirementAge: 65, cppAnnualAt65: cpp, oasAnnualAt65: oas, earnedIncome: known(wages) })
   self.provenance.earnedIncome = recorded
   plan.lifeExpectancy = 69
-  plan.incomeSources.push(cppStart(RETIREE, 65, CPP))
+  if (cpp) plan.incomeSources.push(cppStart(RETIREE, 65, cpp))
   if (oas) plan.incomeSources.push({
     id: 'recorded-oas', kind: 'oas', recipientId: RETIREE, startAge: claimAge, annualAmount: known(oas), provenance: recorded,
   })
@@ -175,7 +175,22 @@ describe('independent Ontario solo annual GIS settlement vectors', () => {
       expect(result.rows[2].cashLedger.benefits).toBeCloseTo((OAS + gis) * cpi(2028), 5)
       expect(result.rows[2].byPerson[RETIREE].gis).toBeCloseTo(gis * cpi(2028), 5)
       expect(result.rows[2].retirementSettlement?.gis?.amountReal).toBeCloseTo(gis, 5)
-      expect(gisSheetRow(result).gis?.cells?.[2028]).toMatchObject({ value: close(gis * cpi(2028)) })
+      const { sheet, gis: gisRow } = gisSheetRow(result)
+      const cell = gisRow?.cells?.[2028]
+      expect(cell).toMatchObject({ value: close(gis * cpi(2028)) })
+      const explanation = sheet.resolveExplanation?.(cell?.explanationRefs?.[0] ?? '')
+      const sources = explanation?.sources ?? []
+      const assessment = sources.find(source => source.field === 'gisAssessmentLag')
+      if (!assessment) throw new Error('Missing GIS assessment provenance')
+      for (const [locale, ageBasis] of [
+        ['en', /age.amount net income/i], ['fr', /revenu net (?:pour|aux fins).*âge/i], ['zh', /年龄抵免净收入/],
+      ] as const) {
+        expect(annualSheetText(assessment.label, locale)).toContain('CA-OAS-GIS-2026-Q4-v1')
+        const labels = sources.map(source => annualSheetText(source.label, locale)).join(' ')
+        expect(labels).not.toContain('undefined')
+        if (gis > 0) expect(labels).toMatch(ageBasis)
+        else expect(labels).not.toMatch(ageBasis)
+      }
     }
   })
 
@@ -319,4 +334,234 @@ describe('independent Ontario solo annual GIS settlement vectors', () => {
     expect(result.state.benefitIncomeLag[RETIREE]).toEqual(known(456))
     expect(result.state.gisAssessmentLag?.[RETIREE]).toBeUndefined()
   })
+})
+
+
+// Income Tax Act ss. 56 and 180.2 include the supplement in the income
+// and repayment bases. The annual model uses its pinned 2026 threshold.
+// https://laws-lois.justice.gc.ca/eng/acts/I-3.3/section-180.2.html
+describe('independent GIS-inclusive OAS recovery guard', () => {
+  const threshold = 95_323
+  const boundaryDraw = threshold - CPP - OAS - gis65
+
+  function expectRecoveryStop(rrsp: number, spending: number) {
+    const { plan, evidence } = scenario({ rrsp, spending })
+    optIntoGis(plan)
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(prefix.blocked).toBeNull()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 5))
+    expect(result.blocked).toMatchObject({
+      year: 2028, status: 'unsupported', causes: ['unsupported'],
+      issues: [{ code: 'unsupported', detail: 'GIS: combined OAS/GIS recovery interaction not supported' }],
+    })
+    expect(result.rows).toEqual(prefix.rows)
+    expect(result.state).toEqual(prefix.state)
+    expect(result.uncomputedYears).toEqual([2029, 2030])
+    expect(result.overallConclusionAvailable).toBe(false)
+    const { sheet, gis } = gisSheetRow(result)
+    const blockedCell = gis?.cells?.[2028]
+    expect(blockedCell).toMatchObject({ status: 'not-computed', value: null })
+    expect(gis?.cells?.[2029]).toMatchObject({ status: 'not-computed', value: null })
+    const explanation = sheet.resolveExplanation?.(blockedCell?.explanationRefs?.[0] ?? '')
+    if (!explanation?.summary) throw new Error('Missing GIS recovery stop explanation')
+    expect(annualSheetText(explanation.summary, 'en')).toMatch(/combined OAS\/GIS (?:recovery|repayment)/i)
+    expect(annualSheetText(explanation.summary, 'fr')).toMatch(/récupération|recouvrement|remboursement/i)
+    expect(annualSheetText(explanation.summary, 'zh')).toMatch(/扣回|追缴|追回|回收|偿还/)
+  }
+
+  it.each([90_000, 120_000])('stops on the reviewer’s $%i spending case with a $900,000 RRSP', spending => {
+    expectRecoveryStop(900_000, spending)
+  })
+
+  it.each([0.01, 1])('stops when GIS alone pushes the exhausted candidate $%s over the threshold', offset => {
+    const rrsp = boundaryDraw + offset
+    expect(rrsp + CPP + OAS).toBeLessThan(threshold)
+    expect(rrsp + CPP + OAS + gis65).toBeCloseTo(threshold + offset, 8)
+    // With $90,000 spending and no other accounts, the early shortfall
+    // exhausts this RRSP even before subtracting regular income tax.
+    expectRecoveryStop(rrsp, 90_000)
+  })
+
+  it.each([-1, 0])('commits a GIS-inclusive recovery base $%i relative to the threshold', offset => {
+    const rrsp = boundaryDraw + offset
+    const { plan, evidence } = scenario({ rrsp, spending: 90_000 })
+    optIntoGis(plan)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(result.blocked).toBeNull()
+    const row = result.rows[2]
+    expect(row.byAccount[RRSP]).toMatchObject({ withdrawal: close(rrsp * cpi(2028)), closing: 0 })
+    expect(row.retirementSettlement?.oas).toMatchObject({ recoveryReal: 0, grossReal: OAS, netReal: OAS })
+    expect(row.byPerson[RETIREE].gis).toBeCloseTo(gis65 * cpi(2028), 5)
+    expect(row.cashLedger.spending).toBeCloseTo((threshold + offset) * cpi(2028) - row.cashLedger.tax, 5)
+  })
+
+  it('allows a safe accepted draw even though the full RRSP trial exceeds the threshold', () => {
+    const { plan, evidence } = scenario({ rrsp: 900_000 })
+    optIntoGis(plan)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(result.blocked).toBeNull()
+    const row = result.rows[2]
+    expect(row.byAccount[RRSP].opening / cpi(2028) + CPP + OAS + gis65).toBeGreaterThan(threshold)
+    expect(row.byAccount[RRSP].withdrawal).toBeGreaterThan(0)
+    expect(row.byAccount[RRSP].withdrawal / cpi(2028) + CPP + OAS + gis65).toBeLessThan(threshold)
+    expect(row.retirementSettlement).toMatchObject({ spendingFunded: close(40_000 * cpi(2028)), spendingUnmet: close(0) })
+  })
+
+  it('settles the same safe withdrawal with an extreme or moderate speculative RRSP cap', () => {
+    // Both full age amounts remain available on the accepted candidate. At
+    // the resulting taxable income both tax rates are in the first bracket
+    // and Ontario's health premium is on its $300 plateau.
+    const spending = 40_000
+    const credits = 0.14 * (16_452 + 9_208) + 0.0505 * (12_989 + 6_342)
+    const taxable = (spending - MAX_GIS - credits + 300) / (1 - 0.14 - 0.0505)
+    const draw = taxable - OAS
+    const tax = taxable + MAX_GIS - spending
+    const rrspBalances = [900_000, Number.MAX_SAFE_INTEGER / 100 - 1_000]
+    const withdrawals = rrspBalances.map(rrsp => {
+      const { plan, evidence } = scenario({ cpp: 0, wages: 0, spending, rrsp })
+      plan.inflation = 0
+      optIntoGis(plan)
+      const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+      expect(result.blocked).toBeNull()
+      const row = result.rows[2]
+      const withdrawal = row.byAccount[RRSP].withdrawal
+      expect(Math.abs(withdrawal - draw)).toBeLessThan(0.0001)
+      expect(row).toMatchObject({
+        taxLedger: { [RETIREE]: { taxableIncome: expect.closeTo(taxable, 2), tax: expect.closeTo(tax, 2) } },
+        cashLedger: { benefits: expect.closeTo(OAS + MAX_GIS, 2), tax: expect.closeTo(tax, 2), spending, unallocated: expect.closeTo(0, 2) },
+        retirementSettlement: {
+          gis: { amountReal: close(MAX_GIS) }, gisAgeAmountNetIncomeReal: expect.closeTo(taxable + MAX_GIS, 2),
+          oas: { recoveryReal: 0, grossReal: OAS, netReal: OAS }, spendingFunded: spending, spendingUnmet: 0,
+        },
+      })
+      expect(result.state.gisAssessmentLag?.[RETIREE]).toMatchObject({
+        status: 'known', value: { assessmentYear: 2028, incomeNominal: close(withdrawal), employmentNetPayrollNominal: 0 },
+      })
+      return withdrawal
+    })
+    expect(Math.abs(withdrawals[1] - withdrawals[0])).toBeLessThan(0.0001)
+  })
+
+  it.each([-0.01, 0, 0.01])('decides an extreme-cap funded withdrawal $%s from the recovery threshold', offset => {
+    const rrsp = Number.MAX_SAFE_INTEGER / 100 - 1_000
+    const draw = threshold - MAX_GIS - OAS + offset
+    const taxable = draw + OAS
+    const netIncome = taxable + MAX_GIS
+    // At this income Ontario's age amount is zero and the $750 premium
+    // applies. Federal age credit still phases out at 15% of net income.
+    const federalAgeAmount = 9_208 - 0.15 * (netIncome - 46_432)
+    const tax = 0.14 * (58_523 - 16_452 - federalAgeAmount) + 0.205 * (taxable - 58_523)
+      + 0.0505 * (53_891 - 12_989) + 0.0915 * (taxable - 53_891) + 750
+    const spending = netIncome - tax
+    if (offset === 0) {
+      expect(draw).toBeCloseTo(72_506.20, 8)
+      expect(spending).toBeCloseTo(79_597.0962, 8)
+    }
+    const { plan, evidence } = scenario({ wages: 0, cpp: 0, rrsp, spending })
+    plan.inflation = 0
+    optIntoGis(plan)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    if (offset > 0) {
+      expect(result.blocked).toMatchObject({
+        year: 2028, status: 'unsupported',
+        issues: [{ code: 'unsupported', detail: 'GIS: combined OAS/GIS recovery interaction not supported' }],
+      })
+      return
+    }
+    expect(result.blocked).toBeNull()
+    const row = result.rows[2]
+    expect(Math.abs(row.byAccount[RRSP].withdrawal - draw)).toBeLessThan(0.0001)
+    expect(row.retirementSettlement).toMatchObject({
+      oas: { recoveryReal: 0, grossReal: OAS, netReal: OAS },
+      gisAgeAmountNetIncomeReal: expect.closeTo(netIncome, 2),
+      spendingFunded: expect.closeTo(spending, 2), spendingUnmet: 0,
+    })
+    expect(row.taxLedger[RETIREE]).toMatchObject({ taxableIncome: expect.closeTo(taxable, 2), tax: expect.closeTo(tax, 2) })
+  })
+
+  it('posts exactly zero OAS recovery when a tiny positive GIS reaches the bounded equality', () => {
+    const rrsp = 86_173.00000000002
+    const spending = 110_000
+    const workingSpending = 29_673.52814634313
+    const { plan, evidence } = scenario({ baseAge: 64, cpp: 0, wages: 35_602.41242492631, rrsp, spending })
+    plan.inflation = 0
+    plan.budget = { kind: 'incomeBudget', workingSpending, retirementSpending: spending }
+    evidence.workingSpending = known(workingSpending)
+    optIntoGis(plan, 2027)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(result.blocked).toBeNull()
+    const row = result.rows[1]
+    expect(row.byAccount[RRSP].withdrawal).toBe(rrsp)
+    const gis = row.retirementSettlement?.gis?.amountReal ?? 0
+    expect(gis).toBeGreaterThan(0)
+    expect(gis).toBeLessThan(1e-9)
+    expect(row.retirementSettlement?.oas).toMatchObject({ recoveryReal: 0, grossReal: OAS, netReal: OAS })
+    expect(row.byPerson[RETIREE]).toMatchObject({ oasRecovery: 0, oasGross: OAS, oasNet: OAS })
+  })
+
+  it('preserves ordinary OAS recovery when assessed GIS is a known zero', () => {
+    const { plan, evidence } = scenario({ wages: 40_000, rrsp: 900_000, spending: 90_000 })
+    const excluded = ok(projectCanonicalCoverage(plan, evidence, 3))
+    optIntoGis(plan)
+    const optedIn = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(excluded.blocked).toBeNull()
+    expect(optedIn.blocked).toBeNull()
+    const row = optedIn.rows[2]
+    const control = excluded.rows[2]
+    expect(row.byPerson[RETIREE].gis).toBe(0)
+    expect(row.retirementSettlement?.gis?.amountReal).toBe(0)
+    expect(row.retirementSettlement?.oas?.recoveryReal).toBeGreaterThan(0)
+    expect(row.retirementSettlement?.oas?.recoveryReal).toEqual(control.retirementSettlement?.oas?.recoveryReal)
+    expect(row.cashLedger).toEqual(control.cashLedger)
+    expect(row.taxLedger).toEqual(control.taxLedger)
+    expect(row.byAccount).toEqual(control.byAccount)
+  })
+})
+
+
+it('uses GIS in net income for federal and Ontario age amounts while excluding it from taxable income and the next GIS assessment', () => {
+  // CRA lines 30100/58080 use line 23600 net income. The GIS deduction at
+  // line 25000 reduces taxable income in this below-recovery fixture.
+  // https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-30100-amount.html
+  // https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-25000-other-payments-deduction.html
+  const draw = 60_000
+  const taxable = draw + OAS
+  const factor = cpi(2028)
+  // The fixtures lie in the second tax bracket in both jurisdictions, below
+  // Ontario surtax and in the $600 premium plateau. Both age amounts phase down.
+  const ageAmount = (maximum: number, threshold: number, netIncome: number) => maximum - 0.15 * (netIncome - threshold)
+  const federal = (netIncome: number) => 0.14 * (58_523 - 16_452 - ageAmount(9_208, 46_432, netIncome))
+    + 0.205 * (taxable - 58_523)
+  const ontario = (netIncome: number) => 0.0505 * (53_891 - 12_989 - ageAmount(6_342, 47_210, netIncome))
+    + 0.0915 * (taxable - 53_891) + 600
+  expect(federal(taxable + MAX_GIS) - federal(taxable)).toBeCloseTo(287.0028, 6)
+  expect(ontario(taxable + MAX_GIS) - ontario(taxable)).toBeCloseTo(103.52601, 6)
+
+  for (const optIn of [false, true]) {
+    const gis = optIn ? MAX_GIS : 0
+    const tax = federal(taxable + gis) + ontario(taxable + gis)
+    const spending = taxable + gis - tax
+    const { plan, evidence } = scenario({ wages: 0, cpp: 0, rrsp: 900_000, spending })
+    if (optIn) optIntoGis(plan)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(result.blocked).toBeNull()
+    const row = result.rows[2]
+    expect(row).toMatchObject({
+      byAccount: { [RRSP]: { withdrawal: close(draw * factor) } },
+      taxLedger: { [RETIREE]: { taxableIncome: close(taxable * factor), tax: close(tax * factor) } },
+      cashLedger: { benefits: close((OAS + gis) * factor), spending: close(spending * factor), unallocated: close(0) },
+      retirementSettlement: { oas: { recoveryReal: 0 }, spendingUnmet: close(0) },
+    })
+    if (optIn) {
+      expect(row.retirementSettlement?.gisAgeAmountNetIncomeReal).toBeCloseTo(taxable + gis, 5)
+      expect(result.state.gisAssessmentLag?.[RETIREE]).toMatchObject({
+        status: 'known', value: { assessmentYear: 2028, incomeNominal: close(draw * factor), employmentNetPayrollNominal: 0 },
+      })
+      const next = ok(projectCanonicalCoverage(plan, evidence, 4))
+      expect(next.blocked).toBeNull()
+      expect(next.rows[3].retirementSettlement?.gis).toMatchObject({
+        amountReal: 0, assessmentYear: 2028, grossIncomeReal: close(draw),
+      })
+    }
+  }
 })

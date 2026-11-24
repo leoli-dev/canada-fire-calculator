@@ -61,6 +61,10 @@ const fail = (status: 'invalid' | 'unsupported', reason: string): IncomeResult =
  * never mutated in place and is never written back into the canonical plan.
  */
 export interface IncomeYearContext {
+  /** Internal solo Ontario GIS tax quote only: explicit line-23600 basis for
+   * federal/ON age amounts. Includes GIS, unlike taxable income after line
+   * 25000. Does not alter income events, cash or the GIS assessment ledger. */
+  ageAmountNetIncome?: Record<string, number>
   registeredOpeningBalances?: Record<string, number>
   spousalAttributionLedger?: SpousalAttributionLedger
   /**

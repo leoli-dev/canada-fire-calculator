@@ -67,7 +67,7 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
