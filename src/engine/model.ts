@@ -150,7 +150,15 @@ export type BudgetReconciliation = {
   /** The savings answers, kept while the plan is in `incomeBudget`. */
   savingsBasis?: BudgetBasis
 }
+/** Internal annual settlement exclusions: supplied facts, never inferred from income. */
+export interface BenefitExclusion {
+  status: 'excluded' | 'not-applicable'
+  reason: string
+  provenance: Provenance
+}
 export interface InputsV2 {
+  annualBenefitsEvidence?: Record<string, { gis: BenefitExclusion; allowance: BenefitExclusion; otherBenefits: BenefitExclusion }>
+
   schemaVersion: 2
   baseYear: number
   province: Province

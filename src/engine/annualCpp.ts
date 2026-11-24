@@ -1,4 +1,5 @@
 import type { InputsV2, Person } from './model'
+import { annualOas } from './annualOas'
 import { personCppAnnual } from './pensionProvenance'
 
 /** Annual convention: age reached in the year, full-year payment at start CPI.
@@ -51,10 +52,12 @@ export function annualCpp(plan: InputsV2, person: Person, age: number): AnnualCp
       person.cppWork ||
       !Number.isFinite(s.annualAmount.value) || s.annualAmount.value < 0)
     throw { status: 'unsupported', reason: 'CPP requires unique confirmed canonical source (user or matching app mirror), known matching amount, verified today-dollar basis and start age; statement retirement premise must be confirmed' }
-  // OAS eligibility/activity and GIS/Allowance have no absence evidence in this
-  // slice. Stop before their age-dependent eligibility can affect settlement.
-  if (plan.people.some(p => p.cppAnnualAt65 > 0) && plan.people.some(p => p.ageInBaseYear + age - person.ageInBaseYear >= 65))
-    throw { status: 'unsupported', reason: 'CPP slice stops at household age 65: OAS/GIS/Allowance eligibility not wired' }
+  // Crossing 65 requires independently verified OAS and explicit exclusions.
+  // The legacy known-zero context retains its existing stop and reason.
+  if (plan.people.some(p => p.cppAnnualAt65 > 0) && plan.people.some(p => p.ageInBaseYear + age - person.ageInBaseYear >= 65)) {
+    if (!plan.annualBenefitsEvidence) throw { status: 'unsupported', reason: 'CPP slice stops at household age 65: OAS/GIS/Allowance eligibility not wired' }
+    for (const member of plan.people) annualOas(plan, member, member.ageInBaseYear + age - person.ageInBaseYear)
+  }
   if (age < person.retirementAge && age >= s.startAge! && s.annualAmount.value > 0)
     throw { status: 'unsupported', reason: 'working CPP recipient requires post-retirement benefit and payroll election rules' }
   const amountReal = age < s.startAge! ? 0 : personCppAnnual(person, s.startAge!, plan.province, s.annualAmount.value, p.ageBasis)
