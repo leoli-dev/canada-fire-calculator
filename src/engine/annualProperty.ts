@@ -48,6 +48,10 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
  * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
  */
 export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence): string | null {
+  if (!plan.debts.length && plan.annualPrimaryHomePurchaseEvidence && plan.properties.length === 1 && plan.properties[0].plannedPurchaseAge !== null) {
+    const p = plan.properties[0]
+    return passiveHomeProblem({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
+  }
   if (!plan.debts.length) return passiveHomeProblem(plan)
   const p = plan.properties[0], d = plan.debts[0]
   if (!p || plan.properties.length !== 1 || plan.debts.length !== 1 || d.kind !== 'mortgage' || d.propertyId !== p.id || p.mortgageDebtId !== d.id)
