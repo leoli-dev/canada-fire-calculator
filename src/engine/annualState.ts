@@ -35,6 +35,7 @@ export interface AnnualState {
    * entry means the room is not yet established for that person, never zero.
    */
   fhsaLedgers?: Record<string, FhsaRoomYear>
+  tfsaWithdrawalHistory?: { id: string; calendarYear: number; amount: number; personId: string }[]
   unfundedEvents: FundingGap[]
 }
 
@@ -54,6 +55,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
+  retirementSettlement?: { evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
@@ -131,7 +133,7 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
 }
 
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
-function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
+export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
   try {
     const self = plan.people.find(person => person.role === 'self')!
     if (!Number.isInteger(opening.year) || opening.year < plan.baseYear || opening.baseYear !== plan.baseYear) return 'snapshot year/base mismatch'
@@ -604,7 +606,7 @@ export type AnnualStopCause = 'retirement' | 'propertyPurchase' | 'propertySale'
 
 /** Diagnostic classification stays internal: detail strings never become display text.
  * The strict API returns its original issue objects, without extra fields. */
-function annualStopCause(issue: AnnualIssue): AnnualStopCause {
+export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   const detail = issue.detail
   if (issue.code === 'unfunded') return 'contributionFunding'
   if (detail === 'retirement withdrawals and benefit rules not yet wired') return 'retirement'
@@ -636,7 +638,7 @@ export interface AnnualCoverage {
   /** Requested years strictly after the first blocked year. */
   uncomputedYears: number[]
   overallConclusionAvailable: boolean
-  evaluationBasis: 'provider-supplied'
+  evaluationBasis: 'provider-supplied' | 'canonical-retirement'
 }
 
 export function projectAnnualCoverage(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<AnnualCoverage> {

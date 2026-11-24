@@ -1,3 +1,4 @@
+import { allocateOrderedWithdrawals, searchWithdrawalTarget } from './withdrawalSearch'
 import {
   ACCOUNT_TYPES,
   type AccountType,
@@ -171,21 +172,7 @@ function evaluate(
   legacyRules?: TaxRuleContext,
   hbpIncome?: HbpIncome[],
 ): WithdrawalOutcome {
-  const w: Record<AccountType, number> = { tfsa: 0, rrsp: 0, nonReg: 0 }
-  let remaining = G
-
-  const fromRrif = Math.min(remaining, forcedRrsp)
-  w.rrsp += fromRrif
-  remaining -= fromRrif
-
-  for (const s of steps) {
-    let capacity = balances[s.account] - w[s.account]
-    if (s.cap !== undefined) capacity = Math.min(capacity, Math.max(0, s.cap - w[s.account]))
-    const take = Math.min(remaining, capacity)
-    w[s.account] += take
-    remaining -= take
-    if (remaining <= 0) break
-  }
+  const w = allocateOrderedWithdrawals(G, balances, forcedRrsp, steps)
 
   const persons = oasGrossPerPerson.length
   // extraTaxable is taxable but not cash-in-hand (reinvested distributions,
@@ -333,20 +320,7 @@ function solveWithdrawals(
   const run = (G: number) =>
     evaluate(G, balances, forcedRrsp, gainFraction, cpp, pension, oasGrossPerPerson, agesPerPerson, extraTaxable, nonRegDistributions, rent, extraIncome, nUnder6, n6to17, steps, inputs, prepaidPurchaseTax, purchaseRrspWithdrawal, purchaseNonRegTaxable, propertySaleTaxable, canonical, taxYear, spousalAttribution, legacyRules, hbpIncome)
 
-  const atMin = run(forcedRrsp)
-  if (atMin.netCash >= target) return atMin
-
-  const atMax = run(total)
-  if (atMax.netCash < target) return atMax
-
-  let lo = forcedRrsp
-  let hi = total
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2
-    if (run(mid).netCash < target) lo = mid
-    else hi = mid
-  }
-  return run(hi)
+  return searchWithdrawalTarget(target, forcedRrsp, total, run)
 }
 
 /** Primary-timeline age at which the first government benefit begins. */

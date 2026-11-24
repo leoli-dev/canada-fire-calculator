@@ -112,10 +112,12 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
   const explanations = new Map<string, () => AnnualSheetExplanation>()
   const make = (id: string, label: AnnualSheetText, get: (row: YearRow) => number | null,
     timing: AnnualSheetCell['timing'] = 'during-year', options: { supplied?: boolean; unit?: AnnualSheetCell['unit']; taxBasis?: boolean; entity?: AnnualSheetRow['entity']; applicable?: (row: YearRow) => boolean; inapplicable?: 'workingYear' | 'nonTerminal'; memo?: boolean; postingDetail?: boolean; retainedDetail?: boolean; summary?: AnnualSheetText; formula?: (row: YearRow) => NonNullable<AnnualSheetExplanation['formula']>; sources?: (row: YearRow) => NonNullable<AnnualSheetExplanation['sources']>; realValue?: (row: YearRow, start: number, end: number) => number } = {}): AnnualSheetRow => ({
-    id, label, entity: options.entity,
+    id, label: coverage.evaluationBasis === 'canonical-retirement' && label === labels.tax ? text('Modeled tax', 'Impôt modélisé', '模型税额') : coverage.evaluationBasis === 'canonical-retirement' && label === labels.benefits ? text('Confirmed cash benefits', 'Prestations confirmées', '已确认现金福利') : label, entity: options.entity,
     cells: Object.fromEntries(years.map(({ year, openingRealFactor, realFactor }) => {
       const row = settled.get(year)
       const reference = JSON.stringify([id, year])
+      const supplied = options.supplied && !row?.retirementSettlement
+      const estimated = supplied || !!row?.retirementSettlement && (row.retirementSettlement.taxRules.coverage === 'estimated' || row.retirementSettlement.taxRules.assumedFutureRule || row.year > row.retirementSettlement.taxRules.ruleYear)
       const applicable = row && (options.applicable?.(row) ?? true)
       const value = applicable ? get(row!) : null
       const limitation: CanonicalSheetLimitation = !row ? year === coverage.blocked?.year
@@ -123,16 +125,16 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
         : 'suffix' : !applicable ? options.inapplicable ?? 'notHeld' : 'unknown'
       const stop = !row && year === coverage.blocked?.year ? coverage.blocked.causes[0] : undefined
       const reason = stop ? stopCopy[stop] : copy[limitation]
-      explanations.set(reference, () => ({ summary: options.summary ?? (options.memo ? copy.memo : options.supplied ? copy.supplied : copy.ledger),
-        projectionYear: year, sources: [{ label: options.supplied ? copy.supplied : copy.ledger,
-          id: options.entity?.id, field: id, code: !row || value === null ? stop ?? limitation : undefined, granularity: 'year' }, ...(row && options.sources ? options.sources(row) : []),
+      explanations.set(reference, () => ({ summary: options.summary ?? (options.memo ? copy.memo : supplied ? copy.supplied : copy.ledger),
+        projectionYear: year, rulePackage: row?.retirementSettlement?.taxRules.rulePackId, taxYear: row?.retirementSettlement?.taxRules.ruleYear, formulaBasis: row?.retirementSettlement ? text('Start-year nominal CAD ÷ start CPI → anchor-year real tax → tax × start CPI for nominal settlement.', 'CAD nominaux au début ÷ IPC initial → impôt réel de référence → impôt × IPC initial pour règlement nominal.', '年初名义加元 ÷ 年初 CPI → 基准年实际税额 → 税额 × 年初 CPI 进行名义结算。') : undefined, forwardAssumption: row?.retirementSettlement && (row.retirementSettlement.taxRules.assumedFutureRule || row.year > row.retirementSettlement.taxRules.ruleYear) ? text(`Pinned anchor-year ${row.retirementSettlement.taxRules.ruleYear} real tax rules used for projection year ${row.year}; future statutory changes are not priced.`, `Règles fiscales réelles de référence ${row.retirementSettlement.taxRules.ruleYear} utilisées pour ${row.year}; les modifications légales futures ne sont pas calculées.`, `预测年份 ${row.year} 使用固定基准年 ${row.retirementSettlement.taxRules.ruleYear} 的实际税务规则；未计算未来法定变更。`) : undefined, sources: [{ label: supplied ? copy.supplied : copy.ledger,
+          id: options.entity?.id, field: id, code: !row || value === null ? stop ?? limitation : undefined, granularity: 'year' }, ...(row?.retirementSettlement ? [{ label: text('Canonical retirement tax rules; start-CPI nominal to anchor real and back', 'Règles fiscales de retraite; IPC initial vers réel puis nominal', '退休税务规则；年初 CPI 名义与实际换算'), id: row.retirementSettlement.taxRules.rulePackId, field: 'retirementSettlement.taxRules', granularity: 'year' as const }] : []), ...(row && applicable && options.sources ? options.sources(row) : []),
           ...(row && options.postingDetail ? row.contributionLedger.postings.flatMap(posting => [
             { label: postingLabel(posting), id: posting.id, field: 'contributionPosting', granularity: 'year' as const },
             { label: labels.account, id: posting.accountId, field: 'accountId', granularity: 'year' as const },
             { label: text('Account owner', 'Titulaire du compte', '账户持有人'), id: posting.ownerId, field: 'ownerId', granularity: 'year' as const },
             { label: text('Contributor', 'Cotisant', '供款人'), id: posting.contributorId ?? undefined, field: 'contributorId', granularity: 'year' as const },
           ]) : []), ...(row && options.retainedDetail ? row.contributionLedger.retained.map(posting => ({ label: retainedLabel(posting), id: posting.personId, field: posting.kind, granularity: 'year' as const })) : [])],
-        formula: row && options.formula ? options.formula(row) : row && options.postingDetail ? row.contributionLedger.postings.map(posting => ({
+        formula: !applicable ? undefined : row && options.formula ? options.formula(row) : row && options.postingDetail ? row.contributionLedger.postings.map(posting => ({
           label: postingLabel(posting), sourceId: posting.id, field: 'contributionPosting', value: posting.amount,
           direction: 'add' as const, unit: 'CAD' as const, basis: 'nominal-CAD' as const,
         })) : row && options.retainedDetail ? row.contributionLedger.retained.map(posting => ({
@@ -141,11 +143,11 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
         })) : undefined,
         limitations: !row || value === null ? [reason] : undefined }))
       const cell: AnnualSheetCell = { value: value !== null && Number.isFinite(value) ? value === 0 ? 0 : value : null,
-        status: !row ? 'not-computed' : !applicable ? 'not-applicable' : value === null || !Number.isFinite(value) ? 'unknown' : options.supplied ? 'estimated' : 'calculated',
+        status: !row ? 'not-computed' : !applicable ? 'not-applicable' : value === null || !Number.isFinite(value) ? 'unknown' : estimated ? 'estimated' : 'calculated',
         realFactor: timing === 'closing' || timing === 'terminal' ? realFactor : openingRealFactor,
         realValue: row && options.realValue ? options.realValue(row, openingRealFactor, realFactor) : undefined,
         timing, unit: options.unit ?? 'CAD', basis: options.taxBasis ? 'nominal-tax-basis' : 'nominal-CAD',
-        nativeBasis: options.supplied ? copy.supplied : copy.ledger, conversion: copy.ledger,
+        nativeBasis: supplied ? copy.supplied : copy.ledger, conversion: copy.ledger,
         reason: !row || !applicable || value === null ? reason : undefined, explanationRefs: [reference] }
       return [year, cell]
     })),
@@ -156,6 +158,11 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
   const numbered = (label: AnnualSheetText, index: number): AnnualSheetText => typeof label === 'string' ? `${label} ${index + 1}` : { en: `${label.en} ${index + 1}`, fr: `${label.fr} ${index + 1}`, zh: `${label.zh} ${index + 1}` }
   const group = (id: string, label: AnnualSheetText, children: AnnualSheetRow[], entity?: AnnualSheetRow['entity']): AnnualSheetRow => ({ id, label, kind: 'group', children, entity })
   const household = (row: YearRow) => Object.values(row.byAccount).reduce((sum, account) => sum + account.closing, 0)
+  const fundedFormula = (row: YearRow): NonNullable<AnnualSheetExplanation['formula']> => [
+    ...Object.entries(row.byAccount).map(([accountId, account]) => ({ label: text('Account withdrawal', 'Retrait du compte', '账户提款'), sourceId: `annual:${row.year}:withdrawal:${accountId}`, field: 'withdrawal', value: account.withdrawal, direction: 'add' as const, unit: 'CAD' as const, basis: 'nominal-CAD' as const })),
+    { label: text('Modeled tax', 'Impôt modélisé', '模型税额'), field: 'tax', value: row.cashLedger.tax, direction: 'subtract', unit: 'CAD', basis: 'nominal-CAD' },
+    { label: labels.unallocated, field: 'unallocated', value: row.cashLedger.unallocated, direction: 'subtract', unit: 'CAD', basis: 'nominal-CAD' },
+  ]
   const rows: AnnualSheetRow[] = [group(canonicalSheetId('group', 'household'), labels.household, [
     ...Object.keys(coverage.rows[0]?.cashLedger ?? { income: 0, benefits: 0, tax: 0, spending: 0, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: 0 }).map(key => {
       const field = key as keyof YearRow['cashLedger']
@@ -164,7 +171,7 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
     make(canonicalSheetId('value', 'cash', 'scheduledRrspBudgeted'), labels.scheduledRrspBudgeted, row => row.contributionLedger.scheduledRrspBudgeted, 'during-year', { summary: copy.allocation }),
     make(canonicalSheetId('value', 'cash', 'netAvailableCash'), labels.netAvailableCash,
       row => row.contributionLedger.allocationCashBasis,
-      'during-year', { summary: copy.allocation, sources: () => [{ label: copy.allocationBasis, field: 'contributionLedger.allocationCashBasis', granularity: 'year' }],
+      'during-year', { applicable: row => !row.retirementSettlement, summary: copy.allocation, sources: () => [{ label: copy.allocationBasis, field: 'contributionLedger.allocationCashBasis', granularity: 'year' }],
         formula: row => (['fhsaContributions', 'employeeContributions', 'voluntaryContributions', 'scheduledRrspBudgeted', 'unallocated'] as const).map(field => ({
           label: labels[field], sourceId: canonicalSheetId('value', 'cash', field), field,
           value: field === 'scheduledRrspBudgeted' ? row.contributionLedger.scheduledRrspBudgeted : row.cashLedger[field],
@@ -173,18 +180,26 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
       }),
     make(canonicalSheetId('value', 'cash', 'suppliedNetCash'), labels.suppliedNetCash,
       row => row.cashLedger.income + row.cashLedger.benefits - row.cashLedger.tax - row.cashLedger.spending - row.cashLedger.debtPayments,
-      'during-year', { supplied: true, summary: copy.suppliedCash,
+      'during-year', { applicable: row => !row.retirementSettlement, supplied: true, summary: copy.suppliedCash,
         formula: row => (['income', 'benefits', 'tax', 'spending', 'debtPayments'] as const).map(field => ({
           label: labels[field], sourceId: canonicalSheetId('value', 'cash', field), field, value: row.cashLedger[field],
           direction: field === 'income' || field === 'benefits' ? 'add' : 'subtract', unit: 'CAD', basis: 'nominal-CAD',
         })),
       }),
+    ...(['spendingDue', 'spendingFunded', 'spendingUnmet'] as const).map(field => make(canonicalSheetId('value', 'retirement', field), ({ spendingDue: text('Spending due', 'Dépenses dues', '应付支出'), spendingFunded: text('Spending funded', 'Dépenses financées', '已筹资支出'), spendingUnmet: text('Unmet spending', 'Dépenses non financées', '未满足支出') })[field], row => row.retirementSettlement?.[field] ?? null, 'during-year', {
+      applicable: row => !!row.retirementSettlement, inapplicable: 'workingYear',
+      sources: row => [{ label: text('Retirement spending input, indexed at start CPI', 'Dépenses de retraite indexées à l’IPC initial', '退休支出输入，按年初 CPI 换算'), field: 'budget.retirementSpending', granularity: 'input' }, ...Object.keys(row.byAccount).map(accountId => ({ label: labels.withdrawal, id: `annual:${row.year}:withdrawal:${accountId}`, field: 'withdrawal', granularity: 'event' as const }))],
+      formula: row => field === 'spendingFunded' ? fundedFormula(row) : field === 'spendingUnmet' ? [
+        { label: text('Spending due', 'Dépenses dues', '应付支出'), field: 'spendingDue', value: row.retirementSettlement!.spendingDue, direction: 'add', unit: 'CAD', basis: 'nominal-CAD' },
+        { label: text('Spending funded', 'Dépenses financées', '已筹资支出'), field: 'spendingFunded', value: row.retirementSettlement!.spendingFunded, direction: 'subtract', unit: 'CAD', basis: 'nominal-CAD' },
+      ] : [{ label: text('Indexed spending due', 'Dépenses indexées dues', '按 CPI 换算的应付支出'), field: 'spendingDue', value: row.retirementSettlement!.spendingDue, direction: 'add', unit: 'CAD', basis: 'nominal-CAD' }],
+    })),
     ...(['opening', 'contribution', 'withdrawal', 'returnAmount'] as const).map(field =>
       make(canonicalSheetId('value', 'accounts', field), labels[field], row => Object.values(row.byAccount).reduce((sum, a) => sum + a[field], 0), field === 'opening' ? 'opening' : 'during-year')),
     make(canonicalSheetId('value', 'assets'), labels.assets, household, 'closing'),
     make(canonicalSheetId('value', 'netWorth'), labels.netWorth, row => household(row) + Object.values(row.byProperty).filter(p => p.held).reduce((sum, p) => sum + p.closing, 0) - Object.values(row.byDebt).reduce((sum, d) => sum + d.closing, 0), 'closing'),
     bridge('accounts', null, household),
-    make(canonicalSheetId('value', 'retirement'), labels.retirement, () => null, 'during-year', { applicable: () => false, inapplicable: 'workingYear' }),
+    make(canonicalSheetId('value', 'retirement'), labels.retirement, row => row.retirementSettlement?.spendingFunded ?? null, 'during-year', { applicable: row => !!row.retirementSettlement, inapplicable: 'workingYear' }),
     make(canonicalSheetId('value', 'estate'), labels.estate, () => null, 'terminal', { applicable: row => row.year === coverage.terminalYear, inapplicable: 'nonTerminal' }),
     ...(['scheduledPlanned', 'scheduledApplied', 'scheduledRetained', 'appliedTotal'] as const).map(field => make(canonicalSheetId('value', 'contributions', field), labels[field], row => row.contributionLedger[field], 'during-year', { memo: true, postingDetail: field === 'appliedTotal' })),
   ])]
@@ -215,6 +230,6 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
     const entity = { kind: 'property' as const, id }
     rows.push(group(canonicalSheetId('group', 'property', id), numbered(labels.property, index), [...(['opening', 'growth', 'closing'] as const).map(field => make(canonicalSheetId('value', 'property', id, field), labels[field], row => row.byProperty[id][field], field === 'opening' ? 'opening' : field === 'closing' ? 'closing' : 'during-year', { entity, applicable: row => row.byProperty[id].held })), bridge('property', id, row => row.byProperty[id].closing, entity, row => row.byProperty[id].held)], entity))
   }
-  return { ...context, title: text('Canonical annual ledger', 'Registre annuel canonique', '标准年度账本'), scope: copy.scope,
+  return { ...context, title: text('Canonical annual ledger', 'Registre annuel canonique', '标准年度账本'), scope: coverage.evaluationBasis === 'canonical-retirement' ? text('Internal canonical retirement settlement using production tax rules. Funded spending and unmet spending are separate; future mandatory rules and estate settlement remain unsupported. No FIRE conclusion is available.', 'Règlement interne de retraite selon les règles fiscales de production. Dépenses financées et non financées distinctes; règles obligatoires futures et succession non prises en charge. Aucune conclusion FIRE.', '使用生产税务规则的内部标准退休结算。已筹资及未满足支出分列；未来强制规则和遗产结算尚不支持。不提供 FIRE 结论。') : copy.scope,
     baseYear: coverage.baseYear, years, rows, resolveExplanation: reference => explanations.get(reference)?.() }
 }
