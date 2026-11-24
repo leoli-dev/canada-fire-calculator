@@ -1,3 +1,4 @@
+import { growHeldProperties, passiveHomeProblem } from './annualProperty'
 import { nonRegProblem, quoteNonRegSale, acceptedNonRegProblem } from "./annualNonReg"
 import { minimumForRrif } from "./rrif"
 import { annualGis, gisAssessmentReceipt, GIS_OAS_RECOVERY_UNSUPPORTED } from './annualGis'
@@ -74,7 +75,8 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const oas = generated && plan.annualBenefitsEvidence ? annualGeneratedRetirementOas(plan, person, age, opening) : undefined
     if ((!generated && person.cppAnnualAt65 !== 0) || (!oas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'retirement pension or CPP work rules not yet wired')
-    if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
+    if (plan.dependents.length || plan.debts.length || (plan.properties.length && (!generated || passiveHomeProblem(plan)))) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
+    if (plan.properties.some(p => p.sellAtAge !== null && age >= p.sellAtAge && opening.byProperty[p.id]?.held)) return fail('unsupported', 'property sale funding and tax integration not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'retirement tax election not supported')
     const cpp = generated && person.cppAnnualAt65 > 0 ? annualCpp(plan, person, age, opening) : undefined
     // The newly admitted opted-in years must validate recorded absence too:
@@ -321,6 +323,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const assessmentIncome = (final.tax.byPerson[person.id].netIncome - (final.settledOas?.netReal ?? 0)) * startCpi
     state.benefitIncomeLag[person.id] = { status: 'known', value: assessmentIncome }
     if (generated) (state.gisAssessmentLag ??= {})[person.id] = gisAssessmentReceipt(year, assessmentIncome, 0)
+    const propertyRows = growHeldProperties(plan, state)
     state.year++
     const committedProblem = retirementSnapshotProblem(plan, state, generated ? opening : undefined)
     if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
@@ -329,7 +332,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const oasColumns = final.settledOas ? { oasGross: final.settledOas.grossReal * startCpi, oasRecovery: final.settledOas.recoveryReal * startCpi, oasNet: final.settledOas.netReal * startCpi } : {}
     const gisCash = (gis?.amountReal ?? 0) * startCpi
     const oasCash = (final.settledOas?.netReal ?? 0) * startCpi
-    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
+    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: propertyRows,
       cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
       retirementSettlement: { ...(poolAllowed ? { cashBridge: { method: 'compensated-signed-cash' as const, netCash: final.netCash } } : {}), ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }

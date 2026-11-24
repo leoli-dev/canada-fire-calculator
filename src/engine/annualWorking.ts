@@ -1,3 +1,4 @@
+import { passiveHomeProblem } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
 import { annualOas, annualHouseholdOas, settleHouseholdOas, type AnnualOas } from './annualOas'
@@ -189,7 +190,7 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     if (futureOas && futureOas.grossReal > 0) return fail('unsupported', 'working OAS settlement not yet wired')
     if ((!generated && person.cppAnnualAt65 !== 0) || (!futureOas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
-    if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
+    if (plan.dependents.length || plan.debts.length || (plan.properties.length && (!generated || passiveHomeProblem(plan)))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
     const cpp = generated && person.cppAnnualAt65 !== 0 ? annualCpp(plan, person, age) : undefined
     if (plan.incomeSources.some(s => !(cpp && s.kind === 'cpp' && s.recipientId === person.id) && (s.fromAge ?? -Infinity) <= age && (s.startAge ?? -Infinity) <= age && (s.toAge ?? Infinity) >= age && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0))) return fail('unsupported', 'additional active working income source not yet wired')
