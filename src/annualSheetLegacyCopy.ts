@@ -1,3 +1,5 @@
+import type { FundingGap } from './engine/funding'
+import { fundingGapMessageKey } from './fundingGapMessages'
 import type { AnnualSheetText } from './annualSheet'
 export const sheetText = (en: string, fr: string, zh: string): AnnualSheetText => ({ en, fr, zh })
 export const joinSheetText = (...parts: AnnualSheetText[]): AnnualSheetText => Object.fromEntries(['en','fr','zh'].map(lang => [lang, parts.map(p => typeof p === 'string' ? p : p[lang as 'en'|'fr'|'zh']).join(': ')])) as Exclude<AnnualSheetText, string>
@@ -44,3 +46,27 @@ export const stageIds: Record<string, string> = {
  'Surplus cash reinvested': 'surplus-reinvested',
  'Investment return net of fees': 'investment-return', 'Property appreciation': 'property-appreciation',
 }
+
+/** Compact, native labels share the same reason mapping as validation and results. */
+const gapLabels: Record<ReturnType<typeof fundingGapMessageKey>, AnnualSheetText> = {
+ valPurchaseInvalid: sheetText('Invalid purchase terms','Conditions d’achat invalides','购房条件无效'),
+ valPurchaseMortgageRequired: sheetText('Mortgage terms missing','Conditions hypothécaires manquantes','房贷条件缺失'),
+ valFhsaContributionUnfunded: sheetText('FHSA contribution funding gap','Déficit de financement de cotisation CELIAPP','FHSA 供款融资缺口'),
+ valContributionsUnfunded: sheetText('Employee contribution funding gap','Déficit de financement de cotisation salariale','雇员供款融资缺口'),
+ valSaleDischargeUnfunded: sheetText('Sale mortgage-discharge funding gap','Déficit de financement pour libérer l’hypothèque à la vente','出售抵押清偿融资缺口'),
+ valSaleTaxUnfunded: sheetText('Property sale tax funding gap','Déficit de financement de l’impôt sur vente immobilière','房产出售税融资缺口'),
+ valHbpTaxUnfunded: sheetText('Tax funding gap on unpaid HBP repayment','Déficit de financement de l’impôt sur remboursement RAP impayé','HBP 未还款税融资缺口'),
+ valPurchaseCostUnfunded: sheetText('Housing-cost funding gap','Déficit de financement des frais de logement','住房成本融资缺口'),
+ valDownPaymentUnfunded: sheetText('Down-payment funding gap','Déficit de financement de la mise de fonds','首付融资缺口'),
+}
+export function annualGapLabel(gap: FundingGap): AnnualSheetText {
+ const label = gapLabels[fundingGapMessageKey(gap.reason)]
+ return /^(principalResidence|investmentProperties)/.test(gap.field) ? joinSheetText(propertyLabel(gap.field), label) : label
+}
+export const annualTaxLimits = {
+ propertyEventEstimate: sheetText('This year’s opening property event, including sale-lien funding where applicable, uses the legacy household tax estimate. Person-specific event tax is not verified for this year.', 'L’événement immobilier initial de cette année, y compris le financement de libération d’hypothèque à la vente s’il y a lieu, utilise l’estimation fiscale héritée du ménage. L’impôt de cet événement par personne n’est pas vérifié cette année.', '本年度期初房产事件（含适用的出售抵押清偿融资）采用旧家庭税额估算；该年度逐人事件税额未获验证。'),
+ workingMarginal: sheetText('This accumulation year uses an assumed flat marginal tax rate for known income. Employment income and full working-year tax are not modeled.', 'Cette année d’accumulation utilise un taux marginal forfaitaire supposé pour les revenus connus. Le revenu d’emploi et l’impôt complet du travail ne sont pas modélisés.', '本积累年度对已知收入采用假定固定边际税率；未建模就业收入及完整工作期税额。'),
+ householdEstimate: sheetText('This year uses the legacy household tax estimate. Person-specific tax attribution or required tax facts are not verified for this year.', 'Cette année utilise l’estimation fiscale héritée du ménage. L’attribution fiscale par personne ou les faits fiscaux requis ne sont pas vérifiés pour cette année.', '本年度采用旧家庭税额估算；该年度逐人税务归属或所需税务事实未获验证。'),
+ quebecTerminal: sheetText('The estate figure uses simplified Quebec rules for the final return; treat it as an estimate.', 'La succession utilise des règles québécoises simplifiées pour la déclaration finale; il s’agit d’une estimation.', '遗产数值采用简化魁北克最终报税规则，应视为估算。'),
+}
+export const joinSheetSentences = (...parts: AnnualSheetText[]): AnnualSheetText => Object.fromEntries(['en','fr','zh'].map(lang => [lang, parts.map(p => typeof p === 'string' ? p : p[lang as 'en'|'fr'|'zh']).join(' ')])) as Exclude<AnnualSheetText, string>

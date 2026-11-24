@@ -4,11 +4,19 @@ export type AnnualSheetStatus = 'calculated' | 'estimated' | 'unknown' | 'not-co
 export type AnnualSheetUnit = 'CAD' | 'number' | 'percent' | 'years'
 export interface AnnualSheetExplanation {
   summary?: AnnualSheetText
-  sources?: { label: AnnualSheetText; id?: string; granularity: 'input' | 'event' | 'year' | 'run' }[]
+  sources?: {
+    label: AnnualSheetText
+    /** Optional curated user-facing reference; technical id is metadata only. */
+    displayReference?: AnnualSheetText
+    id?: string
+    field?: string
+    code?: string
+    granularity: 'input' | 'event' | 'year' | 'run'
+  }[]
   /** CAD components use normalized nominal CAD, independently of display mode.
    * References must use the same normalization as cells; tax bases opt out explicitly.
    */
-  formula?: { label: AnnualSheetText; value: number; direction: 'add' | 'subtract'; unit: AnnualSheetUnit; basis?: 'nominal-CAD' | 'nominal-tax-basis' }[]
+  formula?: { label: AnnualSheetText; sourceId?: string; field?: string; code?: string; value: number; direction: 'add' | 'subtract'; unit: AnnualSheetUnit; basis?: 'nominal-CAD' | 'nominal-tax-basis' }[]
   rulePackage?: string
   taxYear?: number
   /** Calendar year being evaluated; separate from the source pack tax year. */

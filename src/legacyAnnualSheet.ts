@@ -1,5 +1,5 @@
 import type { Inputs, ProjectionResult } from './engine'
-import { accountLabels, stageIds, stageLabels, transactionLabels, propertyLabel, joinSheetText, sheetText as text } from './annualSheetLegacyCopy'
+import { annualGapLabel, annualTaxLimits, joinSheetSentences, accountLabels, stageIds, stageLabels, transactionLabels, propertyLabel, joinSheetText, sheetText as text } from './annualSheetLegacyCopy'
 import type { AnnualSheetCell, AnnualSheetExplanation, AnnualSheetModel, AnnualSheetRow, AnnualSheetText } from './annualSheet'
 
 export const annualDetailsTitle = text('Annual financial details', 'Détails financiers annuels', '逐年财务明细')
@@ -39,7 +39,7 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
     id, label, cells: Object.fromEntries(rows.flatMap(row => {
       const d = row.annualDetails
       if (!d) return []
-      const openingEvent = id.startsWith('purchaseFunding.') || id.startsWith('sale.') || id.startsWith('debtEvent.') || id.startsWith('funding.purchase:') || id.startsWith('funding.sale:') && !id.includes(':tax:') || /\.change\.(opening-transfers-purchase|property-sale)$/.test(id)
+      const openingEvent = id.startsWith('purchaseFunding.') && !id.endsWith('.firstYearCostFromSavings') || id.startsWith('sale.') || id.startsWith('debtEvent.') || id.startsWith('funding.purchase:') && !id.endsWith('.firstYearCostFromSavings') || id.startsWith('funding.sale:') && !id.includes(':tax:') || /\.change\.(opening-transfers-purchase|property-sale)$/.test(id)
       const cellTiming = openingEvent ? 'opening' : timing
       // Opening positions carry last closing's factor; opening events are
       // current-year transactions and use the current opening event clock.
@@ -143,7 +143,7 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
   for (const source of new Set(rows.flatMap(r => r.annualDetails?.debtSchedule.map(d=>d.id) ?? []))) {
     for (const field of ['opening','borrowing','saleDischarge','payment','interest','closing'] as const)
       values.push(nominalRow(`debtSource.${source}.${field}`, joinSheetText(source === 'debts' ? text('General household debts','Dettes générales du ménage','家庭一般债务') : propertyLabel(source), {
-        opening:text('Contractual opening lien','Hypothèque contractuelle initiale','合同期初抵押'), borrowing:text('New borrowing','Nouvel emprunt','新增借款'), saleDischarge:text('Lien removed at sale','Hypothèque retirée à la vente','出售移除抵押'), payment:text('Scheduled payment','Paiement prévu','计划还款'), interest:text('Scheduled interest','Intérêts prévus','计划利息'), closing:text('Scheduled closing','Clôture prévue','计划期末'),
+        opening:source === 'debts' ? text('Contractual opening debt','Dette contractuelle initiale','合同期初负债') : text('Contractual opening lien','Hypothèque contractuelle initiale','合同期初抵押'), borrowing:text('New borrowing','Nouvel emprunt','新增借款'), saleDischarge:source === 'debts' ? text('Debt removed from schedule','Dette retirée de l’échéancier','从计划移除负债') : text('Lien removed at sale','Hypothèque retirée à la vente','出售移除抵押'), payment:text('Scheduled payment','Paiement prévu','计划还款'), interest:text('Scheduled interest','Intérêts prévus','计划利息'), closing:text('Scheduled closing','Clôture prévue','计划期末'),
       }[field]), r => {
         const d = r.annualDetails, item = d?.debtSchedule.find(i=>i.id===source)
         return d && item ? item[field] * d.factor * (['opening','borrowing','saleDischarge'].includes(field) ? 1 : inflationStep) : null
@@ -175,17 +175,17 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
     if (!sourceGroups.has(groupId)) {
       const funding = rows.flatMap(r=>r.annualDetails?.funding ?? []).find(f=>f.eventId===item.entity!.id)
       sourceGroups.set(groupId, { id:groupId, kind:'group', entity:item.entity, initiallyExpanded:false,
-        label:funding ? joinSheetText(propertyLabel(funding.field), text('Recorded event funding','Financement d’événement enregistré','已记账事件融资'), funding.eventId) : joinSheetText(item.entity.id === 'debts' ? text('General household debts','Dettes générales du ménage','家庭一般债务') : propertyLabel(item.entity.id), text('Contractual schedule','Échéancier contractuel','合同计划')),
+        label:funding ? joinSheetText(propertyLabel(funding.field), text('Recorded event funding','Financement d’événement enregistré','已记账事件融资')) : joinSheetText(item.entity.id === 'debts' ? text('General household debts','Dettes générales du ménage','家庭一般债务') : propertyLabel(item.entity.id), item.entity.kind === 'event' ? text('Recorded property transaction','Transaction immobilière enregistrée','已记账房产交易') : text('Contractual schedule','Échéancier contractuel','合同计划')),
         children:[] })
     }
     sourceGroups.get(groupId)!.children!.push(item)
   }
   const accountingLimits = text('Debt payment, interest and principal are scheduled, before funding reconciliation; unpaid ordinary debt is not separately settled. Legacy debt streams use an end-of-period inflation factor, including the mortgage origination offset; these rows preserve the main result’s base-year CAD convention and its F(t) display scaling. Net cash includes payroll and prepaid purchase-tax handling; benefits, tax and cash rows must not be added as a cash reconciliation. GIS includes Allowance. Spending shortfall covers all costs and may overlap the event financing gap: never add the two.', 'Dette, intérêts et capital sont prévus avant rapprochement du financement. Les flux de dette hérités utilisent un facteur de fin de période; affichage conforme au résultat principal F(t). La trésorerie inclut cotisations et impôt prépayé; ces lignes ne sont pas additives. Le SRG inclut l’Allocation. Le déficit de dépenses peut recouper celui des événements: ne pas les additionner.', '债务支付、利息与本金为资金调整前的计划值；普通债务欠付未单独结算。旧债务流使用期末通胀因子（含未来房贷起始偏移），本表保留主结果实际币值及 F(t) 显示口径。净现金含工资扣款与预缴购房税处理，福利、税和现金行不可直接相加对账。GIS 含配偶津贴。总支出缺口可能与事件融资缺口重叠，勿相加。')
-  return { scenarioId: context.scenarioId, revision: context.revision, title: text('Household annual estimate', 'Estimation annuelle du ménage', '家庭汇总年度估算'), scope: joinSheetText(limits, text('All-cost spending and event gaps can overlap; do not add them.','Les déficits de dépenses totales et d’événements peuvent se recouper; ne pas les additionner.','总支出与事件缺口可能重叠，勿相加。'), ...(context.disclosures ?? [])), baseYear: years[0]?.year ?? 2026, years, rows: [...values.filter(row=>!row.entity), ...sourceGroups.values(), ...accountRows],
+  return { scenarioId: context.scenarioId, revision: context.revision, title: text('Household annual estimate', 'Estimation annuelle du ménage', '家庭汇总年度估算'), scope: joinSheetSentences(limits, text('All-cost spending and event gaps can overlap; do not add them.','Les déficits de dépenses totales et d’événements peuvent se recouper; ne pas les additionner.','总支出与事件缺口可能重叠，勿相加。'), ...(context.disclosures ?? [])), baseYear: years[0]?.year ?? 2026, years, rows: [...values.filter(row=>!row.entity), ...sourceGroups.values(), ...accountRows],
     jumps: rows.flatMap(r => { const year = r.annualDetails?.year; if (!year) return []; return [
       ...(r.age === inputs.fireAge ? [{ id:'retirement', label:text('Retirement','Retraite','退休'),year,kind:'retirement' as const }] : []),
       ...(r.shortfall > 0 && !rows.some(p=>p.age<r.age&&p.shortfall>0) ? [{id:'living-gap',label:text('First spending gap','Premier déficit de dépenses','首次支出缺口'),year,kind:'living-shortfall' as const,rowId:'shortfall',reason:text('All-cost spending gap; may overlap an event gap.','Déficit total; peut recouper un événement.','总支出缺口；可能与事件缺口重叠。')}] : []),
-      ...(r.unfundedObligations.length && !rows.some(p=>p.age<r.age&&p.unfundedObligations.length) ? [{id:'event-gap',label:text('First event gap','Premier déficit événementiel','首次事件缺口'),year,kind:'event-shortfall' as const,rowId:'eventGap',reason:r.unfundedObligations.map(g=>`${g.eventId} · ${g.field} · ${g.reason}`).join('; ')}] : []),
+      ...(r.unfundedObligations.length && !rows.some(p=>p.age<r.age&&p.unfundedObligations.length) ? [{id:'event-gap',label:text('First event gap','Premier déficit événementiel','首次事件缺口'),year,kind:'event-shortfall' as const,rowId:'eventGap',reason:joinSheetSentences(...r.unfundedObligations.map(annualGapLabel)),entityId:r.unfundedObligations[0]?.eventId}] : []),
       ...(r === rows.at(-1) ? [{id:'terminal',label:text('Terminal year','Année finale','终年'),year,kind:'terminal' as const}] : []),
     ] }),
     resolveExplanation: reference => {
@@ -222,7 +222,7 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
       let formula: AnnualSheetExplanation['formula']
       if (id === 'shortfall' && d.spendingTarget !== null && row.shortfall > 0) formula = parts([['target','add'],['netCash','subtract']])
       if (id === 'shortfall' && row.phase !== 'accumulation' && row.shortfall === 0) formula = [{label:text('No all-cost deficit after tolerance','Aucun déficit total après tolérance','计入容差后无总支出缺口'),value:0,direction:'add',unit:'CAD',basis:'nominal-CAD'}]
-      if (id === 'eventGap') formula = row.unfundedObligations.map(g=>({label:`${g.eventId}: ${g.field} (${g.reason})`,value:g.amount*d.factor,direction:'add',unit:'CAD',basis:'nominal-CAD'}))
+      if (id === 'eventGap') formula = row.unfundedObligations.map(g=>({label:annualGapLabel(g),sourceId:g.eventId,field:g.field,code:g.reason,value:g.amount*d.factor,direction:'add',unit:'CAD',basis:'nominal-CAD'}))
       if (id === 'target') formula = parts([['livingTarget','add'],['debtTarget','add'],['housingTarget','add']])
       if (id === 'netCash' && d.cash) formula = parts([...(['cpp','oas','gis','ccb','rent','pension','extraIncome','withdrawals.tfsa','withdrawals.rrsp','withdrawals.nonReg'] as const).map(k=>[k,'add'] as [string,'add']), ['tax','subtract'],['payroll','subtract'],['prepaidPurchaseTax','add']])
       if (id === 'debtOpeningTranslation') formula = parts([['debtContractOpening','add'],['debtOpening','subtract']])
@@ -242,6 +242,10 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
       const available = ['calculated','estimated'].includes(selected.cells![year].status)
       const benefit = id === 'ccb' && row.phase !== 'accumulation' && available
       const taxRelated = ['tax','netCash','estateTax','estateValue','prepaidPurchaseTax','hbp.unpaidTax'].includes(id) || id.endsWith('.withdrawalTax')
+      // Only the accepted evaluate() result emits byPersonTax, and only
+      // when personProjectionTax returned status 'ok'. The legacy row
+      // taxCapability instead carries the run's first failure forward.
+      const acceptedPersonTax = row.byPersonTax !== undefined
       const marginalTax = taxRelated && row.phase === 'accumulation' && available && !['estateTax','estateValue'].includes(id)
       const provenance = available ? benefit ? result.benefitRules : taxRelated && !marginalTax ? d.taxRules : undefined : undefined
       const accountKey = positions.find(key=>id.startsWith(`${key}.`))
@@ -255,7 +259,7 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
           {label: selected.label, id, granularity:'year'},
           ...(['age','partnerAge','savings','livingTarget'].includes(id) ? [{label:selected.label,id:({age:'currentAge',partnerAge:'partner.currentAge',savings:'annualSavings',livingTarget:'retirementSpending'} as Record<string,string>)[id],granularity:'input' as const}] : []),
           ...(id.endsWith('.opening') && positions.includes(id.split('.')[0]) && row === rows[0] ? [{label:selected.label,id:({tfsa:'balances.tfsa',rrsp:'balances.rrsp',nonReg:'balances.nonReg',fhsa:'fhsa.balance',locked:'lockedRetirement.balance',property:'principalResidence / investmentProperties'} as Record<string,string>)[id.split('.')[0]],granularity:'input' as const}] : []),
-          ...relatedGaps.map(g=>({label:`${g.field}: ${g.reason}`,id:g.eventId,granularity:'event' as const})),
+          ...relatedGaps.map(g=>({label:annualGapLabel(g),id:g.eventId,field:g.field,code:g.reason,granularity:'event' as const})),
           ...relatedFunding.map(f=>({label:propertyLabel(f.field),id:f.eventId,granularity:'event' as const})),
           ...(id.startsWith('purchaseFunding') && row.purchaseFunding ? [{label:transactionLabels.purchaseFunding,id:row.purchaseFunding.eventId,granularity:'event' as const}] : []),
           ...(id.startsWith('housingFunding') && row.housingFunding ? [{label:transactionLabels.housingFunding,id:row.housingFunding.eventId,granularity:'event' as const}] : []),
@@ -266,7 +270,7 @@ export function legacyAnnualSheet(result: ProjectionResult, inputs: Inputs, cont
         taxYear: provenance && !benefit ? d.taxRules.ruleYear : undefined,
         projectionYear: d.year,
         formulaBasis: formula && !debtRelated ? text('Formula components use normalized nominal CAD. Pure nominal-basis translations show zero in real display; ordinary account and cash rows retain the main result’s native real basis.', 'Composantes en CAD nominaux normalisés. Les conversions purement nominales valent zéro en affichage réel; les comptes et la trésorerie conservent la base réelle du résultat principal.', '公式各项为归一化名义加元。纯名义口径换算在实际显示中为零；普通账户及现金各行保留主结果原生实际币值口径。') : formula ? text('Formula components are normalized nominal CAD. Contractual rows use their own settlement factors in real display; the purchasing-power row supplies the real-only inflation change. Basis-translation rows are not cash flows.', 'Composantes en CAD nominaux normalisés. Les lignes contractuelles utilisent leurs facteurs de règlement; la ligne de pouvoir d’achat fournit l’inflation réelle seule. Les conversions ne sont pas des flux de trésorerie.', '公式各项为归一化名义加元。合同各行在实际显示中采用自身结算因子；购买力行补充仅实际币值下的通胀变化。口径换算不是现金流。') : undefined,
-        limitations: [...(context.disclosures ?? []), ...(debtRelated ? [text(`Contractual stream opening × F(t)=${d.factor}; payment/interest/closing × F(t+1)=${d.factor*inflationStep}. Legacy chart closing × F(t)=${d.factor}. A future mortgage keeps its stream origination offset; basis differences are not payments.`, `Ouverture contractuelle × F(t)=${d.factor}; paiements/intérêts/clôture × F(t+1)=${d.factor*inflationStep}. Clôture du graphique × F(t)=${d.factor}. L’hypothèque future conserve le décalage d’origine; écarts de base sans paiements.`, `合同流期初 × F(t)=${d.factor}；还款／利息／期末 × F(t+1)=${d.factor*inflationStep}。旧图表期末 × F(t)=${d.factor}。未来房贷保留起始偏移；口径差额不是支付。`)] : []), ...(debtRelated || id === 'netCash' || id === 'shortfall' || id === 'eventGap' ? [accountingLimits] : []), ...(taxRelated && result.taxCapability?.reason ? [result.taxCapability.reason] : [])],
+        limitations: [...(debtRelated ? [text(`Contractual stream opening × F(t)=${d.factor}; payment/interest/closing × F(t+1)=${d.factor*inflationStep}. Legacy chart closing × F(t)=${d.factor}. A future mortgage keeps its stream origination offset; basis differences are not payments.`, `Ouverture contractuelle × F(t)=${d.factor}; paiements/intérêts/clôture × F(t+1)=${d.factor*inflationStep}. Clôture du graphique × F(t)=${d.factor}. L’hypothèque future conserve le décalage d’origine; écarts de base sans paiements.`, `合同流期初 × F(t)=${d.factor}；还款／利息／期末 × F(t+1)=${d.factor*inflationStep}。旧图表期末 × F(t)=${d.factor}。未来房贷保留起始偏移；口径差额不是支付。`)] : []), ...(debtRelated || id === 'netCash' || id === 'shortfall' || id === 'eventGap' ? [accountingLimits] : []), ...(taxRelated && available ? row.phase === 'accumulation' ? [annualTaxLimits.workingMarginal] : !acceptedPersonTax ? [d.sales.length || row.purchaseFunding ? annualTaxLimits.propertyEventEstimate : annualTaxLimits.householdEstimate] : [] : []), ...(available && result.terminalTaxStatus === 'estimated' && ['estateTax','estateValue'].includes(id) && row === rows.at(-1) && result.terminalTaxDisclosure === 'quebecSimplified' ? [annualTaxLimits.quebecTerminal] : [])],
         forwardAssumption: text('Deterministic main result. Future tax and benefit assumptions follow the cited rule pack; no second projection.','Résultat déterministe principal. Hypothèses fiscales et prestations futures selon les règles citées; aucune seconde projection.','确定性主结果。未来税及福利假设遵循所引规则；未进行第二次投影。'),
       }
     },

@@ -65,6 +65,54 @@ test('professional household results open the current annual estimate and follow
   await expect(detail).toContainText('Projection calculation year: 2035')
 })
 
+for (const locale of [
+  { button: 'FR', opener: 'Détails financiers annuels', dialog: 'Estimation annuelle du ménage',
+    retirement: 'Retraite', inspect: /Examiner la ligne/, tax: /impôt modélisé/i,
+    details: 'Détails de la cellule', limit: /^Limites:.*attribution fiscale par personne/i },
+  { button: '中文', opener: '逐年财务明细', dialog: '家庭汇总年度估算',
+    retirement: '退休', inspect: /查看行详情/, tax: /模型税额/,
+    details: '单元格详情', limit: /^已知限制:.*逐人税务归属/ },
+]) {
+  test(`professional annual tax limitations are localized in ${locale.button}`, async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await page.locator('label.field').filter({ hasText: /^Household/ }).locator('select').selectOption('couple')
+    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await page.getByRole('button', { name: locale.opener, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: locale.dialog })
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.retirement} \\(\\d{4}\\)$`) }).click()
+    const inspectTax = dialog.getByRole('button', { name: locale.inspect }).and(dialog.getByRole('button', { name: locale.tax }))
+    await inspectTax.click()
+    const detail = dialog.getByRole('complementary', { name: locale.details })
+    await expect(detail.getByText(locale.limit)).toBeVisible()
+    await expect(detail).not.toContainText(/registered account owner unknown|working-year tax uses|BE-\d+|budgetBasisExcluded|debtExcluded|taxBenefitExcluded|ownershipNeedsConfirmation/i)
+  })
+}
+
+test('French underwater-sale details show the event label without its technical ID', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    const { annualSheetUnderwaterSale: inputs } = await import('/src/engine/__tests__/fixtures/annualSheetUnderwaterSale.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
+  })
+  await page.reload()
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await page.getByRole('button', { name: 'Détails financiers annuels', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Estimation annuelle du ménage' })
+  const technicalId = 'sale:60:principalResidence.sellAtAge'
+  const event = dialog.getByRole('button', { name: /Résidence principale.*Financement d’événement enregistré/ })
+  await expect(event).toHaveAttribute('aria-expanded', 'false')
+  await expect(event).toHaveAccessibleName("Résidence principale: Financement d’événement enregistré")
+  await event.click()
+  await dialog.getByRole('button', { name: /Examiner la ligne:.*Financement de libération à la vente.*Impôt sur retraits/ }).click()
+  const detail = dialog.getByRole('complementary', { name: 'Détails de la cellule' })
+  await expect(detail.getByText(/^Sources:/)).toContainText('Résidence principale (Événement)')
+  await expect(dialog).not.toContainText(technicalId)
+  await expect(dialog.locator(`[title*="${technicalId}"]`)).toHaveCount(0)
+})
+
 async function openSheet(page: Page, query = '') {
   await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html${query}`)
   const opener = page.getByRole('button', { name: 'Open fixture', includeHidden: true })
@@ -195,7 +243,8 @@ test('distinguishes computed zero and missing states and shows expense and event
   await cell(dialog, 'Event funding gap', 2033).click()
   const details = dialog.getByRole('complementary')
   await expect(details.getByRole('heading')).toContainText('CA$1,340.00')
-  await expect(details).toContainText('roof-repair')
+  await expect(details.getByText(/^Sources:/)).toContainText('Roof repair (Event)')
+  await expect(details).not.toContainText('roof-repair')
   await expect(details).toContainText('Repair due CA$3,000.00 (Normalized nominal CAD)')
 })
 

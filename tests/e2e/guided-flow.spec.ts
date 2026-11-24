@@ -128,6 +128,7 @@ test('an answered-excluded budget basis labels the guided result as an estimate'
   await page.getByRole('button', { name: 'Annual financial details' }).click()
   const annual = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(annual).toHaveAccessibleDescription(/saving basis you recorded leaves out a component this projection still treats as included/i)
+  await expect(annual).not.toHaveAccessibleDescription(/budgetBasisExcluded|debtExcluded|taxBenefitExcluded|ownershipNeedsConfirmation/)
   await page.keyboard.press('Escape')
   await expect(annual).toBeHidden()
   // The recorded basis is what the user answered, and it stays on the plan.

@@ -64,13 +64,6 @@ export default function App() {
   const annualOpen = annualToken?.revision === inputRevision && annualToken.result === result && annualToken.entryMode === entryMode
   // Adapt only for an explicitly opened, current result. An old token cannot
   // render even one frame of a revised scenario before effect cleanup.
-  const annualModel = useMemo(() => annualOpen && result ? legacyAnnualSheet(result, inputs, {
-    scenarioId: 'current', revision: inputRevision,
-    disclosures: [
-      ...(precision?.reasons.includes('budgetBasisExcluded') ? [t('budget.estimateExcluded')] : []),
-      ...(migrationBlocked ? [t('estimateChartsNote')] : []),
-    ],
-  }) : null, [annualOpen, result, inputs, inputRevision, migrationBlocked, precision?.reasons.join(','), t])
   const precisionBlocked = migrationBlocked
   // Keep the existing single-person planning preview usable while BE-14 B
   // wires working-year tax. Couples never get a disguised pooled tax. BE-43:
@@ -89,6 +82,16 @@ export default function App() {
   const coupleTools = !!inputs.partner && !singleLegacyPreview && !!precision &&
     precision.reasons.every((reason) => POOLED_IGNORES.has(reason))
   const planningTools = (!precisionBlocked && !taxBlocked && oldSingleTools) || coupleTools
+  const annualModel = useMemo(() => annualOpen && result ? legacyAnnualSheet(result, inputs, {
+    scenarioId: 'current', revision: inputRevision,
+    disclosures: [
+      ...(precision?.reasons.includes('budgetBasisExcluded') ? [t('budget.estimateExcluded')] : []),
+      ...(migrationBlocked ? [t('estimateChartsNote')] : []),
+      ...(coupleTools ? [t('coupleToolsEstimate')] : []),
+      ...(!migrationBlocked && taxWarning && inputs.province === 'QC' ? [t('be11QcLimit')] : []),
+    ],
+  }) : null, [annualOpen, result, inputs, inputRevision, migrationBlocked, coupleTools, taxWarning, precision?.reasons.join(','), t])
+
   const hasBlockingIssues = useMemo(
     () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
     [inputs],

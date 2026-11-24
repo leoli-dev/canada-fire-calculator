@@ -4,10 +4,12 @@ import type { AnnualSheetRow } from '../../annualSheet'
 import { legacyAnnualSheet } from '../../legacyAnnualSheet'
 import { refreshCanonicalFromLegacy } from '../migration'
 import { runProjection } from '../projection'
+import { validateInputs } from '../validate'
 import type { AccountType, Inputs, ProjectionResult } from '../types'
 import households from './fixtures/households.json'
 import audit from './fixtures/pending-audit.json'
 import propertySales from './fixtures/property-sales.json'
+import { annualSheetUnderwaterSale } from './fixtures/annualSheetUnderwaterSale'
 
 const cash = households.households[1].inputs as Inputs
 const purchase = audit.cases.find((entry) => entry.id === 'P03')!.inputs as Inputs
@@ -128,8 +130,8 @@ describe('FE-53 legacy projection parity', () => {
   })
 })
 
-function observe(inputs: Inputs) {
-  const result = runProjection(inputs, undefined, undefined, { captureAnnualDetails: true })
+function observe(inputs: Inputs, canonical?: Parameters<typeof runProjection>[2]) {
+  const result = runProjection(inputs, undefined, canonical, { captureAnnualDetails: true })
   const sheet = legacyAnnualSheet(result, inputs, { scenarioId: 'current', revision: 19 })
   const flatten = (rows: AnnualSheetRow[]): AnnualSheetRow[] =>
     rows.flatMap(row => [row, ...flatten(row.children ?? [])])
@@ -314,14 +316,107 @@ describe('FE-53 household annual telemetry', () => {
     expect(explanation('ccb', 2035).rulePackage).toBe(result.benefitRules!.rulePackId)
   })
 
+  it('keeps working-year tax limitations off a later person-priced retirement row', () => {
+    const inputs: Inputs = {
+      ...cash, currentAge: 60, fireAge: 66, lifeExpectancy: 67,
+      annualSavings: 0, retirementSpending: 50_000, strategy: 'rrspFirst',
+      balances: { tfsa: 0, rrsp: 300_000, nonReg: 40_000 },
+      nonRegBook: 0, nonRegDistributionYield: 0.02,
+    }
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    const { result, sheet, row } = observe(inputs, canonical)
+    expect(result.taxCapability?.reason).toMatch(/working-year tax/i)
+    expect(result.rows[0].taxCapability).toBe('legacyEstimate')
+    expect(result.rows[6].taxCapability).toBe('person')
+    expect(result.rows[6].tax).toBeGreaterThan(0)
+    const explainTax = (year: number) => sheet.resolveExplanation?.(row('tax').cells![year].explanationRefs![0])!
+    const working = explainTax(sheet.baseYear)
+    const retired = explainTax(sheet.baseYear + 6)
+    expect(retired.rulePackage).toBe(result.taxRules?.rulePackId)
+    expect(retired.limitations ?? []).toEqual([])
+    const localized = (language: string) => working.limitations?.map(limit => annualSheetText(limit, language)).join(' ') ?? ''
+    expect(localized('fr')).toMatch(/marginal/i)
+    expect(localized('zh')).toMatch(/边际/)
+    for (const language of ['en', 'fr', 'zh']) {
+      expect(localized(language)).not.toContain(result.taxCapability!.reason!)
+    }
+  })
+
+  it('limits an accepted underwater sale caveat to its year despite the legacy run flag', () => {
+    const inputs = annualSheetUnderwaterSale
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    const { result, sheet, row } = observe(inputs, canonical)
+    expect(validateInputs(inputs).filter(issue => issue.severity === 'error')).toEqual([])
+    expect(result.taxCapability?.status).toBe('legacyEstimate')
+    const saleYear = sheet.baseYear
+    const eventId = 'sale:60:principalResidence.sellAtAge'
+    expect(result.rows[0].annualDetails?.funding).toContainEqual(expect.objectContaining({
+      eventId, field: 'principalResidence.sellAtAge',
+    }))
+    const funding = row(`funding.${eventId}.withdrawalTax`).cells![saleYear]
+    const eventExplanation = sheet.resolveExplanation?.(funding.explanationRefs![0])
+    expect(eventExplanation?.sources).toContainEqual(expect.objectContaining({
+      id: eventId, granularity: 'event',
+    }))
+    const tax = (year: number) => sheet.resolveExplanation?.(row('tax').cells![year].explanationRefs![0])!
+    const limitations = (year: number) => tax(year).limitations?.map(limit => annualSheetText(limit, 'en')).join(' ') ?? ''
+    for (const index of [1, 2]) {
+      expect(result.rows[index].taxCapability).toBe('legacyEstimate')
+      expect(result.rows[index].tax).toBeCloseTo(9_171.64, 2)
+      expect(Object.values(result.rows[index].byPersonTax ?? {}).map(person => person.tax))
+        .toEqual([expect.closeTo(9_171.64, 2)])
+      expect(limitations(saleYear + index)).not.toMatch(/household tax estimate|sale|lien/i)
+    }
+    expect(limitations(saleYear)).toMatch(/sale-lien funding.*legacy household tax estimate/i)
+  })
+
+  it('omits the simplified Quebec estimate notice when a couple estate is unsupported', () => {
+    const inputs: Inputs = {
+      ...cash, province: 'QC', fireAge: cash.currentAge,
+      partner: { currentAge: 40, cppStartAge: 65, cppAnnualAt65: 0, oasStartAge: 65, oasAnnualAt65: 0 },
+    }
+    const { result, sheet, row } = observe(inputs, refreshCanonicalFromLegacy(null, inputs))
+    expect(result.terminalTaxStatus).toBe('unsupported')
+    expect(result.terminalTaxDisclosure).toBe('quebecSimplified')
+    for (const id of ['estateTax', 'estateValue']) {
+      const terminal = row(id).cells![sheet.years.at(-1)!.year]
+      expect(terminal).toMatchObject({ status: 'unknown', value: null })
+      const explanation = sheet.resolveExplanation?.(terminal.explanationRefs![0])
+      expect(explanation).toBeDefined()
+      expect(explanation?.limitations?.map(limit => annualSheetText(limit, 'en')).join(' ') ?? '')
+        .not.toMatch(/simplified Quebec rules/i)
+    }
+  })
+
   it('displays separate first-gap years and actual modeled purchase and debt amounts', () => {
-    const gaps = observe(cases['failed purchase then depleted living budget'])
+    const blockedPurchase = cases['failed purchase then depleted living budget']
+    const gaps = observe(blockedPurchase)
     const [year, next] = gaps.sheet.years
     expect(gaps.sheet.jumps).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'event-shortfall', year: year.year }),
       expect.objectContaining({ kind: 'living-shortfall', year: next.year }),
     ]))
     expect(gaps.row('eventGap').cells![year.year].value).toBe(100_000)
+    const eventJump = gaps.sheet.jumps!.find(jump => jump.kind === 'event-shortfall')!
+    const eventCell = gaps.row('eventGap').cells![year.year]
+    const eventExplanation = gaps.sheet.resolveExplanation?.(eventCell.explanationRefs![0])!
+    const eventSource = eventExplanation.sources!.find(source => source.id === 'purchase:50')!
+    expect(eventJump.entityId).toBe('purchase:50')
+    expect(eventExplanation.formula).toContainEqual(expect.objectContaining({
+      value: 100_000, direction: 'add', sourceId: 'purchase:50', code: 'downPayment',
+    }))
+    expect(eventSource).toMatchObject({ code: 'downPayment', field: 'principalResidence.downPayment' })
+    expect(validateInputs(blockedPurchase)).toContainEqual(expect.objectContaining({
+      key: 'valDownPaymentUnfunded', eventId: 'purchase:50', params: { age: 50, amount: 100_000 },
+    }))
+    for (const [language, downPayment] of [['fr', /mise de fonds/i], ['zh', /首付/]] as const) {
+      const labels = [eventJump.reason!, eventExplanation.formula![0].label, eventSource.label]
+      for (const label of labels) {
+        const localized = annualSheetText(label, language)
+        expect(localized).toMatch(downPayment)
+        expect(localized).not.toMatch(/principalResidence\.|downPayment|purchase:50/)
+      }
+    }
     const workingShortfall = gaps.row('shortfall').cells![year.year]
     expect(annualSheetCellStatus(workingShortfall, year, 'real')).toBe('not-computed')
     expect(workingShortfall.value).toBeNull()
