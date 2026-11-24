@@ -1,3 +1,4 @@
+import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
 import { settleHouseholdOas } from './annualOas'
@@ -709,15 +710,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
-  const propertyRows: YearRow['byProperty'] = Object.fromEntries(Object.entries(state.byProperty).map(([id, property]) => [id,
-    { held: property.held, opening: property.value, growth: 0, closing: property.value }]))
-  for (const property of plan.properties) if (state.byProperty[property.id].held) {
-    const growthFactor = (1 + property.appreciation) * (1 + plan.inflation)
-    if (!Number.isFinite(growthFactor)) return fail('invalid', `property growth is not finite: ${property.id}`)
-    if (property.appreciation < -1 || plan.inflation < -1 || growthFactor < 0) return fail('unsupported', `property growth outside nonnegative value model: ${property.id}`)
-    state.byProperty[property.id].value *= growthFactor
-    propertyRows[property.id].closing = state.byProperty[property.id].value
-    propertyRows[property.id].growth = propertyRows[property.id].closing - propertyRows[property.id].opening
+  let propertyRows: YearRow['byProperty']
+  try { propertyRows = growHeldProperties(plan, state) } catch (error) {
+    const issue = error as { status: 'invalid' | 'unsupported'; reason: string }
+    return fail(issue.status, issue.reason)
   }
   for (const [id, person] of Object.entries(state.byPerson)) {
     person.age += 1
