@@ -401,10 +401,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (mortgageNegative(due) || mortgageNegative(mortgageSubtract(mortgageDecimal(Number.MAX_SAFE_INTEGER / 100), due)))
       return fail('invalid', 'primary home sale: unsafe indexed nominal spending')
     const cashOpening = opening.primaryHomeSaleCash?.exactBalance ?? mortgageDecimal(0)
-    const added = householdSale ? exactReceipt.netProceeds : mortgageDecimal(0)
+    const added = householdSale ? (exactReceipt.residualCash ?? exactReceipt.netProceeds) : mortgageDecimal(0)
     const used = decimalMin(mortgageAdd(cashOpening, added), due)
     const closing = mortgageSubtract(mortgageAdd(cashOpening, added), used)
-    const balances = clone(opening.primaryHomeSaleCash?.exactAccountBalances ?? Object.fromEntries(plan.accounts.map(a => [a.id, mortgageDecimal(opening.byAccount[a.id].balance)])))
+    const balances = clone(opening.primaryHomeSaleCash?.exactAccountBalances ?? Object.fromEntries(plan.accounts.map(a => [a.id, ownMortgageBalance(opening.mortgageExactBalances, a.id) ?? mortgageDecimal(opening.byAccount[a.id].balance)])))
     const account = plan.accounts.find(a => a.kind === 'tfsa' && mortgageNumber(ownMortgageBalance(balances, a.id)!) > 0)
     const draw = account ? decimalMin(ownMortgageBalance(balances, account.id)!, mortgageSubtract(due, used)) : mortgageDecimal(0)
     if (account && draw.coefficient !== '0') {
@@ -415,6 +415,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const withdrawals = account ? { [account.id]: draw } : {}
     state.primaryHomeSaleCash = { balance: mortgageNumber(closing), exactBalance: closing, exactReceipt: clone(exactReceipt), exactAccountBalances: balances, receipt: clone(receipt), evidence: clone(evidence) }
     if (householdSale) { state.byProperty[receipt.propertyId].held = false; state.byProperty[receipt.propertyId].value = 0 }
+    const payoff = householdSale?.mortgagePayoff
+    if (payoff) { state.byDebt[payoff.debtId].principal = 0; state.byDebt[payoff.debtId].yearsRemaining = 0 }
+    delete state.mortgageExactBalances
     spending = mortgageNumber(due)
     if ('household' in working) { working.household.spending = spending; working.household.spendingReal = evidence.postSaleAnnualSpendingReal.status === 'known' ? evidence.postSaleAnnualSpendingReal.value : 0; working.netCash = -spending }
     householdWithdrawalSettlement = { accountId: account?.id ?? null, ownerId: account?.ownerId ?? null, postings: account && draw.coefficient !== '0' ? [{ accountId: account.id, ownerId: account.ownerId!, kind: 'tfsa', amount: mortgageNumber(draw) }] : [], withdrawal: mortgageNumber(draw), spendingDue: spending, spendingFunded: mortgageNumber(funded), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi, taxIncrement: 0, taxTotal: 0 }
@@ -423,7 +426,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       primaryHomeSaleEvidence: clone(evidence), primaryHomeSaleCash: { opening: mortgageNumber(cashOpening), proceedsAdded: mortgageNumber(added), spendingUsed: mortgageNumber(used), closing: mortgageNumber(closing) },
       primaryHomeSaleArithmetic: { spendingDue: due, spendingFunded: funded, spendingUnmet: unmet, receipt: clone(exactReceipt), cash: { opening: cashOpening, proceedsAdded: added, spendingUsed: used, closing }, withdrawals } }
   }
-  const householdMortgage = !!working && "household" in working && isCanonicalGeneratedState(plan, opening) && plan.debts.length > 0
+  const householdMortgage = !householdSaleActive && !!working && "household" in working && isCanonicalGeneratedState(plan, opening) && plan.debts.length > 0
   // Account IDs are opaque; an absent draw must never resolve through
   // Object.prototype (including on the existing no-debt household path).
   const mortgageDraws = new Map<string, MortgageDecimal>()
@@ -605,6 +608,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const debtSettlement = householdDebt ?? settleAnnualDebt(state, working && isCanonicalGeneratedState(plan, opening) && plan.debts.length ? plan.debts : undefined)
   if (debtSettlement.status !== "ok") return fail(debtSettlement.status, debtSettlement.reason)
   const { debtRows, debtPayments } = debtSettlement.value
+  const salePayoff = householdSale?.mortgagePayoff
+  if (salePayoff) debtRows[salePayoff.debtId] = { opening: salePayoff.recordedOpeningPrincipal, payoffPrincipalReconciliation: salePayoff.principalReconciliation, interest: 0, principal: salePayoff.totalPayoff, payment: salePayoff.totalPayoff, closing: 0, propertyId: householdSale!.propertyId, salePayoff: salePayoff.totalPayoff }
   // The private working quote already validated and normalized its cash in
   // the common anchor basis. Reordering those operands can invent a deficit.
   const evaluatedCash = householdWithdrawalSettlement ? 0 : working ? working.netCash : income + benefits - tax - spending - debtPayments
@@ -851,7 +856,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   for (const [id, account] of Object.entries(state.byAccount)) {
     accountRows[id].returnAmount = account.balance * rates[id]
     account.balance += accountRows[id].returnAmount
-    if (working && isCanonicalGeneratedState(plan, opening) && plan.debts.length) {
+    if (!householdSaleActive && working && isCanonicalGeneratedState(plan, opening) && plan.debts.length) {
       const exact = mortgageDraws.has(id) ? mortgageMultiply(mortgageSubtract(ownMortgageBalance(opening.mortgageExactBalances, id) ?? mortgageDecimal(opening.byAccount[id].balance), mortgageDraws.get(id)!), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[id]))) : mortgageClosing(ownMortgageBalance(opening.mortgageExactBalances, id) ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
       const precise = mortgageNumber(exact)
       const correction = precise - account.balance
