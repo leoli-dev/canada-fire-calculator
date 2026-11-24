@@ -57,6 +57,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
+  householdWithdrawalSettlement?: { accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -308,7 +309,33 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
   const tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
-  const cash = working ? working.netCash : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
+  let householdWithdrawalSettlement: YearRow['householdWithdrawalSettlement']
+  // A live taxable alternative prevents a claim of verified exhaustion. Never
+  // skip an earlier account in the selected order to manufacture TFSA funding.
+  if (working && 'household' in working && working.household.phase !== 'both-working' && working.netCash <= 0) {
+    const deficit = Math.max(0, -working.netCash)
+    const hasRrsp = plan.accounts.some(a => a.kind === 'rrsp' && state.byAccount[a.id].balance > 0)
+    if (deficit > 0 && (plan.strategy === 'meltdownPaced' || (hasRrsp && plan.strategy !== 'tfsaFirst'))) return fail('unsupported', 'household withdrawal order requires unsupported registered funding')
+    const candidates = deficit > 0 ? plan.accounts.filter(a => a.kind === 'tfsa' && state.byAccount[a.id].balance > 0) : []
+    if (candidates.length > 1) return fail('unsupported', 'ambiguous household TFSA withdrawal funding order')
+    const account = candidates[0]
+    if (account) {
+      const statement = tfsaStatement(plan, account.ownerId!)
+      if (!statement || statement.provenance.origin === 'unknown') return fail('unsupported', 'TFSA withdrawal statement evidence missing')
+    }
+    const withdrawal = account ? Math.min(deficit, state.byAccount[account.id].balance) : 0
+    // Match the working quote's operand-scale normalization in nominal CAD.
+    // Cap below half a cent in both nominal and anchor-real dollars; no fixed
+    // epsilon floor may erase a real tiny bill or a genuine cent shortage.
+    const cashResidueBound = Math.min(0.004, 0.004 * working.startCpi,
+      4 * Number.EPSILON * (income + benefits + tax + working.payrollContributions + spending + withdrawal))
+    if (deficit - withdrawal > cashResidueBound && hasRrsp) return fail('unsupported', 'household remaining spending requires unsupported registered funding')
+    const spendingFunded = Math.min(spending, Math.max(0, income + benefits - tax - working.payrollContributions + withdrawal))
+    const remainingSpending = Math.max(0, spending - spendingFunded)
+    const spendingUnmet = remainingSpending <= cashResidueBound ? 0 : remainingSpending
+    householdWithdrawalSettlement = { accountId: account?.id ?? null, ownerId: account?.ownerId ?? null, withdrawal, spendingDue: spending, spendingFunded, spendingUnmet, startCpi: working.startCpi }
+  }
+  const cash = working ? Math.max(0, working.netCash) : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
   const debtRows: YearRow['byDebt'] = Object.fromEntries(Object.entries(state.byDebt).map(([id, debt]) => [id,
@@ -335,7 +362,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   // The private working quote already validated and normalized its cash in
   // the common anchor basis. Reordering those operands can invent a deficit.
-  const evaluatedCash = working ? working.netCash : income + benefits - tax - spending - debtPayments
+  const evaluatedCash = householdWithdrawalSettlement ? 0 : working ? working.netCash : income + benefits - tax - spending - debtPayments
   if (!Number.isFinite(evaluatedCash)) return fail('invalid', 'evaluated cash')
   if (evaluatedCash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
   if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
@@ -466,7 +493,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       statementYear: plan.baseYear,
       openingRoom: facts.tfsaRoom,
       annualAddition: annualTfsaAdditionFor(year, plan.baseYear),
-      withdrawals: statement?.withdrawals ?? [],
+      withdrawals: [...(statement?.withdrawals ?? []), ...(working && 'household' in working ? (state.tfsaWithdrawalHistory ?? []).filter(h => h.personId === person.id) : [])],
       lines: plannedTfsaLines({ personId: person.id, year, savingsShare: plan.people.length === 1 ? allocation.voluntary.tfsa : 0 }),
     })
     tfsaLedger[person.id] = row
@@ -548,6 +575,14 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     account.balance += accountRows[id].contribution
     if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
   }
+  if (householdWithdrawalSettlement) {
+    const { accountId, ownerId, withdrawal } = householdWithdrawalSettlement
+    if (accountId && ownerId && withdrawal > 0) {
+      state.byAccount[accountId].balance -= withdrawal
+      accountRows[accountId].withdrawal = withdrawal
+      state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount: withdrawal }]
+    }
+  }
   const settled = clone(state)
   if (Object.values(settled.byAccount).some(account => !finiteNonnegative(account.balance))) return fail('invalid', 'pre-growth account balance')
   const rates: Record<string, number> = {}
@@ -600,6 +635,11 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
+  if (householdWithdrawalSettlement) {
+    row.householdWithdrawalSettlement = householdWithdrawalSettlement
+    row.cashLedger.spending = householdWithdrawalSettlement.spendingFunded
+  }
+  if (working && 'household' in working && working.household.phase === 'both-retired') delete row.contributionRounding
   if (working) {
     const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
     if (Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) ||
@@ -618,6 +658,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
 export type AnnualStopCause = 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+  | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
 
@@ -634,6 +675,9 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
   if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
   if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
+  if (detail === 'ambiguous household TFSA withdrawal funding order') return 'withdrawalOwnership'
+  if (detail === 'TFSA withdrawal statement evidence missing') return 'tfsaWithdrawalEvidence'
+  if (detail.startsWith('household withdrawal order requires') || detail.startsWith('household remaining spending requires')) return 'withdrawalFunding'
   if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule' || detail === 'negative working cash requires withdrawal funding rule') return 'withdrawalFunding'
   if (detail === 'evaluated cash disagrees with canonical net savings budget') return 'cashMismatch'
   if (detail.startsWith('scheduled RRSP contribution exceeds')) return 'contributionFunding'
@@ -725,13 +769,15 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       if (plan.people.length === 2 || state.byPerson[person.id].age < person.retirementAge) {
         const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
         const unsafe = Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) || Object.values(state.byPerson).some(p => p.tfsaRoom.status === 'known' && !safeMoney(p.tfsaRoom.value))
-        const quote = unsafe ? fail('invalid', 'working unsafe monetary amount or TFSA room') : plan.people.length === 2 ? evaluateCanonicalHouseholdWorkingYear(plan, evidence, state.year) : evaluateCanonicalWorkingYear(plan, evidence, state.year)
+        generatedStates.set(state, plan)
+        const quote = unsafe ? fail('invalid', 'working unsafe monetary amount or TFSA room') : plan.people.length === 2 ? evaluateCanonicalHouseholdWorkingYear(plan, evidence, state.year, state) : evaluateCanonicalWorkingYear(plan, evidence, state.year)
+        generatedStates.delete(state)
         if (quote.status !== 'ok') result = quote
         else if ('age' in quote.value && quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')
         else if (plan.people.some(p => tfsaStatement(plan, p.id)?.withdrawals.some(h => h.amount > 0 && h.calendarYear >= plan.baseYear))) result = fail('unsupported', 'recorded active TFSA withdrawal events not modeled in working chain')
         else if (quote.value.netCash > 0 && Object.entries(plan.savingsAllocation.shares).some(([kind, share]) => share !== (kind === 'tfsa' ? 1 : 0))) result = fail('unsupported', 'continuous working allocation supports TFSA only')
         else result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value)
-        if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory = []; committedWorking = true }
+        if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory ??= []; committedWorking = true }
       } else {
         if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')
         generatedStates.set(state, plan)

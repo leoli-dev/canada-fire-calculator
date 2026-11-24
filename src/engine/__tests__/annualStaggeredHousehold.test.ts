@@ -16,6 +16,13 @@ function ok<T>(result: KernelResult<T>): T {
   return result.value
 }
 
+function setZeroRetirementSpending(plan: ReturnType<typeof staggeredHouseholdPlan>) {
+  if (plan.budget.kind !== 'incomeBudget') throw new Error('Expected the income budget fixture')
+  plan.budget.retirementSpending = 0
+  plan.legacyProjection.retirementSpending = 0
+  return { ...staggeredSpending(), retirementSpending: known(0) }
+}
+
 function spendingCell(sheet: AnnualSheetModel, year: number, personId?: string) {
   const group = personId ? canonicalSheetId('group', 'person', personId) : canonicalSheetId('group', 'household')
   const id = personId ? canonicalSheetId('value', 'person', personId, 'spending') : canonicalSheetId('value', 'cash', 'spending')
@@ -39,12 +46,10 @@ describe('canonical staggered Ontario household', () => {
     const originalPlan = structuredClone(plan)
     const originalEvidence = structuredClone(evidence)
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 1))
-    const result = ok(projectCanonicalCoverage(plan, evidence, 4))
+    const result = ok(projectCanonicalCoverage(plan, evidence, 2))
     expect(result).toMatchObject({
       evaluationBasis: 'canonical-continuous', overallConclusionAvailable: false,
-      blocked: { status: 'unsupported', year: fullyRetiredYear,
-        issues: [{ detail: expect.stringMatching(/both.retired/i) }] },
-      uncomputedYears: [fullyRetiredYear + 1],
+      blocked: null, uncomputedYears: [],
       state: { year: fullyRetiredYear },
     })
     expect(result.rows.map(row => row.year)).toEqual([BASE_YEAR, BASE_YEAR + 1])
@@ -117,7 +122,6 @@ describe('canonical staggered Ontario household', () => {
       [TFSA]: { ownerId: RETIREE, balance: close(ref.tfsaOpening * 1.02 ** 2) },
       [RRSP]: { ownerId: PARTNER, balance: close(ref.rrspOpening * 1.02 ** 2) },
     })
-    expect(result.state).toEqual(ok(projectCanonicalCoverage(plan, evidence, 2)).state)
     expect(plan).toEqual(originalPlan)
     expect(evidence).toEqual(originalEvidence)
   })
@@ -129,17 +133,22 @@ describe('canonical staggered Ontario household', () => {
       .toEqual([['partner', 54], ['self', 56]])
     expect(plan.lifeExpectancy).toBe(60)
 
-    const result = ok(projectCanonicalCoverage(plan, staggeredSpending(), 5))
+    const result = ok(projectCanonicalCoverage(plan, setZeroRetirementSpending(plan), 5))
     // At the 2026 anchor, self reaches 60 in 2030 and the partner reaches 60 in 2032.
     expect(result).toMatchObject({
       terminalYear: 2030,
-      blocked: { year: 2028, status: 'unsupported' },
-      uncomputedYears: [2029, 2030],
+      blocked: { year: 2030, status: 'unsupported', issues: [{ detail: expect.stringMatching(/end.life/i) }] },
+      uncomputedYears: [],
     })
-    expect(result.rows.map(row => row.year)).toEqual([2026, 2027])
+    expect(result.rows.map(row => row.year)).toEqual([2026, 2027, 2028, 2029])
     expect(result.rows[1].byPerson).toMatchObject({
       [RETIREE]: { age: 57, earnedIncome: 0 },
       [PARTNER]: { age: 55, earnedIncome: 81_600 },
+    })
+    expect(result.rows[2]).toMatchObject({
+      workingSettlement: { household: { phase: 'both-retired' } },
+      cashLedger: { spending: 0 },
+      byAccount: { [TFSA]: { withdrawal: 0, closing: close(1_061.208) }, [RRSP]: { withdrawal: 0, closing: close(21_224.16) } },
     })
   })
 
@@ -152,15 +161,15 @@ describe('canonical staggered Ontario household', () => {
     Object.assign(plan.legacyProjection, { currentAge: 49, fireAge: 52, lifeExpectancy: 53 })
     plan.legacyProjection.partner!.currentAge = 56
 
-    const result = ok(projectCanonicalCoverage(plan, staggeredSpending(), 5))
+    const result = ok(projectCanonicalCoverage(plan, setZeroRetirementSpending(plan), 5))
     expect(result).toMatchObject({
       terminalYear: 2030,
-      blocked: { year: 2029, status: 'unsupported', issues: [{ detail: expect.stringMatching(/both.retired/i) }] },
-      state: { year: 2029 },
-      uncomputedYears: [2030],
+      blocked: { year: 2030, status: 'unsupported', issues: [{ detail: expect.stringMatching(/end.life/i) }] },
+      state: { year: 2030 },
+      uncomputedYears: [],
     })
-    expect(result.rows.map(row => row.year)).toEqual([2026, 2027, 2028])
-    for (const [offset, row] of result.rows.entries()) {
+    expect(result.rows.map(row => row.year)).toEqual([2026, 2027, 2028, 2029])
+    for (const [offset, row] of result.rows.slice(0, 3).entries()) {
       const cpi = 1.02 ** offset
       const bothWorking = offset === 0
       expect(row.byPerson).toMatchObject({
@@ -169,6 +178,12 @@ describe('canonical staggered Ontario household', () => {
       })
       expect(row.cashLedger.spending).toBeCloseTo((bothWorking ? ref.working.spending : ref.mixed.spending) * cpi, 8)
     }
+    expect(result.rows[3]).toMatchObject({
+      workingSettlement: { household: { phase: 'both-retired' } },
+      byPerson: { [RETIREE]: { age: 52, earnedIncome: 0 }, [PARTNER]: { age: 59, earnedIncome: 0 } },
+      cashLedger: { spending: 0 },
+      byAccount: { [TFSA]: { withdrawal: 0, closing: close(1_082.43216) }, [RRSP]: { withdrawal: 0, closing: close(21_648.6432) } },
+    })
   })
 
   it('explains the transition budget only for genuine household working settlement', () => {
@@ -223,8 +238,8 @@ describe('canonical staggered Ontario household', () => {
   })
 
   it.each([
-    [0, -0.01], [0, 0.01], [1, -0.01], [1, 0.01],
-  ])('leaves year offset %i uncommitted when spending changes by %s', (offset, change) => {
+    [0, -0.01, 'contributionAttribution'], [1, -0.01, 'contributionAttribution'], [0, 0.01, 'withdrawalFunding'],
+  ])('leaves year offset %i uncommitted when spending changes by %s', (offset, change, cause) => {
     const plan = staggeredHouseholdPlan()
     const evidence = staggeredSpending()
     const prefix = ok(projectCanonicalCoverage(plan, evidence, offset))
@@ -240,12 +255,23 @@ describe('canonical staggered Ontario household', () => {
     expect(result.state).toEqual(prefix.state)
     expect(result.blocked).toMatchObject({
       status: 'unsupported', year: BASE_YEAR + offset,
-      causes: [change > 0 ? 'withdrawalFunding' : 'contributionAttribution'],
+      causes: [cause],
     })
     expect(result.blocked?.issues.map(issue => issue.detail).join(' ')).toMatch(
       change > 0 ? /negative|deficit|withdrawal/i : /positive|surplus|attribution|allocation/i,
     )
     expect(result.uncomputedYears).toEqual(Array.from({ length: 3 - offset }, (_, index) => BASE_YEAR + offset + index + 1))
+  })
+
+  it('funds a one-cent real deficit in the mixed year', () => {
+    const plan = staggeredHouseholdPlan()
+    plan.strategy = 'tfsaFirst'
+    plan.legacyProjection.strategy = 'tfsaFirst'
+    const evidence = { ...staggeredSpending(), transitionSpending: known(ref.mixed.spending + 0.01) }
+    const result = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(result.blocked).toBeNull()
+    expect(result.rows[1].householdWithdrawalSettlement).toMatchObject({ accountId: TFSA, ownerId: RETIREE,
+      withdrawal: close(0.0102), spendingUnmet: 0 })
   })
 
   it('keeps legacy, solo and strict entry points independent of the household run', () => {
