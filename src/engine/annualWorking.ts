@@ -1,5 +1,5 @@
 import { mortgageDecimal, mortgageSubtract, mortgageNumber, mortgageNegative } from "./mortgageDecimal"
-import { heldMortgageProblem } from './annualProperty'
+import { heldMortgageProblem, householdPassiveHomeProblem } from './annualProperty'
 import { settleAnnualDebt } from './annualDebt'
 import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
@@ -88,7 +88,9 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const fact = evidence[spendingSource]
     if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${spendingSource}`)
     if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
-    if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
+    const housingProblem = generated ? householdPassiveHomeProblem(plan) : null
+    if (housingProblem) return fail('unsupported', housingProblem)
+    if (plan.dependents.length || plan.debts.length || (!generated && plan.properties.length)) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
     const support = plan.taxProfile?.spouseSupported
     if (support && (support.status === 'known' ? typeof support.value !== 'boolean' : support.status !== 'unknown' || typeof support.reason !== 'string' || !support.reason)) return fail('invalid', 'household spouse support evidence')
