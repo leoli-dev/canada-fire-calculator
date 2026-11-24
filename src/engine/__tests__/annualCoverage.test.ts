@@ -489,6 +489,27 @@ describe('FE-53 canonical annual sheet', () => {
     expect(cell('retirement', 2027)).toMatchObject({ status: 'not-applicable', value: null })
   })
 
+  it.each(['spendingDue', 'spendingFunded', 'spendingUnmet'])('resolves the inapplicable %s detail in a settled working year', field => {
+    const plan = workingHousehold()
+    const coverage = settled(projectAnnualCoverage(plan, settled(initializeState(plan)), 1, householdProviders()))
+    expect(coverage).toMatchObject({ evaluationBasis: 'provider-supplied', blocked: null })
+    expect(coverage.rows).toHaveLength(1)
+    expect(coverage.rows[0].retirementSettlement).toBeUndefined()
+
+    const { cell, column, explanation } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
+    const path = `retirement.${field}`
+    const retirementCell = cell(path, 2026)
+    expect(retirementCell).toMatchObject({ status: 'not-applicable', value: null })
+    expect(annualSheetDisplayValue(retirementCell, column(2026), 'nominal')).toBeNull()
+    expect(annualSheetDisplayValue(retirementCell, column(2026), 'real')).toBeNull()
+    expect(retirementCell.explanationRefs).toHaveLength(1)
+
+    const detail = explanation(path, 2026)
+    expect(detail).toBeDefined()
+    expect(detail.formula ?? []).toEqual([])
+    expect(detail.rulePackage).toBeUndefined()
+  })
+
   it.each([
     { room: 5000, applied: 1000, retained: 0, alexOwned: 7500, samOwned: 3750, alexAttributed: 2500 },
     { room: 600, applied: 600, retained: 400, alexOwned: 7900, samOwned: 3350, alexAttributed: 2100 },
