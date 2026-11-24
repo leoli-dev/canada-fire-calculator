@@ -1,5 +1,5 @@
 import { mortgageDecimal, mortgageSubtract, mortgageNumber, mortgageNegative } from "./mortgageDecimal"
-import { heldMortgageProblem, householdPassiveHomeProblem } from './annualProperty'
+import { heldMortgageProblem } from './annualProperty'
 import { settleAnnualDebt } from './annualDebt'
 import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
@@ -21,7 +21,7 @@ export interface WorkingSpendingEvidence {
   retirementSpending: Known<number>
   /** Explicit household total for years with one retired and one working member. */
   transitionSpending?: Known<number>
-  /** Both living-spending amounts exclude the separately scheduled mortgage cash. */
+  /** All reached living-spending amounts, including transitionSpending, exclude the separately scheduled mortgage cash. */
   scheduledMortgagePaymentsExcluded?: Known<true>
 }
 
@@ -88,9 +88,9 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const fact = evidence[spendingSource]
     if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${spendingSource}`)
     if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
-    const housingProblem = generated ? householdPassiveHomeProblem(plan) : null
+    const housingProblem = generated ? heldMortgageProblem(plan, evidence) : null
     if (housingProblem) return fail('unsupported', housingProblem)
-    if (plan.dependents.length || plan.debts.length || (!generated && plan.properties.length)) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
+    if (plan.dependents.length || (!generated && (plan.debts.length || plan.properties.length))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
     const support = plan.taxProfile?.spouseSupported
     if (support && (support.status === 'known' ? typeof support.value !== 'boolean' : support.status !== 'unknown' || typeof support.reason !== 'string' || !support.reason)) return fail('invalid', 'household spouse support evidence')
@@ -138,7 +138,8 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     if (Object.values(settled.oas).some(b => ![b.grossReal, b.netReal, b.recoveryReal, b.recoveryIncomeReal, b.grossReal * startCpi, b.netReal * startCpi, b.recoveryReal * startCpi, b.recoveryIncomeReal * startCpi].every(safeMoney))) return fail('invalid', 'household OAS monetary amount unsafe')
     const gross = events.reduce((s, e) => s + e.amount, 0) + Object.values(settled.oas).reduce((sum, b) => sum + b.netReal, 0)
     const deductions = Object.values(payroll).reduce((s, p) => s + p.contributions, 0)
-    const residual = gross - deductions - priced.total - fact.value
+    const mortgagePayment = generated && plan.debts.length ? Object.values(generatedState!.byDebt).reduce((s, d) => s + (d.principal > 0 && d.yearsRemaining > 0 ? d.annualPayment : 0), 0) / startCpi : 0
+    const residual = gross - deductions - priced.total - fact.value - mortgagePayment
     const bound = Math.min(0.004, 0.004 / startCpi, 4 * Number.EPSILON * (gross + deductions + priced.total + fact.value))
     if (residual < -bound && (!generated || phase === 'both-working')) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
     if (residual > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
