@@ -86,6 +86,11 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
   if (!account) return Number.NaN
   return (1 + account.realReturn - account.annualFee) * (1 + plan.inflation) - 1
 }
+/** Exact mortgage carry contains only explicitly written account IDs. */
+function ownMortgageBalance(balances: Record<string, MortgageDecimal> | undefined, id: string): MortgageDecimal | undefined {
+  return balances && Object.prototype.hasOwnProperty.call(balances, id) ? balances[id] : undefined
+}
+
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
@@ -377,7 +382,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
   let householdWithdrawalSettlement: YearRow['householdWithdrawalSettlement']
   const householdMortgage = !!working && "household" in working && isCanonicalGeneratedState(plan, opening) && plan.debts.length > 0
-  const mortgageDraws: Record<string, MortgageDecimal> = {}
+  // Account IDs are opaque; an absent draw must never resolve through
+  // Object.prototype (including on the existing no-debt household path).
+  const mortgageDraws = new Map<string, MortgageDecimal>()
   const householdDebt = householdMortgage ? settleAnnualDebt(state, plan.debts) : undefined
   if (householdDebt && householdDebt.status !== "ok") return fail(householdDebt.status, householdDebt.reason)
   if (householdMortgage && working && "household" in working) {
@@ -421,9 +428,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       const account = candidates[0]
       const statement = tfsaStatement(plan, account.ownerId!)
       if (!statement || statement.provenance.origin === "unknown") return fail("unsupported", "TFSA withdrawal statement evidence missing")
-      const capacity = opening.mortgageExactBalances?.[account.id] ?? mortgageDecimal(state.byAccount[account.id].balance)
+      const capacity = ownMortgageBalance(opening.mortgageExactBalances, account.id) ?? mortgageDecimal(state.byAccount[account.id].balance)
       const draw = mortgageNegative(mortgageSubtract(capacity, shortage)) ? capacity : shortage
-      mortgageDraws[account.id] = draw
+      mortgageDraws.set(account.id, draw)
       const amount = mortgageNumber(draw)
       const nominalOpening = state.byAccount[account.id].balance
       const nominalClosing = mortgageNumber(mortgageSubtract(capacity, draw))
@@ -775,8 +782,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   if (householdWithdrawalSettlement) {
     for (const { accountId, ownerId, kind, amount } of householdWithdrawalSettlement.postings ?? []) {
-      state.byAccount[accountId].balance = mortgageDraws[accountId] ? mortgageNumber(mortgageSubtract(opening.mortgageExactBalances?.[accountId] ?? mortgageDecimal(opening.byAccount[accountId].balance), mortgageDraws[accountId])) : state.byAccount[accountId].balance - amount
-      if (mortgageDraws[accountId]) accountRows[accountId].mortgageExactWithdrawal = mortgageDraws[accountId]
+      state.byAccount[accountId].balance = mortgageDraws.has(accountId) ? mortgageNumber(mortgageSubtract(ownMortgageBalance(opening.mortgageExactBalances, accountId) ?? mortgageDecimal(opening.byAccount[accountId].balance), mortgageDraws.get(accountId)!)) : state.byAccount[accountId].balance - amount
+      if (mortgageDraws.has(accountId)) accountRows[accountId].mortgageExactWithdrawal = mortgageDraws.get(accountId)!
       accountRows[accountId].withdrawal = amount
       if (kind === 'tfsa') state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount }]
     }
@@ -788,7 +795,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     let rate: number
     try { rate = providers.returns({ plan: clone(plan), state: clone(settled) }, id) } catch { return fail('invalid', `return provider failed: ${id}`) }
     if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
-    if (working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence && settled.byAccount[plan.annualNonRegEvidence.accountId]?.nonRegPool)
+    if (householdMortgage || working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence && settled.byAccount[plan.annualNonRegEvidence.accountId]?.nonRegPool)
       Object.defineProperty(rates, id, { value: rate, enumerable: true, writable: true, configurable: true })
     else rates[id] = rate
   }
@@ -796,11 +803,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].returnAmount = account.balance * rates[id]
     account.balance += accountRows[id].returnAmount
     if (working && isCanonicalGeneratedState(plan, opening) && plan.debts.length) {
-      const exact = mortgageDraws[id] ? mortgageMultiply(mortgageSubtract(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), mortgageDraws[id]), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[id]))) : mortgageClosing(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
+      const exact = mortgageDraws.has(id) ? mortgageMultiply(mortgageSubtract(ownMortgageBalance(opening.mortgageExactBalances, id) ?? mortgageDecimal(opening.byAccount[id].balance), mortgageDraws.get(id)!), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[id]))) : mortgageClosing(ownMortgageBalance(opening.mortgageExactBalances, id) ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
       const precise = mortgageNumber(exact)
       const correction = precise - account.balance
       if (!Number.isFinite(precise) || mortgageNegative(exact) || Math.abs(correction) >= Math.min(0.005, 0.005 * working.startCpi)) return fail("unsupported", "mortgage decimal balance precision boundary")
-      ;(state.mortgageExactBalances ??= {})[id] = exact
+      // Keep the published ordinary-object shape, but write an own data key.
+      Object.defineProperty(state.mortgageExactBalances ??= {}, id, { value: exact, enumerable: true, writable: true, configurable: true })
       if (correction !== 0) accountRows[id].mortgageArithmeticReconciliation = correction
       account.balance = precise
     }

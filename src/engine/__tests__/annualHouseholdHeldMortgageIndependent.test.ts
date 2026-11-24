@@ -655,6 +655,59 @@ describe('FE-53 S2 evidence and unsupported events', () => {
 })
 
 describe('FE-53 S2 entry point and production parity', () => {
+  it.each([
+    ['constructor', false], ['toString', false], ['constructor', true], ['toString', true],
+  ] as const)('settles withdrawals from opaque account ID %s with mortgage=%s', (accountId, mortgaged) => {
+    const working = mortgaged ? 10_298.65 : 11_298.65
+    const { plan, evidence } = fixture({
+      inflation: 0, selfWage: 12_000, partnerWage: 0, working, mixed: 200, retired: 300,
+      payment: 1_000, principal: 3_000, term: 3,
+    })
+    plan.accounts[0].id = accountId
+    if (!mortgaged) {
+      plan.debts = []
+      plan.properties[0].mortgageDebtId = null
+      delete evidence.scheduledMortgagePaymentsExcluded
+    }
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 4))
+    expect(coverage).toMatchObject({ blocked: null, uncomputedYears: [] })
+    expect(coverage.rows.map(row => row.year)).toEqual([2026, 2027, 2028, 2029])
+    const draws = mortgaged ? [0, 1_200, 1_300, 300] : [0, 200, 300, 300]
+    const balances = mortgaged ? [22_000, 20_800, 19_500, 19_200] : [22_000, 21_800, 21_500, 21_200]
+    const payments = mortgaged ? [1_000, 1_000, 1_000, 0] : [0, 0, 0, 0]
+
+    for (const [index, row] of coverage.rows.entries()) {
+      expect(Object.keys(row.byAccount)).toEqual([accountId])
+      const posting = row.byAccount[accountId]
+      expect(posting).toMatchObject({
+        ownerId: RETIREE, opening: index ? balances[index - 1] : OPENING_TFSA,
+        withdrawal: draws[index], contribution: 0, returnAmount: 0, closing: balances[index],
+      })
+      expect(row.cashLedger).toMatchObject({ debtPayments: payments[index],
+        spending: index === 0 ? working : index === 1 ? 200 : 300, unallocated: 0 })
+      if (index) expect(row.householdWithdrawalSettlement).toMatchObject({
+        accountId, ownerId: RETIREE, withdrawal: draws[index], spendingUnmet: 0,
+        postings: [{ accountId, ownerId: RETIREE, kind: 'tfsa', amount: draws[index] }],
+      })
+      if (mortgaged && index) {
+        expect(posting.mortgageExactWithdrawal).toEqual({ coefficient: String(draws[index]), scale: 0 })
+      } else {
+        expect(posting).not.toHaveProperty('mortgageExactWithdrawal')
+      }
+    }
+    expect(Object.keys(coverage.state.byAccount)).toEqual([accountId])
+    expect(coverage.state.byAccount[accountId]).toMatchObject({ balance: balances[3], ownerId: RETIREE })
+    expect(coverage.state.tfsaWithdrawalHistory).toEqual(draws.slice(1).map((amount, index) => ({
+      id: `annual:${2027 + index}:withdrawal:${accountId}`, calendarYear: 2027 + index, personId: RETIREE, amount,
+    })))
+    if (mortgaged) {
+      expect(Object.keys(coverage.state.mortgageExactBalances!)).toEqual([accountId])
+      expect(coverage.state.mortgageExactBalances![accountId]).toEqual({ coefficient: '19200', scale: 0 })
+    } else {
+      expect(coverage.state).not.toHaveProperty('mortgageExactBalances')
+    }
+  })
+
   it('preserves the base provider refusal when negative savings and underamortization coincide', () => {
     const { plan } = fixture({ payment: 1_000, principal: 1_000.01, term: 1 })
     plan.budget = { kind: 'savingsBudget', annualNetSavings: -10, retirementSpending: 800,
