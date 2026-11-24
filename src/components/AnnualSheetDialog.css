@@ -24,7 +24,7 @@
 .annual-sheet-controls button:disabled { opacity: .5; cursor: default; }
 .annual-sheet-help { margin: 6px 0; font-size: .75rem; color: var(--ink-soft); }
 .annual-sheet-announcement { font-size: .8rem; }
-.annual-sheet-scroll { min-height: 0; min-width: 0; flex: 1 1 100px; overflow: auto; position: relative; border: 1px solid var(--line-strong); overscroll-behavior: contain; }
+.annual-sheet-scroll { min-height: 0; min-width: 0; flex: 1 1 100px; overflow: auto; scroll-padding-top: 48px; scroll-padding-left: 172px; position: relative; border: 1px solid var(--line-strong); overscroll-behavior: contain; }
 .annual-sheet-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: .8rem; font-variant-numeric: tabular-nums; }
 .annual-sheet-table th, .annual-sheet-table td { padding: 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); vertical-align: top; min-width: 142px; }
 .annual-sheet-table thead th { position: sticky; top: 0; z-index: 3; background: var(--navy); color: white; text-align: right; }

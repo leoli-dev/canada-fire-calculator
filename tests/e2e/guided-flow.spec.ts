@@ -85,6 +85,15 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
   await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
+  const annual = page.getByRole('button', { name: 'Annual financial details' })
+  await annual.click()
+  const annualDialog = page.getByRole('dialog', { name: 'Household annual estimate' })
+  await expect(annualDialog).toBeVisible()
+  const primaryAge = annualDialog.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /Primary age/ }) })
+  await expect(primaryAge.getByRole('cell').first()).toContainText('35')
+  await page.keyboard.press('Escape')
+  await expect(annualDialog).toBeHidden()
+  await expect(annual).toBeFocused()
   await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
   await expect(page.locator('.target-field input')).toHaveValue('750,000')
 
@@ -96,6 +105,10 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await page.goto('/#/guided/results')
   await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
   await expect(page.locator('.results-column')).toHaveCount(0)
+  await expect(annual).toHaveCount(0)
+  await generate.click()
+  await annual.click()
+  await expect(primaryAge.getByRole('cell').first()).toContainText('36')
 })
 
 test('an answered-excluded budget basis labels the guided result as an estimate', async ({ page }) => {
@@ -112,6 +125,11 @@ test('an answered-excluded budget basis labels the guided result as an estimate'
   await expect(estimate).toHaveCount(1)
   await expect(estimate).toContainText('estimate rather than a precise number')
   await expect(estimate).toContainText('Final net worth:')
+  await page.getByRole('button', { name: 'Annual financial details' }).click()
+  const annual = page.getByRole('dialog', { name: 'Household annual estimate' })
+  await expect(annual).toHaveAccessibleDescription(/saving basis you recorded leaves out a component this projection still treats as included/i)
+  await page.keyboard.press('Escape')
+  await expect(annual).toBeHidden()
   // The recorded basis is what the user answered, and it stays on the plan.
   await expect(page.locator('.summary')).not.toContainText('modeled balance lasts')
 })

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { pensionStartAge, runProjection, validateInputs } from './engine'
 import { setLanguage } from './i18n'
@@ -26,6 +26,9 @@ import { GithubCorner } from './components/GithubCorner'
 import { hasUnusableSharedFields } from './forms/fieldState'
 import { migrationReview } from './engine/migrationReview'
 import { MigrationReview } from './components/MigrationReview'
+import { AnnualSheetDialog } from './components/AnnualSheetDialog'
+import { annualSheetText } from './annualSheet'
+import { annualDetailsTitle, legacyAnnualSheet } from './legacyAnnualSheet'
 import { PersonTaxTable } from './components/PersonTaxTable'
 
 /** Precision reasons the pooled household tools do not depend on. */
@@ -56,7 +59,18 @@ export default function App() {
   const resultRevision = useStore((s) => s.resultRevision)
   const sharedFieldsPending = useStore(hasUnusableSharedFields)
   const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision && !sharedFieldsPending
-  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
+  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined, { captureAnnualDetails: true }) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
+  const [annualToken, setAnnualToken] = useState<{ revision: number; result: typeof result; entryMode: typeof entryMode } | null>(null)
+  const annualOpen = annualToken?.revision === inputRevision && annualToken.result === result && annualToken.entryMode === entryMode
+  // Adapt only for an explicitly opened, current result. An old token cannot
+  // render even one frame of a revised scenario before effect cleanup.
+  const annualModel = useMemo(() => annualOpen && result ? legacyAnnualSheet(result, inputs, {
+    scenarioId: 'current', revision: inputRevision,
+    disclosures: [
+      ...(precision?.reasons.includes('budgetBasisExcluded') ? [t('budget.estimateExcluded')] : []),
+      ...(migrationBlocked ? [t('estimateChartsNote')] : []),
+    ],
+  }) : null, [annualOpen, result, inputs, inputRevision, migrationBlocked, precision?.reasons.join(','), t])
   const precisionBlocked = migrationBlocked
   // Keep the existing single-person planning preview usable while BE-14 B
   // wires working-year tax. Couples never get a disguised pooled tax. BE-43:
@@ -144,6 +158,7 @@ export default function App() {
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
+          {result && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}

@@ -392,7 +392,32 @@ export interface TaxBySource {
   pension: number
 }
 
+export interface LegacyAnnualDetails {
+  year: number
+  factor: number
+  openingFactor: number
+  /** Native real positions; opening belongs to the previous closing factor. */
+  opening: Record<string, number>
+  /** Actual changes between named recording points, never a cash balancing plug. */
+  changes: { label: string; amounts: Record<string, number> }[]
+  nonRegAcbNominal: number
+  spendingTarget: number | null
+  debtInterest: number
+  debtPrincipal: number
+  sales: { field: string; owed: number; proceeds: number; cashNeeded: number }[]
+  debtEvents: { id: string; eventId: string; kind: 'borrowing' | 'sale-discharge'; amount: number; unpaid: number }[]
+  debtSchedule: { id: string; opening: number; borrowing: number; saleDischarge: number; payment: number; interest: number; closing: number }[]
+  retainedDebt: { sale: number; mortgage: number }
+  funding: { eventId: string; field: string; allocation: import('./funding').PurchaseAllocation }[]
+  cash: { living: number; debt: number; housing: number; payroll: number; prepaidPurchaseTax: number } | null
+  hbp: { due: number; repaid: number; unpaidTax: number }
+  workingSavings: number | null
+  taxRules: import('./tax').TaxRuleProvenance
+}
+
 export interface YearRow {
+  /** Opt-in observer output; omitted for all existing callers and simulations. */
+  annualDetails?: LegacyAnnualDetails
   age: number
   phase: Phase
   /** Obligations that could not be funded at the event date. */

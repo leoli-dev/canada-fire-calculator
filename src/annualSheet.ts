@@ -11,6 +11,9 @@ export interface AnnualSheetExplanation {
   formula?: { label: AnnualSheetText; value: number; direction: 'add' | 'subtract'; unit: AnnualSheetUnit; basis?: 'nominal-CAD' | 'nominal-tax-basis' }[]
   rulePackage?: string
   taxYear?: number
+  /** Calendar year being evaluated; separate from the source pack tax year. */
+  projectionYear?: number
+  formulaBasis?: AnnualSheetText
   forwardAssumption?: AnnualSheetText
   limitations?: AnnualSheetText[]
 }
@@ -25,6 +28,10 @@ export interface AnnualSheetCell {
   timing: 'opening' | 'during-year' | 'closing' | 'terminal'
   /** Nominal tax bases stay nominal in either display mode. */
   basis?: 'nominal-CAD' | 'nominal-tax-basis'
+  /** Override for a native stream whose settlement clock differs from the column. */
+  realFactor?: number
+  /** Explicit real-basis difference for presentation bridges only (never a cash flow). */
+  realValue?: number
   nativeBasis?: AnnualSheetText
   conversion?: AnnualSheetText
   reason?: AnnualSheetText
@@ -42,6 +49,7 @@ export interface AnnualSheetRow {
 export interface AnnualSheetYear {
   year: number
   /** Multiply normalized nominal CAD by this factor to express base-year CAD. */
+  openingRealFactor?: number
   realFactor: number
 }
 export interface AnnualSheetJump {
@@ -71,15 +79,17 @@ export function annualSheetText(text: AnnualSheetText, language: string): string
 }
 
 export function annualSheetDisplayValue(cell: AnnualSheetCell, year: AnnualSheetYear, mode: 'real' | 'nominal'): number | null {
-  if (cell.status === 'unknown' || cell.status === 'not-computed' || cell.status === 'not-applicable' || cell.value === null || !Number.isFinite(cell.value)) return null
+  if (!['calculated', 'estimated'].includes(cell.status) || cell.value === null || !Number.isFinite(cell.value)) return null
   if (cell.unit !== 'CAD' || cell.basis === 'nominal-tax-basis' || mode === 'nominal') return cell.value
-  const converted = cell.value * year.realFactor
-  return Number.isFinite(year.realFactor) && year.realFactor > 0 && Number.isFinite(converted) ? converted : null
+  if (cell.realValue !== undefined) return Number.isFinite(cell.realValue) ? cell.realValue : null
+  const factor = cell.realFactor ?? (cell.timing === 'opening' ? year.openingRealFactor ?? year.realFactor : year.realFactor)
+  const converted = cell.value * factor
+  return Number.isFinite(factor) && factor > 0 && Number.isFinite(converted) ? converted : null
 }
 
 /** Defensive normalization also covers older/untyped adapters without changing their API. */
 export function annualSheetCellStatus(cell: AnnualSheetCell | undefined, year: AnnualSheetYear | undefined, mode: 'real' | 'nominal'): AnnualSheetStatus {
   if (!cell) return 'not-computed'
-  if (cell.status !== 'calculated' && cell.status !== 'estimated') return cell.status
+  if (cell.status !== 'calculated' && cell.status !== 'estimated') return ['unknown', 'not-computed', 'not-applicable'].includes(cell.status) ? cell.status : 'unknown'
   return year && annualSheetDisplayValue(cell, year, mode) !== null ? cell.status : 'unknown'
 }

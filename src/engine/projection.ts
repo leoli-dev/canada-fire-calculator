@@ -30,8 +30,8 @@ import { openingSpousalAttributionLedger, type SpousalAttributionLedger } from '
 import { personProjectionTax } from './personProjectionTax'
 import { pensionPaid } from './pensionPaid'
 export { pensionPaid } from './pensionPaid'
-import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale } from './debts'
-import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type FundingGap } from './funding'
+import { buildDebtStream, impliedRate, releasedMortgagePayment, yearStartSale, type DebtStream } from './debts'
+import { allocateContributions, planAnnualHousingFunding, planPurchaseFunding, reconcileMortgagePayment, type PurchaseAllocation, type FundingGap } from './funding'
 import { disposeHolding, nominalFactor, toNominal, toReal } from './capitalGains'
 
 /** Per-year, per-account return override; default uses inputs.returns. */
@@ -362,7 +362,7 @@ export function pensionStartAge(inputs: Inputs): number {
   return start
 }
 
-export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?: InputsV2): ProjectionResult {
+export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?: InputsV2, options?: { captureAnnualDetails?: boolean }): ProjectionResult {
   // BE-38 B1: one selected, versioned rule pack prices every tax figure in this
   // run — the year's income tax, the meltdown bracket ceiling and the closing
   // return. An unknown jurisdiction raises the selector's concrete reason here
@@ -524,6 +524,37 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     const yearGaps: FundingGap[] = []
     const yearIdx = age - inputs.currentAge
     const factor = nominalFactor(inflation, yearIdx)
+    // Opt-in observer: snapshots never participate in economic decisions.
+    const positions = () => ({ ...bal, fhsa: fhsaBal, locked: lockedBal,
+      property: prValue + ips.reduce((sum, p) => sum + p.value, 0) })
+    const detail = options?.captureAnnualDetails ? {
+      year: baseCalendarYear + yearIdx, factor,
+      taxRules: taxRuleProvenance(rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
+      openingFactor: nominalFactor(inflation, Math.max(0, yearIdx - 1)),
+      opening: positions(), changes: [] as { label: string; amounts: Record<string, number> }[],
+      nonRegAcbNominal: 0, spendingTarget: null as number | null,
+      debtInterest: 0, debtPrincipal: 0,
+      sales: [] as { field: string; owed: number; proceeds: number; cashNeeded: number }[],
+      debtEvents: [] as NonNullable<YearRow['annualDetails']>['debtEvents'],
+      debtSchedule: [] as NonNullable<YearRow['annualDetails']>['debtSchedule'],
+      retainedDebt: { sale: 0, mortgage: 0 },
+      funding: [] as { eventId: string; field: string; allocation: PurchaseAllocation }[],
+      cash: null as NonNullable<YearRow['annualDetails']>['cash'],
+      hbp: { due: 0, repaid: 0, unpaidTax: 0 }, workingSavings: null as number | null,
+    } : undefined
+    const propertyHeldAtOpening = detail ? { residence: prValue > 0, investments: ips.map(p => p.value > 0) } : undefined
+    const recordFunding = (eventId: string, field: string, allocation: PurchaseAllocation) => {
+      if (detail) detail.funding.push({ eventId, field, allocation: { ...allocation, balances: { ...allocation.balances }, grossWithdrawals: { ...allocation.grossWithdrawals } } })
+    }
+    let observed = detail?.opening
+    const record = (label: string) => {
+      if (!detail || !observed) return
+      const next = positions()
+      const amounts = Object.fromEntries(Object.entries(next).map(([key, value]) =>
+        [key, value - observed![key as keyof typeof next]]))
+      detail.changes.push({ label, amounts })
+      observed = next
+    }
     const hbpDues = yearIdx >= hbpFirstRepayIdx
       ? hbpLoans.map(loan => {
         const nominal = Math.min(loan.nominalInstalment, loan.nominalBalance)
@@ -532,6 +563,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       }).filter(due => due.amount > 1e-9)
       : []
     const hbpDue = hbpDues.reduce((sum, due) => sum + due.amount, 0)
+    if (detail) detail.hbp.due = hbpDue
     const nonRegBookReal = () => toReal(nonRegBook, factor)
     // A purchase or housing-funding disposal can realize an unverified loss in
     // either phase; the funding planner reports it so no year's tax is called
@@ -583,6 +615,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         })
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
+          recordFunding(`purchase:${age}`, 'principalResidence.downPayment', plan.allocation)
           Object.assign(bal, plan.allocation.balances)
           noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
@@ -602,6 +635,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
+          detail?.debtEvents.push({ id: 'principalResidence.mortgage', eventId: `purchase:${age}`, kind: 'borrowing', amount: plan.mortgagePrincipal, unpaid: 0 })
           startHbp(plan.allocation.hbpWithdrawal, buyers, yearIdx)
         }
       } else {
@@ -614,6 +648,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         })
         if (plan.gap) yearGaps.push(plan.gap)
         else if (plan.allocation) {
+          recordFunding(`purchase:${age}`, 'principalResidence.downPayment', plan.allocation)
           Object.assign(bal, plan.allocation.balances)
           noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
@@ -633,6 +668,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           fhsaBal = 0
           fhsaActive = false
           prValue = plannedPurchase.price
+          detail?.debtEvents.push({ id: 'principalResidence.mortgage', eventId: `purchase:${age}`, kind: 'borrowing', amount: plan.mortgagePrincipal, unpaid: 0 })
           startHbp(plan.allocation.hbpWithdrawal, buyers, yearIdx)
         }
       }
@@ -650,11 +686,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       }
     }
 
+    record('Opening transfers and purchase funding')
+
     // All planned sales close at the opening of the year, before interest,
     // rent, appreciation or the scheduled mortgage installment. If the lien
     // exceeds the sale price, draw only opening liquid assets. Any unpaid
     // remainder remains a debt and an explicit funding gap.
     const settleSale = (sale: ReturnType<typeof yearStartSale>, field: string) => {
+      detail?.sales.push({ field, owed: sale.owed, proceeds: sale.proceeds, cashNeeded: sale.cashNeeded })
+      let unsettledLien = 0
       if (sale.proceeds > 0) {
         bal.nonReg += sale.proceeds
         nonRegBook += toNominal(sale.proceeds, factor)
@@ -666,6 +706,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           taxOnWithdrawal: phase === 'accumulation' ? undefined : purchaseTaxIncrement(inputs, age, 0, canonical, rulesForCalendarYear(rules, baseCalendarYear + yearIdx)),
         })
         if (plan.allocation) {
+          recordFunding(`sale:${age}:${field}`, field, plan.allocation)
           Object.assign(bal, plan.allocation.balances)
           noteFundingLoss(plan.allocation)
           nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
@@ -678,10 +719,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           purchaseRrspWithdrawal += plan.allocation.rrspWithdrawal
         }
         if (plan.gap) {
+          unsettledLien = plan.gap.amount
           yearGaps.push({ ...plan.gap, eventId: `sale:${age}:${field}`, field, reason: 'saleDischarge' })
           unpaidSaleDebt += plan.gap.amount
         }
       }
+      detail?.debtEvents.push({ id: field.replace('.sellAtAge', '.mortgage'), eventId: `sale:${age}:${field}`, kind: 'sale-discharge', amount: sale.owed - unsettledLien, unpaid: unsettledLien })
     }
     if (pr && pr.sellAtAge !== null && age >= pr.sellAtAge && prValue > 0) {
       const sale = yearStartSale(prValue, prMortgage, yearIdx, unpaidPlannedMortgage)
@@ -717,10 +760,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         }
       }
     }
+    record('Property sale settlement')
     const releasedPayments =
       releasedMortgagePayment(prMortgage, prSold && !plannedPurchase, yearIdx) +
       ips.reduce((sum, p) => sum + releasedMortgagePayment(p.mortgage, p.sold, yearIdx), 0)
     const workingSavings = inputs.annualSavings + releasedPayments
+    if (detail && phase === 'accumulation') detail.workingSavings = workingSavings
     let savingsAfterSaleTax = workingSavings
     // A same-year planned home's installment/holding cost already has a
     // claim on these savings. Do not let sale tax spend that cash and then
@@ -739,6 +784,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         marginalRate: inputs.accumulationMarginalRate ?? 0.35,
       })
       if (plan.allocation) {
+        recordFunding(`sale:${age}:tax:${obligation.propertyIdx}`, `investmentProperties.${obligation.propertyIdx}.sellAtAge`, plan.allocation)
         Object.assign(bal, plan.allocation.balances)
         noteFundingLoss(plan.allocation)
         nonRegBook = toNominal(plan.allocation.nonRegBook, factor)
@@ -754,6 +800,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         unpaidSaleDebt += plan.gap.amount
       }
     }
+    record('Sale tax funding')
     // net rent from properties still held (stops the year a property sells);
     // a linked mortgage's interest (not principal) is deductible against it,
     // capped at the rent itself — this model doesn't carry forward a rental
@@ -788,6 +835,30 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
 
     // non-registered tax drag: yearly distributions are taxable when paid,
     // then reinvest (raising the ACB so they aren't taxed again at sale)
+    if (detail) {
+      detail.debtInterest = (debtStream.interest[yearIdx] ?? 0)
+        + (prValue > 0 ? prMortgage?.interest[yearIdx] ?? 0 : 0)
+        + ips.reduce((sum, p) => sum + (p.value > 0 ? p.mortgage?.interest[yearIdx] ?? 0 : 0), 0)
+    }
+    if (detail) {
+      detail.debtPrincipal = debtPayment - detail.debtInterest
+      // These are scheduled stream entries, not evidence that a debt was paid.
+      // A stream uses F(t) for opening and F(t+1) for payment/interest/closing.
+      const schedule = (id: string, stream: DebtStream | null, before: boolean, after: boolean) => {
+        const borrowing = detail.debtEvents.find(event=>event.id===id && event.kind==='borrowing')?.amount ?? 0
+        const sold = detail.debtEvents.some(event=>event.id===id && event.kind==='sale-discharge')
+        if (!stream || (!before && !after && !borrowing)) return
+        const opening = stream.openingBalance[yearIdx] ?? 0
+        detail.debtSchedule.push({ id, opening: before ? opening : 0,
+          borrowing, saleDischarge: sold ? opening : 0,
+          payment: after ? stream.payment[yearIdx] ?? 0 : 0,
+          interest: after ? stream.interest[yearIdx] ?? 0 : 0,
+          closing: after ? stream.closingBalance[yearIdx] ?? 0 : 0 })
+      }
+      schedule('debts', debtStream, true, true)
+      schedule('principalResidence.mortgage', prMortgage, propertyHeldAtOpening!.residence, prValue > 0)
+      ips.forEach((p, i) => schedule(`investmentProperties.${i}.mortgage`, p.mortgage, propertyHeldAtOpening!.investments[i], p.value > 0))
+    }
     const dist = bal.nonReg * (inputs.nonRegDistributionYield ?? 0)
 
     // government benefits accrue on each person's own timeline, whether or
@@ -869,8 +940,10 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       // BE-47: an HBP instalment is repaid into the RRSP from this year's
       // savings first; what savings cannot cover is taxed as income.
       const hbpRepaid = Math.min(hbpDue, savingsBudget)
+      if (detail) detail.hbp.repaid = hbpRepaid
       bal.rrsp += hbpRepaid
       hbpUnpaidTax = (hbpDue - hbpRepaid) * (inputs.accumulationMarginalRate ?? 0.35)
+      if (detail) detail.hbp.unpaidTax = hbpUnpaidTax
       if (hbpUnpaidTax > 0) {
         // The tax on the unpaid part is cash: it is raised from liquid assets
         // like any other cost (grossing up a taxable sale), and a shortfall
@@ -880,6 +953,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
           annualSavings: 0,
         })
         if (funding.allocation) {
+          recordFunding(`hbp:${age}`, 'principalResidence.hbp', funding.allocation)
           Object.assign(bal, funding.allocation.balances)
           noteFundingLoss(funding.allocation)
           nonRegBook = toNominal(funding.allocation.nonRegBook, factor)
@@ -890,6 +964,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         if (funding.gap) yearGaps.push({ eventId: `hbp:${age}`, field: 'principalResidence.hbp',
           amount: funding.gap.amount, reason: 'hbpRepaymentTax' })
       }
+      record('Housing funding and HBP repayment/tax')
       const budget = savingsBudget - hbpRepaid
       const allocation = allocateContributions({
         age, budget,
@@ -914,18 +989,21 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
         bal[t] += c
         if (t === 'nonReg') nonRegBook += toNominal(c, factor)
       }
+      record('Savings contributions including employer contributions')
       const marginal = inputs.accumulationMarginalRate ?? 0.35
       // working years: distributions taxed at the assumed marginal rate,
       // with the tax paid out of the account
       const dragTax = dist * marginal
       bal.nonReg -= dragTax
       nonRegBook += toNominal(dist - dragTax, factor)
+      record('Distribution tax deducted from account')
       // net rent, taxed at the same marginal rate (after any mortgage
       // interest deduction), is saved on top of annualSavings (whose hint
       // tells the user to exclude rent)
       const rentTax = (rent - rentMortgageInterest) * marginal
       bal.nonReg += rent - rentTax
       nonRegBook += toNominal(rent - rentTax, factor)
+      record('After-tax rent saved')
       // benefits already being collected pre-FIRE are saved after tax at the
       // working marginal rate (no clawback/GIS modelling here — employment
       // income is unknown, so this leans simple; high earners drawing OAS
@@ -935,6 +1013,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       const benefitTax = benefitBase * marginal
       bal.nonReg += benefitBase - benefitTax
       nonRegBook += toNominal(benefitBase - benefitTax, factor)
+      record('After-tax benefits saved')
       oas = oasGross
       tax = dragTax + rentTax + benefitTax + dpAccumTax + accumulationSaleTax + hbpUnpaidTax
       const marginalPurchaseTax = inputs.accumulationMarginalRate ?? 0.35
@@ -1034,6 +1113,12 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       // and ongoing home costs from the remaining assets and this year's
       // income, while reconciling purchase-withdrawal tax paid at closing.
       const spendTarget = inputs.retirementSpending + debtPayment + netHoldingCost
+      if (detail) {
+        detail.spendingTarget = spendTarget
+        detail.cash = { living: inputs.retirementSpending, debt: debtPayment, housing: netHoldingCost,
+          payroll: sideIncomeDeductions(extraIncome, inputs.extraIncome?.kind ?? 'employment', inputs.province, age).contributions,
+          prepaidPurchaseTax: purchaseTaxPaid }
+      }
       const out = solveWithdrawals(
         spendTarget, bal, forcedRrsp, gainFraction, cpp, pension,
         oasGrossPerPerson, agesPerPerson, extraTaxable, dist, rent,
@@ -1133,6 +1218,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       for (const t of ACCOUNT_TYPES) bal[t] -= withdrawals[t]
       if (bal.nonReg < 0.005) bal.nonReg = 0
 
+      record('Regular gross withdrawals and drain rounding')
       // surplus cash (e.g. forced RRIF minimum above spending) reinvests taxed
       const surplus = netCash - spendTarget
       if (surplus > 0) {
@@ -1145,6 +1231,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
       nonRegBook += toNominal(dist, factor)
     }
 
+    record('Surplus cash reinvested')
     for (const t of ACCOUNT_TYPES) {
       bal[t] *= 1 + (sample ? sample(age, t) : inputs.returns[t]) - (inputs.fees ?? 0)
     }
@@ -1155,9 +1242,15 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     if (lockedBal > 0) {
       lockedBal *= 1 + (sample ? sample(age, 'rrsp') : inputs.returns.rrsp) - (inputs.fees ?? 0)
     }
+    record('Investment return net of fees')
     if (prValue > 0 && pr) prValue *= 1 + pr.appreciation
     for (const p of ips) {
       if (p.value > 0) p.value *= 1 + p.appreciation
+    }
+    record('Property appreciation')
+    if (detail) {
+      detail.nonRegAcbNominal = nonRegBook
+      detail.retainedDebt = { sale: unpaidSaleDebt, mortgage: unpaidPlannedMortgage }
     }
     const ipTotal = ips.reduce((s, p) => s + p.value, 0)
 
@@ -1167,6 +1260,7 @@ export function runProjection(inputs: Inputs, sample?: ReturnSampler, canonical?
     }
 
     rows.push({
+      ...(detail ? { annualDetails: detail } : {}),
       age, phase, unfundedObligations: yearGaps, purchaseFunding, housingFunding,
       balances: { ...bal },
       withdrawals, cpp, oas, gis, ccb, rent,
