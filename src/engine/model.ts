@@ -163,6 +163,8 @@ export interface InputsV2 {
     priceBasis?: "purchase-year-nominal" | "base-year-real-indexed";
     priceNominal: Known<number>; qualifyingAcquisitionCostsNominal: Known<number>;
     postPurchaseAnnualSpendingReal: Known<number>; excludesOneTimeCosts: true;
+    householdTitle?: { shares: Record<string, number>; verified: true; provenance: Provenance; policy: "user-verified-title" };
+    fundingAuthorization?: { accountId: string; ownerId: string; authorized: true; purpose: "household-primary-home-purchase"; provenance: Provenance };
   }>
 
   annualPrimaryHomeSaleEvidence?: Record<string, {

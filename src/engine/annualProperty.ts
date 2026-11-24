@@ -86,7 +86,7 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
 export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence): string | null {
   if (!plan.debts.length && plan.annualPrimaryHomePurchaseEvidence && plan.properties.length === 1 && plan.properties[0].plannedPurchaseAge !== null) {
     const p = plan.properties[0]
-    return passiveHomeProblem({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
+    return (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
   }
   if (!plan.debts.length) return plan.people.length === 2 ? householdPassiveHomeProblem(plan) : passiveHomeProblem(plan)
   const p = plan.properties[0], d = plan.debts[0]
