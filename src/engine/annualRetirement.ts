@@ -1,3 +1,4 @@
+import { annualGis, gisAssessmentReceipt } from './annualGis'
 import { annualOas } from './annualOas'
 import { oasAfterClawback } from './benefits'
 import { annualCpp } from './annualCpp'
@@ -73,6 +74,8 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (!Number.isFinite(startCpi) || startCpi <= 0 || !safeMoney(spendingDue)) return fail('invalid', 'retirement CPI/spending')
     if (oas && !safeMoney(oas.grossReal * startCpi)) return fail('invalid', 'retirement OAS nominal amount unsafe')
     if (cpp && !safeMoney(cpp.amountReal * startCpi)) return fail('invalid', 'retirement CPP nominal amount unsafe')
+    const gis = generated && oas ? annualGis(plan, person.id, year, age, oas, opening.gisAssessmentLag?.[person.id]) : undefined
+    if (gis && !safeMoney(gis.amountReal * startCpi)) return fail('invalid', 'GIS nominal amount unsafe')
     const balances = { tfsa: 0, rrsp: 0, nonReg: 0 }
     for (const a of plan.accounts) balances[a.kind as 'tfsa' | 'rrsp'] += state.byAccount[a.id].balance
     if (!Number.isFinite(balances.tfsa + balances.rrsp)) return fail('invalid', 'retirement aggregate balances')
@@ -100,7 +103,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       if (tax.status !== 'ok') throw tax
       const nominalTax = tax.total * startCpi
       if (!Number.isFinite(nominalTax) || nominalTax < 0 || !Number.isFinite(tax.byPerson[person.id]?.taxableIncome)) throw new Error('invalid canonical tax')
-      return { withdrawals, tax, nominalTax, settledOas, netCash: ((cpp?.amountReal ?? 0) + netReal) * startCpi + withdrawals.rrsp + withdrawals.tfsa - nominalTax }
+      return { withdrawals, tax, nominalTax, settledOas, netCash: ((cpp?.amountReal ?? 0) + netReal + (gis?.amountReal ?? 0)) * startCpi + withdrawals.rrsp + withdrawals.tfsa - nominalTax }
     }
     // No persistent cash account exists in this slice. Refuse a genuine CPP
     // surplus atomically rather than dropping it from the next year's state.
@@ -108,7 +111,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       const baseline = run(0)
       const bound = Math.min(0.004, 0.004 * startCpi,
         4 * Number.EPSILON * (((cpp?.amountReal ?? 0) + (oas?.grossReal ?? 0)) * startCpi + baseline.nominalTax + spendingDue))
-      if (baseline.netCash - spendingDue > bound) return fail('unsupported', oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
+      if (baseline.netCash - spendingDue > bound) return fail('unsupported', gis && gis.amountReal > 0 ? 'GIS: surplus requires a persistent cash destination' : oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
     }
     const final = searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run)
     const spendingFunded = Math.min(spendingDue, Math.max(0, final.netCash))
@@ -148,18 +151,22 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     }
     state.byPerson[person.id].age++
     state.byPerson[person.id].previousYearEarnedIncome = { status: 'known', value: 0 }
-    state.benefitIncomeLag[person.id] = { status: 'known', value: final.tax.byPerson[person.id].netIncome * startCpi }
+    // Both canonical lags exclude OAS. Provider/legacy paths keep their contract.
+    const assessmentIncome = (final.tax.byPerson[person.id].netIncome - (final.settledOas?.netReal ?? 0)) * startCpi
+    state.benefitIncomeLag[person.id] = { status: 'known', value: assessmentIncome }
+    if (generated) (state.gisAssessmentLag ??= {})[person.id] = gisAssessmentReceipt(year, assessmentIncome, 0)
     state.year++
     const committedProblem = retirementSnapshotProblem(plan, state)
     if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = final.tax
     const taxableIncome = final.tax.byPerson[person.id].taxableIncome * startCpi
     const oasColumns = final.settledOas ? { oasGross: final.settledOas.grossReal * startCpi, oasRecovery: final.settledOas.recoveryReal * startCpi, oasNet: final.settledOas.netReal * startCpi } : {}
+    const gisCash = (gis?.amountReal ?? 0) * startCpi
     const oasCash = (final.settledOas?.netReal ?? 0) * startCpi
-    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, benefits: oasCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
-      cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
+    const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
+      cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
-      retirementSettlement: { evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      retirementSettlement: { ...(gis ? { gis } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))
