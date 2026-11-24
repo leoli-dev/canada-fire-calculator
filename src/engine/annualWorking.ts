@@ -96,8 +96,14 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     // full cash payroll is subtracted here once, never hidden inside tax.
     // Net in the common anchor basis before indexing. Separately indexing
     // each cash leg can turn exact exhaustion into a tiny nominal deficit.
-    // Preserve the signed result: no tolerance may erase a genuine deficit.
-    const netCashReal = gross - payroll.contributions - priced.total - plan.budget.workingSpending
+    const cashResidualReal = gross - payroll.contributions - priced.total - plan.budget.workingSpending
+    // Normalize only operand-scale floating-point residue, symmetrically for
+    // surplus and deficit. Do not impose a minimum scale: a zero-wage 1e-12
+    // expense is a real deficit. Cap below half a cent in BOTH anchor and
+    // nominal dollars so large operands/CPI cannot turn this into cash rounding.
+    const arithmeticBoundReal = Math.min(0.004, 0.004 / startCpi,
+      4 * Number.EPSILON * (gross + payroll.contributions + priced.total + plan.budget.workingSpending))
+    const netCashReal = Math.abs(cashResidualReal) <= arithmeticBoundReal ? 0 : cashResidualReal
     const netCash = netCashReal * startCpi
     if (![income, tax, payrollContributions, spending, taxableIncome].every(safeMoney) || !Number.isFinite(netCash)) return fail('invalid', 'working nominal pricing amount')
     if (netCashReal < 0) return fail('unsupported', 'negative working cash requires withdrawal funding rule')

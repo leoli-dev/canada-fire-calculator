@@ -175,4 +175,52 @@ describe('canonical Ontario working evaluation', () => {
       status: 'invalid', issues: [{ code: 'invalid' }],
     })
   })
+
+  it.each([
+    [BASE_YEAR, 1],
+    [BASE_YEAR + 1, 1.02],
+  ])('preserves the cash sign at taxed break-even in %i', (year, cpi) => {
+    const plan = phaseTransitionPlan()
+    Object.assign(plan.people[0], { ageInBaseYear: 30, retirementAge: 70, earnedIncome: known(85_078.84) })
+    plan.lifeExpectancy = 95
+    const evaluate = (workingSpending: number) => {
+      plan.budget = { kind: 'incomeBudget', workingSpending, retirementSpending: reference.retirementSpending }
+      return evaluateCanonicalWorkingYear(plan, { ...spendingEvidence(), workingSpending: known(workingSpending) }, year)
+    }
+
+    // payroll.ts yields capped CPP, CPP2 and EI. The 2026 tax snapshot yields
+    // $10,242.7594 federal and $4,581.6706 Ontario basic tax, plus $750 health premium.
+    expect(evaluate(63_734.89)).toMatchObject({
+      status: 'ok',
+      value: {
+        startCpi: cpi, netCash: 0, payrollContributions: expect.closeTo(5_769.52 * cpi, 8),
+        evaluation: { byPerson: { [RETIREE]: {
+          income: expect.closeTo(85_078.84 * cpi, 8),
+          taxableIncome: expect.closeTo(83_951.84 * cpi, 8),
+          tax: expect.closeTo(15_574.43 * cpi, 8),
+          spending: expect.closeTo(63_734.89 * cpi, 8),
+        } } },
+      },
+    })
+
+    expect(evaluate(63_734.90)).toMatchObject({
+      status: 'unsupported', issues: [{ detail: expect.stringMatching(/negative working cash/) }],
+    })
+
+    expect(evaluate(63_734.88)).toMatchObject({ status: 'ok', value: { netCash: expect.closeTo(0.01 * cpi, 8) } })
+  })
+
+  it('normalizes positive roundoff at break-even and preserves a real tiny deficit at zero wages', () => {
+    const plan = phaseTransitionPlan()
+    // $3,450 × 5.95% CPP plus $6,950 × 1.63% EI is exactly $318.56.
+    plan.people[0].earnedIncome = known(6_950)
+    plan.budget = { kind: 'incomeBudget', workingSpending: 6_631.44, retirementSpending: reference.retirementSpending }
+    expect(evaluateCanonicalWorkingYear(plan, { ...spendingEvidence(), workingSpending: known(6_631.44) }))
+      .toMatchObject({ status: 'ok', value: { netCash: 0 } })
+
+    plan.people[0].earnedIncome = known(0)
+    plan.budget.workingSpending = 1e-12
+    expect(evaluateCanonicalWorkingYear(plan, { ...spendingEvidence(), workingSpending: known(1e-12) }))
+      .toMatchObject({ status: 'unsupported', issues: [{ detail: expect.stringMatching(/negative working cash/) }] })
+  })
 })
