@@ -3,10 +3,10 @@ import { annualSheetText, type AnnualSheetRow } from '../../annualSheet'
 import { canonicalAnnualSheet, canonicalSheetId } from '../../canonicalAnnualSheet'
 import { legacyAnnualSheet } from '../../legacyAnnualSheet'
 import { annualRetirementContinuation, annualRetirementStep, projectRetirementCoverage } from '../annualRetirement'
-import { annualStep, initializeState, projectAnnualCoverage, projectCanonicalCoverage, projectFromState, type KernelResult, type YearRow } from '../annualState'
+import { annualStep, initializeState, projectAnnualCoverage, projectCanonicalCoverage, projectFromState, type AnnualCoverage, type KernelResult, type YearRow } from '../annualState'
 import type { Account } from '../model'
 import { runProjection } from '../projection'
-import { known, legacyRetirement, retirementPlan, RETIREE, RRSP, TFSA } from './fixtures/retirementSettlement'
+import { known, legacyRetirement, recorded, retirementPlan, RETIREE, RRSP, TFSA } from './fixtures/retirementSettlement'
 
 const setupYear = 2028
 const firstDrawYear = 2029
@@ -50,6 +50,19 @@ function assertCash(row: YearRow, spending: number, draw: number, tfsa: number, 
   expect(row.byAccount[TFSA].withdrawal).toBeCloseTo(tfsa, 6)
   expect(row.byAccount[RRSP].withdrawal).toBeCloseTo(draw, 6)
   expect(draw + tfsa - tax).toBeCloseTo(spending, 6)
+}
+
+function expectNoRollover(coverage: AnnualCoverage) {
+  expect(coverage.state.rrifConversions).toBeUndefined()
+  for (const row of coverage.rows) {
+    expect(row.retirementSettlement?.rrif).toBeUndefined()
+    expect(row.byAccount[RRSP]).not.toHaveProperty('openingKind')
+    expect(row.byAccount[RRSP]).not.toHaveProperty('closingKind')
+  }
+  const sheet = canonicalAnnualSheet(coverage, context)
+  for (const field of ['rollover', 'minimum', 'discretionary']) {
+    expect(findRow(sheet.rows, canonicalSheetId('value', 'account', RRSP, 'rrif', field))).toBeUndefined()
+  }
 }
 
 describe('independent Canadian RRIF annual settlement vectors', () => {
@@ -195,6 +208,50 @@ describe('independent Canadian RRIF annual settlement vectors', () => {
 })
 
 describe('RRIF scope and entry-point compatibility', () => {
+  it.each([0, 30_000])('keeps the full baseline horizon when a $%i initial RRSP is empty before age 71', rrsp => {
+    const { plan, evidence } = scenario({ rrsp, tfsa: 2_000_000 })
+    plan.strategy = 'rrspFirst'
+    const baseline = ok(projectCanonicalCoverage(plan, evidence, 5))
+    const account = plan.accounts.find(account => account.id === RRSP)!
+    account.rrifFactorCategory = known('qualifying')
+    account.rrifAgeElection = { personId: RETIREE, electedAtOpening: true }
+    plan.incomeSources.push({ id: 'expired-source', kind: 'other', recipientId: RETIREE,
+      annualAmount: known(25_000), fromAge: 50, toAge: 60, provenance: recorded })
+    const result = ok(projectCanonicalCoverage(plan, evidence, 5))
+    expect(result).toEqual(baseline)
+    expect(result).toMatchObject({ blocked: null, uncomputedYears: [], terminalYear: nextDrawYear,
+      overallConclusionAvailable: false, state: { byAccount: { [RRSP]: { kind: 'rrsp', balance: 0, openedYear: known(2016) } } } })
+    expect(result.rows).toHaveLength(5)
+    const workingClose = result.rows[0].byAccount[TFSA].closing
+    expect(workingClose).toBe(2_000_000)
+    // A $30,000 RRSP draw costs $607.60 federal, $538.7845 Ontario
+    // basic tax under the pinned estimate, and $300 health premium.
+    const taxAt70 = rrsp > 0 ? 1_446.3845 : 0
+    assertCash(result.rows[1], 40_000, rrsp, 40_000 - rrsp + taxAt70, taxAt70)
+    for (const [index, row] of result.rows.slice(2).entries()) {
+      expect(row.byAccount[TFSA].opening).toBe(result.rows[index + 1].byAccount[TFSA].closing)
+      assertCash(row, 40_000, 0, 40_000, 0)
+    }
+    expect(result.state.byAccount[TFSA].balance).toBeCloseTo(2_000_000 - 4 * 40_000 + rrsp - taxAt70, 6)
+    expectNoRollover(result)
+  })
+
+  it('does not establish a RRIF when the age-71 RRSP withdrawal exhausts the account', () => {
+    const { plan, evidence } = scenario({ rrsp: 60_000, tfsa: 2_000_000 })
+    plan.strategy = 'rrspFirst'
+    const result = ok(projectCanonicalCoverage(plan, evidence, 5))
+    expect(result).toMatchObject({ blocked: null, uncomputedYears: [], state: { byAccount: { [RRSP]: { kind: 'rrsp', balance: 0 } } } })
+    const [, , setup, first, next] = result.rows
+    // Ordinary RRSP gross-up at age 70 leaves $15,674.63310685608 for age 71.
+    // This last withdrawal falls below both personal/age offsets and the health premium.
+    const residual = 60_000 - 44_325.36689314392
+    expect(setup.byAccount[RRSP].opening).toBeCloseTo(residual, 6)
+    assertCash(setup, 40_000, residual, 40_000 - residual, 0)
+    expect(setup.byAccount[RRSP].closing).toBe(0)
+    for (const row of [first, next]) assertCash(row, 40_000, 0, 40_000, 0)
+    expectNoRollover(result)
+  })
+
   it.each<[string, Partial<Account>, number]>([
     ['existing RRIF', { kind: 'rrif', rrifFactorCategory: known('allOther') }, 0],
     ['spousal RRSP', { kind: 'spousalRrsp' }, 0],

@@ -74,7 +74,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (plan.accounts.some(a => (!['tfsa', 'rrsp'].includes(a.kind) && !(a.kind === 'nonReg' && a.balance === 0 && opening.byAccount[a.id].balance === 0)) || a.ownerId !== person.id) || ['tfsa', 'rrsp'].some(kind => plan.accounts.filter(a => a.kind === kind).length > 1)) return fail('unsupported', 'retirement supports one owned ordinary RRSP and one TFSA')
     const registered = plan.accounts.find(a => a.kind === "rrsp")
     const conversion = registered ? rrifConversionFor(opening, registered.id) : undefined
-    const rrifSlice = generated && !!registered && (age >= 71 || !!conversion)
+    const rrifSlice = generated && !!registered && (!!conversion || age >= 71 && opening.byAccount[registered.id].balance > 0)
     if (rrifSlice) {
       if (plan.accounts.some(a => a.rrifAgeElection !== undefined && a.rrifAgeElection !== null))
         return fail('unsupported', 'RRIF: pre-conversion age elections are not supported')
@@ -233,7 +233,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       current.balance += row.returnAmount
       row.closing = current.balance
     }
-    if (generated && registered && age === 71 && !conversion) {
+    if (generated && registered && age === 71 && !conversion && state.byAccount[registered.id].balance > 0) {
       const current = state.byAccount[registered.id]
       ;Object.defineProperty(state.rrifConversions ??= {}, registered.id, { value: { year, ownerId: person.id, amount: current.balance, factorCategory: "allOther", ageBasis: "owner", provenance: "generated-owner-rrsp-rollover" }, enumerable: true, configurable: true, writable: true })
       current.kind = "rrif"
@@ -258,7 +258,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const row: YearRow = { year, byPerson: { [person.id]: { age, income: (cpp?.amountReal ?? 0) * startCpi, ...(cpp ? { cpp: cpp.amountReal * startCpi } : {}), earnedIncome: 0, ...oasColumns, ...(generated && oas?.evidence.gis.status === 'annual-estimate' ? { gis: gisCash } : {}), benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, taxableIncome } }, byAccount: accountRows, byDebt: {}, byProperty: {},
       cashLedger: { income: (cpp?.amountReal ?? 0) * startCpi, benefits: oasCash + gisCash, tax: final.nominalTax, spending: spendingFunded, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: Math.max(0, final.netCash - spendingFunded) },
       contributionLedger: { allocationCashBasis: 0, scheduledRrspBudgeted: 0, scheduledPlanned: 0, scheduledApplied: 0, scheduledRetained: 0, appliedTotal: 0, postings: [], retained: [] }, taxLedger: { [person.id]: { taxableIncome, tax: final.nominalTax } }, rrspLedger: {}, fhsaLedger: {}, tfsaLedger: statement ? { [person.id]: tfsaLedger } : {}, issues: [],
-      retirementSettlement: { ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: rrifConversionFor(state, registered.id)!, openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      retirementSettlement: { ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))
