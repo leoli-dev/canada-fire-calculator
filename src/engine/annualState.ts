@@ -1,3 +1,4 @@
+import { annualTerminalEstate } from './annualTerminalEstate'
 import { carryProspectivePurchaseBalance } from "./annualPrimaryHomePurchase"
 import { MortgagePrecisionError, mortgageDecimal, mortgageSubtract, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
 import { growHeldProperties } from './annualProperty'
@@ -86,6 +87,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
+  terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
   householdWithdrawalSettlement?: { /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
@@ -949,6 +951,12 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       }
       if (result.status !== 'ok') { blocked = { year: state.year, status: result.status, issues: result.issues, causes: [...new Set(result.issues.map(annualStopCause))] }; break }
       state = result.value.state
+      if (committedWorking && plan.annualTerminalEstateEvidence !== undefined && result.value.row.retirementSettlement &&
+          result.value.row.year === plan.baseYear + plan.lifeExpectancy - person.ageInBaseYear) {
+        generatedStates.set(state, plan)
+        try { result.value.row.terminalEstateEstimate = annualTerminalEstate(plan, state, result.value.row) }
+        finally { generatedStates.delete(state) }
+      }
       rows.push(result.value.row)
     }
     return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, ...(plan.people.length === 1 && plan.annualBenefitsEvidence?.[plan.people[0].id]?.gis?.status === 'annual-estimate' ? { gisOptInPersonIds: [plan.people[0].id] } : {}), evaluationBasis: 'canonical-continuous' } }

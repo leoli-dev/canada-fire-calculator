@@ -157,6 +157,7 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  annualTerminalEstateEvidence?: Record<number, import('./annualTerminalEstate').AnnualTerminalEstateEvidence>
   annualPrimaryHomePurchaseEvidence?: Record<string, {
     provenance: Provenance; effectiveYear: number; timing: "start-of-purchase-year";
     priceBasis?: "purchase-year-nominal" | "base-year-real-indexed";
