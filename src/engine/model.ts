@@ -158,6 +158,7 @@ export interface BenefitExclusion {
 }
 export interface InputsV2 {
   annualPrimaryHomeSaleEvidence?: Record<string, {
+    mortgagePayoff?: { openingPrincipalNominal: Known<number>; debtId: string; timing: 'start-of-sale-year'; effectiveYear: number; additionalAccruedInterestNominal: Known<number>; prepaymentPenaltyNominal: Known<number>; dischargeFeesNominal: Known<number>; provenance: Provenance };
     provenance: Provenance; wholePropertyFullyExcluded: true;
     salePriceBasis: 'opening-year-nominal-value';
     sellingCostsNominal: Known<number>; postSaleAnnualSpendingReal: Known<number>;

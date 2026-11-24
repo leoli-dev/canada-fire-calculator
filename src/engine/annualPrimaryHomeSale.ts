@@ -5,11 +5,11 @@ import { mortgageDecimal, mortgageSubtract, mortgageAdd, mortgageMultiply, mortg
 
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k)
 const money = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER / 100
-export type HomeSaleExactReceipt = Record<'grossProceeds' | 'sellingCosts' | 'netProceeds' | 'acb' | 'realizedGain', MortgageDecimal>
+export type HomeSaleExactReceipt = Record<'grossProceeds' | 'sellingCosts' | 'netProceeds' | 'acb' | 'realizedGain', MortgageDecimal> & Partial<Record<'mortgagePrincipalPaid' | 'residualCash' | 'recordedOpeningValue' | 'saleValueReconciliation' | 'recordedOpeningPrincipal' | 'mortgagePrincipalReconciliation', MortgageDecimal>>
 export function exactHomeReceipt(r: PrimaryHomeSaleReceipt): HomeSaleExactReceipt {
-  const grossProceeds = mortgageDecimal(r.grossProceeds), sellingCosts = mortgageDecimal(r.sellingCosts), acb = mortgageDecimal(r.acb)
+  const grossProceeds = r.valuation?.modeledGrossProceeds ?? mortgageDecimal(r.grossProceeds), sellingCosts = mortgageDecimal(r.sellingCosts), acb = mortgageDecimal(r.acb)
   const netProceeds = mortgageSubtract(grossProceeds, sellingCosts)
-  return { grossProceeds, sellingCosts, acb, netProceeds, realizedGain: mortgageSubtract(netProceeds, acb) }
+  return { grossProceeds, sellingCosts, acb, netProceeds, realizedGain: mortgageSubtract(netProceeds, acb), ...(r.mortgagePayoff ? { recordedOpeningValue: mortgageDecimal(r.valuation!.recordedOpeningValue), saleValueReconciliation: mortgageSubtract(grossProceeds, mortgageDecimal(r.valuation!.recordedOpeningValue)), recordedOpeningPrincipal: mortgageDecimal(r.mortgagePayoff.recordedOpeningPrincipal), mortgagePrincipalReconciliation: mortgageSubtract(mortgageDecimal(r.mortgagePayoff.openingPrincipal), mortgageDecimal(r.mortgagePayoff.recordedOpeningPrincipal)), mortgagePrincipalPaid: mortgageDecimal(r.mortgagePayoff.openingPrincipal), residualCash: mortgageSubtract(netProceeds, mortgageDecimal(r.mortgagePayoff.openingPrincipal)) } : {}) }
 }
 export const decimalMin = (a: MortgageDecimal, b: MortgageDecimal) => mortgageNegative(mortgageSubtract(a, b)) ? a : b
 export function homeLivingDecimal(amount: number, inflation: number, elapsed: number): MortgageDecimal {
@@ -27,7 +27,7 @@ export function homeLivingDecimal(amount: number, inflation: number, elapsed: nu
  */
 export function primaryHomeSale(plan: InputsV2, opening: AnnualState): PrimaryHomeSaleReceipt {
   const refuse = (detail: string): never => { throw { status: 'unsupported', reason: `primary home sale: ${detail}` } }
-  const problem = passiveHomeProblem(plan)
+  const problem = passiveHomeProblem(plan.debts.length ? { ...plan, debts: [], properties: plan.properties.map(p => ({ ...p, mortgageDebtId: null })) } : plan)
   if (problem) refuse(problem)
   const p = plan.properties[0], person = plan.people[0], held = opening.byProperty[p.id]
   if (plan.accounts.some(a => a.kind !== 'tfsa' || a.jurisdiction || a.accessibleAge !== undefined) ||
@@ -50,9 +50,47 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState): PrimaryHo
   if (held.acb.status !== 'known' || !money(held.acb.value) || !money(held.value)) refuse('requires known nominal ACB and opening value')
   const sellingCosts = e!.sellingCostsNominal.status === 'known' ? e!.sellingCostsNominal.value : NaN
   const acb = held.acb.status === 'known' ? held.acb.value : NaN
-  const exactNet = mortgageSubtract(mortgageDecimal(held.value), mortgageDecimal(sellingCosts))
+  let exactGross = mortgageDecimal(held.value)
+  if (plan.debts.length) {
+    exactGross = mortgageDecimal(p.value)
+    const factor = mortgageMultiply(mortgageAdd(mortgageDecimal(1), mortgageDecimal(p.appreciation)), mortgageAdd(mortgageDecimal(1), mortgageDecimal(plan.inflation)))
+    for (let y = plan.baseYear; y < opening.year; y++) exactGross = mortgageMultiply(exactGross, factor)
+    if (!money(mortgageNumber(exactGross))) refuse('modeled sale valuation outside supported nominal range')
+  }
+  const exactNet = mortgageSubtract(exactGross, mortgageDecimal(sellingCosts))
   const exactGain = mortgageSubtract(exactNet, mortgageDecimal(acb))
   if (mortgageNegative(exactNet) || mortgageNegative(exactGain)) refuse('sale losses or fees exceeding proceeds are unsupported')
   const netProceeds = mortgageNumber(exactNet), realizedGain = mortgageNumber(exactGain)
-  return { propertyId: p.id, year: opening.year, grossProceeds: held.value, sellingCosts, netProceeds, acb, realizedGain, taxableGain: 0 }
+  let mortgagePayoff: PrimaryHomeSaleReceipt['mortgagePayoff']
+  if (plan.debts.length) {
+    const debt = plan.debts[0], terms = e!.mortgagePayoff
+    // FCAC: an early full repayment on sale may incur penalties and fees.
+    // https://www.canada.ca/en/financial-consumer-agency/services/mortgages/reduce-prepayment-penalties.html
+    if (plan.debts.length !== 1 || debt.kind !== 'mortgage' || debt.propertyId !== p.id || p.mortgageDebtId !== debt.id ||
+        !terms || !own(e!, 'mortgagePayoff') || !own(terms, 'debtId') || terms.debtId !== debt.id ||
+        !own(terms, 'timing') || terms.timing !== 'start-of-sale-year' || !own(terms, 'effectiveYear') || terms.effectiveYear !== opening.year ||
+        !own(terms, 'provenance') || !terms.provenance || !own(terms.provenance, 'origin') || terms.provenance.origin !== 'user' ||
+        !own(terms.provenance, 'sourceYear') || !Number.isInteger(terms.provenance.sourceYear) || terms.provenance.sourceYear! < 0 || terms.provenance.sourceYear! > plan.baseYear ||
+        !(['additionalAccruedInterestNominal', 'prepaymentPenaltyNominal', 'dischargeFeesNominal'] as const).every(key => own(terms, key) && terms[key]?.status === 'known' && own(terms[key], 'value') && terms[key].value === 0))
+      refuse('requires explicit matching user start-of-sale-year payoff terms with known zero accrued interest, penalty and discharge fees')
+    const quote = terms!.openingPrincipalNominal
+    if (!own(terms!, 'openingPrincipalNominal') || !quote || !own(quote, 'status') || quote.status !== 'known' || !own(quote, 'value') || !money(quote.value))
+      refuse('requires explicit known safe nominal opening principal payoff quote')
+    const openingPrincipal = quote!.status === 'known' ? quote!.value : NaN
+    const recordedOpeningPrincipal = opening.byDebt[debt.id].principal
+    // An exactly settled balance cannot acquire a new payoff through the
+    // operand-scale solver allowance; nor can a positive balance be forgiven.
+    if ((recordedOpeningPrincipal === 0) !== (openingPrincipal === 0))
+      refuse('payoff quote inconsistent with exactly zero opening principal')
+    const principalReconciliation = mortgageNumber(mortgageSubtract(mortgageDecimal(openingPrincipal), mortgageDecimal(recordedOpeningPrincipal)))
+    // 64 machine epsilons cover the bounded annuity PV solver and input operands.
+    // No absolute floor: tiny loans retain tiny bounds; cap in nominal and anchor-real CAD.
+    const startCpi = (1 + plan.inflation) ** (opening.year - plan.baseYear)
+    const bound = Math.min(0.000001, 0.000001 * startCpi, 64 * Number.EPSILON * Math.max(recordedOpeningPrincipal, openingPrincipal, debt.principal, debt.annualPayment))
+    if (!Number.isFinite(bound) || Math.abs(principalReconciliation) > bound) refuse('payoff quote inconsistent with recorded opening principal')
+    const residual = mortgageSubtract(exactNet, mortgageDecimal(openingPrincipal))
+    if (mortgageNegative(residual)) refuse('net sale proceeds cannot cover opening mortgage principal')
+    mortgagePayoff = { recordedOpeningPrincipal, principalReconciliation, debtId: debt.id, openingPrincipal, additionalAccruedInterest: 0, prepaymentPenalty: 0, dischargeFees: 0, totalPayoff: openingPrincipal, residualCash: mortgageNumber(residual), terms: structuredClone(terms!) }
+  }
+  return { propertyId: p.id, year: opening.year, grossProceeds: mortgageNumber(exactGross), sellingCosts, netProceeds, acb, realizedGain, taxableGain: 0, ...(mortgagePayoff ? { mortgagePayoff, valuation: { recordedOpeningValue: held.value, modeledGrossProceeds: exactGross, reconciliation: mortgageNumber(mortgageSubtract(exactGross, mortgageDecimal(held.value))) } } : {}) }
 }

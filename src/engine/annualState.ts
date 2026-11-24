@@ -31,6 +31,8 @@ export interface RrifSettlement { accountId: string; conversion: RrifConversion;
 export const rrifConversionFor = (state: AnnualState, id: string): RrifConversion | undefined =>
   state.rrifConversions && Object.prototype.hasOwnProperty.call(state.rrifConversions, id) ? state.rrifConversions[id] : undefined
 export interface PrimaryHomeSaleReceipt {
+  valuation?: { recordedOpeningValue: number; modeledGrossProceeds: MortgageDecimal; reconciliation: number };
+  mortgagePayoff?: { recordedOpeningPrincipal: number; principalReconciliation: number; debtId: string; openingPrincipal: number; additionalAccruedInterest: number; prepaymentPenalty: number; dischargeFees: number; totalPayoff: number; residualCash: number; terms: NonNullable<NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string]['mortgagePayoff']> };
   propertyId: string; year: number; grossProceeds: number; sellingCosts: number;
   netProceeds: number; acb: number; realizedGain: number; taxableGain: 0;
 }
@@ -87,7 +89,7 @@ export interface YearRow {
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { mortgageArithmeticReconciliation?: number; mortgageExactWithdrawal?: MortgageDecimal; nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
-  byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
+  byDebt: Record<string, { payoffPrincipalReconciliation?: number; salePayoff?: number; opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
   cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
   /** Budget reservation and final-posting bridge. Final postings and retained
@@ -174,10 +176,11 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
       if (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis) || !p ||
           !finiteNonnegative(cash.balance) || !r || !exact || r.year >= opening.year || r.year !== plan.baseYear + p.sellAtAge! - plan.people[0].ageInBaseYear ||
           !validMortgageDecimal(cash.exactBalance) || mortgageNegative(cash.exactBalance) || mortgageNumber(cash.exactBalance) !== cash.balance ||
-          Object.entries(exact).some(([key, value]) => !validMortgageDecimal(value) || mortgageNegative(value) || mortgageNumber(value) !== r[key as keyof typeof exact]) ||
+          Object.entries(exact).some(([key, value]) => !validMortgageDecimal(value) || (!key.endsWith('Reconciliation') && mortgageNegative(value)) || mortgageNumber(value) !== ({ mortgagePrincipalPaid: r.mortgagePayoff?.openingPrincipal, residualCash: r.mortgagePayoff?.residualCash, recordedOpeningValue: r.valuation?.recordedOpeningValue, saleValueReconciliation: r.valuation?.reconciliation, recordedOpeningPrincipal: r.mortgagePayoff?.recordedOpeningPrincipal, mortgagePrincipalReconciliation: r.mortgagePayoff?.principalReconciliation }[key] ?? r[key as keyof PrimaryHomeSaleReceipt])) ||
           mortgageSubtract(mortgageSubtract(exact.grossProceeds, exact.sellingCosts), exact.netProceeds).coefficient !== '0' ||
           mortgageSubtract(mortgageSubtract(exact.netProceeds, exact.acb), exact.realizedGain).coefficient !== '0' || r.taxableGain !== 0 ||
-          mortgageNegative(mortgageSubtract(exact.netProceeds, cash.exactBalance)) ||
+          mortgageNegative(mortgageSubtract(exact.residualCash ?? exact.netProceeds, cash.exactBalance)) ||
+          (r.mortgagePayoff !== undefined && (!exact.mortgagePrincipalPaid || !exact.residualCash || mortgageSubtract(mortgageSubtract(exact.netProceeds, exact.mortgagePrincipalPaid), exact.residualCash).coefficient !== "0" || opening.byDebt[r.mortgagePayoff.debtId]?.principal !== 0 || opening.byDebt[r.mortgagePayoff.debtId]?.yearsRemaining !== 0)) ||
           !cash.exactAccountBalances || Object.entries(cash.exactAccountBalances).some(([id, value]) => !opening.byAccount[id] || !validMortgageDecimal(value) || mortgageNegative(value) || mortgageNumber(value) !== opening.byAccount[id].balance) ||
           opening.byProperty[p.id]?.held || opening.byProperty[p.id]?.value !== 0)
         return 'primary home sale cash requires authenticated generated settlement'

@@ -140,9 +140,12 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const state = structuredClone(opening)
     const year = state.year
     const startCpi = (1 + plan.inflation) ** (year - plan.baseYear)
+    const payoff = homeSale?.mortgagePayoff
+    if (payoff) { state.byDebt[payoff.debtId].principal = 0; state.byDebt[payoff.debtId].yearsRemaining = 0 }
     const debtSettlement = settleAnnualDebt(state, generated && plan.debts.length ? plan.debts : undefined)
     if (debtSettlement.status !== 'ok') return fail(debtSettlement.status, debtSettlement.reason)
     const { debtRows, debtPayments } = debtSettlement.value
+    if (payoff) debtRows[payoff.debtId] = { opening: payoff.recordedOpeningPrincipal, payoffPrincipalReconciliation: payoff.principalReconciliation, interest: 0, principal: payoff.totalPayoff, payment: payoff.totalPayoff, closing: 0, propertyId: homeSale!.propertyId, salePayoff: payoff.totalPayoff }
     const homeReceipt = homeSale ?? opening.primaryHomeSaleCash?.receipt
     const homeEvidence = homeSale ? plan.annualPrimaryHomeSaleEvidence![homeSale.propertyId] : opening.primaryHomeSaleCash?.evidence
     const postSpending = homeEvidence?.postSaleAnnualSpendingReal
@@ -151,14 +154,15 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     const spendingDue = homeCashActive ? mortgageNumber(exactSpendingDue) : plan.budget.retirementSpending * startCpi
     const exactReceipt = homeReceipt ? homeSale ? exactHomeReceipt(homeSale) : opening.primaryHomeSaleCash!.exactReceipt : undefined
     const exactCashOpening = opening.primaryHomeSaleCash?.exactBalance ?? mortgageDecimal(0)
-    const exactCashAvailable = homeSale ? exactReceipt!.netProceeds : exactCashOpening
+    const exactCashAvailable = homeSale ? (exactReceipt!.residualCash ?? exactReceipt!.netProceeds) : exactCashOpening
     const exactCashUsed = homeCashActive ? decimalMin(exactCashAvailable, exactSpendingDue) : mortgageDecimal(0)
     const exactCashClosing = mortgageSubtract(exactCashAvailable, exactCashUsed)
     const homeCashOpening = mortgageNumber(exactCashOpening), homeCashUsed = mortgageNumber(exactCashUsed), homeCashClosing = mortgageNumber(exactCashClosing)
     const homeExactDraws: Record<string, MortgageDecimal> = {}
     let exactHomeFunded = exactCashUsed
     if (homeCashActive) {
-      state.primaryHomeSaleCash = { balance: homeCashClosing, exactBalance: exactCashClosing, exactReceipt: structuredClone(exactReceipt!), exactAccountBalances: structuredClone(opening.primaryHomeSaleCash?.exactAccountBalances ?? Object.fromEntries(plan.accounts.map(a => [a.id, mortgageDecimal(opening.byAccount[a.id].balance)]))), receipt: Object.freeze(structuredClone(homeReceipt!)), evidence: structuredClone(homeEvidence!) }
+      delete state.mortgageExactBalances
+      state.primaryHomeSaleCash = { balance: homeCashClosing, exactBalance: exactCashClosing, exactReceipt: structuredClone(exactReceipt!), exactAccountBalances: structuredClone(opening.primaryHomeSaleCash?.exactAccountBalances ?? Object.fromEntries(plan.accounts.map(a => [a.id, opening.mortgageExactBalances?.[a.id] ?? mortgageDecimal(opening.byAccount[a.id].balance)]))), receipt: Object.freeze(structuredClone(homeReceipt!)), evidence: structuredClone(homeEvidence!) }
       if (homeSale) { state.byProperty[homeSale.propertyId].held = false; state.byProperty[homeSale.propertyId].value = 0 }
       const account = plan.accounts.find(a => a.kind === 'tfsa')
       if (account) {
@@ -245,7 +249,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         : homeCashActive ? mortgageNumber(exactHomeFunded) - nominalTax : benefitCash + withdrawals.rrsp + withdrawals.tfsa + withdrawals.nonReg - nominalTax
       return { sale, withdrawals, tax, nominalTax, settledOas, gisRecoveryUnsupported, netCash }
     }
-    const mortgagePrecision = generated && plan.debts.length > 0
+    const mortgagePrecision = generated && plan.debts.length > 0 && !homeCashActive
     const exactMortgageQuote = (quote: ReturnType<typeof run>) => {
       const exactDraws: Record<string, MortgageDecimal> = {}
       let exactCash = mortgageDecimal(-quote.nominalTax)
@@ -443,6 +447,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         const exactClosing = mortgageMultiply(exactOpening, exactFactor)
         state.primaryHomeSaleCash!.exactAccountBalances[account.id] = exactClosing
         current.balance = mortgageNumber(exactClosing)
+        if (state.mortgageExactBalances) state.mortgageExactBalances[account.id] = exactClosing
         row.returnAmount = mortgageNumber(mortgageSubtract(exactClosing, exactOpening))
       }
       row.closing = current.balance
@@ -479,7 +484,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         acb: structuredClone(plan.properties.find(p => p.id === homeSale.propertyId)!.acb),
         ...(Object.prototype.hasOwnProperty.call(plan.properties.find(p => p.id === homeSale.propertyId)!.provenance, 'acb')
           ? { provenance: structuredClone(plan.properties.find(p => p.id === homeSale.propertyId)!.provenance.acb) } : {}),
-      } } : {}), ...(homeCashActive ? { primaryHomeSaleArithmetic: { spendingDue: exactSpendingDue, spendingFunded: exactHomeFunded, spendingUnmet: mortgageSubtract(exactSpendingDue, exactHomeFunded), receipt: structuredClone(exactReceipt!), cash: { opening: exactCashOpening, proceedsAdded: homeSale ? exactReceipt!.netProceeds : mortgageDecimal(0), spendingUsed: exactCashUsed, closing: exactCashClosing }, withdrawals: structuredClone(homeExactDraws) }, primaryHomeSaleEvidence: structuredClone(state.primaryHomeSaleCash!.evidence), primaryHomeSaleCash: { opening: homeCashOpening, proceedsAdded: homeSale?.netProceeds ?? 0, spendingUsed: homeCashUsed, closing: homeCashClosing } } : {}), ...(mortgageCashReconciliation ? { mortgageCashReconciliation } : {}), ...(poolAllowed ? { cashBridge: { method: 'compensated-signed-cash' as const, netCash: final.netCash } } : {}), ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
+      } } : {}), ...(homeCashActive ? { primaryHomeSaleArithmetic: { spendingDue: exactSpendingDue, spendingFunded: exactHomeFunded, spendingUnmet: mortgageSubtract(exactSpendingDue, exactHomeFunded), receipt: structuredClone(exactReceipt!), cash: { opening: exactCashOpening, proceedsAdded: homeSale ? (exactReceipt!.residualCash ?? exactReceipt!.netProceeds) : mortgageDecimal(0), spendingUsed: exactCashUsed, closing: exactCashClosing }, withdrawals: structuredClone(homeExactDraws) }, primaryHomeSaleEvidence: structuredClone(state.primaryHomeSaleCash!.evidence), primaryHomeSaleCash: { opening: homeCashOpening, proceedsAdded: homeSale ? (homeSale.mortgagePayoff?.residualCash ?? homeSale.netProceeds) : 0, spendingUsed: homeCashUsed, closing: homeCashClosing } } : {}), ...(mortgageCashReconciliation ? { mortgageCashReconciliation } : {}), ...(poolAllowed ? { cashBridge: { method: 'compensated-signed-cash' as const, netCash: final.netCash } } : {}), ...(registered && rrifConversionFor(state, registered.id) ? { rrif: { accountId: registered.id, conversion: structuredClone(rrifConversionFor(state, registered.id)!), openingBalance: opening.byAccount[registered.id].balance, ageAtYearStart: age - 1, factor: minimumReceipt?.status === "ok" ? minimumReceipt.factor : 0, minimum: floor, withdrawal: final.withdrawals.rrsp, discretionary: final.withdrawals.rrsp - floor, incomeKind: conversion ? "rrifWithdrawal" as const : "rrspWithdrawal" as const } } : {}), ...(gis ? { gis } : {}), ...(final.tax.byPerson[person.id].ageAmountNetIncome !== undefined ? { gisAgeAmountNetIncomeReal: final.tax.byPerson[person.id].ageAmountNetIncome } : {}), evaluationBasis: 'canonical-retirement', ...(cpp ? { cpp } : {}), ...(final.settledOas ? { oas: final.settledOas } : {}), spendingDue, spendingFunded, spendingUnmet, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } } }
     return { status: 'ok', value: { state, row } }
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error && 'reason' in error && (error.status === 'invalid' || error.status === 'unsupported')) return fail(error.status, String(error.reason))

@@ -50,7 +50,7 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
 export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence): string | null {
   if (!plan.debts.length) return passiveHomeProblem(plan)
   const p = plan.properties[0], d = plan.debts[0]
-  if (!p || plan.properties.length !== 1 || plan.debts.length !== 1 || d.kind !== 'mortgage' || d.propertyId !== p.id || p.mortgageDebtId !== d.id || p.sellAtAge !== null)
+  if (!p || plan.properties.length !== 1 || plan.debts.length !== 1 || d.kind !== 'mortgage' || d.propertyId !== p.id || p.mortgageDebtId !== d.id)
     return 'mortgage requires one bidirectionally linked held primary home'
   const source = d.provenance
   if (!source || typeof source !== 'object' || Array.isArray(source) || !Object.prototype.hasOwnProperty.call(source, 'origin') || !Object.prototype.hasOwnProperty.call(source, 'sourceYear') || !['user', 'legacy'].includes(source.origin) || !(source.sourceYear === null || Number.isInteger(source.sourceYear)) || !(source.note === undefined || typeof source.note === 'string'))
