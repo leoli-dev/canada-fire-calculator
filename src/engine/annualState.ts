@@ -1,3 +1,5 @@
+import { calculateHouseholdTax } from './householdTax'
+import { searchWithdrawalTarget } from './withdrawalSearch'
 import { evaluateCanonicalWorkingYear, evaluateCanonicalHouseholdWorkingYear, type ContinuousWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
 import { annualRetirementContinuation } from './annualRetirement'
 import type { InputsV2, Known, AccountKind } from './model'
@@ -57,7 +59,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
-  householdWithdrawalSettlement?: { accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
+  householdWithdrawalSettlement?: { postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -307,33 +309,101 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   for (const dependent of Object.values(state.byDependent)) dependent.age += 1
   const income = sum(Object.values(personRows).map(p => p.income))
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
-  const tax = sum(Object.values(personRows).map(p => p.tax))
+  let tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
   let householdWithdrawalSettlement: YearRow['householdWithdrawalSettlement']
   // A live taxable alternative prevents a claim of verified exhaustion. Never
   // skip an earlier account in the selected order to manufacture TFSA funding.
   if (working && 'household' in working && working.household.phase !== 'both-working' && working.netCash <= 0) {
     const deficit = Math.max(0, -working.netCash)
-    const hasRrsp = plan.accounts.some(a => a.kind === 'rrsp' && state.byAccount[a.id].balance > 0)
-    if (deficit > 0 && (plan.strategy === 'meltdownPaced' || (hasRrsp && plan.strategy !== 'tfsaFirst'))) return fail('unsupported', 'household withdrawal order requires unsupported registered funding')
-    const candidates = deficit > 0 ? plan.accounts.filter(a => a.kind === 'tfsa' && state.byAccount[a.id].balance > 0) : []
-    if (candidates.length > 1) return fail('unsupported', 'ambiguous household TFSA withdrawal funding order')
-    const account = candidates[0]
-    if (account) {
-      const statement = tfsaStatement(plan, account.ownerId!)
-      if (!statement || statement.provenance.origin === 'unknown') return fail('unsupported', 'TFSA withdrawal statement evidence missing')
+    const funded = (kind: string) => plan.accounts.filter(a => a.kind === kind && state.byAccount[a.id].balance > 0)
+    const rrsps = funded('rrsp')
+    const tfsas = funded('tfsa')
+    if (deficit > 0 && plan.strategy === 'meltdownPaced') return fail('unsupported', 'household withdrawal order requires unsupported registered funding')
+    const order = plan.strategy === 'tfsaFirst' ? ['tfsa', 'rrsp'] as const : ['rrsp', 'tfsa'] as const
+    const events: import('./personIncome').IncomeEvent[] = Object.entries(working.household.byPerson).filter(([, p]) => p.phase === 'working').map(([id, p]) => ({ id: `annual:${year}:wage:${id}`, personId: id, kind: 'employment', amount: p.grossWagesReal }))
+    const payroll = Object.fromEntries(Object.entries(working.household.byPerson).flatMap(([id, p]) => p.payrollReal ? [[id, p.payrollReal]] : []))
+    const baselineTax = tax
+    const cpi = working.startCpi
+    const postings: NonNullable<NonNullable<YearRow['householdWithdrawalSettlement']>['postings']> = []
+    let remaining = deficit
+    let fundedCash = Math.max(0, spending - deficit)
+    // Every tolerance is below half a cent in BOTH the cash and tax bases.
+    const bound = (...amounts: number[]) => Math.min(0.004, 0.004 * cpi, 4 * Number.EPSILON * sum(amounts.map(Math.abs)))
+    const cashScale = income + benefits + tax + working.payrollContributions + spending
+    for (const kind of order) {
+      if (remaining <= 0) break
+      const candidates = kind === 'tfsa' ? tfsas : rrsps
+      if (candidates.length > 1) return fail('unsupported', `ambiguous household ${kind === 'tfsa' ? 'TFSA' : 'RRSP'} withdrawal funding order`)
+      const account = candidates[0]
+      if (!account) continue
+      const capacity = state.byAccount[account.id].balance
+      let amount: number
+      let net: number
+      if (kind === 'tfsa') {
+        const statement = tfsaStatement(plan, account.ownerId!)
+        if (!statement || statement.provenance.origin === 'unknown') return fail('unsupported', 'TFSA withdrawal statement evidence missing')
+        // Tax-free cash is direct arithmetic, never a gross-target search.
+        amount = Math.min(remaining, capacity)
+        net = amount
+      } else {
+        const run = (gross: number) => {
+          const priced = calculateHouseholdTax(plan, year, [...events, { id: `annual:${year}:withdrawal:${account.id}`, kind: 'rrspWithdrawal', accountId: account.id, amount: gross / cpi }], { payroll })
+          if (priced.status !== 'ok') throw priced
+          const nominalTax = priced.total * cpi
+          const amounts = [gross, gross / cpi, priced.total, nominalTax, baselineTax, baselineTax / cpi,
+            ...events.map(e => e.amount), ...events.map(e => e.amount * cpi),
+            ...Object.values(priced.byPerson).flatMap(p => [p.tax, p.grossIncome, p.taxableIncome, p.netIncome, p.tax * cpi, p.grossIncome * cpi, p.taxableIncome * cpi, p.netIncome * cpi])]
+          // Bound accumulated arithmetic error to a small fraction of a cent.
+          // The monetary ceiling alone does not guarantee accurate tax deltas.
+          if (amounts.some(n => !finiteNonnegative(n) || n > Number.MAX_SAFE_INTEGER / 100) ||
+              64 * Number.EPSILON * sum(amounts) > 0.0001 * Math.min(1, cpi))
+            throw { status: 'unsupported', reason: 'household withdrawal tax precision cannot be upheld' }
+          return { gross, priced, nominalTax, netCash: gross - (nominalTax - baselineTax) }
+        }
+        try {
+          // Test the actual endpoint before any search or later-source gate.
+          const endpoint = run(capacity)
+          const residue = remaining - endpoint.netCash
+          const endpointBound = bound(cashScale, remaining, capacity, endpoint.nominalTax)
+          const accepted = residue >= -endpointBound ? endpoint : searchWithdrawalTarget(remaining, 0, capacity, run)
+          amount = accepted.gross
+          net = accepted.netCash
+          tax = accepted.nominalTax
+          for (const [id, priced] of Object.entries(accepted.priced.byPerson)) {
+            personRows[id].tax = priced.tax * cpi
+            personRows[id].taxableIncome = priced.taxableIncome * cpi
+            evaluation.byPerson[id].benefitIncomeForNextYear = { status: 'known', value: priced.netIncome * cpi }
+          }
+        } catch (error) {
+          const problem = error as { status?: string; reason?: string }
+          return fail(problem.status === 'invalid' ? 'invalid' : 'unsupported', problem.reason ?? 'household withdrawal tax trial failed')
+        }
+      }
+      if (amount > 0) {
+        // A positive cash receipt must correspond to a real account debit.
+        // Permit only ULP-scale noise, capped in both money bases and relative
+        // to the actual draw; a large opening balance cannot mint tiny cash.
+        const debit = capacity - (capacity - amount)
+        const debitTolerance = Math.min(0.0001, 0.0001 * cpi, amount * 1e-8,
+          4 * Number.EPSILON * (capacity + amount))
+        if (debit <= 0 || Math.abs(debit - amount) > debitTolerance)
+          return fail('unsupported', 'household withdrawal debit precision cannot be upheld')
+        postings.push({ accountId: account.id, ownerId: account.ownerId!, kind, amount })
+      }
+      fundedCash += net
+      const residue = remaining - net
+      remaining = Math.abs(residue) <= bound(cashScale, remaining, net, tax) ? 0 : Math.max(0, residue)
     }
-    const withdrawal = account ? Math.min(deficit, state.byAccount[account.id].balance) : 0
-    // Match the working quote's operand-scale normalization in nominal CAD.
-    // Cap below half a cent in both nominal and anchor-real dollars; no fixed
-    // epsilon floor may erase a real tiny bill or a genuine cent shortage.
-    const cashResidueBound = Math.min(0.004, 0.004 * working.startCpi,
-      4 * Number.EPSILON * (income + benefits + tax + working.payrollContributions + spending + withdrawal))
-    if (deficit - withdrawal > cashResidueBound && hasRrsp) return fail('unsupported', 'household remaining spending requires unsupported registered funding')
-    const spendingFunded = Math.min(spending, Math.max(0, income + benefits - tax - working.payrollContributions + withdrawal))
-    const remainingSpending = Math.max(0, spending - spendingFunded)
-    const spendingUnmet = remainingSpending <= cashResidueBound ? 0 : remainingSpending
-    householdWithdrawalSettlement = { accountId: account?.id ?? null, ownerId: account?.ownerId ?? null, withdrawal, spendingDue: spending, spendingFunded, spendingUnmet, startCpi: working.startCpi }
+    const withdrawal = sum(postings.map(p => p.amount))
+    // Carry the accepted quote deficit and each accepted net cash tranche.
+    // Re-subtracting gross wages/tax/spending can change a small shortage;
+    // subtracting a huge bill from itself can erase a tiny actual payment.
+    const spendingFunded = remaining === 0 ? spending : Math.min(spending, Math.max(0, fundedCash))
+    const spendingUnmet = remaining
+    if (Math.abs(spending - (spendingFunded + spendingUnmet)) > bound(spending, spendingFunded, spendingUnmet))
+      return fail('unsupported', 'household withdrawal cash precision cannot be upheld')
+    householdWithdrawalSettlement = { accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, postings, taxIncrement: tax - baselineTax, taxTotal: tax, withdrawal, spendingDue: spending, spendingFunded, spendingUnmet, startCpi: working.startCpi }
   }
   const cash = working ? Math.max(0, working.netCash) : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
@@ -576,11 +646,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
   }
   if (householdWithdrawalSettlement) {
-    const { accountId, ownerId, withdrawal } = householdWithdrawalSettlement
-    if (accountId && ownerId && withdrawal > 0) {
-      state.byAccount[accountId].balance -= withdrawal
-      accountRows[accountId].withdrawal = withdrawal
-      state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount: withdrawal }]
+    for (const { accountId, ownerId, kind, amount } of householdWithdrawalSettlement.postings ?? []) {
+      state.byAccount[accountId].balance -= amount
+      accountRows[accountId].withdrawal = amount
+      if (kind === 'tfsa') state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount }]
     }
   }
   const settled = clone(state)
@@ -675,7 +744,7 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
   if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
   if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
-  if (detail === 'ambiguous household TFSA withdrawal funding order') return 'withdrawalOwnership'
+  if (/^ambiguous household (TFSA|RRSP) withdrawal funding order$/.test(detail)) return 'withdrawalOwnership'
   if (detail === 'TFSA withdrawal statement evidence missing') return 'tfsaWithdrawalEvidence'
   if (detail.startsWith('household withdrawal order requires') || detail.startsWith('household remaining spending requires')) return 'withdrawalFunding'
   if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule' || detail === 'negative working cash requires withdrawal funding rule') return 'withdrawalFunding'

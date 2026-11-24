@@ -34,6 +34,12 @@ function mixedDeficitFixture(retirementSpending = ref.retirementSpending, mixedS
   return { plan, evidence }
 }
 
+function addSecondFundedRrsp(plan: ReturnType<typeof staggeredHouseholdPlan>) {
+  const partnerRrsp = plan.accounts.find(account => account.id === RRSP)!
+  plan.accounts.push({ ...structuredClone(partnerRrsp), id: 'second-rrsp', ownerId: RETIREE,
+    taxableOwnerShares: { status: 'known', shares: { [RETIREE]: 1 } } })
+}
+
 describe('canonical household TFSA withdrawals', () => {
   it('funds the mixed-year gap with gross cash from the unique TFSA owner after payroll and tax', () => {
     const { plan, evidence } = mixedDeficitFixture()
@@ -77,7 +83,7 @@ describe('canonical household TFSA withdrawals', () => {
     expect(result.state.byAccount[TFSA].balance).toBeCloseTo(780.3, 8)
   })
 
-  it('honours TFSA-first through the fully funded retired year and stops before drawing the remaining RRSP', () => {
+  it('honours TFSA-first through both-retired spending and draws the RRSP only for the remaining gap', () => {
     const { plan, evidence } = mixedDeficitFixture(400)
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 3))
     expect(prefix.blocked).toBeNull()
@@ -86,17 +92,22 @@ describe('canonical household TFSA withdrawals', () => {
       householdWithdrawalSettlement: { withdrawal: close(416.16), spendingFunded: close(416.16), spendingUnmet: 0 },
       byAccount: { [TFSA]: { closing: close(371.4228) }, [RRSP]: { withdrawal: 0, closing: close(21_224.16) } },
     })
-    const result = ok(projectCanonicalCoverage(plan, evidence, 5))
-    expect(result.rows).toEqual(prefix.rows)
-    expect(result.state).toEqual(prefix.state)
-    expect(result).toMatchObject({ overallConclusionAvailable: false,
-      blocked: { year: retiredYear + 1, status: 'unsupported', causes: ['withdrawalFunding'] },
-      uncomputedYears: [retiredYear + 2],
+    const result = ok(projectCanonicalCoverage(plan, evidence, 4))
+    expect(result.rows.slice(0, 3)).toEqual(prefix.rows)
+    expect(result).toMatchObject({ overallConclusionAvailable: false, blocked: null, uncomputedYears: [],
+      state: { byAccount: { [TFSA]: { balance: 0 }, [RRSP]: { balance: close((21_224.16 - 53.0604) * 1.02) } } },
+    })
+    expect(result.rows[3]).toMatchObject({ year: retiredYear + 1,
+      householdWithdrawalSettlement: { withdrawal: close(424.4832), spendingFunded: close(424.4832), spendingUnmet: 0 },
+      cashLedger: { tax: 0, spending: close(424.4832) },
+      byAccount: { [TFSA]: { withdrawal: close(371.4228), closing: 0 }, [RRSP]: { withdrawal: close(53.0604) } },
+      tfsaLedger: { [RETIREE]: { restored: { status: 'known', value: close(416.16) } }, [PARTNER]: { restored: known(0) } },
     })
   })
 
-  it('blocks the original retired deficit before touching either funded account', () => {
+  it('blocks a retired deficit atomically when two owners have funded RRSPs', () => {
     const { plan, evidence } = mixedDeficitFixture(1_000, 400)
+    addSecondFundedRrsp(plan)
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 2))
     expect(prefix.blocked).toBeNull()
     expect(prefix.rows[1].householdWithdrawalSettlement).toMatchObject({ withdrawal: close(408), spendingUnmet: 0 })
@@ -105,13 +116,14 @@ describe('canonical household TFSA withdrawals', () => {
     expect(result.rows).toEqual(prefix.rows)
     expect(result.state).toEqual(prefix.state)
     expect(result).toMatchObject({ overallConclusionAvailable: false,
-      blocked: { year: retiredYear, status: 'unsupported', causes: ['withdrawalFunding'] },
+      blocked: { year: retiredYear, status: 'unsupported', causes: ['withdrawalOwnership'] },
       uncomputedYears: [retiredYear + 1],
     })
   })
 
-  it('settles an exactly funded mixed year and blocks atomically when its TFSA is one nominal cent short', () => {
+  it('settles the exact mixed-year TFSA target and exposes ambiguous RRSP funding for a one-cent residual', () => {
     const { plan, evidence } = mixedDeficitFixture(1_000, 400)
+    addSecondFundedRrsp(plan)
     const account = plan.accounts.find(account => account.id === TFSA)!
     // The $400 real shortfall and opening TFSA both become $408 nominal.
     // Subtraction against five-digit wage and spending terms can put the
@@ -137,15 +149,43 @@ describe('canonical household TFSA withdrawals', () => {
     expect(short.rows).toEqual(prefix.rows)
     expect(short.state).toEqual(prefix.state)
     expect(short.state.tfsaWithdrawalHistory).toEqual([])
-    expect(short).toMatchObject({ blocked: { year: mixedYear, status: 'unsupported', causes: ['withdrawalFunding'] },
+    expect(short).toMatchObject({ blocked: { year: mixedYear, status: 'unsupported', causes: ['withdrawalOwnership'] },
       uncomputedYears: [retiredYear], overallConclusionAvailable: false,
+    })
+
+    plan.accounts = plan.accounts.filter(account => account.id !== 'second-rrsp')
+    const covered = ok(projectCanonicalCoverage(plan, evidence, 2))
+    const rrspGross = 0.01 / (1 - 0.205 - 0.0915)
+    expect(covered.blocked).toBeNull()
+    expect(covered.rows[1]).toMatchObject({
+      byAccount: { [TFSA]: { withdrawal: close(407.99), closing: 0 }, [RRSP]: { withdrawal: close(rrspGross) } },
+      householdWithdrawalSettlement: { spendingUnmet: 0 },
     })
   })
 
-  it.each(['rrspFirst', 'nonRegFirst', 'meltdownPaced'] as const)('does not draw TFSA under %s when an RRSP is funded', strategy => {
+  it('prices the TFSA-only prefix and blocks when the draw reaches an RRSP with incompatible tax evidence', () => {
+    const { plan, evidence } = mixedDeficitFixture(1_000)
+    plan.spousalHistory = { [RRSP]: { status: 'complete' } }
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(prefix.blocked).toBeNull()
+    expect(prefix.rows[1]).toMatchObject({
+      householdWithdrawalSettlement: { withdrawal: close(255), taxIncrement: 0, spendingUnmet: 0 },
+      byAccount: { [TFSA]: { closing: close(780.3) }, [RRSP]: { withdrawal: 0, closing: close(20_808) } },
+    })
+
+    const result = ok(projectCanonicalCoverage(plan, evidence, 4))
+    expect(result.rows).toEqual(prefix.rows)
+    expect(result.state).toEqual(prefix.state)
+    expect(result).toMatchObject({ blocked: { year: retiredYear, status: 'unsupported',
+      issues: [{ detail: expect.stringMatching(/spousal premium history.*ordinary RRSP/i) }] },
+      uncomputedYears: [retiredYear + 1], overallConclusionAvailable: false,
+    })
+  })
+
+  it('does not draw TFSA under the unsupported paced meltdown strategy', () => {
     const { plan, evidence } = mixedDeficitFixture(400)
-    plan.strategy = strategy
-    plan.legacyProjection.strategy = strategy
+    plan.strategy = 'meltdownPaced'
+    plan.legacyProjection.strategy = 'meltdownPaced'
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 1))
     expect(prefix.blocked).toBeNull()
     const result = ok(projectCanonicalCoverage(plan, evidence, 4))
@@ -236,6 +276,77 @@ describe('canonical household TFSA withdrawals', () => {
     expect(row.byAccount[TFSA]).toMatchObject({ withdrawal: close(available), closing: 0 })
   })
 
+  it.each([[0.00001, 0], [0.007, 0], [0.01, 0], [0.01, -0.5]] as const)('refuses a $%s TFSA target at inflation %s when the debit is unrepresentable', (realDue, inflation) => {
+    const capacity = Number.MAX_SAFE_INTEGER / 100
+    const { plan, evidence } = mixedDeficitFixture(realDue, 0)
+    plan.inflation = inflation
+    plan.legacyProjection.inflation = inflation
+    plan.people[1].retirementAge = 55
+    plan.accounts.find(account => account.id === RRSP)!.balance = 0
+    plan.accounts.find(account => account.id === TFSA)!.balance = capacity
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 1))
+    expect(prefix.blocked).toBeNull()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 2))
+    const cpi = 1 + inflation
+    const opening = prefix.state.byAccount[TFSA].balance
+    const nominalDebit = opening - (opening - realDue * cpi)
+    expect(nominalDebit / cpi).not.toBeCloseTo(realDue, 7)
+    expect(result).toMatchObject({ rows: prefix.rows, state: prefix.state,
+      blocked: { year: mixedYear, status: 'unsupported', issues: [{ detail: expect.stringMatching(/debit precision/i) }] } })
+    expect(result.state.tfsaWithdrawalHistory).toEqual([])
+  })
+
+  it.each([TFSA, RRSP])('settles a tiny exactly representable payment from %s', accountId => {
+    const due = 2 ** -46
+    const { plan, evidence } = mixedDeficitFixture(due, 0)
+    plan.inflation = 0
+    plan.legacyProjection.inflation = 0
+    for (const account of plan.accounts) account.balance = account.id === accountId ? 64 : 0
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(result.blocked).toBeNull()
+    expect(result.rows[2]).toMatchObject({ cashLedger: { spending: due, tax: 0 },
+      householdWithdrawalSettlement: { withdrawal: due, spendingDue: due, spendingFunded: due, spendingUnmet: 0 },
+      byAccount: { [accountId]: { opening: 64, withdrawal: due, closing: 64 - due } },
+    })
+    expect(result.state.tfsaWithdrawalHistory).toEqual(accountId === TFSA
+      ? [expect.objectContaining({ calendarYear: retiredYear, amount: due })] : [])
+  })
+
+  it.each([TFSA, RRSP])('refuses to turn an unrepresentable tiny payment into cash from %s', accountId => {
+    const { plan, evidence } = mixedDeficitFixture(1e-14, 0)
+    plan.inflation = 0
+    plan.legacyProjection.inflation = 0
+    for (const account of plan.accounts) account.balance = account.id === accountId ? 100 : 0
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(prefix.blocked).toBeNull()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(result).toMatchObject({ rows: prefix.rows, state: prefix.state,
+      blocked: { year: retiredYear, status: 'unsupported', issues: [{ detail: expect.stringMatching(/debit precision/i) }] } })
+    expect(result.state.tfsaWithdrawalHistory).toEqual([])
+  })
+
+  it('preserves a real $0.0390625 TFSA remnant when the opening CPI is close to 0.1', () => {
+    const capacity = 1_000_000_000_000
+    const realDue = capacity - 0.0390625
+    const { plan, evidence } = mixedDeficitFixture(realDue, 0)
+    plan.inflation = -0.9
+    plan.legacyProjection.inflation = -0.9
+    plan.people[1].retirementAge = 55
+    plan.accounts.find(account => account.id === RRSP)!.balance = 0
+    plan.accounts.find(account => account.id === TFSA)!.balance = capacity
+    const openingCpi = 1 + plan.inflation
+    const due = realDue * openingCpi
+    const opening = capacity + capacity * plan.inflation
+    const remnant = opening - due
+    const result = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(result.blocked).toBeNull()
+    expect(result.rows[1]).toMatchObject({ year: mixedYear,
+      householdWithdrawalSettlement: { startCpi: openingCpi, withdrawal: due, spendingDue: due, spendingFunded: due, spendingUnmet: 0 },
+      byAccount: { [TFSA]: { opening, withdrawal: due, closing: close(remnant * openingCpi) } },
+    })
+    expect(result.state.byAccount[TFSA].balance).toBeGreaterThan(0)
+  })
+
   it('shows known zero spending and retirement labels when both people retire with no bill', () => {
     const { plan, evidence } = mixedDeficitFixture(0)
     const result = ok(projectCanonicalCoverage(plan, evidence, 3))
@@ -284,7 +395,7 @@ describe('canonical household TFSA withdrawals', () => {
     }
     expect(tax?.cells?.[mixedYear]?.status).toBe('estimated')
     expect(limitations(BASE_YEAR)).not.toContainEqual(expect.stringMatching(/age.credit/i))
-    expect(limitations(mixedYear)).toContainEqual(expect.stringMatching(/spouse age.credit transfers.*tax.*TFSA draw/i))
+    expect(limitations(mixedYear)).toContainEqual(expect.stringMatching(/spouse age.credit transfers.*tax.*draw.*shortfall/i))
   })
 
   it('explains nominal household cash with signed inputs and displays opening versus closing CPI', () => {
