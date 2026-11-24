@@ -1,3 +1,4 @@
+import { fundingGapMessageKey } from '../fundingGapMessages'
 import type { Inputs, Mortgage } from './types'
 import { CPP_MAX_AT_65, OAS_FULL_AT_65 } from './benefits'
 import { runProjection } from './projection'
@@ -215,14 +216,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
     for (const gap of firstByField.values()) {
       issues.push({
         field: gap.field, severity: 'error',
-        key: gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
-          : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
-          : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
-          : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
-            : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
-            : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
-            : gap.reason === 'hbpRepaymentTax' ? 'valHbpTaxUnfunded'
-            : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
+        key: fundingGapMessageKey(gap.reason),
         params: { amount: Math.ceil(gap.amount), age: Number(gap.eventId.split(':')[1]) },
         eventId: gap.eventId, amount: gap.amount,
       })

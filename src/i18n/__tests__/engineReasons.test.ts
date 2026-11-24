@@ -6,6 +6,7 @@ import { FHSA_BLOCKING } from '../../engine/fhsa'
 import { TFSA_BLOCKING } from '../../engine/tfsaRoom'
 import type { BudgetFacts } from '../../engine/budgetSemantics'
 import type { SpousalRefusalCode } from '../../engine/spousalAttribution'
+import annualSheetAdapter from '../../legacyAnnualSheet.ts?raw'
 
 // Every component, read as source, so a new leak is caught where it is written.
 const sources = import.meta.glob('../../components/**/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -48,4 +49,9 @@ it('never interpolates an engine diagnostic into a translated sentence', () => {
     expect(source, path).not.toMatch(/\{\s*(?:reason|detail):\s*[\w?.]+\.(?:reason|detail)\b/)
     expect(source, path).not.toMatch(/\b(?:aria-label|title|placeholder)="[A-Za-z][^"]*"/)
   }
+})
+
+it('keeps raw diagnostic strings out of annual sheet text', () => {
+  expect(annualSheetAdapter).not.toMatch(/\$\{\s*[\w?.]+\.(?:reason|field|detail)\s*\}/)
+  expect(annualSheetAdapter).not.toMatch(/\[\s*[\w?.]+\.taxCapability\??\.(?:reason|detail)\s*\]/)
 })

@@ -1,0 +1,97 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`FE-53 legacy projection parity > RRSP-funded purchase and later installments retains the S0 projection output 1`] = `
+{
+  "summary": "06a3682c195036b8f40db52926a94daccf2baaf83a52cc514943206349282216",
+  "years": [
+    {
+      "age": 50,
+      "digest": "3f35a535f77dcdf25c4a2f15b175f297a6e3e63c35e3fab062cd28ca6daf5201",
+    },
+    {
+      "age": 51,
+      "digest": "408ca35f9a3e0ca0cbcf42ce9d613462ca214685fd259576a1df468e676082a6",
+    },
+    {
+      "age": 52,
+      "digest": "4b60d9e1bb3e6b08cfb3c06e9dc7533184227432f41d80516f519af8399d4365",
+    },
+  ],
+}
+`;
+
+exports[`FE-53 legacy projection parity > cash through retirement retains the S0 projection output 1`] = `
+{
+  "summary": "276b900c4ed397377b4b65fd87b7efee125b43c94d28bfd4c301930972ffe64c",
+  "years": [
+    {
+      "age": 40,
+      "digest": "bfe87dc95a8f04a2781d1e7da6caedc9f8741350425e550b52d850723489873b",
+    },
+    {
+      "age": 41,
+      "digest": "db2d860aa3f69b3954fa4827c527cc5537ddf6e038f0878a7b0c786d4ae080e2",
+    },
+    {
+      "age": 42,
+      "digest": "090a4ad1e71a8111ff623a9bb325501fd5733a498969574e94be4152164ec14e",
+    },
+  ],
+}
+`;
+
+exports[`FE-53 legacy projection parity > couple benefits and taxable withdrawals under inflation retains the S0 projection output 1`] = `
+{
+  "summary": "ed3a44b3dc8ba8b790f701e1e24c8e1715b9016f9cc30974fb350e57888f95c8",
+  "years": [
+    {
+      "age": 64,
+      "digest": "2ace84bfcc8b0bbfe4a4c20900bcd821c21cb05bce7ca365e0773f3321a082b7",
+    },
+    {
+      "age": 65,
+      "digest": "fb71539fc5666084d1a64c7bd4af464e518850dcf66c7616c76dd3cb4cd0076f",
+    },
+    {
+      "age": 66,
+      "digest": "1fa31152cb48db99f4f1e2506ac427f38e1c8cc0f02f58044bf7eb6980c3a4c7",
+    },
+    {
+      "age": 67,
+      "digest": "ddcb65ede222ae6cf14807abaeced76d03fc64790cac5b42c06c3566c5d2f14c",
+    },
+  ],
+}
+`;
+
+exports[`FE-53 legacy projection parity > failed purchase then depleted living budget retains the S0 projection output 1`] = `
+{
+  "summary": "063406429ae81530f779a039ccfbfcff1de37623b6296aa78f623cdd62a8cd95",
+  "years": [
+    {
+      "age": 50,
+      "digest": "56dafa1876643a4473cedd877be422079e4e3710a2f203c89f5d3e0b83b8db5a",
+    },
+    {
+      "age": 51,
+      "digest": "a77dab46dcfe15102719a71d04c81475096c7aaf86c2ec0297db9b0cdca2aced",
+    },
+    {
+      "age": 52,
+      "digest": "0a903932c90fa26befa86b8bfe66277b3d090709cae37574333239e124de9c38",
+    },
+  ],
+}
+`;
+
+exports[`FE-53 legacy projection parity > sale discharging a linked mortgage retains the S0 projection output 1`] = `
+{
+  "summary": "049519070cc51b498baa116411b3497631e8da3b16fbd80f516d9ef9aa82b230",
+  "years": [
+    {
+      "age": 50,
+      "digest": "e9d424bfe880762e3609444067c18850dc6ec791dc97c7548fb3ef8533ec8a9f",
+    },
+  ],
+}
+`;

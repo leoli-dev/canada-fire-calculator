@@ -6,6 +6,147 @@ const executablePath = '/Applications/Thorium.app/Contents/MacOS/Thorium'
 test.use({ browserName: 'chromium', launchOptions: { executablePath } })
 test.skip(!existsSync(executablePath), 'This suite requires /Applications/Thorium.app')
 
+test('professional household results open the current annual estimate and follow scenario restore', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  const fields = page.locator('label.field')
+  await fields.filter({ hasText: 'Target FIRE age' }).locator('input').fill('44')
+  await fields.filter({ hasText: /^Household/ }).locator('select').selectOption('couple')
+  const partnerAge = fields.filter({ hasText: "Partner's current age" }).locator('input')
+  await partnerAge.fill('34')
+  const results = page.locator('.results-column')
+  const mainSummary = results.locator('.summary').first()
+  await expect(mainSummary).toContainText('Final net worth')
+  const mainNetWorth = mainSummary.getByText('Final net worth:', { exact: false }).locator('strong')
+  const expectedNetWorth = await mainNetWorth.innerText()
+  const scenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
+  await scenario.locator('summary').click()
+  await scenario.getByRole('button', { name: 'Save current as A' }).click()
+  const opener = results.getByRole('button', { name: 'Annual financial details' })
+  const dialog = page.getByRole('dialog', { name: 'Household annual estimate' })
+  const row = (name: RegExp) => dialog.getByRole('row').filter({ has: page.getByRole('rowheader', { name }) })
+  const partner = row(/Partner age/).getByRole('cell').first()
+  await opener.focus()
+  await page.keyboard.press('Enter')
+  await expect(dialog).toHaveAccessibleDescription(/Household estimate/)
+  await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+  await expect(row(/Salary/).getByRole('cell').first()).toContainText(/Unknown|Not computed/)
+  await expect(partner).toContainText('34')
+  await expect(row(/Closing net worth/).getByRole('cell').last()).toContainText(expectedNetWorth.replace(/^[^\d−-]+/, ''))
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(opener).toBeFocused()
+  await expect(mainNetWorth).toHaveText(expectedNetWorth)
+
+  await partnerAge.fill('38')
+  await opener.click()
+  await expect(partner).toContainText('38')
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await scenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  await opener.click()
+  await expect(partner).toContainText('34')
+  const detail = dialog.getByRole('complementary', { name: 'Cell details' })
+  await dialog.getByRole('combobox', { name: 'Jump to year' }).selectOption('2033')
+  await dialog.getByRole('button', { name: /^Inspect row: Modeled tax.+2033$/ }).click()
+  await expect(detail).toContainText(/flat marginal-rate estimate/i)
+  await expect(detail).not.toContainText(/Rule package:|Source rule tax year:/)
+  await detail.getByRole('button', { name: 'Hide details' }).click()
+  await dialog.getByRole('button', { name: /^Inspect row: Spending shortfall, 2033$/ }).click()
+  await expect(detail.getByRole('heading')).toHaveText('Spending shortfall · 2033: Not computed')
+  await expect(detail).toContainText(/uses net savings and has no modeled living-cost target/i)
+  await expect(detail).not.toContainText('Formula components')
+  await detail.getByRole('button', { name: 'Hide details' }).click()
+  await dialog.getByRole('button', { name: 'Retirement (2035)' }).click()
+  await dialog.getByRole('button', { name: /^Inspect row: After-tax cash available,/ }).click()
+  await expect(detail).toBeFocused()
+  await expect(detail).toContainText('Formula components')
+  await expect(detail).toContainText(/Rule package: CA-ON-tax-/)
+  await expect(detail).toContainText('Source rule tax year: 2026')
+  await expect(detail).toContainText('Projection calculation year: 2035')
+})
+
+for (const locale of [
+  { button: 'FR', opener: 'Détails financiers annuels', dialog: 'Estimation annuelle du ménage',
+    retirement: 'Retraite', inspect: /Examiner la ligne/, tax: /impôt modélisé/i,
+    details: 'Détails de la cellule', limit: /^Limites:.*attribution fiscale par personne/i },
+  { button: '中文', opener: '逐年财务明细', dialog: '家庭汇总年度估算',
+    retirement: '退休', inspect: /查看行详情/, tax: /模型税额/,
+    details: '单元格详情', limit: /^已知限制:.*逐人税务归属/ },
+]) {
+  test(`professional annual tax limitations are localized in ${locale.button}`, async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await page.locator('label.field').filter({ hasText: /^Household/ }).locator('select').selectOption('couple')
+    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await page.getByRole('button', { name: locale.opener, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: locale.dialog })
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.retirement} \\(\\d{4}\\)$`) }).click()
+    const inspectTax = dialog.getByRole('button', { name: locale.inspect }).and(dialog.getByRole('button', { name: locale.tax }))
+    await inspectTax.click()
+    const detail = dialog.getByRole('complementary', { name: locale.details })
+    await expect(detail.getByText(locale.limit)).toBeVisible()
+    await expect(detail).not.toContainText(/registered account owner unknown|working-year tax uses|BE-\d+|budgetBasisExcluded|debtExcluded|taxBenefitExcluded|ownershipNeedsConfirmation/i)
+  })
+}
+
+test('French underwater-sale details show the event label without its technical ID', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    const { annualSheetUnderwaterSale: inputs } = await import('/src/engine/__tests__/fixtures/annualSheetUnderwaterSale.ts')
+    const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+    const canonical = refreshCanonicalFromLegacy(null, inputs)
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
+  })
+  await page.reload()
+  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await page.getByRole('button', { name: 'Détails financiers annuels', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Estimation annuelle du ménage' })
+  const technicalId = 'sale:60:principalResidence.sellAtAge'
+  const event = dialog.getByRole('button', { name: /Résidence principale.*Financement d’événement enregistré/ })
+  await expect(event).toHaveAttribute('aria-expanded', 'false')
+  await expect(event).toHaveAccessibleName('Résidence principale: Financement d’événement enregistré: Année 2026')
+  await event.click()
+  await dialog.getByRole('button', { name: /Examiner la ligne:.*Financement de libération à la vente.*Impôt sur retraits/ }).click()
+  const detail = dialog.getByRole('complementary', { name: 'Détails de la cellule' })
+  await expect(detail.getByText(/^Sources:/)).toContainText('Résidence principale (Événement)')
+  await expect(detail.getByText(/^Limites:.*financement de libération.*estimation fiscale héritée/i)).toBeVisible()
+  await expect(dialog).not.toContainText(technicalId)
+  await expect(dialog.locator(`[title*="${technicalId}"]`)).toHaveCount(0)
+})
+
+for (const locale of [
+  { button: 'FR', opener: 'Détails financiers annuels', dialog: 'Estimation annuelle du ménage',
+    year: 'Aller à une année', tax: 'Examiner la ligne: Impôt modélisé', details: 'Détails de la cellule',
+    hide: 'Masquer les détails', caveat: /^Limites:.*(?:bâtiment|terrain|DPA)/i },
+  { button: '中文', opener: '逐年财务明细', dialog: '家庭汇总年度估算',
+    year: '跳转年份', tax: '查看行详情: 模型税额', details: '单元格详情',
+    hide: '收起详情', caveat: /^已知限制:.*(?:土地|建筑|CCA)/ },
+]) {
+  test(`zero-gain property sale caveat applies only to the sale year in ${locale.button}`, async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(async () => {
+      const { annualSheetZeroGainPropertySale: inputs } = await import('/src/engine/__tests__/fixtures/annualSheetCapitalLimits.ts')
+      const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
+      const canonical = refreshCanonicalFromLegacy(null, inputs)
+      localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
+    })
+    await page.reload()
+    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await page.getByRole('button', { name: locale.opener, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: locale.dialog })
+    const year = dialog.getByRole('combobox', { name: locale.year })
+    const detail = dialog.getByRole('complementary', { name: locale.details })
+    await year.selectOption('2027')
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.tax}.*2027$`) }).click()
+    await expect(detail.getByText(locale.caveat)).toBeVisible()
+    await expect(detail).not.toContainText(/investment-property sale requires|investmentPropertySale|BE-\d+/)
+    await detail.getByRole('button', { name: locale.hide, exact: true }).click()
+    await year.selectOption('2028')
+    await dialog.getByRole('button', { name: new RegExp(`^${locale.tax}.*2028$`) }).click()
+    await expect(detail.getByText(locale.caveat)).toHaveCount(0)
+  })
+}
+
 async function openSheet(page: Page, query = '') {
   await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html${query}`)
   const opener = page.getByRole('button', { name: 'Open fixture', includeHidden: true })
@@ -136,7 +277,8 @@ test('distinguishes computed zero and missing states and shows expense and event
   await cell(dialog, 'Event funding gap', 2033).click()
   const details = dialog.getByRole('complementary')
   await expect(details.getByRole('heading')).toContainText('CA$1,340.00')
-  await expect(details).toContainText('roof-repair')
+  await expect(details.getByText(/^Sources:/)).toContainText('Roof repair (Event)')
+  await expect(details).not.toContainText('roof-repair')
   await expect(details).toContainText('Repair due CA$3,000.00 (Normalized nominal CAD)')
 })
 
@@ -182,6 +324,12 @@ test('a short 320px viewport keeps Close and the table reachable with many jumps
   await expect.poll(() => port.evaluate(node => node.scrollTop)).toBeGreaterThan(0)
   await page.keyboard.press('ArrowRight')
   await expect.poll(() => port.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
+  await expect(port).toBeFocused()
+  const corner = dialog.getByRole('columnheader').first()
+  await expect.poll(async () => {
+    const [header, bounds] = await Promise.all([corner.boundingBox(), port.boundingBox()])
+    return header && bounds ? Math.abs(header.y - bounds.y) + Math.abs(header.x - bounds.x) : Infinity
+  }).toBeLessThanOrEqual(3)
   await dialog.getByRole('button', { name: 'Household milestone 18 (2031)' }).click()
   await expect(dialog.getByRole('combobox', { name: 'Jump to year' })).toHaveValue('2031')
   await expect(details).toBeVisible()

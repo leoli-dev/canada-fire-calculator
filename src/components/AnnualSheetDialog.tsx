@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useCad } from '../format'
@@ -13,7 +13,7 @@ export interface AnnualSheetDialogProps {
   onClose: () => void
 }
 
-/** No production entry point: callers own the current scenario, revision and money mode. */
+/** Callers own the current scenario, revision and money mode. */
 export function AnnualSheetDialog(props: AnnualSheetDialogProps) {
   // Revision keys also discard expanded rows and selected explanations on updated results.
   return props.open ? <AnnualSheetSession key={`${props.model.scenarioId}:${props.model.revision}`} {...props} /> : null
@@ -28,6 +28,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
   const fullCad = useCad(2)
   const id = useId()
   const dialog = useRef<HTMLDialogElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const detail = useRef<HTMLElement>(null)
   const detailTrigger = useRef<HTMLElement | null>(null)
@@ -54,6 +55,10 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     const scrollY = window.scrollY
     document.body.style.overflow = 'hidden'
     node.showModal()
+    // React autoFocus runs while the dialog is still closed. Once modal,
+    // Chromium can instead choose a scrollable header as its first target
+    // on narrow screens; explicitly focus the persistent close control.
+    closeButton.current?.focus({ preventScroll: true })
     return () => {
       node.close()
       document.body.style.overflow = overflow
@@ -109,7 +114,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     const expanded = !collapsed.has(row.id)
     return <tbody key={row.id}>
       <tr className={hasChildren || row.kind === 'group' ? 'annual-sheet-group' : undefined}>
-        <th scope="row" id={`${id}-row-${row.id}`} ref={node => { if (node) rowHeaders.current.set(row.id, node); else rowHeaders.current.delete(row.id) }}>
+        <th scope="row" aria-label={text(row.label)} id={`${id}-row-${row.id}`} ref={node => { if (node) rowHeaders.current.set(row.id, node); else rowHeaders.current.delete(row.id) }}>
           <div style={{ paddingInlineStart: depth * 10 }}>
             {hasChildren && <button type="button" aria-expanded={expanded} aria-label={text(row.label)} onClick={() => setCollapsed(current => {
               const next = new Set(current); if (next.has(row.id)) next.delete(row.id); else next.add(row.id); return next
@@ -125,7 +130,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     </tbody>
   }).flatMap((body, index) => {
     const row = rows[index]
-    return [body, ...(row.children && !collapsed.has(row.id) ? [renderRows(row.children, depth + 1)] : [])]
+    return <Fragment key={row.id}>{body}{row.children && !collapsed.has(row.id) ? renderRows(row.children, depth + 1) : null}</Fragment>
   })
   const selectedCell = selection?.row.cells?.[selection.year]
   const selectedColumn = model.years.find(column => column.year === selection?.year)
@@ -142,7 +147,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     <div className="annual-sheet-layout">
       <header className="annual-sheet-header">
         <div><h2 id={`${id}-title`}>{text(model.title) || copy.title}</h2><p id={`${id}-scope`}>{text(model.scope)} · {copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</p></div>
-        <button type="button" autoFocus onClick={onClose}>{copy.close}</button>
+        <button ref={closeButton} type="button" onClick={onClose}>{copy.close}</button>
       </header>
       <div className="annual-sheet-tools"><div className="annual-sheet-controls">
         <label>{copy.jump} <select value={year} onChange={event => { jump(Number(event.target.value)); setJumpReason('') }}>{model.years.map(column => <option key={column.year} value={column.year}>{column.year}</option>)}</select></label>
@@ -157,14 +162,15 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
         <dl>
           <dt>{copy.status}</dt><dd>{copy[selectedStatus]}</dd>
           {selectedSourceAvailable && selectedCell?.unit === 'CAD' && selectedCell.value !== null && <><dt>{copy.normalized}</dt><dd>{fullCad(selectedCell.value)}</dd></>}
-          {selectedCell && <><dt>{copy.timing}</dt><dd>{copy[selectedCell.timing]}</dd><dt>{copy.native}</dt><dd>{selectedCell.nativeBasis ? text(selectedCell.nativeBasis) : selectedCell.unit === "CAD" ? copy.normalized : copy.unitValue}</dd><dt>{copy.conversion}</dt><dd>{selectedAvailable && selectedCell.conversion && <>{text(selectedCell.conversion)} · </>}{!selectedAvailable ? copy[selectedStatus] : selectedCell.basis === 'nominal-tax-basis' ? copy.taxBasis : selectedCell.unit === 'CAD' && moneyMode === 'real' ? `${copy.factor}: ${model.years.find(column => column.year === selection.year)?.realFactor} (${copy.base}: ${model.baseYear})` : copy.unchanged}</dd>{selectedCell.reason && <><dt>{copy.reason}</dt><dd>{text(selectedCell.reason)}</dd></>}</>}
+          {selectedCell && <><dt>{copy.timing}</dt><dd>{copy[selectedCell.timing]}</dd><dt>{copy.native}</dt><dd>{selectedCell.nativeBasis ? text(selectedCell.nativeBasis) : selectedCell.unit === "CAD" ? copy.normalized : copy.unitValue}</dd><dt>{copy.conversion}</dt><dd>{selectedAvailable && selectedCell.conversion && <>{text(selectedCell.conversion)} · </>}{!selectedAvailable ? copy[selectedStatus] : selectedCell.basis === 'nominal-tax-basis' ? copy.taxBasis : selectedCell.unit === 'CAD' && moneyMode === 'real' ? selectedCell.realValue !== undefined ? copy.realBridge : `${copy.factor}: ${selectedCell.realFactor ?? (selectedCell.timing === 'opening' ? selectedColumn?.openingRealFactor ?? selectedColumn?.realFactor : selectedColumn?.realFactor)} (${copy.base}: ${model.baseYear})` : copy.unchanged}</dd>{selectedCell.reason && <><dt>{copy.reason}</dt><dd>{text(selectedCell.reason)}</dd></>}</>}
         </dl>
         {explanations?.map(({ reference, explanation }) => <section key={reference}>
-          {!explanation ? <p>{copy.missingExplanation}: {reference}</p> : <>
+          {!explanation ? <p>{copy.missingExplanation}</p> : <>
             {explanation.summary && <p>{text(explanation.summary)}</p>}
-            {explanation.sources && <p>{copy.sources}: {explanation.sources.map(source => `${text(source.label)} (${copy[source.granularity]}${source.id ? `: ${source.id}` : ''})`).join('; ')}</p>}
+            {explanation.sources && <p>{copy.sources}: {explanation.sources.map(source => `${text(source.label)} (${copy[source.granularity]}${source.displayReference ? `: ${text(source.displayReference)}` : ''})`).join('; ')}</p>}
+            {explanation.formulaBasis && <p>{text(explanation.formulaBasis)}</p>}
             {selectedSourceAvailable && explanation.formula && <p>{copy.formula}: {explanation.formula.map(part => `${part.direction === 'add' ? '+' : '−'} ${text(part.label)} ${Number.isFinite(part.value) ? format(part.value, part.unit, true) : copy.unknown}${part.unit === "CAD" ? ` (${part.basis === "nominal-tax-basis" ? copy.taxBasis : copy.normalized})` : ""}`).join('; ')}</p>}
-            {explanation.rulePackage && <p>{copy.rule}: {explanation.rulePackage}</p>}{explanation.taxYear && <p>{copy.taxYear}: {explanation.taxYear}</p>}
+            {explanation.rulePackage && <p>{copy.rule}: {explanation.rulePackage}</p>}{explanation.taxYear && <p>{copy.taxYear}: {explanation.taxYear}</p>}{explanation.projectionYear && <p>{copy.projectionYear}: {explanation.projectionYear}</p>}
             {explanation.forwardAssumption && <p>{copy.assumption}: {text(explanation.forwardAssumption)}</p>}
             {explanation.limitations?.map((limit, index) => <p key={index}>{copy.limits}: {text(limit)}</p>)}
           </>}

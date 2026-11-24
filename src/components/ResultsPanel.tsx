@@ -1,3 +1,4 @@
+import { fundingGapMessageKey } from '../fundingGapMessages'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -203,14 +204,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           </div>}
           {result.unfundedObligations.length > 0 && <ul className="funding-gaps">
             {result.unfundedObligations.map((gap) => <li key={gap.eventId + gap.reason}>
-              {t(gap.reason === 'invalidPurchase' ? 'valPurchaseInvalid'
-                : gap.reason === 'missingMortgage' ? 'valPurchaseMortgageRequired'
-                : gap.reason === 'fhsaContribution' ? 'valFhsaContributionUnfunded'
-                : gap.reason === 'employeeContribution' ? 'valContributionsUnfunded'
-                  : gap.reason === 'saleDischarge' ? 'valSaleDischargeUnfunded'
-                  : gap.reason === 'saleTax' ? 'valSaleTaxUnfunded'
-                  : gap.reason === 'hbpRepaymentTax' ? 'valHbpTaxUnfunded'
-                  : gap.reason === 'purchaseCost' ? 'valPurchaseCostUnfunded' : 'valDownPaymentUnfunded',
+              {t(fundingGapMessageKey(gap.reason),
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}
           </ul>}
