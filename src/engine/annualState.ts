@@ -8,7 +8,7 @@ import {
   type RrspRoomLimitation, type RrspRoomYear,
 } from './rrspRoom'
 import {
-  FHSA_BLOCKING, FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_OPENING_YEAR_MISSING,
+  FHSA_BLOCKING, FHSA_MATURITY_UNSUPPORTED, FHSA_MONEY_TOLERANCE, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_OPENING_YEAR_MISSING,
   activeFhsaAccounts, fhsaOpeningRoom, fhsaPlannedYearRequestWithOrigins, fhsaRoomYear,
   fhsaStatementHistory, type FhsaRoomYear,
 } from './fhsa'
@@ -61,9 +61,16 @@ export interface YearRow {
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
   cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
-  /** Memo bridge, not additional cash uses. Postings are the accepted history
-   * entries; ownership and contributor attribution are intentionally separate. */
+  /** Budget reservation and final-posting bridge. Final postings and retained
+   * amounts are memo facts, not additional budget uses. Ownership and
+   * contributor attribution are intentionally separate. */
   contributionLedger: {
+    /** Exact canonical net-savings budget used by the allocator, not supplied net cash. */
+    allocationCashBasis: number
+    /** Allocation-time RRSP/spousal cash reservation only; scheduled FHSA is
+     * already reserved in cashLedger.fhsaContributions. This is requested,
+     * not the room-clipped amount eventually posted to registered accounts. */
+    scheduledRrspBudgeted: number
     scheduledPlanned: number; scheduledApplied: number; scheduledRetained: number; appliedTotal: number
     postings: { id: string; accountId: string; ownerId: string; contributorId: string | null; amount: number }[]
     retained: { personId: string; kind: 'rrsp' | 'fhsa' | 'tfsa'; amount: number }[]
@@ -562,6 +569,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const committedProblem = snapshotProblem(plan, state)
   if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
   const contributionLedger: YearRow['contributionLedger'] = {
+    allocationCashBasis: cash,
+    scheduledRrspBudgeted: scheduledPlanned,
     scheduledPlanned: sum(scheduled.map(line => line.amount)),
     scheduledApplied: sum(scheduledResults.map(line => line.applied)),
     scheduledRetained: sum(scheduledResults.map(line => line.retained)),
@@ -603,7 +612,8 @@ function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if (detail.startsWith('property sale funding')) return 'propertySale'
   if (/^(RRIF|LIF) minimum withdrawal/.test(detail)) return 'registeredWithdrawal'
   if (/^(RRSP|LIRA|FHSA) age-71/.test(detail)) return 'registeredConversion'
-  if (detail.startsWith('FHSA') || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
+  if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
+  if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
   if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
   if (detail === 'taxable withdrawal funding not yet wired' || detail === 'negative net savings needs withdrawal funding rule') return 'withdrawalFunding'
   if (detail === 'evaluated cash disagrees with canonical net savings budget') return 'cashMismatch'

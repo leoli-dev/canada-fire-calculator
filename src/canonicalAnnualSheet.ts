@@ -13,7 +13,10 @@ const labels = {
   retained: text('Retained contribution postings (memo)', 'Écritures de cotisations conservées (mémo)', '保留供款入账（备忘）'),
   owned: text('Owned accounts (not contributor attribution)', 'Comptes détenus (pas l’attribution au cotisant)', '名下账户（非供款人归属）'),
   contributed: text('Accepted postings attributed to this contributor (memo)', 'Écritures acceptées attribuées à ce cotisant (mémo)', '归属此供款人的已接受入账（备忘）'),
-  scheduledPlanned: text('Scheduled contributions requested (memo)', 'Cotisations prévues demandées (mémo)', '计划供款请求（备忘）'),
+  scheduledRrspBudgeted: text('Budgeted scheduled RRSP / spousal RRSP (before room limits; excludes FHSA)', 'REER / REER de conjoint prévus au budget (avant plafonds; exclut CELIAPP)', '预算中的计划 RRSP／配偶 RRSP（额度限制前；不含 FHSA）'),
+  netAvailableCash: text('Net savings budget used for allocation', 'Budget d’épargne nette utilisé pour l’affectation', '实际分配采用的净储蓄预算'),
+  suppliedNetCash: text('Net cash from supplied annual facts (memo)', 'Trésorerie nette selon les faits annuels fournis (mémo)', '提供的年度事实所算净现金（备忘）'),
+  scheduledPlanned: text('Scheduled RRSP and FHSA requested (memo; already in budgets)', 'REER et CELIAPP prévus demandés (mémo; déjà au budget)', '计划 RRSP 与 FHSA 请求（备忘；已计入预算）'),
   scheduledApplied: text('Scheduled contributions accepted and posted (memo)', 'Cotisations prévues acceptées et comptabilisées (mémo)', '计划供款已接受入账（备忘）'),
   scheduledRetained: text('Scheduled contributions retained in non-registered savings (memo)', 'Cotisations prévues conservées hors régime (mémo)', '计划供款保留在非注册储蓄中（备忘）'),
   appliedTotal: text('Total accepted account postings (memo; includes retained savings)', 'Total des écritures acceptées (mémo; épargne conservée incluse)', '账户接受入账合计（备忘；含保留储蓄）'),
@@ -30,9 +33,9 @@ const labels = {
   payment: text('Payment', 'Paiement', '还款'), growth: text('Property growth', 'Appréciation', '房产增长'),
   debtPayments: text('Debt payments', 'Paiements de dettes', '偿债付款'),
   fhsaContributions: text('Allocated FHSA contributions (before room limits)', 'Cotisations CELIAPP affectées (avant plafonds)', '分配的 FHSA 供款（额度限制前）'),
-  employeeContributions: text('Allocated employee contributions', 'Cotisations salariales affectées', '分配的雇员供款'),
-  employerContributions: text('Employer contributions', 'Cotisations patronales', '雇主供款'),
-  voluntaryContributions: text('Allocated voluntary contributions', 'Cotisations volontaires affectées', '分配的自愿供款'),
+  employeeContributions: text('Budgeted employee contributions', 'Cotisations salariales au budget', '预算雇员供款'),
+  employerContributions: text('Additional employer money (outside household cash budget)', 'Apport patronal supplémentaire (hors budget de trésorerie du ménage)', '额外雇主资金（不占家庭现金预算）'),
+  voluntaryContributions: text('Budgeted voluntary contributions (before room limits)', 'Cotisations volontaires au budget (avant plafonds)', '预算自愿供款（额度限制前）'),
   retainedContributions: text('Contributions retained in non-registered savings', 'Cotisations conservées hors régime', '保留在非注册储蓄中的供款'),
   unallocated: text('Unallocated cash', 'Trésorerie non affectée', '未分配现金'),
   assets: text('Closing investable assets', 'Placements finaux', '期末投资资产'),
@@ -43,6 +46,9 @@ const labels = {
  * are diagnostic strings and must never cross the sheet boundary. */
 export type CanonicalSheetLimitation = 'invalid' | 'unsupported' | 'unfunded' | 'suffix' | 'unknown' | 'notHeld' | 'workingYear' | 'nonTerminal'
 const copy = {
+  suppliedCash: text('Income + benefits − tax − spending − debt payments, from the supplied annual evaluation and settled debt payments. Validation accepts an absolute difference of up to nominal CAD 0.01 (one cent) from the allocation budget. These values can therefore differ; this memo is not additional available money or an account posting.', 'Revenus + prestations − impôt − dépenses − paiements de dettes, selon l’évaluation annuelle fournie et les paiements de dettes réglés. La validation accepte un écart absolu d’au plus 0,01 CAD nominal (un cent) avec le budget d’affectation. Ces valeurs peuvent donc différer; ce mémo n’est ni de l’argent disponible supplémentaire ni une écriture de compte.', '根据提供的年度评估与已结算偿债付款，收入 + 福利 − 税额 − 支出 − 偿债付款。验证允许与分配预算相差最多名义 0.01 加元（一分）。因此两者可能不同；此备忘不代表额外可用资金或账户入账。'),
+  allocationBasis: text('The exact canonical net-savings budget used by the allocator, recorded before room clipping. This is separate from net cash derived from supplied annual facts, which may differ within the accepted nominal CAD 0.01 tolerance.', 'Budget canonique exact d’épargne nette utilisé par l’affectation, enregistré avant les plafonds. Il est distinct de la trésorerie nette dérivée des faits annuels fournis, qui peut différer dans la tolérance acceptée de 0,01 CAD nominal.', '分配器实际采用的标准净储蓄预算，记录于额度限制之前。它与提供的年度事实所算净现金分列，后者可在允许的名义 0.01 加元容差内有所不同。'),
+  allocation: text('Allocation-time cash uses: the recorded net savings budget = budgeted FHSA + employee contributions + voluntary contributions + scheduled RRSP / spousal RRSP + unallocated cash. Scheduled FHSA is already inside the FHSA budget and is not added again. Room limits can redirect part of scheduled or voluntary contributions to non-registered savings; those retained amounts and final postings are memo facts, not extra budget uses. Additional employer money is outside this household cash equation.', 'Emplois de trésorerie au moment de l’affectation : budget d’épargne nette enregistré = CELIAPP au budget + cotisations salariales + cotisations volontaires + REER / REER de conjoint prévus + trésorerie non affectée. Le CELIAPP prévu est déjà inclus dans son budget. Les plafonds peuvent réorienter des cotisations prévues ou volontaires hors régime; montants conservés et écritures finales sont des mémos, pas des emplois supplémentaires. L’apport patronal supplémentaire est hors de cette équation.', '分配时的现金用途：已记录净储蓄预算 = 预算 FHSA + 雇员供款 + 自愿供款 + 计划 RRSP／配偶 RRSP + 未分配现金。计划 FHSA 已计入 FHSA 预算，不再重复相加。额度限制可将部分计划或自愿供款转入非注册储蓄；保留金额与最终入账为备忘事实，并非额外预算用途。额外雇主资金不计入此家庭现金等式。'),
   workingYear: text('Retirement pricing does not apply in this settled working year.', 'Le calcul de retraite ne s’applique pas à cette année de travail réglée.', '本已结算工作年度不适用退休定价。'),
   nonTerminal: text('Estate settlement applies only in the plan’s terminal year.', 'Le règlement successoral s’applique uniquement à l’année finale du plan.', '遗产结算仅适用于计划终年。'),
   inflation: text('Presentation bridge only: nominal value is zero. In real CAD, closing nominal balance × (end CPI factor − start CPI factor) reconciles opening balance plus movements to closing purchasing power. This is not a cash flow or an investment gain.', 'Rapprochement de présentation uniquement : valeur nominale nulle. En CAD réels, solde final nominal × (facteur IPC final − initial) rapproche solde initial et mouvements du pouvoir d’achat final. Ce n’est ni un flux ni un gain.', '仅为展示桥接：名义值为零。实际加元值为名义期末余额 ×（年末 CPI 因子 − 年初 CPI 因子），用于将期初余额及变动与期末购买力对账，并非现金流或投资收益。'),
@@ -92,7 +98,7 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
   const retainedLabel = (posting: YearRow['contributionLedger']['retained'][number]): AnnualSheetText => {
     const person = Object.keys(coverage.state.byPerson).indexOf(posting.personId) + 1
     return text(`${posting.kind.toUpperCase()} retained for person ${person} (memo; already in non-registered posting)`,
-      `${posting.kind.toUpperCase()} conservé pour personne ${person} (mémo; déjà comptabilisé hors régime)`,
+      `${({ rrsp: 'REER', fhsa: 'CELIAPP', tfsa: 'CELI' })[posting.kind]} conservé pour personne ${person} (mémo; déjà comptabilisé hors régime)`,
       `人员 ${person} 的 ${posting.kind.toUpperCase()} 保留金额（备忘；已存入非注册账户）`)
   }
   const postingLabel = (posting: YearRow['contributionLedger']['postings'][number]): AnnualSheetText => {
@@ -105,7 +111,7 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
   }
   const explanations = new Map<string, () => AnnualSheetExplanation>()
   const make = (id: string, label: AnnualSheetText, get: (row: YearRow) => number | null,
-    timing: AnnualSheetCell['timing'] = 'during-year', options: { supplied?: boolean; unit?: AnnualSheetCell['unit']; taxBasis?: boolean; entity?: AnnualSheetRow['entity']; applicable?: (row: YearRow) => boolean; inapplicable?: 'workingYear' | 'nonTerminal'; memo?: boolean; postingDetail?: boolean; retainedDetail?: boolean; summary?: AnnualSheetText; sources?: (row: YearRow) => NonNullable<AnnualSheetExplanation['sources']>; realValue?: (row: YearRow, start: number, end: number) => number } = {}): AnnualSheetRow => ({
+    timing: AnnualSheetCell['timing'] = 'during-year', options: { supplied?: boolean; unit?: AnnualSheetCell['unit']; taxBasis?: boolean; entity?: AnnualSheetRow['entity']; applicable?: (row: YearRow) => boolean; inapplicable?: 'workingYear' | 'nonTerminal'; memo?: boolean; postingDetail?: boolean; retainedDetail?: boolean; summary?: AnnualSheetText; formula?: (row: YearRow) => NonNullable<AnnualSheetExplanation['formula']>; sources?: (row: YearRow) => NonNullable<AnnualSheetExplanation['sources']>; realValue?: (row: YearRow, start: number, end: number) => number } = {}): AnnualSheetRow => ({
     id, label, entity: options.entity,
     cells: Object.fromEntries(years.map(({ year, openingRealFactor, realFactor }) => {
       const row = settled.get(year)
@@ -126,7 +132,7 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
             { label: text('Account owner', 'Titulaire du compte', '账户持有人'), id: posting.ownerId, field: 'ownerId', granularity: 'year' as const },
             { label: text('Contributor', 'Cotisant', '供款人'), id: posting.contributorId ?? undefined, field: 'contributorId', granularity: 'year' as const },
           ]) : []), ...(row && options.retainedDetail ? row.contributionLedger.retained.map(posting => ({ label: retainedLabel(posting), id: posting.personId, field: posting.kind, granularity: 'year' as const })) : [])],
-        formula: row && options.postingDetail ? row.contributionLedger.postings.map(posting => ({
+        formula: row && options.formula ? options.formula(row) : row && options.postingDetail ? row.contributionLedger.postings.map(posting => ({
           label: postingLabel(posting), sourceId: posting.id, field: 'contributionPosting', value: posting.amount,
           direction: 'add' as const, unit: 'CAD' as const, basis: 'nominal-CAD' as const,
         })) : row && options.retainedDetail ? row.contributionLedger.retained.map(posting => ({
@@ -134,7 +140,7 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
           direction: 'add' as const, unit: 'CAD' as const, basis: 'nominal-CAD' as const,
         })) : undefined,
         limitations: !row || value === null ? [reason] : undefined }))
-      const cell: AnnualSheetCell = { value: value !== null && Number.isFinite(value) ? value : null,
+      const cell: AnnualSheetCell = { value: value !== null && Number.isFinite(value) ? value === 0 ? 0 : value : null,
         status: !row ? 'not-computed' : !applicable ? 'not-applicable' : value === null || !Number.isFinite(value) ? 'unknown' : options.supplied ? 'estimated' : 'calculated',
         realFactor: timing === 'closing' || timing === 'terminal' ? realFactor : openingRealFactor,
         realValue: row && options.realValue ? options.realValue(row, openingRealFactor, realFactor) : undefined,
@@ -146,15 +152,33 @@ export function canonicalAnnualSheet(coverage: AnnualCoverage, context: { scenar
   })
   const bridge = (domain: string, entityId: string | null, closing: (row: YearRow) => number, entity?: AnnualSheetRow['entity'], applicable?: (row: YearRow) => boolean) =>
     make(canonicalSheetId('value', domain, ...(entityId === null ? [] : [entityId]), 'inflationBridge'), labels.inflationBridge, () => 0, 'closing',
-      { entity, applicable, memo: true, summary: copy.inflation, realValue: (row, start, end) => closing(row) * (end - start) })
+      { entity, applicable, memo: true, summary: copy.inflation, realValue: (row, start, end) => end === start || closing(row) === 0 ? 0 : closing(row) * (end - start) })
   const numbered = (label: AnnualSheetText, index: number): AnnualSheetText => typeof label === 'string' ? `${label} ${index + 1}` : { en: `${label.en} ${index + 1}`, fr: `${label.fr} ${index + 1}`, zh: `${label.zh} ${index + 1}` }
   const group = (id: string, label: AnnualSheetText, children: AnnualSheetRow[], entity?: AnnualSheetRow['entity']): AnnualSheetRow => ({ id, label, kind: 'group', children, entity })
   const household = (row: YearRow) => Object.values(row.byAccount).reduce((sum, account) => sum + account.closing, 0)
   const rows: AnnualSheetRow[] = [group(canonicalSheetId('group', 'household'), labels.household, [
     ...Object.keys(coverage.rows[0]?.cashLedger ?? { income: 0, benefits: 0, tax: 0, spending: 0, debtPayments: 0, fhsaContributions: 0, employeeContributions: 0, employerContributions: 0, voluntaryContributions: 0, retainedContributions: 0, unallocated: 0 }).map(key => {
       const field = key as keyof YearRow['cashLedger']
-      return make(canonicalSheetId('value', 'cash', field), labels[field], row => row.cashLedger[field], 'during-year', { supplied: ['income', 'benefits', 'tax', 'spending'].includes(field), retainedDetail: field === 'retainedContributions', memo: field === 'retainedContributions' })
+      return make(canonicalSheetId('value', 'cash', field), labels[field], row => row.cashLedger[field], 'during-year', { supplied: ['income', 'benefits', 'tax', 'spending'].includes(field), retainedDetail: field === 'retainedContributions', memo: field === 'retainedContributions', summary: ['fhsaContributions', 'employeeContributions', 'employerContributions', 'voluntaryContributions', 'unallocated'].includes(field) ? copy.allocation : undefined })
     }),
+    make(canonicalSheetId('value', 'cash', 'scheduledRrspBudgeted'), labels.scheduledRrspBudgeted, row => row.contributionLedger.scheduledRrspBudgeted, 'during-year', { summary: copy.allocation }),
+    make(canonicalSheetId('value', 'cash', 'netAvailableCash'), labels.netAvailableCash,
+      row => row.contributionLedger.allocationCashBasis,
+      'during-year', { summary: copy.allocation, sources: () => [{ label: copy.allocationBasis, field: 'contributionLedger.allocationCashBasis', granularity: 'year' }],
+        formula: row => (['fhsaContributions', 'employeeContributions', 'voluntaryContributions', 'scheduledRrspBudgeted', 'unallocated'] as const).map(field => ({
+          label: labels[field], sourceId: canonicalSheetId('value', 'cash', field), field,
+          value: field === 'scheduledRrspBudgeted' ? row.contributionLedger.scheduledRrspBudgeted : row.cashLedger[field],
+          direction: 'add', unit: 'CAD', basis: 'nominal-CAD',
+        })),
+      }),
+    make(canonicalSheetId('value', 'cash', 'suppliedNetCash'), labels.suppliedNetCash,
+      row => row.cashLedger.income + row.cashLedger.benefits - row.cashLedger.tax - row.cashLedger.spending - row.cashLedger.debtPayments,
+      'during-year', { supplied: true, summary: copy.suppliedCash,
+        formula: row => (['income', 'benefits', 'tax', 'spending', 'debtPayments'] as const).map(field => ({
+          label: labels[field], sourceId: canonicalSheetId('value', 'cash', field), field, value: row.cashLedger[field],
+          direction: field === 'income' || field === 'benefits' ? 'add' : 'subtract', unit: 'CAD', basis: 'nominal-CAD',
+        })),
+      }),
     ...(['opening', 'contribution', 'withdrawal', 'returnAmount'] as const).map(field =>
       make(canonicalSheetId('value', 'accounts', field), labels[field], row => Object.values(row.byAccount).reduce((sum, a) => sum + a[field], 0), field === 'opening' ? 'opening' : 'during-year')),
     make(canonicalSheetId('value', 'assets'), labels.assets, household, 'closing'),

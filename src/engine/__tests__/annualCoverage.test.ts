@@ -420,6 +420,7 @@ describe('FE-53 canonical annual sheet', () => {
       }
     }
     expect(real(`property.${home}.opening`, 2027)).toBeCloseTo(real(`property.${home}.closing`, 2026), 8)
+    expect(real(`debt.${car}.inflationBridge`, 2027)).toBe(0)
     expect(annualSheetDisplayValue(cell(`canonical.account.${brokerage}.acb`, 2027), column(2027), 'real')).toBe(18200)
     expect(annualSheetDisplayValue(cell(`canonical.person.${self}.taxableIncome`, 2027), column(2027), 'real')).toBe(71400)
     expect(annualSheetDisplayValue(cell(`canonical.person.${self}.income`, 2027), column(2027), 'real')).toBeCloseTo(70000, 8)
@@ -538,6 +539,180 @@ describe('FE-53 canonical annual sheet', () => {
   })
 
   it.each([
+    { name: 'scheduled RRSP only', rrsp: 1000, fhsa: 0, rrspRoom: 5000, voluntaryRrsp: false,
+      voluntary: 8000, rrspPosted: 1000, brokeragePosted: 8000, scheduledRetained: 0, totalRetained: 0 },
+    { name: 'scheduled FHSA only', rrsp: 0, fhsa: 2000, rrspRoom: 5000, voluntaryRrsp: false,
+      voluntary: 7000, rrspPosted: 0, brokeragePosted: 7000, scheduledRetained: 0, totalRetained: 0 },
+    { name: 'both scheduled accounts', rrsp: 1000, fhsa: 2000, rrspRoom: 5000, voluntaryRrsp: false,
+      voluntary: 6000, rrspPosted: 1000, brokeragePosted: 6000, scheduledRetained: 0, totalRetained: 0 },
+    { name: 'a clipped scheduled RRSP', rrsp: 1000, fhsa: 2000, rrspRoom: 600, voluntaryRrsp: false,
+      voluntary: 6000, rrspPosted: 600, brokeragePosted: 6400, scheduledRetained: 400, totalRetained: 400 },
+    { name: 'a clipped voluntary RRSP with full scheduled contributions', rrsp: 1000, fhsa: 2000, rrspRoom: 5000, voluntaryRrsp: true,
+      voluntary: 6000, rrspPosted: 5000, brokeragePosted: 2000, scheduledRetained: 0, totalRetained: 2000 },
+  ])('balances the operating cash budget with $name', ({
+    rrsp, fhsa, rrspRoom, voluntaryRrsp, voluntary, rrspPosted, brokeragePosted, scheduledRetained, totalRetained,
+  }) => {
+    const plan = workingHousehold()
+    const rrspId = 'account:alex:rrsp'
+    const fhsaId = 'account:alex:fhsa'
+    plan.people = [person(self, 'self', 48, 63)]
+    plan.people[0].rrspAvailableRoom = known(rrspRoom)
+    plan.properties[0].taxableOwnerShares = { status: 'known', shares: { [self]: 1 } }
+    plan.accounts = plan.accounts.filter(item => item.ownerId === self)
+    plan.accounts.push(account(rrspId, 'rrsp', self, 0), { ...account(fhsaId, 'fhsa', self, 0), openedYear: known(2026) })
+    plan.recurringContributions = plan.recurringContributions.filter(item => item.contributorId === self)
+    plan.fhsaStatementHistory = { [fhsaId]: { cumulativePriorContributions: known(0), provenance } }
+    if (voluntaryRrsp) plan.savingsAllocation.shares = { tfsa: 0, rrsp: 1, nonReg: 0 }
+    for (const [accountId, amount] of [[rrspId, rrsp], [fhsaId, fhsa]] as const) {
+      if (amount === 0) continue
+      plan.contributions.push({ id: `scheduled:${accountId}`, accountId, contributorId: self,
+        amount, calendarYear: 2026, deductionYear: null, provenance })
+    }
+    const providers: AnnualProviders = {
+      // Operating cash is 120,000 + 300 - 23,000 - 86,090 - 1,210 = 10,000.
+      evaluate: () => ({ byPerson: { [self]: providerPerson(120000, 300, 23000, 86090) } }),
+      returns: () => 0,
+    }
+    const opening = settled(initializeState(plan))
+    const coverage = settled(projectAnnualCoverage(plan, opening, 1, providers))
+    const row = coverage.rows[0]
+    expect(settled(projectFromState(plan, opening, 1, providers))).toEqual({ rows: [row], state: coverage.state })
+    expect(row.cashLedger).toEqual({
+      income: 120000, benefits: 300, tax: 23000, spending: 86090, debtPayments: expect.closeTo(1210, 2),
+      fhsaContributions: fhsa, employeeContributions: 1000, employerContributions: 500,
+      voluntaryContributions: voluntary, retainedContributions: totalRetained, unallocated: 0,
+    })
+    expect(row.contributionLedger).toMatchObject({
+      scheduledRrspBudgeted: rrsp, scheduledPlanned: rrsp + fhsa, scheduledApplied: rrsp + fhsa - scheduledRetained,
+      scheduledRetained, appliedTotal: 10500,
+    })
+    const { nominal, cell, explanation } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
+    const amount = (path: string) => nominal(path, 2026)
+    expect(cell('cash.scheduledRrspBudgeted', 2026)).toMatchObject({ value: rrsp, status: 'calculated', timing: 'during-year' })
+    expect(amount('cash.netAvailableCash')).toBeCloseTo(10000, 2)
+    expect(amount('cash.netAvailableCash')).toBeCloseTo(amount('cash.income') + amount('cash.benefits') -
+      amount('cash.tax') - amount('cash.spending') - amount('cash.debtPayments'), 2)
+    expect(amount('cash.netAvailableCash')).toBeCloseTo(amount('cash.fhsaContributions') + amount('cash.employeeContributions') +
+      amount('cash.voluntaryContributions') + amount('cash.scheduledRrspBudgeted') + amount('cash.unallocated'), 2)
+    expect(amount('contributions.scheduledPlanned')).toBe(rrsp + fhsa)
+    const expectedFormula = [
+      ['fhsaContributions', fhsa], ['employeeContributions', 1000], ['voluntaryContributions', voluntary],
+      ['scheduledRrspBudgeted', rrsp], ['unallocated', 0],
+    ] as const
+    const formula = explanation('cash.netAvailableCash', 2026).formula!
+    expect(formula).toHaveLength(expectedFormula.length)
+    expect(formula).toMatchObject(expectedFormula.map(([field, value]) => ({
+      field, sourceId: valueId(`cash.${field}`), value, direction: 'add', unit: 'CAD', basis: 'nominal-CAD',
+    })))
+    if (totalRetained > 0) {
+      const retained = explanation('cash.retainedContributions', 2026).formula!
+      expect(retained).toHaveLength(1)
+      expect(annualSheetText(retained[0].label, 'fr-CA')).toMatch(/REER.*hors régime/)
+    }
+
+    // Accepted postings include the external employer contribution and route clipped cash to brokerage.
+    expect(amount(`account.${rrspId}.contribution`)).toBe(rrspPosted)
+    expect(amount(`account.${fhsaId}.contribution`)).toBe(fhsa)
+    expect(amount(`account.${brokerage}.contribution`)).toBe(brokeragePosted)
+    expect(amount(`account.${alexLocked}.contribution`)).toBe(1500)
+    expect(amount('accounts.contribution')).toBe(10500)
+    expect(amount('contributions.appliedTotal')).toBe(10500)
+    expect(amount('contributions.appliedTotal')).toBeCloseTo(amount('cash.netAvailableCash') + amount('cash.employerContributions'), 2)
+    expect(row.contributionLedger.postings.reduce((total, posting) => total + posting.amount, 0)).toBe(10500)
+  })
+
+  it('balances the allocation formula exactly within the supplied cash tolerance', () => {
+    const plan = workingHousehold()
+    const opening = settled(initializeState(plan))
+    const providersWithDelta = (delta: number) => {
+      const providers = householdProviders()
+      const evaluate = providers.evaluate.getMockImplementation()!
+      providers.evaluate.mockImplementation(context => {
+        const facts = evaluate(context)
+        facts.byPerson[self].income += delta
+        return facts
+      })
+      return providers
+    }
+    const providers = providersWithDelta(.009)
+    const coverage = settled(projectAnnualCoverage(plan, opening, 1, providers))
+    const strict = settled(projectFromState(plan, opening, 1, providers))
+    expect(strict).toEqual({ rows: coverage.rows, state: coverage.state })
+    expect(coverage.rows[0].contributionLedger.allocationCashBasis).toBe(10000)
+    const { cell, nominal, explanation } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
+    expect(nominal('cash.netAvailableCash', 2026)).toBe(10000)
+    expect(cell('cash.suppliedNetCash', 2026).status).toBe('estimated')
+    expect(nominal('cash.suppliedNetCash', 2026)).toBeCloseTo(10000.009, 8)
+    const budgetDetails = explanation('cash.netAvailableCash', 2026)
+    expect(budgetDetails.sources).toContainEqual(expect.objectContaining({ field: 'contributionLedger.allocationCashBasis' }))
+    const budgetFormula = budgetDetails.formula!
+    expect(budgetFormula).toHaveLength(5)
+    expect(budgetFormula.reduce((sum, part) => sum + part.value, 0)).toBe(10000)
+    expect(nominal('contributions.appliedTotal', 2026)).toBe(11250)
+    const suppliedDetails = explanation('cash.suppliedNetCash', 2026)
+    const suppliedFormula = suppliedDetails.formula!
+    expect(suppliedFormula.map(({ field, direction }) => [field, direction])).toEqual([
+      ['income', 'add'], ['benefits', 'add'], ['tax', 'subtract'], ['spending', 'subtract'], ['debtPayments', 'subtract'],
+    ])
+    expect(suppliedFormula.reduce((sum, part) => sum + (part.direction === 'add' ? part.value : -part.value), 0)).toBeCloseTo(10000.009, 8)
+    for (const language of ['en-CA', 'fr-CA', 'zh-CN']) {
+      const copy = [suppliedDetails.summary!, ...(suppliedDetails.limitations ?? [])]
+        .map(value => annualSheetText(value, language)).join(' ')
+      expect(copy).toMatch(/0[.,]01/)
+    }
+
+    const issues = [{ code: 'unsupported', detail: 'evaluated cash disagrees with canonical net savings budget' }]
+    for (const outsideTolerance of [.011, -.011]) {
+      const mismatched = providersWithDelta(outsideTolerance)
+      expect(projectFromState(plan, opening, 1, mismatched)).toEqual({ status: 'unsupported', issues })
+      const blocked = settled(projectAnnualCoverage(plan, opening, 2, mismatched))
+      expect(blocked.rows).toEqual([])
+      expect(blocked.blocked).toEqual({ year: 2026, status: 'unsupported', issues, causes: ['cashMismatch'] })
+      expect(blocked.uncomputedYears).toEqual([2027])
+    }
+  })
+
+  it.each([
+    { name: 'missing FHSA opening year', multiple: false,
+      diagnostic: 'the FHSA opening year is not confirmed, so the participation year and the 15-year clock cannot be established: account:alex:fhsa' },
+    { name: 'multiple active FHSAs', multiple: true,
+      diagnostic: 'more than one active FHSA cannot be attributed to a single participation-room ledger; BE-36 A prices at most one active FHSA per plan (BE-36 B owns per-person accounts): account:alex:fhsa, account:sam:fhsa' },
+  ])('localizes $name while preserving the strict error', ({ multiple, diagnostic }) => {
+    const plan = workingHousehold()
+    const alexFhsa = account('account:alex:fhsa', 'fhsa', self, 500)
+    if (multiple) {
+      alexFhsa.openedYear = known(2026)
+      plan.accounts.push({ ...account('account:sam:fhsa', 'fhsa', partner, 500), openedYear: known(2026) })
+    }
+    plan.accounts.unshift(alexFhsa)
+    const opening = settled(initializeState(plan))
+    const providers = householdProviders()
+    const issues = [{ code: 'unsupported', detail: diagnostic }]
+    expect(projectFromState(plan, opening, 2, providers)).toEqual({ status: 'unsupported', issues })
+    const coverage = settled(projectAnnualCoverage(plan, opening, 2, providers))
+    expect(coverage.rows).toEqual([])
+    expect(coverage.blocked).toEqual({ year: 2026, status: 'unsupported', issues, causes: ['fhsaRules'] })
+    expect(coverage.uncomputedYears).toEqual([2027])
+    expect(providers.evaluate).not.toHaveBeenCalled()
+    expect(providers.returns).not.toHaveBeenCalled()
+
+    const { cell, explanation } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
+    expect(cell('netWorth', 2026)).toMatchObject({ status: 'not-computed', value: null })
+    expect(cell('netWorth', 2027)).toMatchObject({ status: 'not-computed', value: null })
+    const detail = explanation('netWorth', 2026)
+    expect(detail.sources?.[0].code).toBe('fhsaRules')
+    for (const [language, message] of [['en-CA', /FHSA.*facts or rules/], ['fr-CA', /faits ou règles CELIAPP/], ['zh-CN', /FHSA.*事实或规则/]] as const) {
+      const reason = annualSheetText(cell('netWorth', 2026).reason!, language)
+      const limitation = annualSheetText(detail.limitations![0], language)
+      expect(reason).toMatch(message)
+      expect(limitation).toBe(reason)
+      expect(reason).not.toContain(diagnostic)
+      expect(reason).not.toContain(alexFhsa.id)
+      expect(annualSheetText(cell('netWorth', 2027).reason!, language)).not.toBe(reason)
+    }
+  })
+
+  it.each([
     { kind: 'rrsp', room: 5000, scheduled: 2000, scheduledApplied: 2000, scheduledRetained: 0, residualApplied: 3000, totalRetained: 5000 },
     { kind: 'rrsp', room: 1200, scheduled: 2000, scheduledApplied: 1200, scheduledRetained: 800, residualApplied: 0, totalRetained: 8800 },
     { kind: 'fhsa', room: 8000, scheduled: 2000, scheduledApplied: 2000, scheduledRetained: 0, residualApplied: 6000, totalRetained: 1000 },
@@ -584,10 +759,13 @@ describe('FE-53 canonical annual sheet', () => {
       expect(registeredPosts.map(post => post.amount).sort((left, right) => left - right))
         .toEqual([scheduledApplied, residualApplied].filter(amount => amount > 0).sort((left, right) => left - right))
       expect(contributionLedger.postings.reduce((total, post) => total + post.amount, 0)).toBe(10000)
-      const { nominal } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
+      const { nominal, explanation } = sheetAccess(canonicalAnnualSheet(coverage, sheetContext))
       expect(nominal('contributions.scheduledApplied', 2026)).toBe(scheduledApplied)
       expect(nominal('contributions.scheduledRetained', 2026)).toBe(scheduledRetained)
       expect(nominal('contributions.appliedTotal', 2026)).toBe(10000)
+      const retained = explanation('cash.retainedContributions', 2026).formula!
+      expect(retained).toHaveLength(1)
+      expect(annualSheetText(retained[0].label, 'fr-CA')).toContain(kind === 'fhsa' ? 'CELIAPP' : 'REER')
     }
   })
 
