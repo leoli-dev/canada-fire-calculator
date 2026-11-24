@@ -1,4 +1,4 @@
-import { MortgagePrecisionError, mortgageDecimal, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
+import { MortgagePrecisionError, mortgageDecimal, mortgageSubtract, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
 import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
@@ -30,7 +30,12 @@ export interface RrifConversion { year: number; ownerId: string; amount: number;
 export interface RrifSettlement { accountId: string; conversion: RrifConversion; openingBalance: number; ageAtYearStart: number; factor: number; minimum: number; withdrawal: number; discretionary: number; incomeKind: "rrspWithdrawal" | "rrifWithdrawal" }
 export const rrifConversionFor = (state: AnnualState, id: string): RrifConversion | undefined =>
   state.rrifConversions && Object.prototype.hasOwnProperty.call(state.rrifConversions, id) ? state.rrifConversions[id] : undefined
+export interface PrimaryHomeSaleReceipt {
+  propertyId: string; year: number; grossProceeds: number; sellingCosts: number;
+  netProceeds: number; acb: number; realizedGain: number; taxableGain: 0;
+}
 export interface AnnualState {
+  primaryHomeSaleCash?: { exactBalance: MortgageDecimal; exactReceipt: import('./annualPrimaryHomeSale').HomeSaleExactReceipt; exactAccountBalances: Record<string, MortgageDecimal>; balance: number; receipt: Readonly<PrimaryHomeSaleReceipt>; evidence: NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string] }
   /** Exact decimal-CAD balances for the authenticated mortgage model only. */
   mortgageExactBalances?: Record<string, MortgageDecimal>
   rrifConversions?: Record<string, RrifConversion>
@@ -77,7 +82,7 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { mortgageCashReconciliation?: { amount: number; basis: "decimal-CAD" }; cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { primaryHomeSaleAcbSource?: { propertyId: string; acb: Known<number>; provenance?: import('./model').Provenance }; primaryHomeSaleArithmetic?: { spendingDue: MortgageDecimal; spendingFunded: MortgageDecimal; spendingUnmet: MortgageDecimal; cash: Record<'opening' | 'proceedsAdded' | 'spendingUsed' | 'closing', MortgageDecimal>; withdrawals: Record<string, MortgageDecimal>; receipt: import('./annualPrimaryHomeSale').HomeSaleExactReceipt }; primaryHomeSaleEvidence?: NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string]; primaryHomeSale?: PrimaryHomeSaleReceipt; primaryHomeSaleCash?: { opening: number; proceedsAdded: number; spendingUsed: number; closing: number }; mortgageCashReconciliation?: { amount: number; basis: "decimal-CAD" }; cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { mortgageArithmeticReconciliation?: number; mortgageExactWithdrawal?: MortgageDecimal; nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
@@ -162,6 +167,21 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
       const problem = nonRegProblem(plan, opening)
       if (problem) return problem
     }
+    if (opening.primaryHomeSaleCash !== undefined) {
+      const cash = opening.primaryHomeSaleCash, r = cash.receipt
+      const p = plan.properties.find(p => p.id === r?.propertyId)
+      const exact = cash.exactReceipt
+      if (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis) || !p ||
+          !finiteNonnegative(cash.balance) || !r || !exact || r.year >= opening.year || r.year !== plan.baseYear + p.sellAtAge! - plan.people[0].ageInBaseYear ||
+          !validMortgageDecimal(cash.exactBalance) || mortgageNegative(cash.exactBalance) || mortgageNumber(cash.exactBalance) !== cash.balance ||
+          Object.entries(exact).some(([key, value]) => !validMortgageDecimal(value) || mortgageNegative(value) || mortgageNumber(value) !== r[key as keyof typeof exact]) ||
+          mortgageSubtract(mortgageSubtract(exact.grossProceeds, exact.sellingCosts), exact.netProceeds).coefficient !== '0' ||
+          mortgageSubtract(mortgageSubtract(exact.netProceeds, exact.acb), exact.realizedGain).coefficient !== '0' || r.taxableGain !== 0 ||
+          mortgageNegative(mortgageSubtract(exact.netProceeds, cash.exactBalance)) ||
+          !cash.exactAccountBalances || Object.entries(cash.exactAccountBalances).some(([id, value]) => !opening.byAccount[id] || !validMortgageDecimal(value) || mortgageNegative(value) || mortgageNumber(value) !== opening.byAccount[id].balance) ||
+          opening.byProperty[p.id]?.held || opening.byProperty[p.id]?.value !== 0)
+        return 'primary home sale cash requires authenticated generated settlement'
+    }
     if (opening.mortgageExactBalances !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis) || !plan.debts.length || Object.entries(opening.mortgageExactBalances).some(([id, d]) => !opening.byAccount[id] || !validMortgageDecimal(d) || mortgageNegative(d) || mortgageNumber(d) !== opening.byAccount[id].balance))) return "mortgage decimal balances require authenticated generated state"
     if (opening.gisAssessmentLag && (Object.keys(opening.gisAssessmentLag).some(id => !plan.people.some(p => p.id === id)) || Object.values(opening.gisAssessmentLag).some(fact => !validGisBasis(fact, opening.year)))) return 'GIS assessment snapshot year or evidence'
     if (opening.year === plan.baseYear && opening.gisAssessmentLag && Object.keys(opening.gisAssessmentLag).length) return 'GIS initial historical assessment unsupported'
@@ -196,7 +216,7 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
         plan.accounts.some(account => opening.byAccount[account.id].kind !== (rrifConversionFor(opening, account.id) ? "rrif" : account.kind) || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
     // A never executes purchase/sale or changes opening-year facts. A candidate
     // cannot claim the property was acquired or a missing statement was verified.
-    if (plan.properties.some(property => opening.byProperty[property.id].held !== (property.plannedPurchaseAge === null) ||
+    if (plan.properties.some(property => opening.byProperty[property.id].held !== (opening.primaryHomeSaleCash?.receipt.propertyId === property.id ? false : property.plannedPurchaseAge === null) ||
         !sameKnown(opening.byProperty[property.id].acb, property.acb)) ||
         plan.debts.some(debt => opening.byDebt[debt.id].annualPayment !== debt.annualPayment ||
           opening.byDebt[debt.id].propertyId !== debt.propertyId) ||
@@ -782,7 +802,7 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if (issue.code === 'unfunded') return 'contributionFunding'
   if (detail === 'retirement withdrawals and benefit rules not yet wired') return 'retirement'
   if (detail.startsWith('planned purchase funding')) return 'propertyPurchase'
-  if (detail.startsWith('property sale funding')) return 'propertySale'
+  if (detail.startsWith('property sale funding') || detail.startsWith('primary home sale:')) return 'propertySale'
   if (/^(RRIF|LIF) minimum withdrawal/.test(detail)) return 'registeredWithdrawal'
   if (/^(RRSP|LIRA|FHSA) age-71/.test(detail)) return 'registeredConversion'
   if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
@@ -855,7 +875,7 @@ export function projectFromState(plan: InputsV2, opening: AnnualState, years: nu
 }
 
 export const sumInvestableAssets = (state: AnnualState) => sum(Object.values(state.byAccount).map(account => account.balance))
-export const sumNetWorth = (state: AnnualState) => sumInvestableAssets(state) + sum(Object.values(state.byProperty).filter(p => p.held).map(p => p.value)) - sum(Object.values(state.byDebt).map(d => d.principal))
+export const sumNetWorth = (state: AnnualState) => sumInvestableAssets(state) + (state.primaryHomeSaleCash?.balance ?? 0) + sum(Object.values(state.byProperty).filter(p => p.held).map(p => p.value)) - sum(Object.values(state.byDebt).map(d => d.principal))
 export const sumWithdrawals = (row: YearRow) => sum(Object.values(row.byAccount).map(account => account.withdrawal))
 
 // Only identities emitted inside this synchronous run are authorized. The map

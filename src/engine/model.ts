@@ -157,6 +157,11 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  annualPrimaryHomeSaleEvidence?: Record<string, {
+    provenance: Provenance; wholePropertyFullyExcluded: true;
+    salePriceBasis: 'opening-year-nominal-value';
+    sellingCostsNominal: Known<number>; postSaleAnnualSpendingReal: Known<number>;
+  }>
   annualNonRegEvidence?: { accountId: string; holdingId: string; ownership: "individual-whole"; propertyKind: "capital-identical-pool"; units: number; pooledAcbNominal: number; distributions: 0; interest: 0; returnOfCapital: 0; saleFees: 0; provenance: "user-supplied" }
   /** Internal evidence only; no enrolment or entitlement is inferred. */
   annualGisEvidence?: Record<string, Record<number, {
