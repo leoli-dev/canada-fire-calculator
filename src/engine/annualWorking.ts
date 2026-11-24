@@ -103,7 +103,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
       const age = ageReachedInYear(p, plan.baseYear, year)
       if (![p.ageInBaseYear, p.retirementAge, plan.lifeExpectancy].every(Number.isInteger)) return fail('invalid', 'working age clocks must use whole years')
       if (p.role === 'self' && age >= plan.lifeExpectancy) return fail('unsupported', 'household end-life settlement not yet wired')
-      if (age < 19 || age >= 70) return fail('unsupported', 'household working chain supports ages 19 through 69')
+      if (age < 19 || age >= 70 && !(generated && phase === 'both-retired' && (generatedState?.primaryHomeSaleCash || plan.properties.some(home => home.sellAtAge === ageReachedInYear(plan.people.find(person => person.role === 'self')!, plan.baseYear, year) && plan.annualPrimaryHomeSaleEvidence?.[home.id])))) return fail('unsupported', 'household working chain supports ages 19 through 69')
       const oas = generated && plan.annualBenefitsEvidence ? annualHouseholdOas(plan, p, age) : undefined
       if ((!generated && p.cppAnnualAt65 !== 0) || (!oas && p.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
       if (p.pension || p.pensionAnnual !== 0 || p.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')

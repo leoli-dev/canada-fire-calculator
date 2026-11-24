@@ -1,6 +1,6 @@
 import type { InputsV2 } from './model'
 import type { AnnualState, PrimaryHomeSaleReceipt } from './annualState'
-import { passiveHomeProblem } from './annualProperty'
+import { passiveHomeProblem, householdPassiveHomeProblem } from './annualProperty'
 import { mortgageDecimal, mortgageSubtract, mortgageAdd, mortgageMultiply, mortgageNegative, mortgageNumber, type MortgageDecimal } from './mortgageDecimal'
 
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k)
@@ -25,11 +25,11 @@ export function homeLivingDecimal(amount: number, inflation: number, elapsed: nu
  * https://laws-lois.justice.gc.ca/eng/acts/I-3.3/section-40.html
  * https://laws-lois.justice.gc.ca/eng/acts/I-3.3/section-54.html
  */
-export function primaryHomeSale(plan: InputsV2, opening: AnnualState): PrimaryHomeSaleReceipt {
+export function primaryHomeSale(plan: InputsV2, opening: AnnualState, household = false): PrimaryHomeSaleReceipt {
   const refuse = (detail: string): never => { throw { status: 'unsupported', reason: `primary home sale: ${detail}` } }
-  const problem = passiveHomeProblem(plan.debts.length ? { ...plan, debts: [], properties: plan.properties.map(p => ({ ...p, mortgageDebtId: null })) } : plan)
+  const problem = (household ? householdPassiveHomeProblem : passiveHomeProblem)(plan.debts.length ? { ...plan, debts: [], properties: plan.properties.map(p => ({ ...p, mortgageDebtId: null })) } : plan)
   if (problem) refuse(problem)
-  const p = plan.properties[0], person = plan.people[0], held = opening.byProperty[p.id]
+  const p = plan.properties[0], person = plan.people.find(p => p.role === 'self')!, held = opening.byProperty[p.id]
   if (plan.accounts.some(a => a.kind !== 'tfsa' || a.jurisdiction || a.accessibleAge !== undefined) ||
       plan.dependents.length || person.pension || person.pensionAnnual !== 0 || person.cppWork || plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit ||
       !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '') ||
@@ -47,6 +47,24 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState): PrimaryHo
       !own(e, 'sellingCostsNominal') || e.sellingCostsNominal?.status !== 'known' || !money(e.sellingCostsNominal.value) ||
       !own(e, 'postSaleAnnualSpendingReal') || e.postSaleAnnualSpendingReal?.status !== 'known' || !money(e.postSaleAnnualSpendingReal.value))
     refuse('requires explicit user event designation, opening valuation, known nominal fees and post-sale living spending')
+  if (household) {
+    const dated = (v: unknown): boolean => {
+      if (!v || typeof v !== 'object') return false
+      const p = v as { origin?: string; sourceYear?: number }
+      return own(p, 'origin') && p.origin === 'user' && own(p, 'sourceYear') && Number.isInteger(p.sourceYear) && p.sourceYear! >= 0 && p.sourceYear! <= plan.baseYear
+    }
+    const owners = p.taxableOwnerShares.status === 'known' ? Object.entries(p.taxableOwnerShares.shares).filter(([, share]) => share > 0).map(([id]) => id).sort() : []
+    const exclusions = e!.ownerExclusions
+    if (!own(e!, 'effectiveYear') || e!.effectiveYear !== opening.year || !own(e!, 'timing') || e!.timing !== 'start-of-sale-year' ||
+        !dated(e!.provenance) || !own(e!, 'allSaleCashAvailableForJointSpending') || e!.allSaleCashAvailableForJointSpending !== true ||
+        !own(e!, 'ownerExclusions') || !exclusions || Object.keys(exclusions).sort().join('|') !== owners.join('|') ||
+        owners.some(id => !own(exclusions, id) || !own(exclusions[id], 'fullyExcluded') || exclusions[id].fullyExcluded !== true || !own(exclusions[id], 'provenance') || !dated(exclusions[id].provenance)) ||
+        !own(held.acb, 'status') || !own(held.acb, 'value') || !own(e!.sellingCostsNominal, 'status') || !own(e!.sellingCostsNominal, 'value') || !own(e!.postSaleAnnualSpendingReal, 'status') || !own(e!.postSaleAnnualSpendingReal, 'value') ||
+        plan.people.some(p => opening.byPerson[p.id].age < p.retirementAge || p.pension || p.pensionAnnual !== 0 || p.cppWork || p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) ||
+        plan.accounts.filter(a => a.kind === 'tfsa' && a.balance > 0).length !== 1 || plan.accounts.some(a => a.kind !== 'tfsa' || a.jurisdiction || a.accessibleAge !== undefined) ||
+        plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || e!.mortgagePayoff || plan.strategy === 'meltdownPaced')
+      refuse('requires dated complete owner exclusions and authorization of all cash for joint living in a both-retired ordinary TFSA household')
+  }
   if (held.acb.status !== 'known' || !money(held.acb.value) || !money(held.value)) refuse('requires known nominal ACB and opening value')
   const sellingCosts = e!.sellingCostsNominal.status === 'known' ? e!.sellingCostsNominal.value : NaN
   const acb = held.acb.status === 'known' ? held.acb.value : NaN
