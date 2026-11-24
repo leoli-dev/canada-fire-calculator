@@ -162,7 +162,10 @@ export interface InputsV2 {
     eligible: true; residentInCanada: true; notSponsored: true; fullOasInPay: true
     provenance: Provenance
   }>>
-  annualBenefitsEvidence?: Record<string, { gis: BenefitExclusion | (Omit<BenefitExclusion, 'status'> & { status: 'annual-estimate' }); allowance: BenefitExclusion; otherBenefits: BenefitExclusion }>
+  /** oasAge75 records an exact first uplift calendar year/month, never a DOB.
+   * Internal retired solo continuation weights the pinned annual forecast;
+   * provenance is independently supplied by the user, not inferred from age. */
+  annualBenefitsEvidence?: Record<string, { gis: BenefitExclusion | (Omit<BenefitExclusion, 'status'> & { status: 'annual-estimate' }); allowance: BenefitExclusion; otherBenefits: BenefitExclusion; oasAge75?: { firstUpliftYear: number; firstUpliftMonth: number; provenance: Provenance } }>
 
   schemaVersion: 2
   baseYear: number

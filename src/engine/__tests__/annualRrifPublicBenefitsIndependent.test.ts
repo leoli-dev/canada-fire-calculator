@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { annualSheetText, type AnnualSheetRow } from '../../annualSheet'
 import { canonicalAnnualSheet, canonicalSheetId } from '../../canonicalAnnualSheet'
 import { annualCpp } from '../annualCpp'
 import { annualGeneratedRetirementOas, annualHouseholdOas, annualOas } from '../annualOas'
 import { annualRetirementContinuation, annualRetirementStep } from '../annualRetirement'
-import { initializeState, projectCanonicalCoverage, type KernelResult, type YearRow } from '../annualState'
+import { initializeState, projectAnnualCoverage, projectCanonicalCoverage, type KernelResult, type YearRow } from '../annualState'
+import { runProjection } from '../projection'
 import { cppStart } from './fixtures/annualCpp'
 import { known, recorded, RETIREE, retirementPlan, RRSP, TFSA } from './fixtures/retirementSettlement'
 import { PARTNER, staggeredHouseholdPlan } from './fixtures/staggeredHousehold'
@@ -39,13 +40,13 @@ function ok<T>(value: KernelResult<T>): T {
 const positive = (n: number) => Math.max(n, 0)
 const band = (income: number, lower: number, upper: number) => positive(Math.min(income, upper) - lower)
 
-function quote(draw: number, rrif = false) {
+function quote(draw: number, rrif = false, gross = grossOas) {
   // ESDC 2026 estimated threshold and CRA lines 23500/42200.
   // https://www.canada.ca/en/employment-social-development/programs/pensions/pension/statistics/2026-quarterly-april-june.html
   // https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-23500-social-benefits-repayment.html
-  const recoveryIncome = cpp + grossOas + draw
-  const recovery = Math.min(grossOas, 0.15 * positive(recoveryIncome - 95_323))
-  const netOas = grossOas - recovery
+  const recoveryIncome = cpp + gross + draw
+  const recovery = Math.min(gross, 0.15 * positive(recoveryIncome - 95_323))
+  const netOas = gross - recovery
   const taxable = cpp + netOas + draw
   const fedAge = positive(9_208 - 0.15 * positive(taxable - 46_432))
   const onAge = positive(6_342 - 0.15 * positive(taxable - 47_210))
@@ -86,9 +87,9 @@ function scenario(spending = 60_000, tfsa = 500_000, rrsp = 1_200_000) {
   return { plan, evidence: { workingSpending: known(0), retirementSpending: known(spending) } }
 }
 
-function assertSettlement(row: YearRow, age: number, draw: number, tfsa: number, spending: number) {
+function assertSettlement(row: YearRow, age: number, draw: number, tfsa: number, spending: number, gross = grossOas) {
   const cpi = cpiAt(age)
-  const expected = quote(draw, age >= 72)
+  const expected = quote(draw, age >= 72, gross)
   expect(row).toMatchObject({
     year: 2026 + age - 69,
     cashLedger: {
@@ -96,7 +97,7 @@ function assertSettlement(row: YearRow, age: number, draw: number, tfsa: number,
       spending: close(spending * cpi), unallocated: close(0),
     },
     byPerson: { [RETIREE]: {
-      age, cpp: close(cpp * cpi), oasGross: close(grossOas * cpi), oasRecovery: close(expected.recovery * cpi),
+      age, cpp: close(cpp * cpi), oasGross: close(gross * cpi), oasRecovery: close(expected.recovery * cpi),
       oasNet: close(expected.netOas * cpi), earnedIncome: 0,
     } },
     taxLedger: { [RETIREE]: { taxableIncome: close(expected.taxable * cpi), tax: close(expected.tax * cpi) } },
@@ -104,7 +105,7 @@ function assertSettlement(row: YearRow, age: number, draw: number, tfsa: number,
       startCpi: close(cpi), spendingFunded: close(spending * cpi), spendingUnmet: close(0),
       cpp: { status: 'paying', startAge: 70, sourceYear: 2026, ageBasis: 65, amountReal: close(cpp) },
       oas: {
-        grossReal: close(grossOas), netReal: close(expected.netOas), recoveryReal: close(expected.recovery),
+        grossReal: close(gross), netReal: close(expected.netOas), recoveryReal: close(expected.recovery),
         recoveryIncomeReal: close(expected.recoveryIncome), sourceId: oasId, startAge: 70, ageBasis: 65,
       },
     },
@@ -238,6 +239,193 @@ describe('independent Ontario RRIF with public benefits', () => {
   })
 })
 
+function upliftDate(firstUpliftYear = 2032, firstUpliftMonth = 7) {
+  return { firstUpliftYear, firstUpliftMonth, provenance: { ...recorded, sourceYear: 2025 } }
+}
+
+describe('independent age-75 OAS month weighting', () => {
+  // A recorded 20/40 pension of $4,200 at 65 becomes $5,712 at 70.
+  // Justice Laws sections 3(3), 7(5), and 7.1(2)/(6) apply the 10%
+  // increment to the pension after partial entitlement and deferral.
+  // https://laws-lois.justice.gc.ca/eng/acts/O-9/page-1.html
+  // https://laws-lois.justice.gc.ca/eng/acts/O-9/section-7.html
+  // https://laws-lois.justice.gc.ca/eng/acts/O-9/section-7.1.html
+  it.each([
+    { month: 2, year: 2032, months: 11, gross: 6_235.60 },
+    { month: 7, year: 2032, months: 6, gross: 5_997.60 },
+    { month: 12, year: 2032, months: 1, gross: 5_759.60 },
+    { month: 1, year: 2033, months: 0, gross: 5_712 },
+  ])('settles an effective date of $year/$month using $months increased months', ({ year, month, months, gross }) => {
+    const { plan, evidence } = scenario(60_000, 500_000, 600_000)
+    plan.people[0].oasAnnualAt65 = 4_200
+    plan.incomeSources[1].annualAmount = known(4_200)
+    const date = upliftDate(year, month)
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = date
+    const input = structuredClone({ plan, evidence })
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    expect(result.blocked).toBeNull()
+    expect({ plan, evidence }).toEqual(input)
+    const [baseline, transition, full] = result.rows.slice(5)
+    expect(baseline.retirementSettlement?.oas).toMatchObject({ grossReal: close(5_712) })
+    expect(baseline.retirementSettlement?.oas?.age75Uplift).toBeUndefined()
+    expect(baseline.byPerson[RETIREE].oasGross).toBeCloseTo(5_712 * cpiAt(74), 5)
+    for (const [row, age, expectedGross, increasedMonths] of [[transition, 75, gross, months], [full, 76, 6_283.20, 12]] as const) {
+      expect(row.retirementSettlement?.oas).toMatchObject({
+        grossReal: close(expectedGross), sourceYear: 2026,
+        age75Uplift: { evidence: date, increasedMonths, baseGrossReal: close(5_712), policy: 'annual-estimate-month-weighted-anchor-real' },
+      })
+      expect(row.byPerson[RETIREE].oasGross).toBeCloseTo(expectedGross * cpiAt(age), 5)
+      expect(row.cashLedger.benefits).toBeCloseTo(expectedGross * cpiAt(age), 5)
+    }
+  })
+
+  it.each([
+    { label: 'threshold equality', draw: 65_216.80, recovery: 0 },
+    { label: 'partial recovery', draw: 85_000, recovery: 2_967.48 },
+    { label: 'full recovery', draw: 164_000, recovery: 13_066.20 },
+  ])('prices age-75 CPP, RRIF and ordinary income tax with $label', ({ draw, recovery }) => {
+    const gross = 13_066.20
+    const expected = quote(draw, true, gross)
+    expect(expected.recovery).toBeCloseTo(recovery, 8)
+    const factor = 0.0567
+    const openingAt75 = draw / factor
+    const initialRrsp = openingAt75 / floorFactors.reduce((remaining, minimum) => remaining * (1 - minimum), 1)
+    const spending = expected.cash + 25_000
+    const { plan, evidence } = scenario(spending, 1_000_000, initialRrsp)
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 7))
+    expect(result.blocked).toBeNull()
+    const row = result.rows[6]
+    assertSettlement(row, 75, draw, 25_000, spending, gross)
+    expect(row.retirementSettlement?.rrif).toMatchObject({
+      ageAtYearStart: 74, factor, minimum: close(draw * cpiAt(75)), discretionary: close(0),
+    })
+    expect(result.state.benefitIncomeLag[RETIREE]).toMatchObject(known(close((cpp + draw) * cpiAt(75))))
+  })
+
+  it.each([
+    { label: 'missing', date: undefined },
+    { label: 'null', date: null },
+    { label: 'month out of range', date: upliftDate(2032, 13) },
+    { label: 'fractional month', date: upliftDate(2032, 7.5) },
+    { label: 'same-year January', date: upliftDate(2032, 1) },
+    { label: 'following-year February', date: upliftDate(2033, 2) },
+    { label: 'wrong calendar year', date: upliftDate(2031, 7) },
+    { label: 'unrecorded provenance', date: { ...upliftDate(), provenance: { ...recorded, origin: 'estimated' } } },
+    { label: 'invalid provenance year', date: { ...upliftDate(), provenance: { ...recorded, sourceYear: -1 } } },
+  ])('keeps the complete age-74 prefix when uplift evidence is $label', ({ date }) => {
+    const { plan, evidence } = scenario(60_000, 500_000, 600_000)
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(prefix.blocked).toBeNull()
+    if (date !== undefined) Object.assign(plan.annualBenefitsEvidence![RETIREE], { oasAge75: date })
+    const input = structuredClone({ plan, evidence })
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    const detail = date === undefined
+      ? 'OAS: reached age 75 requires separate monthly uplift modeling; no claim month inferred'
+      : 'OAS: reached age 75 requires verified user first uplift year and month compatible with reached age; no date inferred'
+    expect(result).toMatchObject({
+      rows: prefix.rows, state: prefix.state, overallConclusionAvailable: false, uncomputedYears: [2033],
+      blocked: { year: 2032, status: 'unsupported', issues: [{ detail }] },
+    })
+    expect({ plan, evidence }).toEqual(input)
+  })
+
+  it.each([false, true])('continues confirmed zero OAS with matching source row present = %s', hasSource => {
+    const { plan, evidence } = scenario(60_000, 500_000, 600_000)
+    plan.people[0].oasAnnualAt65 = 0
+    plan.incomeSources[1].annualAmount = known(0)
+    if (!hasSource) plan.incomeSources.pop()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    expect(result.blocked).toBeNull()
+    for (const row of result.rows.slice(6)) {
+      expect(row.cashLedger.benefits).toBe(0)
+      expect(row.retirementSettlement?.oas?.age75Uplift).toBeUndefined()
+    }
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate()
+    expect(ok(projectCanonicalCoverage(plan, evidence, 8))).toEqual(result)
+    if (hasSource) {
+      plan.incomeSources[1].annualAmount = known(1)
+    } else {
+      plan.people[0].oasAmountSource!.premisesNeedReview = true
+    }
+    expect(ok(projectCanonicalCoverage(plan, evidence, 8))).toMatchObject({
+      blocked: { year: 2026, status: 'unsupported' }, rows: [],
+    })
+  })
+
+  it('rejects malformed supplied evidence even for confirmed zero OAS', () => {
+    const { plan, evidence } = scenario(60_000, 500_000, 600_000)
+    plan.people[0].oasAnnualAt65 = 0
+    plan.incomeSources.pop()
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(prefix.blocked).toBeNull()
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate(2032, 0)
+    expect(ok(projectCanonicalCoverage(plan, evidence, 8))).toMatchObject({
+      rows: prefix.rows, state: prefix.state, uncomputedYears: [2033],
+      blocked: { year: 2032, status: 'unsupported', issues: [{ detail: expect.stringMatching(/75.*uplift.*month/i) }] },
+    })
+  })
+
+  it('limits the uplift to generated retirement and preserves legacy and provider results', () => {
+    const { plan, evidence } = scenario(60_000, 500_000, 0)
+    Object.assign(plan.legacyProjection, { oasAnnualAt65: oasAt65, oasStartAge: 70, lifeExpectancy: 76 })
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(prefix.blocked).toBeNull()
+    const legacy = runProjection(plan.legacyProjection, undefined, plan)
+    const providers = { evaluate: vi.fn(), returns: vi.fn() }
+    const supplied = ok(projectAnnualCoverage(plan, prefix.state, 2, providers))
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate()
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    expect(result.blocked).toBeNull()
+    expect(result.rows.slice(0, 6)).toEqual(prefix.rows)
+    expect(() => annualOas(plan, plan.people[0], 75)).toThrow(expect.objectContaining({ status: 'unsupported' }))
+    expect(annualRetirementContinuation(plan, structuredClone(prefix.state))).toMatchObject({ status: 'invalid' })
+    expect(annualRetirementStep(plan, prefix.state, providers.returns)).toMatchObject({ status: 'unsupported' })
+    expect(supplied).toMatchObject({ rows: [], blocked: { year: 2032, status: 'unsupported' } })
+    expect(ok(projectAnnualCoverage(plan, prefix.state, 2, providers))).toEqual(supplied)
+    expect(providers.evaluate).not.toHaveBeenCalled()
+    expect(providers.returns).not.toHaveBeenCalled()
+    expect(runProjection(plan.legacyProjection, undefined, plan)).toEqual(legacy)
+  })
+
+  it('requires benefit opt-in for positive OAS even with a matching recorded amount', () => {
+    const { plan, evidence } = scenario(60_000, 500_000, 0)
+    plan.people[0].cppAnnualAt65 = 0
+    plan.incomeSources.shift()
+    delete plan.annualBenefitsEvidence
+    const opening = ok(projectCanonicalCoverage(plan, evidence, 0))
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    expect(result).toMatchObject({
+      rows: [], state: opening.state, uncomputedYears: [2027, 2028, 2029, 2030, 2031, 2032, 2033],
+      blocked: { year: 2026, status: 'unsupported', issues: [{ detail: expect.stringMatching(/benefits.*zero evidence/i) }] },
+    })
+  })
+
+  it('displays the verified uplift only on eligible years in the annual sheet', () => {
+    const { plan, evidence } = scenario(60_000, 500_000, 600_000)
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate(2033, 1)
+    const result = ok(projectCanonicalCoverage(plan, evidence, 8))
+    expect(result.blocked).toBeNull()
+    const sheet = canonicalAnnualSheet(result, { scenarioId: 'oas-age-75', revision: 1 })
+    const row = findRow(sheet.rows, canonicalSheetId('value', 'person', RETIREE, 'oasNet'))!
+    const sourcesIn = (year: number) => {
+      const ref = row.cells![year].explanationRefs![0]
+      return sheet.resolveExplanation!(ref)?.sources
+    }
+    expect(sourcesIn(2031)?.some(source => source.field === 'annualBenefitsEvidence.oasAge75')).toBe(false)
+    for (const [year, months] of [[2032, 0], [2033, 12]]) {
+      const source = sourcesIn(year)?.find(source => source.field === 'annualBenefitsEvidence.oasAge75')
+      expect(source).toBeDefined()
+      for (const lang of ['en', 'fr', 'zh'] as const) {
+        const label = annualSheetText(source!.label, lang)
+        expect(label).toContain('2033-1')
+        expect(label).toContain('2025')
+        expect(label).toContain(`${months}/12`)
+      }
+    }
+  })
+})
+
 describe('generated-only retirement benefit scope', () => {
   it.each(['unconfirmed CPP', 'unconfirmed OAS', 'unrecorded exclusion'])('refuses %s without benefit or rollover postings', invalid => {
     const { plan, evidence } = scenario()
@@ -254,6 +442,7 @@ describe('generated-only retirement benefit scope', () => {
   it('keeps the prefix when opted-in GIS would cross the age-69 limit', () => {
     const { plan, evidence } = scenario()
     plan.annualBenefitsEvidence![RETIREE].gis = { status: 'annual-estimate', reason: 'Requested GIS estimate', provenance: recorded }
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate()
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 1))
     expect(prefix.blocked).toBeNull()
     const result = ok(projectCanonicalCoverage(plan, evidence, 3))
@@ -266,6 +455,7 @@ describe('generated-only retirement benefit scope', () => {
   it('does not extend working or household coverage to an age-70 claim', () => {
     const { plan, evidence } = scenario()
     plan.people[0].retirementAge = 71
+    plan.annualBenefitsEvidence![RETIREE].oasAge75 = upliftDate()
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 1))
     expect(prefix.blocked).toBeNull()
     expect(ok(projectCanonicalCoverage(plan, evidence, 3))).toMatchObject({
@@ -279,6 +469,7 @@ describe('generated-only retirement benefit scope', () => {
     household.lifeExpectancy = 73
     household.incomeSources = [plan.incomeSources[1]]
     household.annualBenefitsEvidence = { [RETIREE]: exclusions(), [PARTNER]: exclusions() }
+    household.annualBenefitsEvidence[RETIREE].oasAge75 = upliftDate()
     household.budget = { kind: 'incomeBudget', workingSpending: 0, retirementSpending: 75_000 }
     const householdEvidence = { workingSpending: known(0), retirementSpending: known(75_000) }
     const householdPrefix = ok(projectCanonicalCoverage(household, householdEvidence, 1))

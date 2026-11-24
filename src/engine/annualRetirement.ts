@@ -56,7 +56,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     if (!generated && age >= 71 && plan.accounts.some(a => a.kind === 'rrsp' && opening.byAccount[a.id].balance > 0)) return fail('unsupported', 'RRSP age-71 conversion rule not yet wired')
     if (age > plan.lifeExpectancy) return fail('invalid', 'year beyond plan horizon')
     if (!generated && (person.earnedIncome.status !== 'known' || person.earnedIncome.value !== 0)) return fail('unsupported', 'retirement wage evidence must be known zero')
-    // Only authenticated retired solo state extends verified CPP/OAS to 74.
+    // Only authenticated retired solo state extends verified CPP/OAS, with evidenced age-75 month weighting.
     // Annual GIS retains its existing gate; opt-out zero benefits need no claim.
     const oas = generated && plan.annualBenefitsEvidence ? annualGeneratedRetirementOas(plan, person, age, opening) : undefined
     if ((!generated && person.cppAnnualAt65 !== 0) || (!oas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
@@ -69,7 +69,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
     // matching claim/provenance facts. Discard the validation-only quote so
     // known-zero CPP keeps its existing no-receipt/no-cash settlement shape.
     // Earlier years and the bare non-opt-in zero path retain their contract.
-    if (generated && oas && age >= 70 && age <= 74 && person.cppAnnualAt65 === 0)
+    if (generated && oas && age >= 70 && person.cppAnnualAt65 === 0)
       annualCpp(plan, person, age, opening)
     if (plan.incomeSources.some(source => !(cpp && source.kind === 'cpp' && source.recipientId === person.id) && !(oas && source.kind === 'oas' && source.id === oas.sourceId) && (source.fromAge ?? -Infinity) <= age && (source.startAge ?? -Infinity) <= age && (source.toAge ?? Infinity) >= age && (source.annualAmount.status !== 'known' || source.annualAmount.value !== 0))) return fail('unsupported', 'active retirement income source not yet wired')
     if (person.rrspUnusedUndeducted.status !== 'known' || person.rrspUnusedUndeducted.value !== 0) return fail('unsupported', 'retirement undeducted RRSP premiums require explicit zero evidence')
