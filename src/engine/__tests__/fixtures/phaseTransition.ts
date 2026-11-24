@@ -1,5 +1,5 @@
 import type { InputsV2 } from '../../model'
-import { known, legacyRetirement, retirementPlan } from './retirementSettlement'
+import { known, legacyRetirement, recorded, retirementPlan, RETIREE } from './retirementSettlement'
 
 // Reference constants and formulas pinned to 589742895cb351b817caa2feea1475d15e4b3193.
 // The expectations use arithmetic on the pinned values without calling production calculators.
@@ -69,6 +69,21 @@ export function phaseTransitionPlan(): InputsV2 {
     currentAge: age, fireAge: retirementAge, lifeExpectancy: plan.lifeExpectancy,
     annualSavings: 4_000, retirementSpending, inflation,
     balances: { tfsa: tfsaOpening, rrsp: rrspOpening, nonReg: 0 },
+  })
+  return plan
+}
+
+export function phaseTransitionSpending() {
+  return { workingSpending: known(workingSpending), retirementSpending: known(retirementSpending) }
+}
+
+export const deferredSourceId = 'private-retirement-employment'
+
+export function phaseTransitionWithDeferredSource(annualAmount: InputsV2['incomeSources'][number]['annualAmount']): InputsV2 {
+  const plan = phaseTransitionPlan()
+  plan.incomeSources.push({
+    id: deferredSourceId, kind: 'employment', recipientId: RETIREE, startAge: retirementAge,
+    annualAmount, provenance: recorded,
   })
   return plan
 }

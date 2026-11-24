@@ -1,7 +1,9 @@
+import { evaluateCanonicalWorkingYear, type CanonicalWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
+import { annualRetirementContinuation } from './annualRetirement'
 import type { InputsV2, Known, AccountKind } from './model'
 import { ageReachedInYear, pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
-import { resolveYearAllocation, type FundingGap } from './funding'
+import { allocateContributions, resolveYearAllocation, type FundingGap } from './funding'
 import { impliedRate } from './debts'
 import {
   RRSP_ADDITION_RULE_MISSING, plannedRrspSlices, rrspRoomYear, statementOpeningRoom,
@@ -55,6 +57,9 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
+  workingSettlement?: CanonicalWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
+  payrollContributions?: number
+  contributionRounding?: number
   retirementSettlement?: { evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
@@ -190,7 +195,7 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | 
   } catch { return 'damaged annual snapshot' }
 }
 
-function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders): KernelResult<AnnualStepValue> {
+function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders, working?: CanonicalWorkingEvaluation): KernelResult<AnnualStepValue> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
   const gate = pricingGate(plan)
   if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
@@ -209,7 +214,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // fact the user has not answered is not the same outcome as an answered flag
   // whose component is not modelled, and neither is `incomeBudget`.
   const facts = budgetFacts(plan.budget)
-  if (facts.status !== 'ready') return fail(facts.status === 'invalid' ? 'invalid' : 'unsupported', facts.detail)
+  if (!working && facts.status !== 'ready') return fail(facts.status === 'invalid' ? 'invalid' : 'unsupported', facts.detail)
   // Rules not yet supplied by BE-11/12/23/38 must not masquerade as exact advice.
   // These obligations follow the account holder's age, even when they remain
   // employed. A does not compute minimums, conversions, or FHSA closure tax.
@@ -303,7 +308,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const benefits = sum(Object.values(personRows).map(p => p.benefits))
   const tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = sum(Object.values(personRows).map(p => p.spending))
-  const cash = cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
+  const cash = working ? working.netCash : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
   const debtRows: YearRow['byDebt'] = Object.fromEntries(Object.entries(state.byDebt).map(([id, debt]) => [id,
@@ -328,7 +333,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     debtRows[id].principal = debtRows[id].opening - debt.principal
     debt.yearsRemaining -= 1
   }
-  const evaluatedCash = income + benefits - tax - spending - debtPayments
+  // The private working quote already validated and normalized its cash in
+  // the common anchor basis. Reordering those operands can invent a deficit.
+  const evaluatedCash = working ? working.netCash : income + benefits - tax - spending - debtPayments
   if (!Number.isFinite(evaluatedCash)) return fail('invalid', 'evaluated cash')
   if (evaluatedCash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
   if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
@@ -341,7 +348,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (scheduledPlanned > cash + 1e-8) return fail('unsupported', 'scheduled RRSP contribution exceeds the year net savings')
   // One allocation resolver serves the kernel and the panel preview, so the
   // voluntary RRSP share priced here is the same number the panel shows.
-  const allocation = resolveYearAllocation(plan, year)
+  const allocation = working ? allocateContributions({ age: opening.byPerson[self.id].age, budget: cash, fhsa: 0, employee: 0, employer: 0, split: plan.savingsAllocation.shares }) : resolveYearAllocation(plan, year)
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
   if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
   // TFSA room belongs to one person, so a couple's contribution cannot be
@@ -522,6 +529,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     sum(Object.values(rrspLedger).map(row => row.retained)) +
     sum(Object.values(fhsaLedger).map(row => row.retained)) +
     sum(Object.values(tfsaLedger).map(row => row.retained)))
+  if (working && Object.values(tfsaLedger).some(row => row.retained > 0 || (cash > 0 && row.closingRoom.status !== 'known'))) return fail('unsupported', 'canonical working TFSA room unknown or clipped; no taxable contribution sink')
   const nonRegAmount = allocation.voluntary.nonReg + retainedContributions
   if (nonRegAmount > 0) {
     if (nonRegDestinations.length !== 1) return fail('unsupported', 'ambiguous nonReg contribution destination')
@@ -529,6 +537,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     state.contributionHistory.push({ id: `annual:${year}:nonReg`, accountId: nonRegDestinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: nonRegAmount, deductionYear: null })
   }
   const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
+  if (working) {
+    const bound = 0.005 + Math.min(1e-9, 4 * Number.EPSILON * (totalContributions + cash))
+    if (Math.abs(totalContributions - cash) > bound) return fail('unsupported', 'canonical TFSA cash requires representable cent contribution; no rounding sink')
+  }
   if (Math.abs(totalContributions - cash - allocation.employer) > 0.01) return fail('invalid', 'cash/contribution conservation')
   // Every provider evaluates the same settled, pre-growth portfolio. Neither
   // account order nor a provider mutating its own context may affect peers.
@@ -584,7 +596,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     retained: ([['rrsp', rrspLedger], ['fhsa', fhsaLedger], ['tfsa', tfsaLedger]] as const).flatMap(([kind, ledger]) =>
       Object.entries(ledger).filter(([, row]) => row.retained > 0).map(([personId, row]) => ({ personId, kind, amount: row.retained }))),
   }
-  const row: YearRow = { year, byPerson: personRows, byAccount: accountRows, byDebt: debtRows, byProperty: propertyRows, contributionLedger,
+  const row: YearRow = { ...(working ? { workingSettlement: { ...working, payrollRuleId: 'PAYROLL_2026', payrollPolicy: 'Pinned 2026 Ontario employment CPP/EI rules in anchor-real dollars; ages 19–69 only; no future statutory promise' }, payrollContributions: working.payrollContributions, contributionRounding: totalContributions - cash } : {}), year, byPerson: personRows, byAccount: accountRows, byDebt: debtRows, byProperty: propertyRows, contributionLedger,
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
@@ -638,7 +650,7 @@ export interface AnnualCoverage {
   /** Requested years strictly after the first blocked year. */
   uncomputedYears: number[]
   overallConclusionAvailable: boolean
-  evaluationBasis: 'provider-supplied' | 'canonical-retirement'
+  evaluationBasis: 'provider-supplied' | 'canonical-retirement' | 'canonical-continuous'
 }
 
 export function projectAnnualCoverage(plan: InputsV2, opening: AnnualState, years: number, providers: AnnualProviders): KernelResult<AnnualCoverage> {
@@ -682,3 +694,46 @@ export function projectFromState(plan: InputsV2, opening: AnnualState, years: nu
 export const sumInvestableAssets = (state: AnnualState) => sum(Object.values(state.byAccount).map(account => account.balance))
 export const sumNetWorth = (state: AnnualState) => sumInvestableAssets(state) + sum(Object.values(state.byProperty).filter(p => p.held).map(p => p.value)) - sum(Object.values(state.byDebt).map(d => d.principal))
 export const sumWithdrawals = (row: YearRow) => sum(Object.values(row.byAccount).map(account => account.withdrawal))
+
+// Only identities emitted inside this synchronous run are authorized. The map
+// is never exposed and returned states are not reusable continuation tokens.
+const generatedStates = new WeakMap<AnnualState, InputsV2>()
+export const isCanonicalGeneratedState = (plan: InputsV2, state: AnnualState): boolean => generatedStates.get(state) === plan
+
+/** Internal continuous slice: no supplied snapshots, evaluators, or state splice. */
+export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendingEvidence, years: number): KernelResult<AnnualCoverage> {
+  try {
+    if (!Number.isInteger(years) || years < 0 || years > 120) return fail('invalid', 'projection years')
+    plan = clone(plan)
+    const initialized = initializeState(plan)
+    if (initialized.status !== 'ok') return initialized
+    if (plan.baseYear !== 2026 || plan.people.length !== 1 || plan.province !== 'ON' || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'continuous projection requires solo Ontario incomeBudget at 2026 anchor')
+    if (plan.people[0].ageInBaseYear >= plan.people[0].retirementAge) return fail('unsupported', 'continuous projection requires an initial working year; use strict standalone retirement')
+    let state = initialized.value
+    let committedWorking = false
+    const rows: YearRow[] = []
+    let blocked: AnnualCoverage['blocked'] = null
+    for (let i = 0; i < years; i++) {
+      let result: KernelResult<AnnualStepValue>
+      const person = plan.people[0]
+      if (state.byPerson[person.id].age < person.retirementAge) {
+        const quote = evaluateCanonicalWorkingYear(plan, evidence, state.year)
+        if (quote.status !== 'ok') result = quote
+        else if (quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')
+        else if (tfsaStatement(plan, person.id)?.withdrawals.some(h => h.amount > 0 && h.calendarYear >= plan.baseYear)) result = fail('unsupported', 'recorded active TFSA withdrawal events not modeled in working chain')
+        else if (quote.value.netCash > 0 && Object.entries(plan.savingsAllocation.shares).some(([kind, share]) => share !== (kind === 'tfsa' ? 1 : 0))) result = fail('unsupported', 'continuous working allocation supports TFSA only')
+        else result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value)
+        if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory = []; committedWorking = true }
+      } else {
+        if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')
+        generatedStates.set(state, plan)
+        result = annualRetirementContinuation(plan, state)
+        generatedStates.delete(state)
+      }
+      if (result.status !== 'ok') { blocked = { year: state.year, status: result.status, issues: result.issues, causes: [...new Set(result.issues.map(annualStopCause))] }; break }
+      state = result.value.state
+      rows.push(result.value.row)
+    }
+    return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people[0].ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, evaluationBasis: 'canonical-continuous' } }
+  } catch { return fail('invalid', 'damaged canonical continuous plan') }
+}
