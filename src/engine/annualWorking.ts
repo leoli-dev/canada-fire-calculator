@@ -1,6 +1,6 @@
 import type { InputsV2, Known } from './model'
 import { ageReachedInYear } from './model'
-import { initializeState, type AnnualEvaluation, type KernelResult } from './annualState'
+import { initializeState, isCanonicalGeneratedState, type AnnualState, type AnnualEvaluation, type KernelResult } from './annualState'
 import { calculateHouseholdTax } from './householdTax'
 import { sideIncomeDeductions, type PayrollDeductions } from './payroll'
 import { PLAN_TAX_YEAR, type TaxRuleProvenance } from './tax'
@@ -38,32 +38,38 @@ export interface CanonicalWorkingEvaluation {
 
 export interface CanonicalHouseholdWorkingEvaluation extends Omit<CanonicalWorkingEvaluation, 'personId' | 'age' | 'payrollReal' | 'suppliedInputs'> {
   household: {
-    phase: 'both-working' | 'mixed'
+    phase: 'both-working' | 'mixed' | 'both-retired'
     spending: number
     spendingReal: number
-    spendingSource: 'workingSpending' | 'transitionSpending'
+    spendingSource: 'workingSpending' | 'transitionSpending' | 'retirementSpending'
+    /** Explicit year-specific omission; never a claim of complete household tax. */
+    taxLimitations?: 'spouse-age-credit-transfer-unmodeled'[]
     byPerson: Record<string, { phase: 'working' | 'retired'; grossWagesReal: number; payrollReal: PayrollDeductions | null }>
   }
 }
 export type ContinuousWorkingEvaluation = CanonicalWorkingEvaluation | CanonicalHouseholdWorkingEvaluation
 
-/** Internal household pricing companion. No withdrawal or contribution recipient
- * is inferred: this first settlement scope accepts genuine zero residual only. */
-export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: WorkingSpendingEvidence, year: number): KernelResult<CanonicalHouseholdWorkingEvaluation> {
+/** Internal household pricing companion. Direct quotes retain the zero-residual
+ * boundary. Only the continuous runner's live state identity authorizes a
+ * deficit or both-retired quote; the annual kernel chooses no taxable funding.
+ * The existing tax pack remains estimated (including incomplete credit rules).
+ */
+export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: WorkingSpendingEvidence, year: number, generatedState?: AnnualState): KernelResult<CanonicalHouseholdWorkingEvaluation> {
   try {
     const initialized = initializeState(plan)
     if (initialized.status !== 'ok') return initialized
     if (plan.people.length !== 2 || plan.province !== 'ON' || plan.baseYear !== PLAN_TAX_YEAR || plan.budget.kind !== 'incomeBudget') return fail('unsupported', 'household working pricing requires two-person Ontario incomeBudget at tax anchor')
     if (!Number.isInteger(year) || year < plan.baseYear) return fail('invalid', 'household working year')
     const active = plan.people.filter(p => ageReachedInYear(p, plan.baseYear, year) < p.retirementAge)
-    if (!active.length) return fail('unsupported', 'both-retired household settlement not yet wired')
+    const generated = !!generatedState && generatedState.year === year && isCanonicalGeneratedState(plan, generatedState)
+    if (!active.length && !generated) return fail('unsupported', 'both-retired household settlement requires generated working prefix')
     for (const key of ['workingSpending', 'retirementSpending'] as const) {
       const fact = evidence[key]
       if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${key}`)
       if (!safeMoney(fact.value) || fact.value !== plan.budget[key]) return fail('invalid', `working spending evidence disagrees with plan: ${key}`)
     }
-    const phase = active.length === 2 ? 'both-working' : 'mixed'
-    const spendingSource = phase === 'mixed' ? 'transitionSpending' : 'workingSpending'
+    const phase = active.length === 2 ? 'both-working' : active.length === 1 ? 'mixed' : 'both-retired'
+    const spendingSource = phase === 'mixed' ? 'transitionSpending' : phase === 'both-retired' ? 'retirementSpending' : 'workingSpending'
     const fact = evidence[spendingSource]
     if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${spendingSource}`)
     if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
@@ -109,7 +115,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const deductions = Object.values(payroll).reduce((s, p) => s + p.contributions, 0)
     const residual = gross - deductions - priced.total - fact.value
     const bound = Math.min(0.004, 0.004 / startCpi, 4 * Number.EPSILON * (gross + deductions + priced.total + fact.value))
-    if (residual < -bound) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
+    if (residual < -bound && (!generated || phase === 'both-working')) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
     if (residual > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
     const evaluation: AnnualEvaluation = { byPerson: {} }
     for (const p of plan.people) {
@@ -118,7 +124,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     }
     if (![gross, deductions, priced.total, fact.value, gross * startCpi, deductions * startCpi, priced.total * startCpi, fact.value * startCpi].every(safeMoney)) return fail('invalid', 'working nominal pricing amount')
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = priced
-    return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage }, payrollContributions: deductions * startCpi, netCash: 0, evaluation, household: { phase, spending: fact.value * startCpi, spendingReal: fact.value, spendingSource, byPerson }, overallConclusionAvailable: false } }
+    return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, startCpi, taxRules: { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage }, payrollContributions: deductions * startCpi, netCash: residual < -bound ? residual * startCpi : 0, evaluation, household: { phase, spending: fact.value * startCpi, spendingReal: fact.value, spendingSource, byPerson, ...(plan.people.some(p => ageReachedInYear(p, plan.baseYear, year) >= 65) ? { taxLimitations: ['spouse-age-credit-transfer-unmodeled' as const] } : {}) }, overallConclusionAvailable: false } }
   } catch { return fail('invalid', 'damaged household working plan or evidence') }
 }
 
