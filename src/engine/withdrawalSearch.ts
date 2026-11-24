@@ -18,15 +18,21 @@ export function allocateOrderedWithdrawals(G: number, balances: Record<AccountTy
   return w
 }
 /** Preserve the legacy endpoint calls, 60 trials and final high-end evaluation. */
-export function searchWithdrawalTarget<T extends { netCash: number }>(target: number, minimum: number, total: number, run: (gross: number) => T): T {
+export function searchWithdrawalTarget<T extends { netCash: number }>(target: number, minimum: number, total: number, run: (gross: number) => T, iterations: 60 | 120 = 60): T {
   const atMin = run(minimum)
   if (atMin.netCash >= target) return atMin
   const atMax = run(total)
   if (atMax.netCash < target) return atMax
   let lo = minimum
   let hi = total
-  for (let i = 0; i < 60; i++) {
+  // Legacy callers retain exactly their 60 trials and call trace. The
+  // positive-GIS canonical caller opts into refinement so an extreme account
+  // bracket cannot leave an otherwise exact recovery-boundary draw too high.
+  for (let i = 0; i < iterations; i++) {
     const mid = (lo + hi) / 2
+    // Only the opt-in path stops at adjacent representable bounds; avoid
+    // repeating a stagnant floating-point midpoint without touching legacy.
+    if (iterations > 60 && (mid === lo || mid === hi)) break
     if (run(mid).netCash < target) lo = mid
     else hi = mid
   }

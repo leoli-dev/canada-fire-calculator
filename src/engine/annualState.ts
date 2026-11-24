@@ -1,3 +1,4 @@
+import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
 import { settleHouseholdOas } from './annualOas'
 import { cppInputProblem } from './annualCpp'
 import { searchWithdrawalTarget } from './withdrawalSearch'
@@ -33,6 +34,8 @@ export interface AnnualState {
   byDebt: Record<string, { principal: number; annualPayment: number; yearsRemaining: number; propertyId: string | null }>
   byProperty: Record<string, { value: number; held: boolean; acb: Known<number> }>
   contributionHistory: { id: string; accountId: string; contributorId: string | null; calendarYear: number; amount: number; deductionYear: number | null }[]
+  /** Additive canonical receipt; provider/legacy snapshots do not imply work evidence. */
+  gisAssessmentLag?: Record<string, GisAssessmentFact>
   benefitIncomeLag: Record<string, Known<number>>
   /**
    * BE-36 A: the most recent priced FHSA participation-room row per person.
@@ -64,9 +67,9 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
-  byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
+  byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
@@ -144,6 +147,8 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
 export function snapshotProblem(plan: InputsV2, opening: AnnualState): string | null {
   try {
+    if (opening.gisAssessmentLag && (Object.keys(opening.gisAssessmentLag).some(id => !plan.people.some(p => p.id === id)) || Object.values(opening.gisAssessmentLag).some(fact => !validGisBasis(fact, opening.year)))) return 'GIS assessment snapshot year or evidence'
+    if (opening.year === plan.baseYear && opening.gisAssessmentLag && Object.keys(opening.gisAssessmentLag).length) return 'GIS initial historical assessment unsupported'
     const self = plan.people.find(person => person.role === 'self')!
     if (!Number.isInteger(opening.year) || opening.year < plan.baseYear || opening.baseYear !== plan.baseYear) return 'snapshot year/base mismatch'
     if (opening.year > plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return 'year beyond plan horizon'
@@ -307,7 +312,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
         !validKnownAmount(entry.benefitIncomeForNextYear)) return fail('invalid', `evaluator amounts: ${id}`)
     const oas = working && ('household' in working ? working.household.byPerson[id].oas : working.oas)
     const oasColumns = oas && working ? { oasGross: oas.grossReal * working.startCpi, oasRecovery: oas.recoveryReal * working.startCpi, oasNet: oas.netReal * working.startCpi } : {}
-    personRows[id] = { ...oasColumns, age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, ...(working && entry.cpp !== undefined ? { cpp: entry.cpp } : {}), benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
+    personRows[id] = { ...(working && plan.people.length === 1 && plan.annualBenefitsEvidence?.[id]?.gis?.status === 'annual-estimate' ? { gis: 0 } : {}), ...oasColumns, age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, ...(working && entry.cpp !== undefined ? { cpp: entry.cpp } : {}), benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
   }
   for (const dependent of Object.values(state.byDependent)) dependent.age += 1
   const income = sum(Object.values(personRows).map(p => p.income))
@@ -697,6 +702,17 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     person.age += 1
     person.previousYearEarnedIncome = { status: 'known', value: personRows[id].earnedIncome }
     state.benefitIncomeLag[id] = clone(evaluation.byPerson[id].benefitIncomeForNextYear)
+    if (working) {
+      const income = evaluation.byPerson[id].benefitIncomeForNextYear
+      const payroll = 'household' in working ? working.household.byPerson[id].payrollReal : working.payrollReal
+      // Tax net already deducted enhanced CPP. Reverse that deduction before
+      // subtracting full employee CPP/EI under the GIS income definition.
+      const fullPayroll = (payroll?.contributions ?? 0) * working.startCpi
+      const enhancedAlreadyDeducted = (payroll?.taxDeduction ?? 0) * working.startCpi
+      ;(state.gisAssessmentLag ??= {})[id] = income.status === 'known'
+        ? gisAssessmentReceipt(year, income.value + enhancedAlreadyDeducted - fullPayroll, personRows[id].earnedIncome - fullPayroll)
+        : { status: 'unknown', reason: income.reason }
+    } else if (state.gisAssessmentLag) delete state.gisAssessmentLag[id]
   }
   state.fhsaLedgers = { ...fhsaLedgerByPerson }
   state.year += 1
@@ -784,6 +800,7 @@ export interface AnnualCoverage {
   /** Requested years strictly after the first blocked year. */
   uncomputedYears: number[]
   overallConclusionAvailable: boolean
+  gisOptInPersonIds?: string[]
   evaluationBasis: 'provider-supplied' | 'canonical-retirement' | 'canonical-continuous'
 }
 
@@ -877,6 +894,6 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       state = result.value.state
       rows.push(result.value.row)
     }
-    return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, evaluationBasis: 'canonical-continuous' } }
+    return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: plan.baseYear, requestedYears: years, rows, state, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, ...(plan.people.length === 1 && plan.annualBenefitsEvidence?.[plan.people[0].id]?.gis?.status === 'annual-estimate' ? { gisOptInPersonIds: [plan.people[0].id] } : {}), evaluationBasis: 'canonical-continuous' } }
   } catch { return fail('invalid', 'damaged canonical continuous plan') }
 }

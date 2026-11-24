@@ -30,8 +30,11 @@ function validateAnnualOas(plan: InputsV2, person: Person, age: number, househol
   if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || age > 69)
     stop('OAS annual settlement supports one or two Ontario people through age 69 at 2026 anchor')
   const evidence = plan.annualBenefitsEvidence?.[person.id]
-  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || ![evidence.gis, evidence.allowance, evidence.otherBenefits].every(e => e && typeof e === 'object' && !Array.isArray(e) && ['excluded', 'not-applicable'].includes(e.status) && typeof e.reason === 'string' && e.reason.trim().length > 0 && e.provenance?.origin === 'user' && Number.isSafeInteger(e.provenance.sourceYear) && e.provenance.sourceYear! >= 0))
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || ![evidence.allowance, evidence.otherBenefits].every(e => e && typeof e === 'object' && !Array.isArray(e) && ['excluded', 'not-applicable'].includes(e.status) && typeof e.reason === 'string' && e.reason.trim().length > 0 && e.provenance?.origin === 'user' && Number.isSafeInteger(e.provenance.sourceYear) && e.provenance.sourceYear! >= 0))
     stop('OAS requires recorded GIS/Allowance/other-benefit exclusion evidence')
+  const gis = evidence!.gis
+  if (!gis || typeof gis !== 'object' || Array.isArray(gis) || !['excluded', 'not-applicable', ...(!household ? ['annual-estimate'] : [])].includes(gis.status) || typeof gis.reason !== 'string' || !gis.reason.trim() || gis.provenance?.origin !== 'user' || !Number.isSafeInteger(gis.provenance.sourceYear) || gis.provenance.sourceYear! < 0)
+    stop(household ? 'OAS requires recorded GIS/Allowance/other-benefit exclusion evidence' : 'OAS requires recorded GIS scope evidence; household GIS unsupported')
   // Only these three validated exclusions enter settlement and explanations.
   const verifiedEvidence = { gis: evidence!.gis, allowance: evidence!.allowance, otherBenefits: evidence!.otherBenefits }
   const p = person.oasAmountSource

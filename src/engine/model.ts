@@ -157,7 +157,12 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
-  annualBenefitsEvidence?: Record<string, { gis: BenefitExclusion; allowance: BenefitExclusion; otherBenefits: BenefitExclusion }>
+  /** Internal evidence only; no enrolment or entitlement is inferred. */
+  annualGisEvidence?: Record<string, Record<number, {
+    eligible: true; residentInCanada: true; notSponsored: true; fullOasInPay: true
+    provenance: Provenance
+  }>>
+  annualBenefitsEvidence?: Record<string, { gis: BenefitExclusion | (Omit<BenefitExclusion, 'status'> & { status: 'annual-estimate' }); allowance: BenefitExclusion; otherBenefits: BenefitExclusion }>
 
   schemaVersion: 2
   baseYear: number
