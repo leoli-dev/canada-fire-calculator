@@ -1,3 +1,4 @@
+import { mortgageDecimal, mortgageMultiply, mortgageSubtract, mortgageNegative } from './mortgageDecimal'
 import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
 import type { AnnualState, YearRow } from './annualState'
@@ -87,19 +88,23 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
     const p = plan.properties[0]
     return passiveHomeProblem({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
   }
-  if (!plan.debts.length) return passiveHomeProblem(plan)
+  if (!plan.debts.length) return plan.people.length === 2 ? householdPassiveHomeProblem(plan) : passiveHomeProblem(plan)
   const p = plan.properties[0], d = plan.debts[0]
   if (!p || plan.properties.length !== 1 || plan.debts.length !== 1 || d.kind !== 'mortgage' || d.propertyId !== p.id || p.mortgageDebtId !== d.id)
-    return 'mortgage requires one bidirectionally linked held primary home'
+    return plan.people.length === 2 ? 'household passive home mortgage requires one bidirectionally linked held primary home' : 'mortgage requires one bidirectionally linked held primary home'
+  if (plan.people.length === 2 && mortgageNegative(mortgageSubtract(mortgageMultiply(mortgageDecimal(d.annualPayment), mortgageDecimal(d.yearsRemaining)), mortgageDecimal(d.principal))))
+    return 'household mortgage recorded principal exceeds scheduled payments'
   const source = d.provenance
   if (!source || typeof source !== 'object' || Array.isArray(source) || !Object.prototype.hasOwnProperty.call(source, 'origin') || !Object.prototype.hasOwnProperty.call(source, 'sourceYear') || !['user', 'legacy'].includes(source.origin) || !(source.sourceYear === null || Number.isInteger(source.sourceYear)) || !(source.note === undefined || typeof source.note === 'string'))
     return 'mortgage requires recorded debt provenance'
-  const homeProblem = passiveHomeProblem({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
+  const homeProblem = (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
   if (homeProblem) return homeProblem
+  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomeSaleEvidence || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || plan.annualGisEvidence))
+    return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
     return 'mortgage spending evidence must explicitly exclude scheduled payments'
   if (plan.people.some(p => p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0) || plan.annualBenefitsEvidence || plan.annualNonRegEvidence || plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))
-    return 'mortgage supports ordinary TFSA/RRSP accounts and explicitly excluded benefits only'
+    return plan.people.length === 2 ? 'household passive home mortgage supports ordinary TFSA accounts and explicit zero public benefits only' : 'mortgage supports ordinary TFSA/RRSP accounts and explicitly excluded benefits only'
   return null
 }

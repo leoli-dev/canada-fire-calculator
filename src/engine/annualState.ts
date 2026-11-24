@@ -1,6 +1,7 @@
+import { PAYROLL_2026 } from './payroll'
 import { annualTerminalEstate } from './annualTerminalEstate'
 import { carryProspectivePurchaseBalance } from "./annualPrimaryHomePurchase"
-import { MortgagePrecisionError, mortgageDecimal, mortgageSubtract, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
+import { MortgagePrecisionError, mortgageDecimal, mortgageSubtract, mortgageAdd, mortgageMultiply, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
 import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
@@ -88,7 +89,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
-  householdWithdrawalSettlement?: { /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
+  householdWithdrawalSettlement?: { mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -375,9 +376,77 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   let tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
   let householdWithdrawalSettlement: YearRow['householdWithdrawalSettlement']
+  const householdMortgage = !!working && "household" in working && isCanonicalGeneratedState(plan, opening) && plan.debts.length > 0
+  const mortgageDraws: Record<string, MortgageDecimal> = {}
+  const householdDebt = householdMortgage ? settleAnnualDebt(state, plan.debts) : undefined
+  if (householdDebt && householdDebt.status !== "ok") return fail(householdDebt.status, householdDebt.reason)
+  if (householdMortgage && working && "household" in working) {
+    const debtPayments = householdDebt!.status === "ok" ? householdDebt!.value.debtPayments : 0
+    // Reproduce computed Ontario employment CPP/CPP2/EI from the pinned
+    // rates and caps, rather than treating a serialized multiplication ULP
+    // as supplied cash debt. The ordinary payroll and tax postings stay intact.
+    const rules = PAYROLL_2026
+    // The existing annual start-CPI Number is a serialized decimal factor.
+    // Index each recorded wage and living fact with that same factor before
+    // summing; never serialize an already rounded household aggregate.
+    const exactCpi = mortgageDecimal(working.startCpi)
+    let exactIncome = mortgageDecimal(0)
+    let exactBenefits = mortgageDecimal(0)
+    let exactTax = mortgageDecimal(0)
+    let exactPayroll = mortgageDecimal(0)
+    for (const [id, person] of Object.entries(working.household.byPerson)) {
+      exactIncome = mortgageAdd(exactIncome, mortgageMultiply(mortgageDecimal(person.grossWagesReal), exactCpi))
+      exactBenefits = mortgageAdd(exactBenefits, mortgageDecimal(personRows[id].benefits))
+      // Ordinary nominal per-person tax is the supported tax-engine boundary:
+      // preserve its posted Number as a decimal atom, then sum atoms exactly.
+      // This proof does not reconstruct or round tax, or change its postings.
+      exactTax = mortgageAdd(exactTax, mortgageDecimal(personRows[id].tax))
+      if (person.phase !== "working") continue
+      const wages = person.grossWagesReal
+      const pensionable = mortgageSubtract(mortgageDecimal(Math.max(rules.basicExemption, Math.min(wages, rules.ympe))), mortgageDecimal(rules.basicExemption))
+      const second = mortgageSubtract(mortgageDecimal(Math.max(rules.ympe, Math.min(wages, rules.yampe))), mortgageDecimal(rules.ympe))
+      const ei = mortgageMultiply(mortgageDecimal(Math.min(wages, rules.ei.insurable)), mortgageDecimal(rules.ei.rate))
+      exactPayroll = mortgageAdd(exactPayroll, mortgageAdd(mortgageAdd(mortgageMultiply(pensionable, mortgageDecimal(rules.cpp.employee)), mortgageMultiply(second, mortgageDecimal(rules.cpp.secondEmployee))), ei))
+    }
+    exactPayroll = mortgageMultiply(exactPayroll, exactCpi)
+    const exactLiving = mortgageMultiply(mortgageDecimal(working.household.spendingReal), exactCpi)
+    let available = mortgageSubtract(mortgageSubtract(mortgageAdd(exactIncome, exactBenefits), exactTax), exactPayroll)
+    // The admitted contract has exactly one fixed nominal installment.
+    const due = mortgageAdd(exactLiving, mortgageDecimal(debtPayments))
+    const shortage = mortgageSubtract(due, available)
+    const candidates = plan.accounts.filter(a => a.kind === "tfsa" && state.byAccount[a.id].balance > 0)
+    const postings: NonNullable<NonNullable<YearRow["householdWithdrawalSettlement"]>["postings"]> = []
+    if (working.household.phase !== "both-working" && !mortgageNegative(shortage) && shortage.coefficient !== "0" && candidates.length) {
+      if (plan.strategy === "meltdownPaced") return fail("unsupported", "household mortgage withdrawal strategy unsupported")
+      const account = candidates[0]
+      const statement = tfsaStatement(plan, account.ownerId!)
+      if (!statement || statement.provenance.origin === "unknown") return fail("unsupported", "TFSA withdrawal statement evidence missing")
+      const capacity = opening.mortgageExactBalances?.[account.id] ?? mortgageDecimal(state.byAccount[account.id].balance)
+      const draw = mortgageNegative(mortgageSubtract(capacity, shortage)) ? capacity : shortage
+      mortgageDraws[account.id] = draw
+      const amount = mortgageNumber(draw)
+      const nominalOpening = state.byAccount[account.id].balance
+      const nominalClosing = mortgageNumber(mortgageSubtract(capacity, draw))
+      const debit = nominalOpening - nominalClosing
+      if (amount > 0 && (debit <= 0 || Math.abs(debit - amount) > Math.min(0.0001, 0.0001 * working.startCpi, amount * 1e-8, 4 * Number.EPSILON * (nominalOpening + amount))))
+        return fail("unsupported", "household mortgage withdrawal debit precision cannot be upheld")
+      if (amount > 0) postings.push({ accountId: account.id, ownerId: account.ownerId!, kind: "tfsa", amount })
+      available = mortgageAdd(available, draw)
+    }
+    const afterDebt = mortgageSubtract(available, mortgageDecimal(debtPayments))
+    if (mortgageNegative(afterDebt)) return fail("unsupported", "mortgage scheduled payment cannot be fully funded")
+    const living = mortgageNegative(mortgageSubtract(afterDebt, exactLiving)) ? afterDebt : exactLiving
+    const unmet = mortgageSubtract(exactLiving, living)
+    if (working.household.phase === "both-working" && unmet.coefficient !== "0") return fail("unsupported", "mortgage working cash cannot be fully funded")
+    const nominalAvailable = income + benefits - tax - working.payrollContributions + sum(postings.map(p => p.amount))
+    const postedCash = mortgageAdd(mortgageSubtract(mortgageSubtract(mortgageAdd(mortgageDecimal(income), mortgageDecimal(benefits)), mortgageDecimal(tax)), mortgageDecimal(working.payrollContributions)), mortgageDecimal(sum(postings.map(p => p.amount))))
+    const reconciliation = mortgageNumber(available) - nominalAvailable ||
+      mortgageNumber(mortgageSubtract(available, postedCash))
+    householdWithdrawalSettlement = { ...(reconciliation !== 0 ? { mortgageCashReconciliation: reconciliation } : {}), postings, accountId: postings[0]?.accountId ?? null, ownerId: postings[0]?.ownerId ?? null, withdrawal: sum(postings.map(p => p.amount)), taxIncrement: 0, taxTotal: tax, spendingDue: mortgageNumber(exactLiving), spendingFunded: mortgageNumber(living), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi }
+  }
   // A live taxable alternative prevents a claim of verified exhaustion. Never
   // skip an earlier account in the selected order to manufacture TFSA funding.
-  if (working && 'household' in working && working.household.phase !== 'both-working' && working.netCash <= 0) {
+  if (!householdMortgage && working && 'household' in working && working.household.phase !== 'both-working' && working.netCash <= 0) {
     const deficit = Math.max(0, -working.netCash)
     const funded = (kind: string) => plan.accounts.filter(a => a.kind === kind && state.byAccount[a.id].balance > 0)
     const rrsps = funded('rrsp')
@@ -484,8 +553,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const cash = working ? Math.max(0, working.netCash) : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')
   if (cash < 0) return fail('unsupported', 'negative net savings needs withdrawal funding rule')
-  const debtSettlement = settleAnnualDebt(state, working && isCanonicalGeneratedState(plan, opening) && plan.debts.length ? plan.debts : undefined)
-  if (debtSettlement.status !== 'ok') return fail(debtSettlement.status, debtSettlement.reason)
+  const debtSettlement = householdDebt ?? settleAnnualDebt(state, working && isCanonicalGeneratedState(plan, opening) && plan.debts.length ? plan.debts : undefined)
+  if (debtSettlement.status !== "ok") return fail(debtSettlement.status, debtSettlement.reason)
   const { debtRows, debtPayments } = debtSettlement.value
   // The private working quote already validated and normalized its cash in
   // the common anchor basis. Reordering those operands can invent a deficit.
@@ -706,7 +775,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   if (householdWithdrawalSettlement) {
     for (const { accountId, ownerId, kind, amount } of householdWithdrawalSettlement.postings ?? []) {
-      state.byAccount[accountId].balance -= amount
+      state.byAccount[accountId].balance = mortgageDraws[accountId] ? mortgageNumber(mortgageSubtract(opening.mortgageExactBalances?.[accountId] ?? mortgageDecimal(opening.byAccount[accountId].balance), mortgageDraws[accountId])) : state.byAccount[accountId].balance - amount
+      if (mortgageDraws[accountId]) accountRows[accountId].mortgageExactWithdrawal = mortgageDraws[accountId]
       accountRows[accountId].withdrawal = amount
       if (kind === 'tfsa') state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount }]
     }
@@ -726,7 +796,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].returnAmount = account.balance * rates[id]
     account.balance += accountRows[id].returnAmount
     if (working && isCanonicalGeneratedState(plan, opening) && plan.debts.length) {
-      const exact = mortgageClosing(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
+      const exact = mortgageDraws[id] ? mortgageMultiply(mortgageSubtract(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), mortgageDraws[id]), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[id]))) : mortgageClosing(opening.mortgageExactBalances?.[id] ?? mortgageDecimal(opening.byAccount[id].balance), accountRows[id].contribution, accountRows[id].withdrawal, rates[id])
       const precise = mortgageNumber(exact)
       const correction = precise - account.balance
       if (!Number.isFinite(precise) || mortgageNegative(exact) || Math.abs(correction) >= Math.min(0.005, 0.005 * working.startCpi)) return fail("unsupported", "mortgage decimal balance precision boundary")
