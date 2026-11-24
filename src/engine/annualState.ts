@@ -906,7 +906,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
-  if (working && isCanonicalGeneratedState(plan, opening)) {
+  if (householdPurchase) delete state.prospectivePurchaseExactBalances
+  else if (working && isCanonicalGeneratedState(plan, opening)) {
     try { carryProspectivePurchaseBalance(plan, opening, state, accountRows) }
     catch { return fail("unsupported", "primary home purchase: prospective decimal precision boundary") }
   }

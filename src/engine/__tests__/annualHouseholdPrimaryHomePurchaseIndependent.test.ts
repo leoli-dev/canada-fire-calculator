@@ -279,6 +279,84 @@ describe('FE-53 independently calculated household cash home purchase', () => {
 })
 
 describe('household purchase precision and scope regressions', () => {
+  it('buys the home when the exact residual only partially funds living and exhausts the TFSA', () => {
+    const { plan, home, purchase, evidence } = fixture()
+    Object.assign(plan.accounts[0], { balance: 300_000, realReturn: 0.03, annualFee: 0.005 })
+    plan.inflation = 0.021
+    plan.budget = { kind: 'incomeBudget', workingSpending: 0, retirementSpending: 0 }
+    evidence.transitionSpending = known(0)
+    evidence.retirementSpending = known(0)
+    Object.assign(home, { value: 342_800, plannedDownPayment: 342_800 })
+    purchase.priceNominal = known(342_800)
+    purchase.qualifyingAcquisitionCostsNominal = known(1_000)
+    purchase.postPurchaseAnnualSpendingReal = known(30_000)
+
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 3))
+    expect(prefix.blocked).toBeNull()
+    // Three untouched years give 300,000 × (1.025 × 1.021)³ = 343,850.8301267859375.
+    // The displayed opening rounds up, so the exact backing must fund the two debits.
+    const displayedOpening = 343_850.83012678596
+    expect(prefix.state.prospectivePurchaseExactBalances).toEqual({ [TFSA]: atom('3438508301267859375', 13) })
+    expect(prefix.state.byAccount[TFSA].balance).toBe(displayedOpening)
+    expect(prefix.state.tfsaWithdrawalHistory).toEqual([])
+
+    const result = ok(projectCanonicalCoverage(plan, evidence, 5))
+    expect(result.blocked).toBeNull()
+    expect(result.uncomputedYears).toEqual([])
+    expect(result.rows.slice(0, 3)).toStrictEqual(prefix.rows)
+    const [bought, next] = result.rows.slice(3)
+    const receipt = { propertyId: HOME, year: YEAR, priceBasis: 'purchase-year-nominal',
+      price: 342_800, qualifyingAcquisitionCosts: 1_000, totalCost: 343_800, acb: 343_800, tax: 0 }
+    expect(bought.retirementSettlement?.primaryHomePurchase).toEqual(receipt)
+    // Subtract 343,800 from the exact opening, then apply the residual to 30,000 × 1.021³.
+    expect(bought.retirementSettlement?.primaryHomePurchaseArithmetic).toEqual({
+      price: atom('342800'), qualifyingAcquisitionCosts: atom('1000'), totalCost: atom('343800'),
+      withdrawals: { [TFSA]: atom('343800') }, spendingDue: atom('3192996783', 5),
+      spendingFunded: atom('508301267859375', 13), spendingUnmet: atom('318791377032140625', 13),
+    })
+    expect(bought.householdWithdrawalSettlement).toMatchObject({ ownerId: PARTNER, accountId: TFSA,
+      withdrawal: displayedOpening, spendingDue: 31_929.96783, spendingFunded: 50.8301267859375,
+      spendingUnmet: 31_879.1377032140625, taxIncrement: 0,
+      postings: [{ accountId: TFSA, ownerId: PARTNER, kind: 'tfsa', amount: displayedOpening }],
+    })
+    expect(bought.cashLedger.spending).toBe(50.8301267859375)
+    expect(bought.byAccount[TFSA]).toMatchObject({ opening: displayedOpening, withdrawal: displayedOpening,
+      contribution: 0, returnAmount: 0, closing: 0 })
+    expect(bought.byAccount[TFSA].primaryHomePurchaseReconciliation).toBeUndefined()
+
+    const acquired = ok(projectCanonicalCoverage(plan, evidence, 4))
+    expect(acquired.rows).toStrictEqual(result.rows.slice(0, 4))
+    for (const { state } of [acquired, result]) {
+      expect(state.prospectivePurchaseExactBalances).toBeUndefined()
+      expect(state.primaryHomePurchase).toMatchObject({ receipt, exactAccountBalances: { [TFSA]: atom('0') } })
+      expect(state.byAccount[TFSA].balance).toBe(0)
+      expect(state.byProperty[HOME]).toMatchObject({ held: true, acb: known(343_800) })
+      expect(state.tfsaWithdrawalHistory).toEqual([
+        { id: `annual:${YEAR}:withdrawal:${TFSA}`, personId: PARTNER, calendarYear: YEAR, amount: displayedOpening },
+      ])
+    }
+    expect(next.year).toBe(YEAR + 1)
+    expect(next.retirementSettlement?.primaryHomePurchase).toBeUndefined()
+    expect(next.byProperty[HOME]).toMatchObject({ held: true, opening: bought.byProperty[HOME].closing })
+    expect(next.householdWithdrawalSettlement).toMatchObject({ withdrawal: 0, postings: [],
+      spendingDue: 32_600.49715443, spendingFunded: 0, spendingUnmet: 32_600.49715443 })
+    expect(next.tfsaLedger[PARTNER].restored).toEqual(known(343_850.83))
+    expect(next.tfsaLedger[SELF].restored).toEqual(known(0))
+
+    // These fees make the true cost exceed the opening by 0.0000000000005.
+    // The displayed total still equals the displayed opening.
+    const shortPlan = structuredClone(plan)
+    const shortCosts = 1_050.830126785938
+    shortPlan.annualPrimaryHomePurchaseEvidence![HOME].qualifyingAcquisitionCostsNominal = known(shortCosts)
+    expect(342_800 + shortCosts).toBe(displayedOpening)
+    const short = ok(projectCanonicalCoverage(shortPlan, evidence, 5))
+    expect(short).toMatchObject({ blocked: { year: YEAR, status: 'unsupported', causes: ['propertyPurchase'],
+      issues: [{ detail: 'primary home purchase: entire nominal price plus costs is not funded; no acquisition or debit committed' }],
+    }, uncomputedYears: [YEAR + 1] })
+    expect(short.rows).toStrictEqual(prefix.rows)
+    expect(short.state).toStrictEqual(prefix.state)
+  })
+
   it('commits partial mixed living on exact TFSA exhaustion before refusing the later purchase', () => {
     const { plan, home, purchase, evidence } = fixture()
     Object.assign(plan.accounts[0], { balance: 100_000.01, realReturn: 0.03, annualFee: 0 })
