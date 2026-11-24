@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
 
-export function useCad() {
+export function useCad(fractionDigits = 0) {
   const { i18n } = useTranslation()
   const fmt = new Intl.NumberFormat(i18n.language, {
     style: 'currency',
     currency: 'CAD',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   })
   return (v: number) => fmt.format(v)
 }
