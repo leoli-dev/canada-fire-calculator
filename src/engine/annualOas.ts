@@ -1,3 +1,4 @@
+import { isCanonicalGeneratedState, type AnnualState } from "./annualState"
 import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext } from './personIncome'
 import { calculateHouseholdTax } from './householdTax'
 import { oasAfterClawback } from './benefits'
@@ -24,10 +25,10 @@ export interface AnnualOas {
  * https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-23500-social-benefits-repayment.html
  * https://www.canada.ca/content/dam/canada/employment-social-development/migration/documents/assets/portfolio/docs/en/statistics/quarterly_report/isp-card-apr-jun-2026-en.pdf
  */
-function validateAnnualOas(plan: InputsV2, person: Person, age: number, household: boolean): AnnualOas {
+function validateAnnualOas(plan: InputsV2, person: Person, age: number, household: boolean, retiredContinuation = false): AnnualOas {
   const stop = (reason: string): never => { throw { status: 'unsupported', reason } }
   if (!Number.isInteger(age) || age < 0) throw { status: 'invalid', reason: 'invalid OAS annual age' }
-  if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || age > 69)
+  if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || age > (retiredContinuation ? 74 : 69))
     stop('OAS annual settlement supports one or two Ontario people through age 69 at 2026 anchor')
   const evidence = plan.annualBenefitsEvidence?.[person.id]
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || ![evidence.allowance, evidence.otherBenefits].every(e => e && typeof e === 'object' && !Array.isArray(e) && ['excluded', 'not-applicable'].includes(e.status) && typeof e.reason === 'string' && e.reason.trim().length > 0 && e.provenance?.origin === 'user' && Number.isSafeInteger(e.provenance.sourceYear) && e.provenance.sourceYear! >= 0))
@@ -82,4 +83,17 @@ export function annualOas(plan: InputsV2, person: Person, age: number): AnnualOa
 /** Called only inside the generated household companion and CPP evidence gate. */
 export function annualHouseholdOas(plan: InputsV2, person: Person, age: number): AnnualOas {
   return validateAnnualOas(plan, person, age, true)
+}
+
+/** Generated solo retirement only; public/provider quotes keep their existing boundary.
+ * ESDC: the 10% uplift starts the month after the 75th birthday.
+ * https://www.canada.ca/en/services/benefits/publicpensions/old-age-security/benefit-amount.html
+ */
+export function annualGeneratedRetirementOas(plan: InputsV2, person: Person, age: number, state: AnnualState): AnnualOas {
+  if (!isCanonicalGeneratedState(plan, state) || plan.people.length !== 1 || plan.people[0] !== person || state.byPerson[person.id]?.age !== age || age < person.retirementAge)
+    throw { status: "unsupported", reason: "OAS continuation requires authenticated solo retirement" }
+  if (age >= 75) throw { status: "unsupported", reason: "OAS: reached age 75 requires separate monthly uplift modeling; no claim month inferred" }
+  if (age >= 70 && plan.annualBenefitsEvidence?.[person.id]?.gis.status === "annual-estimate")
+    throw { status: "unsupported", reason: "GIS: continuation beyond age 69 requires explicit exclusion" }
+  return validateAnnualOas(plan, person, age, false, true)
 }

@@ -1,5 +1,6 @@
+import type { AnnualState } from "./annualState"
 import type { InputsV2, Person } from './model'
-import { annualOas, annualHouseholdOas } from './annualOas'
+import { annualOas, annualHouseholdOas, annualGeneratedRetirementOas } from './annualOas'
 import { personCppAnnual } from './pensionProvenance'
 
 /** Annual convention: age reached in the year, full-year payment at start CPI.
@@ -28,7 +29,7 @@ export function cppInputProblem(person: Person): string | null {
     return 'CPP amount provenance fields are malformed'
   return null
 }
-export function annualCpp(plan: InputsV2, person: Person, age: number): AnnualCpp {
+export function annualCpp(plan: InputsV2, person: Person, age: number, retirementState?: AnnualState): AnnualCpp {
   const problem = cppInputProblem(person)
   if (problem) throw { status: 'invalid', reason: problem }
   const sources = plan.incomeSources.filter(s => s.kind === 'cpp' && s.recipientId === person.id)
@@ -56,7 +57,11 @@ export function annualCpp(plan: InputsV2, person: Person, age: number): AnnualCp
   // The legacy known-zero context retains its existing stop and reason.
   if (plan.people.some(p => p.cppAnnualAt65 > 0) && plan.people.some(p => p.ageInBaseYear + age - person.ageInBaseYear >= 65)) {
     if (!plan.annualBenefitsEvidence) throw { status: 'unsupported', reason: 'CPP slice stops at household age 65: OAS/GIS/Allowance eligibility not wired' }
-    for (const member of plan.people) (plan.people.length === 2 ? annualHouseholdOas : annualOas)(plan, member, member.ageInBaseYear + age - person.ageInBaseYear)
+    for (const member of plan.people) {
+      const memberAge = member.ageInBaseYear + age - person.ageInBaseYear
+      if (retirementState) annualGeneratedRetirementOas(plan, member, memberAge, retirementState)
+      else (plan.people.length === 2 ? annualHouseholdOas : annualOas)(plan, member, memberAge)
+    }
   }
   if (age < person.retirementAge && age >= s.startAge! && s.annualAmount.value > 0)
     throw { status: 'unsupported', reason: 'working CPP recipient requires post-retirement benefit and payroll election rules' }
