@@ -1,3 +1,4 @@
+import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
 import { settleHouseholdOas } from './annualOas'
 import { cppInputProblem } from './annualCpp'
@@ -34,7 +35,7 @@ export interface AnnualState {
   byPerson: Record<string, { age: number; retirementAge: number; previousYearEarnedIncome: Known<number>; rrspRoom: Known<number>; tfsaRoom: Known<number>
     rrspDeductionLimit: Known<number>; rrspUnusedUndeducted: Known<number>
     rrspPensionAdjustment: Known<number>; rrspPspa: Known<number>; rrspPar: Known<number> }>
-  byAccount: Record<string, { kind: AccountKind; ownerId: string; balance: number; acb: Known<number>; room: Known<number>; openedYear: Known<number> }>
+  byAccount: Record<string, { nonRegPool?: { holdingId: string; units: number }; kind: AccountKind; ownerId: string; balance: number; acb: Known<number>; room: Known<number>; openedYear: Known<number> }>
   byDependent: Record<string, { age: number }>
   byDebt: Record<string, { principal: number; annualPayment: number; yearsRemaining: number; propertyId: string | null }>
   byProperty: Record<string, { value: number; held: boolean; acb: Known<number> }>
@@ -72,10 +73,10 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
-  byAccount: Record<string, { openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  byAccount: Record<string, { nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
@@ -152,6 +153,11 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
 export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedBasis?: AnnualState): string | null {
   try {
+    if (Object.values(opening.byAccount).some(a => 'nonRegPool' in a)) {
+      if (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis)) return 'nonReg: pool metadata requires authenticated generated state'
+      const problem = nonRegProblem(plan, opening)
+      if (problem) return problem
+    }
     if (opening.gisAssessmentLag && (Object.keys(opening.gisAssessmentLag).some(id => !plan.people.some(p => p.id === id)) || Object.values(opening.gisAssessmentLag).some(fact => !validGisBasis(fact, opening.year)))) return 'GIS assessment snapshot year or evidence'
     if (opening.year === plan.baseYear && opening.gisAssessmentLag && Object.keys(opening.gisAssessmentLag).length) return 'GIS initial historical assessment unsupported'
     if (opening.rrifConversions !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis))) return 'RRIF conversion receipts require authenticated generated retirement'
@@ -220,7 +226,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const gate = pricingGate(plan)
   if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   const self = plan.people.find(person => person.role === 'self')!
-  const problem = snapshotProblem(plan, opening)
+  const problem = snapshotProblem(plan, opening, working && isCanonicalGeneratedState(plan, opening) ? opening : undefined)
   if (problem) return fail('invalid', problem)
   if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return fail('invalid', 'year beyond plan horizon')
   const state = clone(opening)
@@ -675,6 +681,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // Every provider evaluates the same settled, pre-growth portfolio. Neither
   // account order nor a provider mutating its own context may affect peers.
   for (const [id, account] of Object.entries(state.byAccount)) {
+    if (working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence?.accountId === id && accountRows[id].contribution !== 0) return fail("unsupported", "nonReg: working taxable contributions not supported")
     account.balance += accountRows[id].contribution
     if (account.kind === 'nonReg' && account.acb.status === 'known') account.acb.value += accountRows[id].contribution
   }
@@ -692,7 +699,9 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     let rate: number
     try { rate = providers.returns({ plan: clone(plan), state: clone(settled) }, id) } catch { return fail('invalid', `return provider failed: ${id}`) }
     if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
-    rates[id] = rate
+    if (working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence && settled.byAccount[plan.annualNonRegEvidence.accountId]?.nonRegPool)
+      Object.defineProperty(rates, id, { value: rate, enumerable: true, writable: true, configurable: true })
+    else rates[id] = rate
   }
   for (const [id, account] of Object.entries(state.byAccount)) {
     accountRows[id].returnAmount = account.balance * rates[id]
@@ -728,7 +737,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   state.fhsaLedgers = { ...fhsaLedgerByPerson }
   state.year += 1
-  const committedProblem = snapshotProblem(plan, state)
+  const committedProblem = snapshotProblem(plan, state, working && isCanonicalGeneratedState(plan, opening) ? opening : undefined)
   if (committedProblem) return fail('invalid', `year-end state: ${committedProblem}`)
   const contributionLedger: YearRow['contributionLedger'] = {
     allocationCashBasis: cash,
@@ -770,7 +779,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * Only rows successfully returned by annualStep are settled. state is never advanced
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
-export type AnnualStopCause = 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+export type AnnualStopCause = 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
   | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
@@ -779,6 +788,7 @@ export type AnnualStopCause = 'retirement' | 'propertyPurchase' | 'propertySale'
  * The strict API returns its original issue objects, without extra fields. */
 export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   const detail = issue.detail
+  if (detail.startsWith("nonReg:")) return "nonRegSale"
   if (issue.code === 'unfunded') return 'contributionFunding'
   if (detail === 'retirement withdrawals and benefit rules not yet wired') return 'retirement'
   if (detail.startsWith('planned purchase funding')) return 'propertyPurchase'
@@ -878,6 +888,12 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
     if (plan.people.some(p => p.ageInBaseYear >= p.retirementAge)) return fail('unsupported', 'continuous projection requires an initial working year for each person; use strict standalone retirement')
     evidence = clone(evidence)
     let state = initialized.value
+    if (plan.annualNonRegEvidence) {
+      const problem = nonRegProblem(plan, state, true)
+      if (problem) return fail("unsupported", problem)
+      const e = plan.annualNonRegEvidence
+      state.byAccount[e.accountId].nonRegPool = { holdingId: e.holdingId, units: e.units }
+    }
     let committedWorking = false
     const rows: YearRow[] = []
     let blocked: AnnualCoverage['blocked'] = null
@@ -894,7 +910,11 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
         else if ('age' in quote.value && quote.value.age === 18) result = fail('unsupported', 'age-18 partial-year CPP eligibility not modeled')
         else if (plan.people.some(p => tfsaStatement(plan, p.id)?.withdrawals.some(h => h.amount > 0 && h.calendarYear >= plan.baseYear))) result = fail('unsupported', 'recorded active TFSA withdrawal events not modeled in working chain')
         else if (quote.value.netCash > 0 && Object.entries(plan.savingsAllocation.shares).some(([kind, share]) => share !== (kind === 'tfsa' ? 1 : 0))) result = fail('unsupported', 'continuous working allocation supports TFSA only')
-        else result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value)
+        else {
+          generatedStates.set(state, plan)
+          try { result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value) }
+          finally { generatedStates.delete(state) }
+        }
         if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory ??= []; committedWorking = true }
       } else {
         if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')

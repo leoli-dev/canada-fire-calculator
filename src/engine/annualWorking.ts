@@ -1,3 +1,4 @@
+import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
 import { annualOas, annualHouseholdOas, settleHouseholdOas, type AnnualOas } from './annualOas'
 import { annualCpp, type AnnualCpp } from './annualCpp'
@@ -193,9 +194,11 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     const cpp = generated && person.cppAnnualAt65 !== 0 ? annualCpp(plan, person, age) : undefined
     if (plan.incomeSources.some(s => !(cpp && s.kind === 'cpp' && s.recipientId === person.id) && (s.fromAge ?? -Infinity) <= age && (s.startAge ?? -Infinity) <= age && (s.toAge ?? Infinity) >= age && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0))) return fail('unsupported', 'additional active working income source not yet wired')
     if (person.rrspUnusedUndeducted.status !== 'known' || person.rrspUnusedUndeducted.value !== 0 || plan.contributions.some(c => c.amount !== 0) || plan.recurringContributions.some(c => c.annualAmount !== 0)) return fail('unsupported', 'working registered contributions and deductions not yet wired')
+    const poolAllowed = generated && !!plan.annualNonRegEvidence
+    if (poolAllowed) { const problem = nonRegProblem(plan, generatedState!); if (problem) return fail("unsupported", problem) }
     // Even a zero nonReg placeholder is deliberately outside this quote's
     // scope: zero balance alone does not verify absence of active tax facts.
-    if (plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.ownerId !== person.id) || ['tfsa', 'rrsp'].some(k => plan.accounts.filter(a => a.kind === k).length > 1)) return fail('unsupported', 'working supports one owned ordinary RRSP and one TFSA')
+    if (plan.accounts.some(a => (!['tfsa', 'rrsp'].includes(a.kind) && !(poolAllowed && a.kind === 'nonReg')) || a.ownerId !== person.id) || ['tfsa', 'rrsp'].some(k => plan.accounts.filter(a => a.kind === k).length > 1)) return fail('unsupported', 'working supports one owned ordinary RRSP and one TFSA')
     const startCpi = (1 + plan.inflation) ** (year - plan.baseYear)
     if (1 + plan.inflation <= 0 || !Number.isFinite(startCpi) || startCpi <= 0 || !Number.isFinite(1 / startCpi)) return fail('invalid', 'working CPI ratio')
     const gross = person.earnedIncome.value

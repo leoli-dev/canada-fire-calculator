@@ -100,11 +100,11 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
     for (const id of ids) {
       const person = people[id]
       const row = qc.byPerson[id]
-      byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
+      Object.defineProperty(byPerson, id, { enumerable: true, configurable: true, writable: true, value: { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
         taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
         provincialPensionEligible: row.qcRetirementEligible,
         tax: row.federalTax + row.provincialIncomeTax + row.fss + row.ramq,
-        bySource: person.bySource, qc: row }
+        bySource: person.bySource, qc: row } })
     }
     return { status: 'ok', total: qc.total, byPerson, ...provenance,
       spousalAttribution: income.spousalAttribution }
@@ -120,11 +120,11 @@ export function calculateHouseholdTax(plan: InputsV2, year: number, events: Inco
       pensionIncome: person.federalPensionEligible,
       provincialPensionIncome: person.provincialPensionEligible, spouseNetIncome,
       payrollCredit: person.payrollCredit, employmentAmount: person.employmentAmount }, rules)
-    byPerson[id] = { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
+    Object.defineProperty(byPerson, id, { enumerable: true, configurable: true, writable: true, value: { personId: id, grossIncome: person.gross, netIncome: person.netIncome,
       taxableIncome: person.taxableIncome, federalPensionEligible: person.federalPensionEligible,
       provincialPensionEligible: person.provincialPensionEligible,
-      tax, bySource: person.bySource, ...(ageAmountNetIncome !== undefined ? { ageAmountNetIncome } : {}) }
+      tax, bySource: person.bySource, ...(ageAmountNetIncome !== undefined ? { ageAmountNetIncome } : {}) } })
   }
-  return { status: 'ok', total: Object.values(byPerson).reduce((sum, row) => sum + row.tax, 0),
+  return { status: 'ok', total: ids.reduce((sum, id) => sum + byPerson[id].tax, 0),
     byPerson, ...provenance, spousalAttribution: income.spousalAttribution }
 }
