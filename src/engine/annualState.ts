@@ -64,9 +64,9 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
-  byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
+  byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
   byAccount: Record<string, { opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>

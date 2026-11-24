@@ -1,3 +1,4 @@
+import { annualOas } from './annualOas'
 import { annualCpp, type AnnualCpp } from './annualCpp'
 import type { InputsV2, Known } from './model'
 import { ageReachedInYear } from './model'
@@ -171,7 +172,9 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     }
     if (person.earnedIncome.status !== 'known') return fail('unsupported', 'working wage evidence unknown')
     if (!safeMoney(person.earnedIncome.value)) return fail('invalid', 'working wage amount')
-    if ((!generated && person.cppAnnualAt65 !== 0) || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
+    const futureOas = generated && plan.annualBenefitsEvidence ? annualOas(plan, person, age) : undefined
+    if (futureOas && futureOas.grossReal > 0) return fail('unsupported', 'working OAS settlement not yet wired')
+    if ((!generated && person.cppAnnualAt65 !== 0) || (!futureOas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
     if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
