@@ -330,20 +330,28 @@ export function contributionLinesFor(
  * function for both callers. `accounts` carries the destination kinds, so a
  * scheduled FHSA row can never appear here as an RRSP line.
  */
-export function plannedRrspLines(args: {
+/** Origin is separate from the caller-controlled ID, which may equal a
+ * generated voluntary ID. Both request construction and pricing preserve order. */
+export interface RrspPlannedSlice { origin: 'scheduled' | 'voluntary'; line: RrspContributionLine }
+export function plannedRrspSlices(args: {
   accounts: Pick<Account, 'id' | 'kind'>[]
   contributions: Contribution[]
   personId: string
   year: number
   savingsShare: number
-}): RrspContributionLine[] {
+}): RrspPlannedSlice[] {
   const accountKinds = new Map(args.accounts.map(account => [account.id, account.kind]))
-  const lines = contributionLinesFor(args.contributions, args.personId, args.year, accountKinds)
+  const slices: RrspPlannedSlice[] = contributionLinesFor(args.contributions, args.personId, args.year, accountKinds).map(line => ({ origin: 'scheduled', line }))
   const share = roundCents(Math.max(0, args.savingsShare))
   // Same synthetic id the kernel records, so the two ledgers are identical
   // objects and the applied row is attributable in the contribution history.
-  if (share > 0) lines.push({ id: `annual:${args.year}:rrsp`, calendarYear: args.year, deductionYear: null, amount: share })
-  return lines
+  if (share > 0) slices.push({ origin: 'voluntary', line: { id: `annual:${args.year}:rrsp`, calendarYear: args.year, deductionYear: null, amount: share } })
+  return slices
+}
+
+/** Compatibility view: original request-line shape and ordering are unchanged. */
+export function plannedRrspLines(args: Parameters<typeof plannedRrspSlices>[0]): RrspContributionLine[] {
+  return plannedRrspSlices(args).map(slice => slice.line)
 }
 
 export interface RrspRoomPreview {
