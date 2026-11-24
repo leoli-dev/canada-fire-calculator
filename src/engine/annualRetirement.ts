@@ -1,7 +1,8 @@
 import type { InputsV2 } from './model'
 import { pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
-import { annualStopCause, fixedReturnProvider, snapshotProblem, type AnnualState, type AnnualStepValue, type AnnualCoverage, type KernelResult, type ReturnProvider, type YearRow } from './annualState'
+import { isCanonicalGeneratedState, annualStopCause, fixedReturnProvider, snapshotProblem, type AnnualState, type AnnualStepValue, type AnnualCoverage, type KernelResult, type ReturnProvider, type YearRow } from './annualState'
+import { PLAN_TAX_YEAR } from './tax'
 import { calculateHouseholdTax } from './householdTax'
 import { allocateOrderedWithdrawals, searchWithdrawalTarget } from './withdrawalSearch'
 import { annualTfsaAdditionFor, tfsaRoomYear, tfsaStatement } from './tfsaRoom'
@@ -34,9 +35,10 @@ function retirementSnapshotProblem(plan: InputsV2, state: AnnualState): string |
 /** Internal only: ordered draws, no external cash or mandatory registered rules.
  * Tax events enter the existing anchor-real tax engine; settlement is nominal.
  */
-export function annualRetirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider = fixedReturnProvider): KernelResult<AnnualStepValue> {
+function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider, generated = false): KernelResult<AnnualStepValue> {
   try {
     assertCanonicalPlan(plan)
+    if (generated && plan.baseYear !== PLAN_TAX_YEAR) return fail('unsupported', 'continuous retirement requires tax anchor')
     const gate = pricingGate(plan)
     if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
     const problem = retirementSnapshotProblem(plan, opening)
@@ -44,10 +46,10 @@ export function annualRetirementStep(plan: InputsV2, opening: AnnualState, retur
     const person = plan.people[0]
     const age = opening.byPerson[person.id].age
     if (plan.people.length !== 1 || person.role !== 'self' || plan.province !== 'ON') return fail('unsupported', 'retirement requires a single Ontario person')
-    if (person.ageInBaseYear < person.retirementAge || age < person.retirementAge) return fail('unsupported', 'retirement settlement requires already-retired person')
+    if ((!generated && person.ageInBaseYear < person.retirementAge) || age < person.retirementAge) return fail('unsupported', 'retirement settlement requires already-retired person')
     if (age >= 71 && plan.accounts.some(a => a.kind === 'rrsp' && opening.byAccount[a.id].balance > 0)) return fail('unsupported', 'RRSP age-71 conversion rule not yet wired')
     if (age > plan.lifeExpectancy) return fail('invalid', 'year beyond plan horizon')
-    if (person.earnedIncome.status !== 'known' || person.earnedIncome.value !== 0) return fail('unsupported', 'retirement wage evidence must be known zero')
+    if (!generated && (person.earnedIncome.status !== 'known' || person.earnedIncome.value !== 0)) return fail('unsupported', 'retirement wage evidence must be known zero')
     if (person.cppAnnualAt65 !== 0 || person.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'retirement benefit evidence must be explicitly supplied zero')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'retirement pension or CPP work rules not yet wired')
     if (plan.dependents.length || plan.properties.length || plan.debts.length) return fail('unsupported', 'retirement dependents/property/debt settlement not yet wired')
@@ -72,6 +74,11 @@ export function annualRetirementStep(plan: InputsV2, opening: AnnualState, retur
       // Exact exhaustion is a canonical settlement invariant. Leave the shared
       // legacy allocator's subtraction order and all search calls untouched.
       const withdrawals = gross === balances.tfsa + balances.rrsp ? { ...balances } : allocateOrderedWithdrawals(gross, balances, 0, order.map(account => ({ account })))
+      if (generated) for (const kind of ['tfsa', 'rrsp'] as const) {
+        const remaining = balances[kind] - withdrawals[kind]
+        const bound = Math.min(0.004, 4 * Number.EPSILON * (balances[kind] + withdrawals[kind]))
+        if (remaining > 0 && remaining <= bound) withdrawals[kind] = balances[kind]
+      }
       const rrsp = plan.accounts.find(a => a.kind === 'rrsp')
       const tax = calculateHouseholdTax(plan, year, rrsp ? [{ id: `annual:${year}:withdrawal:${rrsp.id}`, kind: 'rrspWithdrawal', accountId: rrsp.id, amount: withdrawals.rrsp / startCpi }] : [])
       if (tax.status !== 'ok') throw tax
@@ -153,4 +160,13 @@ export function projectRetirementCoverage(plan: InputsV2, opening: AnnualState, 
     rows.push(result.value.row)
   }
   return { status: 'ok', value: { baseYear: plan.baseYear, inflation: plan.inflation, terminalYear: plan.baseYear + plan.lifeExpectancy - plan.people.find(p => p.role === 'self')!.ageInBaseYear, requestedStartYear: opening.year, requestedYears: years, state, rows, blocked, uncomputedYears: blocked ? Array.from({ length: years - rows.length - 1 }, (_, i) => blocked!.year + i + 1) : [], overallConclusionAvailable: false, evaluationBasis: 'canonical-retirement' } }
+}
+
+export function annualRetirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider = fixedReturnProvider): KernelResult<AnnualStepValue> {
+  return retirementStep(plan, opening, returns)
+}
+/** Only the initializing continuous runner can issue a live state identity. */
+export function annualRetirementContinuation(plan: InputsV2, opening: AnnualState): KernelResult<AnnualStepValue> {
+  if (!isCanonicalGeneratedState(plan, opening)) return fail('invalid', 'retirement continuation requires internally generated state')
+  return retirementStep(plan, opening, fixedReturnProvider, true)
 }
