@@ -182,6 +182,128 @@ describe('FE-53 independently calculated household debt-free home sale', () => {
       .toBeCloseTo(Number(`${closing}e-60`), 8)
   })
 
+  it.each(['constructor', 'toString'])('preserves exhausted TFSA postings for the opaque ID %s', accountId => {
+    const { plan, evidence } = fixture()
+    const ordinary = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(ordinary.blocked).toBeNull()
+    plan.accounts[0].id = accountId
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(coverage.blocked).toBeNull()
+    expect(coverage.rows.map(row => row.byAccount[accountId])).toEqual(ordinary.rows.map(row => row.byAccount[TFSA]))
+    expect(coverage.rows.map(row => row.cashLedger)).toEqual(ordinary.rows.map(row => row.cashLedger))
+    expect(coverage.rows[4].byAccount[accountId]).toMatchObject({ withdrawal: 16_018.06640625, closing: 0 })
+    expect(coverage.rows[4].retirementSettlement?.primaryHomeSaleArithmetic?.withdrawals[accountId])
+      .toEqual(ordinary.rows[4].retirementSettlement?.primaryHomeSaleArithmetic?.withdrawals[TFSA])
+    expect(Object.keys(coverage.rows[5].retirementSettlement!.primaryHomeSaleArithmetic!.withdrawals)).toEqual([])
+    expect(coverage.rows[5].byAccount[accountId].withdrawal).toBe(0)
+    expect(coverage.state.primaryHomeSaleCash?.exactAccountBalances[accountId]).toEqual(atom('0'))
+    expect(coverage.state.tfsaWithdrawalHistory).toEqual([
+      { id: `annual:2030:withdrawal:${accountId}`, calendarYear: 2030, personId: SELF, amount: 16_018.06640625 },
+    ])
+  })
+
+  it.each(['constructor', 'toString'])('ignores the empty partner TFSA with opaque ID %s', accountId => {
+    const { plan, evidence } = fixture()
+    const empty = { ...structuredClone(plan.accounts[0]), id: 'empty-partner-tfsa', ownerId: PARTNER, balance: 0,
+      taxableOwnerShares: { status: 'known' as const, shares: { [PARTNER]: 1 } } }
+    plan.accounts.push(empty)
+    const ordinary = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(ordinary.blocked).toBeNull()
+    empty.id = accountId
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 6))
+    expect(coverage.blocked).toBeNull()
+    for (const [index, row] of coverage.rows.entries()) {
+      expect(row.byAccount[accountId]).toEqual(ordinary.rows[index].byAccount['empty-partner-tfsa'])
+      expect(row.byAccount[accountId]).toMatchObject({ ownerId: PARTNER, opening: 0, withdrawal: 0, closing: 0 })
+      expect(row.byAccount[TFSA]).toEqual(ordinary.rows[index].byAccount[TFSA])
+      expect(row.retirementSettlement?.primaryHomeSaleArithmetic).toEqual(ordinary.rows[index].retirementSettlement?.primaryHomeSaleArithmetic)
+      expect(Object.keys(row.retirementSettlement?.primaryHomeSaleArithmetic?.withdrawals ?? {})).not.toContain(accountId)
+    }
+    expect(coverage.state.primaryHomeSaleCash?.exactAccountBalances[accountId]).toEqual(atom('0'))
+    expect(coverage.state.tfsaWithdrawalHistory).toEqual(ordinary.state.tfsaWithdrawalHistory)
+    expect(coverage.state.tfsaWithdrawalHistory).toHaveLength(1)
+  })
+
+  it.each(['funded', 'exhausted before sale', 'empty second'] as const)(
+    'settles the authenticated sale with a literal __proto__ TFSA that is %s', status => {
+      const { plan, evidence } = fixture()
+      let target = plan.accounts[0]
+      if (status === 'exhausted before sale') {
+        target.balance = 1
+        evidence.transitionSpending = known(1)
+      } else if (status === 'empty second') {
+        target = { ...structuredClone(target), id: 'empty-partner-tfsa', ownerId: PARTNER, balance: 0,
+          taxableOwnerShares: { status: 'known', shares: { [PARTNER]: 1 } } }
+        plan.accounts.push(target)
+      }
+      const ordinary = ok(projectCanonicalCoverage(plan, evidence, 6))
+      expect(ordinary.blocked).toBeNull()
+      const ordinaryId = target.id
+      target.id = '__proto__'
+      const coverage = ok(projectCanonicalCoverage(plan, evidence, 6))
+      expect(coverage.blocked).toBeNull()
+      const [,, sold] = coverage.rows
+      expect(sold.retirementSettlement?.primaryHomeSale).toMatchObject({ propertyId: HOME, year: SALE_YEAR, netProceeds: 129_999.97 })
+      const expectedDraws = {
+        funded: [0, 0, 0, 0, 16_018.06640625, 0],
+        'exhausted before sale': [0, 1.125, 0, 0, 0, 0],
+        'empty second': [0, 0, 0, 0, 0, 0],
+      }
+      expect(coverage.rows.map(row => row.byAccount['__proto__'].withdrawal)).toEqual(expectedDraws[status])
+      for (const [index, row] of coverage.rows.entries()) {
+        expect(Object.keys(row.byAccount)).toContain('__proto__')
+        const exactDraws = row.retirementSettlement?.primaryHomeSaleArithmetic?.withdrawals ?? {}
+        if (status !== 'funded' || index === 5) expect(Object.keys(exactDraws)).not.toContain('__proto__')
+        else if (index === 4) expect(Object.getOwnPropertyDescriptor(exactDraws, '__proto__')?.value)
+          .toEqual(atom('1601806640625', 8))
+      }
+      expect(Object.getOwnPropertyDescriptor(coverage.state.primaryHomeSaleCash!.exactAccountBalances, '__proto__')?.value)
+        .toEqual(atom('0'))
+      // The account ID is also embedded in withdrawal event IDs.
+      expect(JSON.stringify(coverage).replaceAll('__proto__', ordinaryId)).toBe(JSON.stringify(ordinary))
+    },
+  )
+
+  it('preserves the committed prefix when the indexed sale budget exceeds decimal precision', () => {
+    const { plan, evidence } = fixture(1e-300)
+    // The exact CPI power has scale 300 per year, so exponent 27 fits
+    // within 8,192 places and exponent 28 reaches scale 8,400.
+    const prefix = ok(projectCanonicalCoverage(plan, evidence, 28))
+    expect(prefix.blocked).toBeNull()
+    expect(prefix.rows).toHaveLength(28)
+    expect(prefix.rows.at(-1)?.year).toBe(2053)
+    // The 45,000 CAD budget removes three trailing decimal places.
+    expect(prefix.rows.at(-1)?.retirementSettlement?.primaryHomeSaleArithmetic?.spendingDue.scale).toBe(8097)
+    expect(prefix.state.primaryHomeSaleCash?.receipt.year).toBe(SALE_YEAR)
+    expect(prefix.state.byProperty[HOME].held).toBe(false)
+
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 36))
+    expect(coverage.blocked).toMatchObject({ year: 2054, status: 'unsupported', causes: ['propertySale'],
+      issues: [{ code: 'unsupported', detail: expect.stringMatching(/decimal precision boundary/i) }] })
+    expect(coverage.uncomputedYears).toEqual([2055, 2056, 2057, 2058, 2059, 2060, 2061])
+    expect(coverage.rows).toStrictEqual(prefix.rows)
+    expect(coverage.state).toStrictEqual(prefix.state)
+
+    const sheet = canonicalAnnualSheet(coverage, CONTEXT)
+    const due = flatten(sheet.rows).find(row => row.id === canonicalSheetId('value', 'retirement', 'spendingDue'))!.cells!
+    expect(due[2053].value).toBe(45_000)
+    const boundary = sheet.resolveExplanation!(due[2054].explanationRefs![0])!
+    expect(boundary.sources?.[0].code).toBe('propertySale')
+    for (const [locale, precision, preserved] of [
+      ['en', /exact decimal precision limit/i, /any completed sale are preserved/i],
+      ['fr', /limite de précision décimale exacte/i, /vente déjà comptabilisées sont conservées/i],
+      ['zh', /精确十进制精度上限/, /已完成的出售均予保留/],
+    ] as const) {
+      const message = annualSheetText(boundary.summary!, locale)
+      expect(message).toMatch(precision)
+      expect(message).toMatch(preserved)
+    }
+    for (let year = 2054; year <= 2061; year++) {
+      expect(due[year]).toMatchObject({ value: null, status: 'not-computed' })
+      if (year > 2054) expect(sheet.resolveExplanation!(due[year].explanationRefs![0])!.sources?.[0].code).toBe('suffix')
+    }
+  })
+
   it.each([
     { living: 99.999999999, cash: 0.000000001, draw: 0, unmet: 0 },
     { living: 100, cash: 0, draw: 0, unmet: 0 },
@@ -576,6 +698,31 @@ describe('FE-53 household home sale admission and entry-point parity', () => {
     expect(withEvidence).toStrictEqual(ok(projectAnnualCoverage(control, ok(initializeState(control)), 4, providers)))
     expect(withEvidence).toMatchObject({ evaluationBasis: 'provider-supplied', rows: prefix.rows, state: prefix.state,
       blocked: { year: SALE_YEAR, status: 'unsupported', causes: ['propertySale'] }, uncomputedYears: [2029] })
+  })
+
+  it('preserves the pre-sale account refusal for literal __proto__ without authenticated opt-in', () => {
+    const { plan, evidence } = fixture()
+    const optIn = plan.annualPrimaryHomeSaleEvidence
+    delete plan.annualPrimaryHomeSaleEvidence
+    plan.accounts[0].id = '__proto__'
+    const opening = ok(initializeState(plan))
+    expect(Object.keys(opening.byAccount)).toEqual(['__proto__'])
+    const canonical = ok(projectCanonicalCoverage(plan, evidence, 4))
+    expect(canonical.blocked).toMatchObject({ year: BASE_YEAR, status: 'invalid', causes: ['invalidState'] })
+    expect(canonical.rows).toEqual([])
+    expect(canonical.state).toEqual(opening)
+
+    plan.annualPrimaryHomeSaleEvidence = optIn
+    plan.budget = { kind: 'savingsBudget', annualNetSavings: 0, retirementSpending: 0,
+      debtIncluded: known(true), taxBenefitIncluded: known(true) }
+    for (const person of plan.people) person.retirementAge = 67
+    const providers = { evaluate: () => ({ byPerson: Object.fromEntries(plan.people.map(person => [person.id, {
+      income: 0, earnedIncome: 0, benefits: 0, tax: 0, spending: 0, taxableIncome: 0, benefitIncomeForNextYear: known(0),
+    }])) }), returns: () => 0 }
+    const providerOpening = ok(initializeState(plan))
+    const supplied = ok(projectAnnualCoverage(plan, providerOpening, 4, providers))
+    expect(supplied).toMatchObject({ evaluationBasis: 'provider-supplied', rows: [], state: providerOpening,
+      blocked: { year: BASE_YEAR, status: 'invalid', causes: ['invalidState'] } })
   })
 
   it('preserves the pre-existing solo opt-in without household proof', () => {

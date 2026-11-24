@@ -405,8 +405,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const used = decimalMin(mortgageAdd(cashOpening, added), due)
     const closing = mortgageSubtract(mortgageAdd(cashOpening, added), used)
     const balances = clone(opening.primaryHomeSaleCash?.exactAccountBalances ?? Object.fromEntries(plan.accounts.map(a => [a.id, mortgageDecimal(opening.byAccount[a.id].balance)])))
-    const account = plan.accounts.find(a => a.kind === 'tfsa' && mortgageNumber(balances[a.id]) > 0)
-    const draw = account ? decimalMin(balances[account.id], mortgageSubtract(due, used)) : mortgageDecimal(0)
+    const account = plan.accounts.find(a => a.kind === 'tfsa' && mortgageNumber(ownMortgageBalance(balances, a.id)!) > 0)
+    const draw = account ? decimalMin(ownMortgageBalance(balances, account.id)!, mortgageSubtract(due, used)) : mortgageDecimal(0)
     if (account && draw.coefficient !== '0') {
       const statement = tfsaStatement(plan, account.ownerId!)
       if (!statement || statement.provenance.origin === 'unknown') return fail('unsupported', 'TFSA withdrawal statement evidence missing')
@@ -824,7 +824,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   if (householdWithdrawalSettlement) {
     for (const { accountId, ownerId, kind, amount } of householdWithdrawalSettlement.postings ?? []) {
-      state.byAccount[accountId].balance = householdSaleActive ? mortgageNumber(mortgageSubtract(state.primaryHomeSaleCash!.exactAccountBalances[accountId], householdSaleSettlement!.primaryHomeSaleArithmetic!.withdrawals[accountId])) : mortgageDraws.has(accountId) ? mortgageNumber(mortgageSubtract(ownMortgageBalance(opening.mortgageExactBalances, accountId) ?? mortgageDecimal(opening.byAccount[accountId].balance), mortgageDraws.get(accountId)!)) : state.byAccount[accountId].balance - amount
+      state.byAccount[accountId].balance = householdSaleActive ? mortgageNumber(mortgageSubtract(ownMortgageBalance(state.primaryHomeSaleCash!.exactAccountBalances, accountId)!, ownMortgageBalance(householdSaleSettlement!.primaryHomeSaleArithmetic!.withdrawals, accountId)!)) : mortgageDraws.has(accountId) ? mortgageNumber(mortgageSubtract(ownMortgageBalance(opening.mortgageExactBalances, accountId) ?? mortgageDecimal(opening.byAccount[accountId].balance), mortgageDraws.get(accountId)!)) : state.byAccount[accountId].balance - amount
       if (mortgageDraws.has(accountId)) accountRows[accountId].mortgageExactWithdrawal = mortgageDraws.get(accountId)!
       accountRows[accountId].withdrawal = amount
       if (kind === 'tfsa') state.tfsaWithdrawalHistory = [...(state.tfsaWithdrawalHistory ?? []), { id: `annual:${year}:withdrawal:${accountId}`, personId: ownerId, calendarYear: year, amount }]
@@ -832,12 +832,19 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   }
   const settled = clone(state)
   if (Object.values(settled.byAccount).some(account => !finiteNonnegative(account.balance))) return fail('invalid', 'pre-growth account balance')
+  // Opt-in presence scopes opaque return keys through the authenticated held
+  // prefix too. Future sale facts are checked only when their event is reached.
+  const salePrefixHome = plan.properties[0]
+  const householdSalePrefix = householdSaleAuthorized && plan.people.length === 2 && !plan.debts.length && plan.properties.length === 1 &&
+    salePrefixHome.kind === 'principal' && salePrefixHome.sellAtAge !== null && state.byPerson[self.id].age < salePrefixHome.sellAtAge &&
+    state.byProperty[salePrefixHome.id]?.held && !!plan.annualPrimaryHomeSaleEvidence &&
+    Object.prototype.hasOwnProperty.call(plan.annualPrimaryHomeSaleEvidence, salePrefixHome.id)
   const rates: Record<string, number> = {}
   for (const id of Object.keys(settled.byAccount)) {
     let rate: number
     try { rate = providers.returns({ plan: clone(plan), state: clone(settled) }, id) } catch { return fail('invalid', `return provider failed: ${id}`) }
     if (!Number.isFinite(rate) || rate < -1) return fail('invalid', `return rate: ${id}`)
-    if (householdMortgage || working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence && settled.byAccount[plan.annualNonRegEvidence.accountId]?.nonRegPool)
+    if (householdSalePrefix || householdSaleActive || householdMortgage || working && isCanonicalGeneratedState(plan, opening) && plan.annualNonRegEvidence && settled.byAccount[plan.annualNonRegEvidence.accountId]?.nonRegPool)
       Object.defineProperty(rates, id, { value: rate, enumerable: true, writable: true, configurable: true })
     else rates[id] = rate
   }
@@ -855,10 +862,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       account.balance = precise
     }
     if (householdSaleActive) {
-      const previous = state.primaryHomeSaleCash!.exactAccountBalances[id]
-      const draw = householdSaleSettlement!.primaryHomeSaleArithmetic!.withdrawals[id] ?? mortgageDecimal(0)
+      const previous = ownMortgageBalance(state.primaryHomeSaleCash!.exactAccountBalances, id)!
+      const draw = ownMortgageBalance(householdSaleSettlement!.primaryHomeSaleArithmetic!.withdrawals, id) ?? mortgageDecimal(0)
       const exact = mortgageMultiply(mortgageSubtract(previous, draw), mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[id])))
-      state.primaryHomeSaleCash!.exactAccountBalances[id] = exact
+      Object.defineProperty(state.primaryHomeSaleCash!.exactAccountBalances, id, { value: exact, enumerable: true, writable: true, configurable: true })
       account.balance = mortgageNumber(exact)
       accountRows[id].returnAmount = mortgageNumber(mortgageSubtract(exact, mortgageSubtract(previous, draw)))
     }
@@ -1079,6 +1086,13 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
         else {
           generatedStates.set(state, plan)
           try { result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value) }
+          catch (error) {
+            // Only the authenticated household sale route owns this precision
+            // boundary. Keep its failed year atomic, preserving the prior rows.
+            if (!(error instanceof MortgagePrecisionError) || plan.people.length !== 2 ||
+                !(state.primaryHomeSaleCash || plan.properties.some(p => p.sellAtAge !== null && state.byPerson[person.id].age >= p.sellAtAge && state.byProperty[p.id]?.held))) throw error
+            result = fail('unsupported', 'primary home sale: decimal precision boundary')
+          }
           finally { generatedStates.delete(state) }
         }
         if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory ??= []; committedWorking = true }
