@@ -1,3 +1,4 @@
+import { carryProspectivePurchaseBalance } from "./annualPrimaryHomePurchase"
 import { MortgagePrecisionError, mortgageDecimal, mortgageSubtract, mortgageClosing, mortgageNumber, validMortgageDecimal, mortgageNegative, type MortgageDecimal } from "./mortgageDecimal"
 import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
@@ -36,7 +37,12 @@ export interface PrimaryHomeSaleReceipt {
   propertyId: string; year: number; grossProceeds: number; sellingCosts: number;
   netProceeds: number; acb: number; realizedGain: number; taxableGain: 0;
 }
+export interface PrimaryHomePurchaseReceipt { propertyId: string; year: number; priceBasis: "purchase-year-nominal" | "base-year-real-indexed"; price: number; qualifyingAcquisitionCosts: number; totalCost: number; acb: number; tax: 0 }
+export interface PrimaryHomePurchaseState { exactPrice: MortgageDecimal; receipt: PrimaryHomePurchaseReceipt; evidence: NonNullable<InputsV2["annualPrimaryHomePurchaseEvidence"]>[string]; exactAccountBalances: Record<string, MortgageDecimal> }
 export interface AnnualState {
+  prospectivePurchaseExactBalances?: Record<string, MortgageDecimal>
+  primaryHomePurchase?: PrimaryHomePurchaseState
+
   primaryHomeSaleCash?: { exactBalance: MortgageDecimal; exactReceipt: import('./annualPrimaryHomeSale').HomeSaleExactReceipt; exactAccountBalances: Record<string, MortgageDecimal>; balance: number; receipt: Readonly<PrimaryHomeSaleReceipt>; evidence: NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string] }
   /** Exact decimal-CAD balances for the authenticated mortgage model only. */
   mortgageExactBalances?: Record<string, MortgageDecimal>
@@ -84,10 +90,10 @@ export interface YearRow {
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
-  retirementSettlement?: { primaryHomeSaleAcbSource?: { propertyId: string; acb: Known<number>; provenance?: import('./model').Provenance }; primaryHomeSaleArithmetic?: { spendingDue: MortgageDecimal; spendingFunded: MortgageDecimal; spendingUnmet: MortgageDecimal; cash: Record<'opening' | 'proceedsAdded' | 'spendingUsed' | 'closing', MortgageDecimal>; withdrawals: Record<string, MortgageDecimal>; receipt: import('./annualPrimaryHomeSale').HomeSaleExactReceipt }; primaryHomeSaleEvidence?: NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string]; primaryHomeSale?: PrimaryHomeSaleReceipt; primaryHomeSaleCash?: { opening: number; proceedsAdded: number; spendingUsed: number; closing: number }; mortgageCashReconciliation?: { amount: number; basis: "decimal-CAD" }; cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
+  retirementSettlement?: { primaryHomePurchase?: PrimaryHomePurchaseReceipt; primaryHomePurchaseEvidence?: PrimaryHomePurchaseState["evidence"]; primaryHomePurchaseArithmetic?: { price: MortgageDecimal; qualifyingAcquisitionCosts: MortgageDecimal; totalCost: MortgageDecimal; withdrawals: Record<string, MortgageDecimal>; spendingDue: MortgageDecimal; spendingFunded: MortgageDecimal; spendingUnmet: MortgageDecimal }; primaryHomeSaleAcbSource?: { propertyId: string; acb: Known<number>; provenance?: import('./model').Provenance }; primaryHomeSaleArithmetic?: { spendingDue: MortgageDecimal; spendingFunded: MortgageDecimal; spendingUnmet: MortgageDecimal; cash: Record<'opening' | 'proceedsAdded' | 'spendingUsed' | 'closing', MortgageDecimal>; withdrawals: Record<string, MortgageDecimal>; receipt: import('./annualPrimaryHomeSale').HomeSaleExactReceipt }; primaryHomeSaleEvidence?: NonNullable<InputsV2['annualPrimaryHomeSaleEvidence']>[string]; primaryHomeSale?: PrimaryHomeSaleReceipt; primaryHomeSaleCash?: { opening: number; proceedsAdded: number; spendingUsed: number; closing: number }; mortgageCashReconciliation?: { amount: number; basis: "decimal-CAD" }; cashBridge?: { method: 'compensated-signed-cash'; netCash: number }; rrif?: RrifSettlement; gisAgeAmountNetIncomeReal?: number; gis?: import('./annualGis').AnnualGis; oas?: import('./annualOas').AnnualOas; cpp?: import('./annualCpp').AnnualCpp; evaluationBasis: 'canonical-retirement'; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number; taxRules: import('./tax').TaxRuleProvenance }
   year: number
   byPerson: Record<string, { age: number; income: number; earnedIncome: number; cpp?: number; oasGross?: number; oasRecovery?: number; oasNet?: number; gis?: number; benefits: number; tax: number; spending: number; taxableIncome: number }>
-  byAccount: Record<string, { mortgageArithmeticReconciliation?: number; mortgageExactWithdrawal?: MortgageDecimal; nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
+  byAccount: Record<string, { primaryHomePurchaseReconciliation?: number; primaryHomePurchaseExactWithdrawal?: MortgageDecimal; primaryHomePurchaseWithdrawalReconciliation?: number; mortgageArithmeticReconciliation?: number; mortgageExactWithdrawal?: MortgageDecimal; nonRegSale?: import("./annualNonReg").NonRegSale; openingKind?: AccountKind; closingKind?: AccountKind; opening: number; contribution: number; withdrawal: number; returnAmount: number; closing: number; acb: Known<number>; ownerId: string }>
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { payoffPrincipalReconciliation?: number; salePayoff?: number; opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
@@ -169,6 +175,8 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
       const problem = nonRegProblem(plan, opening)
       if (problem) return problem
     }
+    if (opening.prospectivePurchaseExactBalances !== undefined && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis) || !plan.annualPrimaryHomePurchaseEvidence || Object.entries(opening.prospectivePurchaseExactBalances).some(([id, exact]) => !opening.byAccount[id] || !validMortgageDecimal(exact) || mortgageNegative(exact) || mortgageNumber(exact) !== opening.byAccount[id].balance))) return "purchase balances require authenticated generated state"
+    if (opening.primaryHomePurchase && (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis))) return "purchase requires authenticated generated state"
     if (opening.primaryHomeSaleCash !== undefined) {
       const cash = opening.primaryHomeSaleCash, r = cash.receipt
       const p = plan.properties.find(p => p.id === r?.propertyId)
@@ -219,8 +227,8 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
         plan.accounts.some(account => opening.byAccount[account.id].kind !== (rrifConversionFor(opening, account.id) ? "rrif" : account.kind) || opening.byAccount[account.id].ownerId !== account.ownerId)) return 'snapshot identity or age'
     // A never executes purchase/sale or changes opening-year facts. A candidate
     // cannot claim the property was acquired or a missing statement was verified.
-    if (plan.properties.some(property => opening.byProperty[property.id].held !== (opening.primaryHomeSaleCash?.receipt.propertyId === property.id ? false : property.plannedPurchaseAge === null) ||
-        !sameKnown(opening.byProperty[property.id].acb, property.acb)) ||
+    if (plan.properties.some(property => opening.byProperty[property.id].held !== (opening.primaryHomeSaleCash?.receipt.propertyId === property.id ? false : (opening.primaryHomePurchase?.receipt.propertyId === property.id ? true : property.plannedPurchaseAge === null)) ||
+        !sameKnown(opening.byProperty[property.id].acb, opening.primaryHomePurchase?.receipt.propertyId === property.id ? { status: "known", value: opening.primaryHomePurchase.receipt.acb } : property.acb)) ||
         plan.debts.some(debt => opening.byDebt[debt.id].annualPayment !== debt.annualPayment ||
           opening.byDebt[debt.id].propertyId !== debt.propertyId) ||
         plan.accounts.some(account => !sameKnown(opening.byAccount[account.id].openedYear, rrifConversionFor(opening, account.id) ? { status: "known", value: rrifConversionFor(opening, account.id)!.year } : account.openedYear))) return 'snapshot event or opening fact'
@@ -727,6 +735,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[id].closing = account.balance
     accountRows[id].acb = clone(account.acb)
   }
+  if (working && isCanonicalGeneratedState(plan, opening)) {
+    try { carryProspectivePurchaseBalance(plan, opening, state, accountRows) }
+    catch { return fail("unsupported", "primary home purchase: prospective decimal precision boundary") }
+  }
   let propertyRows: YearRow['byProperty']
   try { propertyRows = growHeldProperties(plan, state) } catch (error) {
     const issue = error as { status: 'invalid' | 'unsupported'; reason: string }
@@ -804,7 +816,7 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if (detail.startsWith("nonReg:")) return "nonRegSale"
   if (issue.code === 'unfunded') return 'contributionFunding'
   if (detail === 'retirement withdrawals and benefit rules not yet wired') return 'retirement'
-  if (detail.startsWith('planned purchase funding')) return 'propertyPurchase'
+  if (detail.startsWith('primary home purchase:') || detail.startsWith('planned purchase funding')) return 'propertyPurchase'
   if (detail.startsWith('property sale funding') || detail.startsWith('primary home sale:')) return 'propertySale'
   if (/^(RRIF|LIF) minimum withdrawal/.test(detail)) return 'registeredWithdrawal'
   if (/^(RRSP|LIRA|FHSA) age-71/.test(detail)) return 'registeredConversion'

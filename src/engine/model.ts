@@ -157,6 +157,13 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  annualPrimaryHomePurchaseEvidence?: Record<string, {
+    provenance: Provenance; effectiveYear: number; timing: "start-of-purchase-year";
+    priceBasis?: "purchase-year-nominal" | "base-year-real-indexed";
+    priceNominal: Known<number>; qualifyingAcquisitionCostsNominal: Known<number>;
+    postPurchaseAnnualSpendingReal: Known<number>; excludesOneTimeCosts: true;
+  }>
+
   annualPrimaryHomeSaleEvidence?: Record<string, {
     mortgagePayoff?: { openingPrincipalNominal: Known<number>; debtId: string; timing: 'start-of-sale-year'; effectiveYear: number; additionalAccruedInterestNominal: Known<number>; prepaymentPenaltyNominal: Known<number>; dischargeFeesNominal: Known<number>; provenance: Provenance };
     provenance: Provenance; wholePropertyFullyExcluded: true;
