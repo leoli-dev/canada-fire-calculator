@@ -108,7 +108,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
       const baseline = run(0)
       const bound = Math.min(0.004, 0.004 * startCpi,
         4 * Number.EPSILON * (((cpp?.amountReal ?? 0) + (oas?.grossReal ?? 0)) * startCpi + baseline.nominalTax + spendingDue))
-      if (baseline.netCash - spendingDue > bound) return fail('unsupported', oas ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
+      if (baseline.netCash - spendingDue > bound) return fail('unsupported', oas && oas.grossReal > 0 ? 'OAS surplus requires a persistent cash destination' : 'CPP surplus requires a persistent cash destination')
     }
     const final = searchWithdrawalTarget(spendingDue, 0, balances.tfsa + balances.rrsp, run)
     const spendingFunded = Math.min(spendingDue, Math.max(0, final.netCash))

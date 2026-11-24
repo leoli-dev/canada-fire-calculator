@@ -1,3 +1,6 @@
+import { calculatePersonIncome, type IncomeEvent, type IncomeYearContext } from './personIncome'
+import { calculateHouseholdTax } from './householdTax'
+import { oasAfterClawback } from './benefits'
 import type { InputsV2, Person } from './model'
 import { personOasAnnual } from './pensionProvenance'
 
@@ -21,11 +24,11 @@ export interface AnnualOas {
  * https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/about-your-tax-return/tax-return/completing-a-tax-return/deductions-credits-expenses/line-23500-social-benefits-repayment.html
  * https://www.canada.ca/content/dam/canada/employment-social-development/migration/documents/assets/portfolio/docs/en/statistics/quarterly_report/isp-card-apr-jun-2026-en.pdf
  */
-export function annualOas(plan: InputsV2, person: Person, age: number): AnnualOas {
+function validateAnnualOas(plan: InputsV2, person: Person, age: number, household: boolean): AnnualOas {
   const stop = (reason: string): never => { throw { status: 'unsupported', reason } }
   if (!Number.isInteger(age) || age < 0) throw { status: 'invalid', reason: 'invalid OAS annual age' }
-  if (plan.province !== 'ON' || plan.baseYear !== 2026 || plan.people.length !== 1 || age > 69)
-    stop('OAS annual settlement supports solo Ontario through age 69 at 2026 anchor')
+  if (plan.province !== 'ON' || plan.baseYear !== 2026 || (household ? plan.people.length !== 2 : plan.people.length !== 1) || age > 69)
+    stop('OAS annual settlement supports one or two Ontario people through age 69 at 2026 anchor')
   const evidence = plan.annualBenefitsEvidence?.[person.id]
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence) || ![evidence.gis, evidence.allowance, evidence.otherBenefits].every(e => e && typeof e === 'object' && !Array.isArray(e) && ['excluded', 'not-applicable'].includes(e.status) && typeof e.reason === 'string' && e.reason.trim().length > 0 && e.provenance?.origin === 'user' && Number.isSafeInteger(e.provenance.sourceYear) && e.provenance.sourceYear! >= 0))
     stop('OAS requires recorded GIS/Allowance/other-benefit exclusion evidence')
@@ -49,4 +52,31 @@ export function annualOas(plan: InputsV2, person: Person, age: number): AnnualOa
   const grossReal = age < s.startAge! ? 0 : personOasAnnual(person.oasAnnualAt65, s.startAge!, p!.ageBasis)
   if (!Number.isFinite(grossReal) || grossReal < 0 || grossReal > Number.MAX_SAFE_INTEGER / 100) throw { status: 'invalid', reason: 'unsafe OAS amount' }
   return { grossReal, recoveryReal: 0, netReal: grossReal, recoveryIncomeReal: 0, sourceId: s.id, startAge: s.startAge!, sourceYear: p!.sourceYear!, source: p!.source as AnnualOas['source'], ageBasis: p!.ageBasis, evidence: verifiedEvidence, policy: 'annual-estimate-full-year-anchor-real' }
+}
+
+/** Internal household quote: aggregate income without pricing credits first.
+ * Recovery belongs to the recipient; ordinary tax sees net OAS exactly once.
+ * Callers supply only already-reached withdrawal events, never pending accounts.
+ */
+export function settleHouseholdOas(plan: InputsV2, year: number, events: IncomeEvent[], payroll: IncomeYearContext['payroll'], benefits: Record<string, AnnualOas>) {
+  const income = calculatePersonIncome(plan, year, events, { payroll })
+  if (income.status !== 'ok') throw income
+  const oas: Record<string, AnnualOas> = {}
+  for (const [id, benefit] of Object.entries(benefits)) {
+    const ownIncome = income.byPerson[id].netIncome
+    const netReal = oasAfterClawback(benefit.grossReal, ownIncome)
+    oas[id] = { ...benefit, netReal, recoveryReal: benefit.grossReal - netReal, recoveryIncomeReal: ownIncome + benefit.grossReal }
+  }
+  const priced = calculateHouseholdTax(plan, year, [...events, ...Object.entries(oas).map(([id, b]) => ({ id: `annual:${year}:oas:${id}`, personId: id, kind: 'oas' as const, amount: b.netReal }))], { payroll })
+  if (priced.status !== 'ok') throw priced
+  return { priced, oas }
+}
+
+/** Preserve the existing solo validator's public scope. */
+export function annualOas(plan: InputsV2, person: Person, age: number): AnnualOas {
+  return validateAnnualOas(plan, person, age, false)
+}
+/** Called only inside the generated household companion and CPP evidence gate. */
+export function annualHouseholdOas(plan: InputsV2, person: Person, age: number): AnnualOas {
+  return validateAnnualOas(plan, person, age, true)
 }

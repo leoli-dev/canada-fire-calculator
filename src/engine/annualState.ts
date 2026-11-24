@@ -1,5 +1,5 @@
+import { settleHouseholdOas } from './annualOas'
 import { cppInputProblem } from './annualCpp'
-import { calculateHouseholdTax } from './householdTax'
 import { searchWithdrawalTarget } from './withdrawalSearch'
 import { evaluateCanonicalWorkingYear, evaluateCanonicalHouseholdWorkingYear, type ContinuousWorkingEvaluation, type WorkingSpendingEvidence } from './annualWorking'
 import { annualRetirementContinuation } from './annualRetirement'
@@ -60,7 +60,7 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
 }
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
-  householdWithdrawalSettlement?: { postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
+  householdWithdrawalSettlement?: { /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -305,11 +305,13 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const entry = evaluation.byPerson[id]
     if (!entry || ![entry.income, entry.earnedIncome, entry.benefits, entry.tax, entry.spending, entry.taxableIncome].every(finiteNonnegative) ||
         !validKnownAmount(entry.benefitIncomeForNextYear)) return fail('invalid', `evaluator amounts: ${id}`)
-    personRows[id] = { age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, ...(working && entry.cpp !== undefined ? { cpp: entry.cpp } : {}), benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
+    const oas = working && ('household' in working ? working.household.byPerson[id].oas : working.oas)
+    const oasColumns = oas && working ? { oasGross: oas.grossReal * working.startCpi, oasRecovery: oas.recoveryReal * working.startCpi, oasNet: oas.netReal * working.startCpi } : {}
+    personRows[id] = { ...oasColumns, age: person.age, income: entry.income, earnedIncome: entry.earnedIncome, ...(working && entry.cpp !== undefined ? { cpp: entry.cpp } : {}), benefits: entry.benefits, tax: entry.tax, spending: entry.spending, taxableIncome: entry.taxableIncome }
   }
   for (const dependent of Object.values(state.byDependent)) dependent.age += 1
   const income = sum(Object.values(personRows).map(p => p.income))
-  const benefits = sum(Object.values(personRows).map(p => p.benefits))
+  let benefits = sum(Object.values(personRows).map(p => p.benefits))
   let tax = sum(Object.values(personRows).map(p => p.tax))
   const spending = working && 'household' in working ? working.household.spending : sum(Object.values(personRows).map(p => p.spending))
   let householdWithdrawalSettlement: YearRow['householdWithdrawalSettlement']
@@ -325,6 +327,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const events: import('./personIncome').IncomeEvent[] = Object.entries(working.household.byPerson).filter(([, p]) => p.phase === 'working').map(([id, p]) => ({ id: `annual:${year}:wage:${id}`, personId: id, kind: 'employment', amount: p.grossWagesReal }))
     for (const [id, p] of Object.entries(working.household.byPerson)) if (p.cpp) events.push({ id: `annual:${year}:cpp:${id}`, personId: id, kind: 'cpp', amount: p.cpp.amountReal })
     const payroll = Object.fromEntries(Object.entries(working.household.byPerson).flatMap(([id, p]) => p.payrollReal ? [[id, p.payrollReal]] : []))
+    const oasBenefits = Object.fromEntries(Object.entries(working.household.byPerson).flatMap(([id, p]) => p.oas ? [[id, p.oas]] : []))
+    const baselineBenefits = benefits
     const baselineTax = tax
     const cpi = working.startCpi
     const postings: NonNullable<NonNullable<YearRow['householdWithdrawalSettlement']>['postings']> = []
@@ -350,10 +354,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
         net = amount
       } else {
         const run = (gross: number) => {
-          const priced = calculateHouseholdTax(plan, year, [...events, { id: `annual:${year}:withdrawal:${account.id}`, kind: 'rrspWithdrawal', accountId: account.id, amount: gross / cpi }], { payroll })
+          const settled = settleHouseholdOas(plan, year, [...events, { id: `annual:${year}:withdrawal:${account.id}`, kind: 'rrspWithdrawal', accountId: account.id, amount: gross / cpi }], payroll, oasBenefits)
+          const priced = settled.priced
+          const netBenefits = sum(Object.values(settled.oas).map(b => b.netReal)) * cpi
           if (priced.status !== 'ok') throw priced
           const nominalTax = priced.total * cpi
-          const amounts = [gross, gross / cpi, priced.total, nominalTax, baselineTax, baselineTax / cpi,
+          const amounts = [netBenefits, ...Object.values(settled.oas).flatMap(b => [b.grossReal, b.netReal, b.recoveryReal, b.recoveryIncomeReal, b.grossReal * cpi, b.netReal * cpi, b.recoveryReal * cpi]), gross, gross / cpi, priced.total, nominalTax, baselineTax, baselineTax / cpi,
             ...events.map(e => e.amount), ...events.map(e => e.amount * cpi),
             ...Object.values(priced.byPerson).flatMap(p => [p.tax, p.grossIncome, p.taxableIncome, p.netIncome, p.tax * cpi, p.grossIncome * cpi, p.taxableIncome * cpi, p.netIncome * cpi])]
           // Bound accumulated arithmetic error to a small fraction of a cent.
@@ -361,7 +367,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
           if (amounts.some(n => !finiteNonnegative(n) || n > Number.MAX_SAFE_INTEGER / 100) ||
               64 * Number.EPSILON * sum(amounts) > 0.0001 * Math.min(1, cpi))
             throw { status: 'unsupported', reason: 'household withdrawal tax precision cannot be upheld' }
-          return { gross, priced, nominalTax, netCash: gross - (nominalTax - baselineTax) }
+          return { gross, priced, nominalTax, oas: settled.oas, netBenefits, netCash: gross - (nominalTax - baselineTax) + netBenefits - baselineBenefits }
         }
         try {
           // Test the actual endpoint before any search or later-source gate.
@@ -372,10 +378,18 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
           amount = accepted.gross
           net = accepted.netCash
           tax = accepted.nominalTax
+          benefits = accepted.netBenefits
+          for (const [id, oas] of Object.entries(accepted.oas)) {
+            working.household.byPerson[id].oas = oas
+            personRows[id].oasGross = oas.grossReal * cpi
+            personRows[id].oasRecovery = oas.recoveryReal * cpi
+            personRows[id].oasNet = oas.netReal * cpi
+            personRows[id].benefits = oas.netReal * cpi
+          }
           for (const [id, priced] of Object.entries(accepted.priced.byPerson)) {
             personRows[id].tax = priced.tax * cpi
             personRows[id].taxableIncome = priced.taxableIncome * cpi
-            evaluation.byPerson[id].benefitIncomeForNextYear = { status: 'known', value: priced.netIncome * cpi }
+            evaluation.byPerson[id].benefitIncomeForNextYear = { status: 'known', value: (priced.netIncome - (accepted.oas[id]?.netReal ?? 0)) * cpi }
           }
         } catch (error) {
           const problem = error as { status?: string; reason?: string }
@@ -405,7 +419,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const spendingUnmet = remaining
     if (Math.abs(spending - (spendingFunded + spendingUnmet)) > bound(spending, spendingFunded, spendingUnmet))
       return fail('unsupported', 'household withdrawal cash precision cannot be upheld')
-    householdWithdrawalSettlement = { accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, postings, taxIncrement: tax - baselineTax, taxTotal: tax, withdrawal, spendingDue: spending, spendingFunded, spendingUnmet, startCpi: working.startCpi }
+    householdWithdrawalSettlement = { ...(Object.keys(oasBenefits).length ? { baselineBenefits, settledBenefits: benefits } : {}), accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, postings, taxIncrement: tax - baselineTax, taxTotal: tax, withdrawal, spendingDue: spending, spendingFunded, spendingUnmet, startCpi: working.startCpi }
   }
   const cash = working ? Math.max(0, working.netCash) : cashBudget(plan.budget, year, plan.baseYear, plan.inflation)
   if (cash === null || !Number.isFinite(cash)) return fail('invalid', 'nominal savings budget')

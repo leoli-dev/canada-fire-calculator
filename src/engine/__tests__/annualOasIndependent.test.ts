@@ -277,7 +277,7 @@ describe('independent annual OAS settlement vectors', () => {
     },
   )
 
-  it('keeps two-recipient OAS outside settlement even with both owners and complete exclusions', () => {
+  it('settles two simultaneous claims from the both-working prefix', () => {
     const plan = staggeredHouseholdPlan()
     const { evidence } = scenario({ spending: 70_000 })
     for (const person of plan.people) Object.assign(person, { ageInBaseYear: 64, retirementAge: 65, oasAnnualAt65: grossOas })
@@ -287,7 +287,15 @@ describe('independent annual OAS settlement vectors', () => {
     const workingSpending = staggeredReference.working.spending
     plan.budget = { kind: 'incomeBudget', workingSpending, retirementSpending: 70_000 }
     const result = ok(projectCanonicalCoverage(plan, { ...staggeredSpending(), ...evidence, workingSpending: known(workingSpending) }, 3))
-    expect(result.blocked).not.toBeNull()
-    expect(result.rows.every(row => row.cashLedger.benefits === 0)).toBe(true)
+    expect(result.blocked).toBeNull()
+    expect(result.rows[0].cashLedger.benefits).toBe(0)
+    for (const [index, row] of result.rows.slice(1).entries()) {
+      const receipt = grossOas * (1 + inflation) ** (index + 1)
+      expect(row.byPerson).toMatchObject({
+        [RETIREE]: { oasGross: close(receipt), oasRecovery: 0, oasNet: close(receipt) },
+        [PARTNER]: { oasGross: close(receipt), oasRecovery: 0, oasNet: close(receipt) },
+      })
+      expect(row.cashLedger.benefits).toBeCloseTo(2 * receipt, 4)
+    }
   })
 })
