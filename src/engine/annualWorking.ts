@@ -1,4 +1,6 @@
-import { passiveHomeProblem } from './annualProperty'
+import { mortgageDecimal, mortgageSubtract, mortgageNumber, mortgageNegative } from "./mortgageDecimal"
+import { heldMortgageProblem } from './annualProperty'
+import { settleAnnualDebt } from './annualDebt'
 import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
 import { annualOas, annualHouseholdOas, settleHouseholdOas, type AnnualOas } from './annualOas'
@@ -19,6 +21,8 @@ export interface WorkingSpendingEvidence {
   retirementSpending: Known<number>
   /** Explicit household total for years with one retired and one working member. */
   transitionSpending?: Known<number>
+  /** Both living-spending amounts exclude the separately scheduled mortgage cash. */
+  scheduledMortgagePaymentsExcluded?: Known<true>
 }
 
 export interface CanonicalWorkingEvaluation {
@@ -190,7 +194,9 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     if (futureOas && futureOas.grossReal > 0) return fail('unsupported', 'working OAS settlement not yet wired')
     if ((!generated && person.cppAnnualAt65 !== 0) || (!futureOas && person.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(person.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(person.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')
     if (person.pension || person.pensionAnnual !== 0 || person.cppWork) return fail('unsupported', 'working pension and CPP work rules not yet wired')
-    if (plan.dependents.length || plan.debts.length || (plan.properties.length && (!generated || passiveHomeProblem(plan)))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
+    const housingProblem = generated ? heldMortgageProblem(plan, evidence) : null
+    if (housingProblem) return fail('unsupported', housingProblem)
+    if (plan.dependents.length || (!generated && (plan.debts.length || plan.properties.length))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
     const cpp = generated && person.cppAnnualAt65 !== 0 ? annualCpp(plan, person, age) : undefined
     if (plan.incomeSources.some(s => !(cpp && s.kind === 'cpp' && s.recipientId === person.id) && (s.fromAge ?? -Infinity) <= age && (s.startAge ?? -Infinity) <= age && (s.toAge ?? Infinity) >= age && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0))) return fail('unsupported', 'additional active working income source not yet wired')
@@ -216,17 +222,26 @@ export function evaluateCanonicalWorkingYear(plan: InputsV2, evidence: WorkingSp
     // full cash payroll is subtracted here once, never hidden inside tax.
     // Net in the common anchor basis before indexing. Separately indexing
     // each cash leg can turn exact exhaustion into a tiny nominal deficit.
-    const cashResidualReal = gross + (cpp?.amountReal ?? 0) - payroll.contributions - priced.total - plan.budget.workingSpending
+    const debtSettlement = generated && plan.debts.length ? settleAnnualDebt(structuredClone(generatedState!), plan.debts) : undefined
+    if (debtSettlement && debtSettlement.status !== 'ok') return fail(debtSettlement.status, debtSettlement.reason)
+    const debtPayments = debtSettlement?.status === 'ok' ? debtSettlement.value.debtPayments : 0
+    const debtReal = debtPayments / startCpi
+    const cashResidualReal = gross + (cpp?.amountReal ?? 0) - payroll.contributions - priced.total - plan.budget.workingSpending - debtReal
     // Normalize only operand-scale floating-point residue, symmetrically for
     // surplus and deficit. Do not impose a minimum scale: a zero-wage 1e-12
     // expense is a real deficit. Cap below half a cent in BOTH anchor and
     // nominal dollars so large operands/CPI cannot turn this into cash rounding.
     const arithmeticBoundReal = Math.min(0.004, 0.004 / startCpi,
-      4 * Number.EPSILON * (gross + payroll.contributions + priced.total + plan.budget.workingSpending))
+      4 * Number.EPSILON * (gross + payroll.contributions + priced.total + plan.budget.workingSpending + debtReal))
     const netCashReal = Math.abs(cashResidualReal) <= arithmeticBoundReal ? 0 : cashResidualReal
-    const netCash = netCashReal * startCpi
+    let netCash = netCashReal * startCpi
+    if (generated && plan.debts.length) {
+      const exactCash = [tax, payrollContributions, spending, debtPayments].reduce((cash, use) => mortgageSubtract(cash, mortgageDecimal(use)), mortgageDecimal(income))
+      if (mortgageNegative(exactCash)) return fail("unsupported", "negative working cash requires withdrawal funding rule")
+      netCash = mortgageNumber(exactCash)
+    }
     if (![income, tax, payrollContributions, spending, taxableIncome].every(safeMoney) || !Number.isFinite(netCash)) return fail('invalid', 'working nominal pricing amount')
-    if (netCashReal < 0) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
+    if (netCash < 0) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
     const { rulePackId, ruleYear, assumedFutureRule, projectionPolicy, coverage } = priced
     return { status: 'ok', value: { evaluationBasis: 'canonical-working', year, personId: person.id, age, startCpi, ...(futureOas ? { oas: futureOas } : {}), ...(cpp ? { cpp } : {}),
       suppliedInputs: { basis: 'supplied-known', grossWagesReal: gross, workingSpendingReal: plan.budget.workingSpending, retirementSpendingReal: plan.budget.retirementSpending },
