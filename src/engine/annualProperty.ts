@@ -79,6 +79,35 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
   return rows
 }
 
+/** Additive two-owner consent. Every reference is an own recorded field. */
+export const HOUSEHOLD_MORTGAGE_ORDER_REFUSAL = "household mortgage requires dated explicit exhaustive two-owner TFSA funding authorization"
+export function householdMortgageOrderProblem(plan: InputsV2, opening?: AnnualState): string | null {
+  const own = (v: object, k: string) => Object.prototype.hasOwnProperty.call(v, k)
+  const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
+  const fields = (v: unknown, keys: string[]): v is Record<string, unknown> => record(v) && keys.every(k => own(v, k))
+  const e = plan.annualHouseholdMortgageFundingEvidence
+  const accounts = plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0)
+  if (!own(plan, "annualHouseholdMortgageFundingEvidence") || !fields(e, ["orderedAccounts", "authorized", "purpose", "provenance"]) ||
+      e.authorized !== true || e.purpose !== "household-held-mortgage-and-living" ||
+      !fields(e.provenance, ["origin", "sourceYear"]) || e.provenance.origin !== "user" ||
+      !Number.isInteger(e.provenance.sourceYear) || typeof e.provenance.sourceYear !== "number" || e.provenance.sourceYear < 0 || e.provenance.sourceYear > plan.baseYear ||
+      e.provenance.note !== undefined && (!own(e.provenance, "note") || typeof e.provenance.note !== "string") ||
+      !Array.isArray(e.orderedAccounts) || e.orderedAccounts.length !== 2 || !own(e.orderedAccounts, "0") || !own(e.orderedAccounts, "1") ||
+      accounts.length !== 2 || new Set(accounts.map(a => a.ownerId)).size !== 2 ||
+      e.orderedAccounts.some(ref => !fields(ref, ["accountId", "ownerId"]) || typeof ref.accountId !== "string" || typeof ref.ownerId !== "string" ||
+        !accounts.some(a => a.id === ref.accountId && a.ownerId === ref.ownerId) || !plan.people.some(p => p.id === ref.ownerId) ||
+        opening && (!own(opening.byAccount, ref.accountId) || opening.byAccount[ref.accountId].ownerId !== ref.ownerId)) ||
+      new Set(e.orderedAccounts.map(ref => ref.accountId)).size !== 2 || new Set(e.orderedAccounts.map(ref => ref.ownerId)).size !== 2)
+    return HOUSEHOLD_MORTGAGE_ORDER_REFUSAL
+  for (const account of accounts) {
+    const title = own(account, "taxableOwnerShares") ? account.taxableOwnerShares : undefined
+    if (title?.status === "known" && (!fields(title, ["status", "shares"]) || !record(title.shares) ||
+        Object.entries(title.shares).some(([id, share]) => id !== account.ownerId && share !== 0 || typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 1) ||
+        !own(title.shares, account.ownerId!) || title.shares[account.ownerId!] !== 1)) return HOUSEHOLD_MORTGAGE_ORDER_REFUSAL
+  }
+  return null
+}
+
 /** Narrow generated mortgage extension; a linked primary home is personal use.
  * CRA personal borrowing interest is not deductible (verified 2026-11-24):
  * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
@@ -99,7 +128,13 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
     return 'mortgage requires recorded debt provenance'
   const homeProblem = (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
   if (homeProblem) return homeProblem
-  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !(opening && isCanonicalGeneratedState(plan, opening)) || plan.annualGisEvidence))
+  const ordered = plan.people.length === 2 && (plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualHouseholdMortgageFundingEvidence !== undefined)
+  if (ordered && plan.annualHouseholdMortgageFundingEvidence === undefined) return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
+  if (ordered) {
+    const problem = householdMortgageOrderProblem(plan, opening)
+    if (problem) return problem
+  }
+  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || !ordered && plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !(opening && isCanonicalGeneratedState(plan, opening)) || plan.annualGisEvidence))
     return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
