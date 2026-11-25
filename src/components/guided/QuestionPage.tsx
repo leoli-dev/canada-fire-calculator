@@ -48,9 +48,10 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
   const draft = useStore((s) => isSharedField(props.field) ? s.draftByField[props.field] : undefined)
   const editSharedField = useStore((s) => s.editSharedField)
   const inputs = useStore((s) => s.inputs)
+  const canonicalSelected = useStore((s) => !!s.canonical?.deterministicProjection)
   const missingMortgage = props.field === 'principalResidence.annualMortgagePayment' && meta?.status === 'unknown' && inputs.principalResidence?.mode === 'planned' && inputs.principalResidence.price > inputs.principalResidence.downPayment
   const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution' || props.field === 'fhsa.annualContribution'
-    ? validateInputs(inputs).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
+    ? validateInputs(inputs, { canonical: canonicalSelected }).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
     : undefined
   return <div className="question-answer" data-field={props.field}>
     <label htmlFor={`q-${props.field}`}>{props.label}</label>

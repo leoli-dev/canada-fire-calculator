@@ -32,7 +32,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
   const { i18n, t } = useTranslation()
   const cad = useCad()
   const state = useStore()
-  const issues = validateInputs(state.inputs).filter((issue) => issue.severity === 'error')
+  const issues = validateInputs(state.inputs, { canonical: !!state.canonical?.deterministicProjection }).filter((issue) => issue.severity === 'error')
   const incomplete = pages.filter((page) => !page.optional && !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
   const canGenerate = issues.length === 0 && incomplete.length === 0

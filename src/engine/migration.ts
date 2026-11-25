@@ -565,6 +565,12 @@ export function refreshCanonicalFromLegacy(previous: InputsV2 | null, inputs: In
   next.incomeSources.push(...prior.incomeSources.filter(income => !nextIncomeIds.has(income.id) && income.recipientId === null))
   next.migration = { ...prior.migration, ownershipNeedsConfirmation: next.accounts.some(a => a.kind !== 'nonReg' && a.ownerId === null || a.taxableOwnerShares.status === 'unknown') || next.properties.some(p => p.taxableOwnerShares.status === 'unknown') }
   next.budget = carryRecordedBudget(inputs, previous, next.budget)
+  // Keep the selected route visible after edits, but never carry advanced
+  // authorizations across a reconstruction that may change IDs or ownership.
+  // The user must re-record living budgets; a diagnostic replaces stale output.
+  if (previous.deterministicProjection) next.deterministicProjection = {
+    ...structuredClone(previous.deterministicProjection), invalidated: true,
+  }
   return next
 }
 

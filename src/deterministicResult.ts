@@ -1,0 +1,37 @@
+import { runProjection, type Inputs, type ProjectionResult } from './engine'
+import type { InputsV2 } from './engine/model'
+import { projectCanonicalCoverage, type AnnualCoverage, type AnnualIssue } from './engine/annualState'
+
+export type CanonicalDeterministicResult = {
+  route: 'canonical'
+  status: 'complete' | 'partial' | 'blocked' | 'invalid'
+  coverage: AnnualCoverage | null
+  issues: AnnualIssue[]
+  requestedStartYear: number
+  requestedYears: number
+}
+export type DeterministicResult = { route: 'legacy'; result: ProjectionResult } | CanonicalDeterministicResult
+
+/** Sole deterministic routing point. A selected canonical stop never falls back. */
+export function selectDeterministicResult(inputs: Inputs, plan: InputsV2 | null, evidence: { nonRegAbsent: boolean }): DeterministicResult {
+  if (!plan?.deterministicProjection) return { route: 'legacy', result: runProjection(inputs, undefined, plan ?? undefined, { captureAnnualDetails: true }) }
+  const self = plan.people.find(person => person.role === 'self')
+  const years = self ? plan.lifeExpectancy - self.ageInBaseYear + 1 : NaN
+  const requestedYears = Number.isInteger(years) && years > 0 && years <= 120 ? years : 0
+  const base = { route: 'canonical' as const, requestedStartYear: plan.baseYear, requestedYears }
+  if (plan.deterministicProjection.invalidated || !requestedYears) return { ...base, status: 'invalid', coverage: null,
+    issues: [{ code: 'invalid', detail: plan.deterministicProjection.invalidated ? 'deterministic-spending-reconfirmation-required' : 'projection-horizon-invalid' }] }
+  // Omit only the migration placeholder after an explicit absence answer.
+  // This scoped snapshot never removes recorded assets from the persisted plan.
+  const snapshot = structuredClone(plan)
+  if (evidence.nonRegAbsent && !plan.annualNonRegEvidence) snapshot.accounts = snapshot.accounts.filter(account =>
+    !(account.id === 'legacy:account:nonReg' && account.kind === 'nonReg' && account.balance === 0 &&
+      account.acb.status === 'known' && account.acb.value === 0 &&
+      !plan.contributions.some(item => item.accountId === account.id) &&
+      !plan.recurringContributions.some(item => item.accountId === account.id)))
+  const projected = projectCanonicalCoverage(snapshot, snapshot.deterministicProjection!.spending, requestedYears)
+  if (projected.status !== 'ok') return { ...base, status: projected.status === 'invalid' ? 'invalid' : 'blocked', coverage: null, issues: projected.issues }
+  const coverage = projected.value
+  return { ...base, status: coverage.blocked ? (coverage.rows.length ? 'partial' : coverage.blocked.status === 'invalid' ? 'invalid' : 'blocked') : 'complete',
+    coverage, issues: coverage.blocked?.issues ?? [] }
+}

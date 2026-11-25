@@ -25,28 +25,30 @@ function Cell(props: { r: ProjectionResult; life: number; blocked: boolean }) {
 export function ScenarioCard() {
   const { t } = useTranslation()
   const { inputs, canonical, scenarioA, scenarioACanonical, saveScenarioA, restoreScenarioA, clearScenarioA } = useStore()
+  const canonicalSelected = !!canonical?.deterministicProjection || !!scenarioACanonical?.deterministicProjection
   const currentReview = migrationReview(canonical)
   const scenarioReview = migrationReview(scenarioACanonical)
   const migrationComparisonBlocked = !!scenarioA && !canComparePrecisely(canonical, scenarioACanonical)
   const ownershipPending = currentReview?.ownershipPending || scenarioReview?.ownershipPending
 
   const resultA = useMemo(
-    () => (scenarioA ? runProjection(scenarioA, undefined, scenarioACanonical ?? undefined) : null),
-    [scenarioA, scenarioACanonical],
+    () => (!canonicalSelected && scenarioA ? runProjection(scenarioA, undefined, scenarioACanonical ?? undefined) : null),
+    [scenarioA, scenarioACanonical, canonicalSelected],
   )
-  const resultNow = useMemo(() => runProjection(inputs, undefined, canonical ?? undefined), [inputs, canonical])
+  const resultNow = useMemo(() => canonicalSelected ? null : runProjection(inputs, undefined, canonical ?? undefined), [inputs, canonical, canonicalSelected])
   const singleLegacyPreview = !inputs.partner && !scenarioA?.partner && inputs.province !== 'QC' && scenarioA?.province !== 'QC'
   const taxComparisonBlocked = !!scenarioA &&
-    (resultNow.taxCapability?.status !== 'person' || resultA?.taxCapability?.status !== 'person')
+    (resultNow?.taxCapability?.status !== 'person' || resultA?.taxCapability?.status !== 'person')
   const terminalComparisonBlocked = !!scenarioA &&
-    (resultNow.terminalTaxStatus === 'unsupported' || resultA?.terminalTaxStatus === 'unsupported')
-  const comparisonBlocked = migrationComparisonBlocked || terminalComparisonBlocked || taxComparisonBlocked && !singleLegacyPreview
+    (resultNow?.terminalTaxStatus === 'unsupported' || resultA?.terminalTaxStatus === 'unsupported')
+  const comparisonBlocked = canonicalSelected || migrationComparisonBlocked || terminalComparisonBlocked || taxComparisonBlocked && !singleLegacyPreview
 
   return (
     <details className="chart-card collapsible" data-testid="scenario-comparison"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
-      {comparisonBlocked && <p className="hint">{t(migrationComparisonBlocked ? 'migrationComparisonBlocked' : terminalComparisonBlocked ? 'be11TerminalComparisonLimit' : 'be11ComparisonLimit')} {ownershipPending && t('migrationLegacySummary')}</p>}
+      {canonicalSelected && <p className="hint">{t('canonical.comparisonUnavailable')}</p>}
+      {!canonicalSelected && comparisonBlocked && <p className="hint">{t(migrationComparisonBlocked ? 'migrationComparisonBlocked' : terminalComparisonBlocked ? 'be11TerminalComparisonLimit' : 'be11ComparisonLimit')} {ownershipPending && t('migrationLegacySummary')}</p>}
       {!comparisonBlocked && taxComparisonBlocked && <p className="hint">{t('be11ComparisonEstimate')}</p>}
       <div className="card-head">
         <div>
@@ -65,7 +67,7 @@ export function ScenarioCard() {
           )}
         </div>
       </div>
-      {scenarioA && resultA ? (
+      {scenarioA && resultA && resultNow ? (
         <div className="table-scroll">
         <table className="compare-table">
           <thead>

@@ -153,6 +153,21 @@ export function assertLegacyInputs(value: unknown): asserts value is Inputs {
 export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
   requireShape(object(value) && value.schemaVersion === 2, 'schemaVersion')
   const plan = value as unknown as InputsV2
+  if (plan.deterministicProjection !== undefined) {
+    const e = plan.deterministicProjection
+    requireShape(object(e) && e.mode === 'canonical' && object(e.spending), 'deterministicProjection')
+    provenance(e.provenance, 'deterministicProjection.provenance')
+    requireShape(e.provenance.origin === 'user' && integer(e.provenance.sourceYear), 'deterministicProjection.userSource')
+    requireShape(e.invalidated === undefined || e.invalidated === true, 'deterministicProjection.invalidated')
+    for (const key of ['workingSpending', 'retirementSpending', 'transitionSpending'] as const) {
+      if (key !== 'transitionSpending' || e.spending[key] !== undefined)
+        knownNonnegative(e.spending[key], `deterministicProjection.spending.${key}`)
+    }
+    if (e.spending.scheduledMortgagePaymentsExcluded !== undefined) {
+      known(e.spending.scheduledMortgagePaymentsExcluded, 'deterministicProjection.mortgageExcluded', 'boolean')
+      requireShape(e.spending.scheduledMortgagePaymentsExcluded.status === 'known' && e.spending.scheduledMortgagePaymentsExcluded.value === true, 'deterministicProjection.mortgageExcluded.true')
+    }
+  }
   requireShape(integer(plan.baseYear), 'baseYear')
   requireShape(text(plan.province) && finite(plan.inflation), 'province/inflation')
   requireShape(object(plan.budget) && ['incomeBudget', 'savingsBudget'].includes(plan.budget.kind as string), 'budget.kind')
