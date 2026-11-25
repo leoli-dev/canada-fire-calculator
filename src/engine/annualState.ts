@@ -8,6 +8,7 @@ import { growHeldProperties } from './annualProperty'
 import { nonRegProblem } from "./annualNonReg"
 import { gisAssessmentReceipt, validGisBasis, type GisAssessmentFact } from './annualGis'
 import { settleHouseholdOas } from './annualOas'
+import { quoteHouseholdMortgageRrsp, type HouseholdMortgageRrspReceipt } from './annualHouseholdMortgageRrsp'
 import { cppInputProblem } from './annualCpp'
 import { HOUSEHOLD_MORTGAGE_BENEFITS_REFUSAL, type HouseholdMortgageBenefitsCash } from './annualHouseholdMortgageBenefits'
 import { searchWithdrawalTarget } from './withdrawalSearch'
@@ -99,7 +100,7 @@ export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; det
 export interface YearRow {
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
   householdExpense?: HouseholdExpenseReceipt
-  householdWithdrawalSettlement?: { publicBenefitsCash?: HouseholdMortgageBenefitsCash; orderedFundingAuthorization?: InputsV2["annualHouseholdMortgageFundingEvidence"]; primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
+  householdWithdrawalSettlement?: { rrspFunding?: HouseholdMortgageRrspReceipt; publicBenefitsCash?: HouseholdMortgageBenefitsCash; orderedFundingAuthorization?: InputsV2["annualHouseholdMortgageFundingEvidence"]; primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -287,6 +288,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const expense = plan.annualHouseholdExpenseEvidence
   const expenseReached = !!working && 'household' in working && isCanonicalGeneratedState(plan, opening) && expense !== undefined && (!Number.isInteger(expense?.effectiveYear) || expense.effectiveYear <= year) && !opening.householdExpenseReceipt
   if (expenseReached) {
+    if (plan.annualHouseholdMortgageRrspEvidence !== undefined) return fail('unsupported', 'household mortgage RRSP reached one-time expense composition is not supported')
     const problem = expenseEvidenceProblem(plan, expense, year)
     if (problem || !working || !("household" in working) || working.household.phase !== "both-retired" || !isCanonicalGeneratedState(plan, opening) || !plan.debts.length || opening.primaryHomeSaleCash || opening.primaryHomePurchase || plan.properties.some(p => p.sellAtAge !== null && opening.byPerson[self.id].age >= p.sellAtAge || p.plannedPurchaseAge !== null)) return fail("unsupported", problem ?? "household expense: authenticated both-retired held mortgage required")
   }
@@ -472,8 +474,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     let exactBenefits = mortgageDecimal(0)
     let exactTax = mortgageDecimal(0)
     let exactPayroll = mortgageDecimal(0)
+    let rrspFunding: HouseholdMortgageRrspReceipt | undefined
+    const rrspAuthorization = householdMortgage ? plan.annualHouseholdMortgageRrspEvidence : undefined
     const publicBenefitsCash: HouseholdMortgageBenefitsCash | undefined = householdMortgage && plan.annualHouseholdMortgageBenefitsEvidence ? {
-      evidence: clone(plan.annualHouseholdMortgageBenefitsEvidence), basis: 'anchor-real-quote-times-serialized-start-CPI', startCpi: exactCpi,
+      evidence: clone(plan.annualHouseholdMortgageBenefitsEvidence), basis: rrspAuthorization ? 'quoted-CPP-times-start-CPI-and-posted-tax-net-OAS-atoms' : 'anchor-real-quote-times-serialized-start-CPI', startCpi: exactCpi,
       byPerson: {}, cpp: mortgageDecimal(0), oasNet: mortgageDecimal(0), afterDebt: mortgageDecimal(0),
       beforeDrawsAfterDebt: mortgageDecimal(0), livingDue: mortgageDecimal(0), expenseDue: mortgageDecimal(0), netCashBeforeWithdrawals: mortgageDecimal(0),
     } : undefined
@@ -484,7 +488,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
         // Decimalize each quoted anchor-real leg BEFORE CPI multiplication;
         // never recover CPP by subtracting wages from rounded posted income.
         const cppReal = mortgageDecimal(person.cpp!.amountReal), oasNetReal = mortgageDecimal(person.oas!.netReal)
-        const cpp = mortgageMultiply(cppReal, exactCpi), oasNet = mortgageMultiply(oasNetReal, exactCpi)
+        const cpp = mortgageMultiply(cppReal, exactCpi), oasNet = rrspAuthorization ? mortgageDecimal(personRows[id].benefits) : mortgageMultiply(oasNetReal, exactCpi)
         publicBenefitsCash.byPerson[id] = { cppReal, oasNetReal, cpp, oasNet, postedIncome: personRows[id].income, postedBenefits: personRows[id].benefits, postedTax: personRows[id].tax }
         publicBenefitsCash.cpp = mortgageAdd(publicBenefitsCash.cpp, cpp)
         publicBenefitsCash.oasNet = mortgageAdd(publicBenefitsCash.oasNet, oasNet)
@@ -506,6 +510,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const exactLiving = mortgageMultiply(mortgageDecimal(working.household.spendingReal), exactCpi)
     let available = mortgageSubtract(mortgageSubtract(mortgageAdd(exactIncome, exactBenefits), exactTax), exactPayroll)
     const availableBeforeDraws = available
+    const baselineTax = tax
+    const baselineBenefits = benefits
     // The admitted contract has exactly one fixed nominal installment.
     const expenseDue = expenseReached ? mortgageDecimal(expense!.amountNominal.status === "known" ? expense!.amountNominal.value : NaN) : mortgageDecimal(0)
     const due = mortgageAdd(mortgageAdd(exactLiving, mortgageDecimal(debtPayments)), expenseDue)
@@ -549,11 +555,53 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       remaining = mortgageSubtract(remaining, draw)
       }
     }
+    // Actual authorized TFSA draws have already been accepted. Only a remaining
+    // mandatory/living shortage reaches the separately authorized RRSP owner.
+    if (rrspAuthorization && working.household.phase !== 'both-working' && mortgageNegative(mortgageSubtract(available, due))) {
+      if (plan.strategy === 'meltdownPaced') return fail('unsupported', 'household mortgage RRSP withdrawal strategy unsupported')
+      const account = plan.accounts.find(a => a.id === rrspAuthorization.accountId)!
+      const capacity = ownMortgageBalance(opening.mortgageExactBalances, account.id) ?? mortgageDecimal(state.byAccount[account.id].balance)
+      if (capacity.coefficient !== '0') {
+        try {
+          const accepted = quoteHouseholdMortgageRrsp(plan, year, working, capacity, available, due, exactTax, exactBenefits)
+          rrspFunding = accepted.receipt
+          available = accepted.availableAfterDraw
+          mortgageDraws.set(account.id, accepted.receipt.arithmetic.gross)
+          postings.push({ accountId: account.id, ownerId: account.ownerId!, kind: 'rrsp', amount: accepted.gross })
+          exactTax = accepted.tax
+          exactBenefits = accepted.netOas
+          for (const [id, oas] of Object.entries(accepted.settled.oas)) {
+            working.household.byPerson[id].oas = oas
+            personRows[id].oasGross = oas.grossReal * working.startCpi
+            personRows[id].oasRecovery = oas.recoveryReal * working.startCpi
+            personRows[id].oasNet = personRows[id].benefits = oas.netReal * working.startCpi
+            if (publicBenefitsCash) {
+              publicBenefitsCash.byPerson[id].oasNetReal = mortgageDecimal(oas.netReal)
+              publicBenefitsCash.byPerson[id].oasNet = mortgageDecimal(personRows[id].benefits)
+              publicBenefitsCash.byPerson[id].postedBenefits = personRows[id].benefits
+            }
+          }
+          for (const [id, priced] of Object.entries(accepted.settled.priced.byPerson)) {
+            personRows[id].tax = priced.tax * working.startCpi
+            personRows[id].taxableIncome = priced.taxableIncome * working.startCpi
+            evaluation.byPerson[id].benefitIncomeForNextYear = { status: 'known', value: (priced.netIncome - (accepted.settled.oas[id]?.netReal ?? 0)) * working.startCpi }
+            if (publicBenefitsCash) publicBenefitsCash.byPerson[id].postedTax = personRows[id].tax
+          }
+          tax = sum(Object.values(personRows).map(p => p.tax))
+          benefits = sum(Object.values(personRows).map(p => p.benefits))
+          if (publicBenefitsCash) publicBenefitsCash.oasNet = exactBenefits
+        } catch (error) {
+          const problem = error as { status?: string; reason?: string }
+          return fail(problem.status === 'invalid' ? 'invalid' : 'unsupported', problem.reason?.startsWith('household mortgage RRSP') ? problem.reason : `household mortgage RRSP candidate pricing failed: ${problem.reason ?? 'unknown pricing error'}`)
+        }
+      }
+    }
     const afterDebt = mortgageSubtract(available, mortgageDecimal(debtPayments))
     if (mortgageNegative(afterDebt)) return fail("unsupported", "mortgage scheduled payment cannot be fully funded")
     if (publicBenefitsCash) publicBenefitsCash.afterDebt = afterDebt
     const living = mortgageNegative(mortgageSubtract(afterDebt, exactLiving)) ? afterDebt : exactLiving
     const unmet = mortgageSubtract(exactLiving, living)
+    if (rrspFunding) rrspFunding.cashProof = { debtDue: mortgageDecimal(debtPayments), afterDebt, livingDue: exactLiving, livingFunded: living, livingUnmet: unmet, residual: mortgageSubtract(afterDebt, living) }
     if (working.household.phase === "both-working" && unmet.coefficient !== "0") return fail("unsupported", "mortgage working cash cannot be fully funded")
     if (expenseReached) {
       const paid = decimalMin(mortgageSubtract(afterDebt, living), expenseDue)
@@ -578,7 +626,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const postedCash = mortgageAdd(mortgageSubtract(mortgageSubtract(mortgageAdd(mortgageDecimal(income), mortgageDecimal(benefits)), mortgageDecimal(tax)), mortgageDecimal(working.payrollContributions)), mortgageDecimal(sum(postings.map(p => p.amount))))
     const reconciliation = mortgageNumber(available) - nominalAvailable ||
       mortgageNumber(mortgageSubtract(available, postedCash))
-    householdWithdrawalSettlement = { ...(publicBenefitsCash ? { publicBenefitsCash } : {}), ...(orderedAuthorization ? { orderedFundingAuthorization: clone(orderedAuthorization) } : {}), ...(reconciliation !== 0 ? householdPurchasePrefix ? { primaryHomePurchaseCashReconciliation: reconciliation } : { mortgageCashReconciliation: reconciliation } : {}), postings, accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, withdrawal: sum(postings.map(p => p.amount)), taxIncrement: 0, taxTotal: tax, spendingDue: mortgageNumber(exactLiving), spendingFunded: mortgageNumber(living), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi }
+    householdWithdrawalSettlement = { ...(rrspFunding ? { rrspFunding, baselineBenefits, settledBenefits: benefits } : {}), ...(publicBenefitsCash ? { publicBenefitsCash } : {}), ...(orderedAuthorization ? { orderedFundingAuthorization: clone(orderedAuthorization) } : {}), ...(reconciliation !== 0 ? householdPurchasePrefix ? { primaryHomePurchaseCashReconciliation: reconciliation } : { mortgageCashReconciliation: reconciliation } : {}), postings, accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, withdrawal: sum(postings.map(p => p.amount)), taxIncrement: rrspFunding ? tax - baselineTax : 0, taxTotal: tax, spendingDue: mortgageNumber(exactLiving), spendingFunded: mortgageNumber(living), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi }
   }
   // A live taxable alternative prevents a claim of verified exhaustion. Never
   // skip an earlier account in the selected order to manufacture TFSA funding.
@@ -1058,7 +1106,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * Only rows successfully returned by annualStep are settled. state is never advanced
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
-export type AnnualStopCause = 'mortgageBenefits' | 'householdExpense' | 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+export type AnnualStopCause = 'mortgageRrsp' | 'mortgageBenefits' | 'householdExpense' | 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
   | 'mortgageFundingAuthorization' | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
@@ -1068,6 +1116,7 @@ export type AnnualStopCause = 'mortgageBenefits' | 'householdExpense' | 'nonRegS
 export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if (issue.detail.startsWith("household expense:")) return "householdExpense"
   const detail = issue.detail
+  if (detail.startsWith('household mortgage RRSP')) return 'mortgageRrsp'
   if (detail === HOUSEHOLD_MORTGAGE_BENEFITS_REFUSAL) return 'mortgageBenefits'
   if (detail.startsWith("nonReg:")) return "nonRegSale"
   if (issue.code === 'unfunded') return 'contributionFunding'

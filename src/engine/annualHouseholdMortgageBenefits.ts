@@ -4,7 +4,7 @@ import type { MortgageDecimal } from './mortgageDecimal'
 export const HOUSEHOLD_MORTGAGE_BENEFITS_REFUSAL = 'household mortgage benefits require explicit dated composition authorization and existing verified claims'
 export interface HouseholdMortgageBenefitsCash {
   evidence: NonNullable<InputsV2['annualHouseholdMortgageBenefitsEvidence']>
-  basis: 'anchor-real-quote-times-serialized-start-CPI'
+  basis: 'anchor-real-quote-times-serialized-start-CPI' | 'quoted-CPP-times-start-CPI-and-posted-tax-net-OAS-atoms'
   startCpi: MortgageDecimal
   byPerson: Record<string, { cppReal: MortgageDecimal; oasNetReal: MortgageDecimal; cpp: MortgageDecimal; oasNet: MortgageDecimal; postedIncome: number; postedBenefits: number; postedTax: number }>
   cpp: MortgageDecimal
@@ -31,7 +31,7 @@ export function householdMortgageBenefitsProblem(plan: InputsV2): string | null 
       plan.properties[0].sellAtAge !== null || plan.annualPrimaryHomeSaleEvidence !== undefined || plan.annualPrimaryHomePurchaseEvidence !== undefined ||
       plan.annualTerminalEstateEvidence !== undefined || plan.annualGisEvidence !== undefined || plan.annualNonRegEvidence !== undefined ||
       !plan.annualBenefitsEvidence || plan.accounts.filter(a => a.kind === 'tfsa').length < 1 || plan.accounts.filter(a => a.kind === 'tfsa').length > 2 ||
-      plan.accounts.some(a => a.kind !== 'tfsa' && a.balance > 0) ||
+      plan.accounts.some(a => a.kind !== 'tfsa' && !(a.kind === 'rrsp' && plan.annualHouseholdMortgageRrspEvidence !== undefined) && a.balance > 0) ||
       plan.incomeSources.some(s => !['cpp', 'oas'].includes(s.kind) && (s.annualAmount.status !== 'known' || s.annualAmount.value !== 0)))
     return HOUSEHOLD_MORTGAGE_BENEFITS_REFUSAL
   return null

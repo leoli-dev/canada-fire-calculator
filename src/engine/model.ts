@@ -157,6 +157,8 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  /** Explicit owner consent for ordinary RRSP funding after authorized TFSAs. */
+  annualHouseholdMortgageRrspEvidence?: { accountId: string; ownerId: string; authorized: true; purpose: 'household-held-mortgage-and-living'; priority: 'tfsa-before-rrsp'; provenance: Provenance }
   /** Internal generated household composition; existing verified claims remain mandatory. */
   annualHouseholdMortgageBenefitsEvidence?: { authorized: true; purpose: 'household-held-mortgage-with-verified-public-benefits'; provenance: Provenance }
   annualHouseholdExpenseEvidence?: import("./annualHouseholdExpense").HouseholdExpenseEvidence
