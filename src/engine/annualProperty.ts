@@ -1,5 +1,6 @@
 import { mortgageDecimal, mortgageMultiply, mortgageSubtract, mortgageNegative } from './mortgageDecimal'
 import { householdMortgageBenefitsProblem } from './annualHouseholdMortgageBenefits'
+import { householdMortgageRrspProblem } from './annualHouseholdMortgageRrsp'
 import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
 import { isCanonicalGeneratedState, type AnnualState, type YearRow } from './annualState'
@@ -114,6 +115,13 @@ export function householdMortgageOrderProblem(plan: InputsV2, opening?: AnnualSt
  * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
  */
 export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence, opening?: AnnualState): string | null {
+  const rrspFunding = plan.people.length === 2 && plan.annualHouseholdMortgageRrspEvidence !== undefined
+  if (rrspFunding) {
+    const problem = householdMortgageRrspProblem(plan, opening)
+    if (problem) return problem
+    if (!plan.debts.length || plan.annualPrimaryHomePurchaseEvidence || plan.annualPrimaryHomeSaleEvidence || plan.properties.some(p => p.sellAtAge !== null) || plan.annualTerminalEstateEvidence)
+      return 'household mortgage RRSP requires held mortgage without property transactions or estate pricing'
+  }
   const composedBenefits = plan.annualHouseholdMortgageBenefitsEvidence !== undefined
   if (composedBenefits) {
     const problem = householdMortgageBenefitsProblem(plan)
@@ -140,7 +148,7 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
     const problem = householdMortgageOrderProblem(plan, opening)
     if (problem) return problem
   }
-  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || !ordered && plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !(opening && isCanonicalGeneratedState(plan, opening)) || plan.annualGisEvidence))
+  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && !(rrspFunding && a.kind === 'rrsp') && a.balance > 0) || !ordered && plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !(opening && isCanonicalGeneratedState(plan, opening)) || plan.annualGisEvidence))
     return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
