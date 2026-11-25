@@ -95,7 +95,7 @@ function ownMortgageBalance(balances: Record<string, MortgageDecimal> | undefine
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
-  householdWithdrawalSettlement?: { primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
+  householdWithdrawalSettlement?: { orderedFundingAuthorization?: InputsV2["annualHouseholdMortgageFundingEvidence"]; primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
   contributionRounding?: number
@@ -478,15 +478,26 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     // The admitted contract has exactly one fixed nominal installment.
     const due = mortgageAdd(exactLiving, mortgageDecimal(debtPayments))
     const shortage = mortgageSubtract(due, available)
-    const candidates = plan.accounts.filter(a => a.kind === "tfsa" && state.byAccount[a.id].balance > 0)
+    const orderedAuthorization = householdMortgage ? plan.annualHouseholdMortgageFundingEvidence : undefined
+    const candidates = orderedAuthorization ? orderedAuthorization.orderedAccounts.map(ref => plan.accounts.find(a => a.id === ref.accountId && a.ownerId === ref.ownerId)!) : plan.accounts.filter(a => a.kind === "tfsa" && state.byAccount[a.id].balance > 0)
     const postings: NonNullable<NonNullable<YearRow["householdWithdrawalSettlement"]>["postings"]> = []
     if (working.household.phase !== "both-working" && !mortgageNegative(shortage) && shortage.coefficient !== "0" && candidates.length) {
       if (plan.strategy === "meltdownPaced") return fail("unsupported", "household mortgage withdrawal strategy unsupported")
-      const account = candidates[0]
-      const statement = tfsaStatement(plan, account.ownerId!)
-      if (!statement || statement.provenance.origin === "unknown") return fail("unsupported", "TFSA withdrawal statement evidence missing")
+      let remaining = shortage
+      for (const account of orderedAuthorization ? candidates : candidates.slice(0, 1)) {
+      if (remaining.coefficient === "0") break
       const capacity = ownMortgageBalance(householdPurchasePrefix ? opening.prospectivePurchaseExactBalances : opening.mortgageExactBalances, account.id) ?? mortgageDecimal(state.byAccount[account.id].balance)
-      const draw = mortgageNegative(mortgageSubtract(capacity, shortage)) ? capacity : shortage
+      if (capacity.coefficient === "0") continue
+      const statement = tfsaStatement(plan, account.ownerId!)
+      if (orderedAuthorization) {
+        const own = (v: object, k: string) => Object.prototype.hasOwnProperty.call(v, k)
+        const provenance = statement && own(statement, "provenance") ? statement.provenance : undefined
+        if (!statement || !own(statement, "withdrawals") || !provenance || !own(provenance, "origin") || provenance.origin !== "user" || !own(provenance, "sourceYear") ||
+            typeof provenance.sourceYear !== "number" || !Number.isInteger(provenance.sourceYear) || provenance.sourceYear < 0 || provenance.sourceYear > plan.baseYear)
+          return fail("unsupported", "TFSA withdrawal statement evidence missing")
+      }
+      if (!statement || statement.provenance.origin === "unknown") return fail("unsupported", "TFSA withdrawal statement evidence missing")
+      const draw = mortgageNegative(mortgageSubtract(capacity, remaining)) ? capacity : remaining
       if (householdPurchasePrefix) prospectiveDraws.set(account.id, draw)
       else mortgageDraws.set(account.id, draw)
       const amount = mortgageNumber(draw)
@@ -497,6 +508,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
         return fail("unsupported", "household mortgage withdrawal debit precision cannot be upheld")
       if (amount > 0) postings.push({ accountId: account.id, ownerId: account.ownerId!, kind: "tfsa", amount })
       available = mortgageAdd(available, draw)
+      remaining = mortgageSubtract(remaining, draw)
+      }
     }
     const afterDebt = mortgageSubtract(available, mortgageDecimal(debtPayments))
     if (mortgageNegative(afterDebt)) return fail("unsupported", "mortgage scheduled payment cannot be fully funded")
@@ -507,7 +520,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const postedCash = mortgageAdd(mortgageSubtract(mortgageSubtract(mortgageAdd(mortgageDecimal(income), mortgageDecimal(benefits)), mortgageDecimal(tax)), mortgageDecimal(working.payrollContributions)), mortgageDecimal(sum(postings.map(p => p.amount))))
     const reconciliation = mortgageNumber(available) - nominalAvailable ||
       mortgageNumber(mortgageSubtract(available, postedCash))
-    householdWithdrawalSettlement = { ...(reconciliation !== 0 ? householdPurchasePrefix ? { primaryHomePurchaseCashReconciliation: reconciliation } : { mortgageCashReconciliation: reconciliation } : {}), postings, accountId: postings[0]?.accountId ?? null, ownerId: postings[0]?.ownerId ?? null, withdrawal: sum(postings.map(p => p.amount)), taxIncrement: 0, taxTotal: tax, spendingDue: mortgageNumber(exactLiving), spendingFunded: mortgageNumber(living), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi }
+    householdWithdrawalSettlement = { ...(orderedAuthorization ? { orderedFundingAuthorization: clone(orderedAuthorization) } : {}), ...(reconciliation !== 0 ? householdPurchasePrefix ? { primaryHomePurchaseCashReconciliation: reconciliation } : { mortgageCashReconciliation: reconciliation } : {}), postings, accountId: postings.length === 1 ? postings[0].accountId : null, ownerId: postings.length === 1 ? postings[0].ownerId : null, withdrawal: sum(postings.map(p => p.amount)), taxIncrement: 0, taxTotal: tax, spendingDue: mortgageNumber(exactLiving), spendingFunded: mortgageNumber(living), spendingUnmet: mortgageNumber(unmet), startCpi: working.startCpi }
   }
   // A live taxable alternative prevents a claim of verified exhaustion. Never
   // skip an earlier account in the selected order to manufacture TFSA funding.
@@ -987,7 +1000,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
 export type AnnualStopCause = 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
-  | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
+  | 'mortgageFundingAuthorization' | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
 
@@ -1005,6 +1018,7 @@ export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if ([FHSA_OPENING_YEAR_MISSING, FHSA_MULTIPLE_ACTIVE_ACCOUNTS, FHSA_MATURITY_UNSUPPORTED].some(message => detail === message || detail.startsWith(`${message}: `))) return 'fhsaRules'
   if (/^fhsa/i.test(detail) || detail.startsWith('scheduled FHSA') || detail.startsWith('only the FHSA')) return 'fhsaRules'
   if (detail.startsWith('RRSP room not verified')) return 'rrspRoom'
+  if (detail === "household mortgage requires dated explicit exhaustive two-owner TFSA funding authorization") return "mortgageFundingAuthorization"
   if (/^ambiguous household (TFSA|RRSP) withdrawal funding order$/.test(detail)) return 'withdrawalOwnership'
   if (detail === 'TFSA withdrawal statement evidence missing') return 'tfsaWithdrawalEvidence'
   if (detail.startsWith('household withdrawal order requires') || detail.startsWith('household remaining spending requires')) return 'withdrawalFunding'

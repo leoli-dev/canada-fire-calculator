@@ -306,7 +306,7 @@ export function tfsaRoomYear(request: TfsaRoomRequest): TfsaRoomYear {
 
 /** The statement history recorded for one person, or `undefined` when not supplied. */
 export function tfsaStatement(plan: Pick<InputsV2, 'tfsaStatement'>, personId: string): TfsaStatementHistory | undefined {
-  return plan.tfsaStatement?.[personId]
+  return plan.tfsaStatement && Object.prototype.hasOwnProperty.call(plan.tfsaStatement, personId) ? plan.tfsaStatement[personId] : undefined
 }
 
 /**
