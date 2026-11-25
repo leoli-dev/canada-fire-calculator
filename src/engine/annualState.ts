@@ -1,4 +1,5 @@
 import { expenseEvidenceProblem, expenseSnapshotProblem, type HouseholdExpenseReceipt } from "./annualHouseholdExpense"
+import { reachedHouseholdWorkingTfsa, householdWorkingTfsaProblem, type HouseholdWorkingTfsaReceipt } from './annualHouseholdWorkingTfsa'
 import { primaryHomeSale, exactHomeReceipt, decimalMin, homeLivingDecimal } from './annualPrimaryHomeSale'
 import { PAYROLL_2026 } from './payroll'
 import { annualTerminalEstate } from './annualTerminalEstate'
@@ -98,6 +99,7 @@ function ownMortgageBalance(balances: Record<string, MortgageDecimal> | undefine
 
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
+  householdWorkingTfsaSettlement?: HouseholdWorkingTfsaReceipt
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
   householdExpense?: HouseholdExpenseReceipt
   householdWithdrawalSettlement?: { rrspFunding?: HouseholdMortgageRrspReceipt; publicBenefitsCash?: HouseholdMortgageBenefitsCash; orderedFundingAuthorization?: InputsV2["annualHouseholdMortgageFundingEvidence"]; primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
@@ -283,6 +285,12 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return fail('invalid', 'year beyond plan horizon')
   const state = clone(opening)
   const year = opening.year
+  const workingTfsaReached = !!working && 'household' in working && isCanonicalGeneratedState(plan, opening) && reachedHouseholdWorkingTfsa(plan, year)
+  let householdWorkingTfsaSettlement: HouseholdWorkingTfsaReceipt | undefined
+  if (workingTfsaReached) {
+    const problem = householdWorkingTfsaProblem(plan, opening, working!.household.phase === 'both-working')
+    if (problem) return fail('unsupported', problem)
+  }
   state.unfundedEvents = state.unfundedEvents.filter(g => g.reason !== "householdExpense")
   let householdExpense: HouseholdExpenseReceipt | undefined
   const expense = plan.annualHouseholdExpenseEvidence
@@ -515,6 +523,16 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const expenseDue = expenseReached ? mortgageDecimal(expense!.amountNominal.status === "known" ? expense!.amountNominal.value : NaN) : mortgageDecimal(0)
     const ordinaryDue = mortgageAdd(exactLiving, mortgageDecimal(debtPayments))
     const due = mortgageAdd(ordinaryDue, expenseDue)
+    if (workingTfsaReached) {
+      const e = plan.annualHouseholdWorkingTfsaEvidence!
+      const contributions = e.years[year]
+      const allocated = contributions.reduce((total, line) => mortgageAdd(total, mortgageDecimal(line.amountNominal)), mortgageDecimal(0))
+      const surplus = mortgageSubtract(available, due)
+      if (exactBenefits.coefficient !== '0' || mortgageNegative(surplus) || surplus.coefficient === '0' || mortgageSubtract(surplus, allocated).coefficient !== '0')
+        return fail('unsupported', 'household working TFSA: two contributions must exactly allocate proven positive wage cash after payroll, posted tax, living and mandatory mortgage')
+      working.netCash = mortgageNumber(surplus)
+      householdWorkingTfsaSettlement = { evidence: clone(e), contributions: clone(contributions), arithmetic: { income: exactIncome, payroll: exactPayroll, tax: exactTax, living: exactLiving, debtPayments: mortgageDecimal(debtPayments), surplus, allocated } }
+    }
     if (publicBenefitsCash) {
       publicBenefitsCash.beforeDrawsAfterDebt = mortgageSubtract(availableBeforeDraws, mortgageDecimal(debtPayments))
       publicBenefitsCash.livingDue = exactLiving
@@ -761,7 +779,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (salePayoff) debtRows[salePayoff.debtId] = { opening: salePayoff.recordedOpeningPrincipal, payoffPrincipalReconciliation: salePayoff.principalReconciliation, interest: 0, principal: salePayoff.totalPayoff, payment: salePayoff.totalPayoff, closing: 0, propertyId: householdSale!.propertyId, salePayoff: salePayoff.totalPayoff }
   // The private working quote already validated and normalized its cash in
   // the common anchor basis. Reordering those operands can invent a deficit.
-  const evaluatedCash = householdWithdrawalSettlement ? 0 : working ? working.netCash : income + benefits - tax - spending - debtPayments
+  const evaluatedCash = householdWorkingTfsaSettlement ? mortgageNumber(householdWorkingTfsaSettlement.arithmetic.surplus) : householdWithdrawalSettlement ? 0 : working ? working.netCash : income + benefits - tax - spending - debtPayments
   if (!Number.isFinite(evaluatedCash)) return fail('invalid', 'evaluated cash')
   if (evaluatedCash < -1e-8) return fail('unsupported', 'taxable withdrawal funding not yet wired')
   if (Math.abs(evaluatedCash - cash) > 0.01) return fail('unsupported', 'evaluated cash disagrees with canonical net savings budget')
@@ -774,13 +792,13 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (scheduledPlanned > cash + 1e-8) return fail('unsupported', 'scheduled RRSP contribution exceeds the year net savings')
   // One allocation resolver serves the kernel and the panel preview, so the
   // voluntary RRSP share priced here is the same number the panel shows.
-  const allocation = working ? allocateContributions({ age: opening.byPerson[self.id].age, budget: cash, fhsa: 0, employee: 0, employer: 0, split: plan.savingsAllocation.shares }) : resolveYearAllocation(plan, year)
+  const allocation = working ? allocateContributions({ age: opening.byPerson[self.id].age, budget: cash, fhsa: 0, employee: 0, employer: 0, split: householdWorkingTfsaSettlement ? { tfsa: 1, rrsp: 0, nonReg: 0 } : plan.savingsAllocation.shares }) : resolveYearAllocation(plan, year)
   if (allocation.gaps.length) return { status: 'unsupported', issues: allocation.gaps.map(gap => ({ code: 'unfunded', detail: gap.reason, eventId: gap.eventId })) }
   if (plan.people.length > 1 && allocation.voluntary.rrsp > 0) return fail('unsupported', 'couple RRSP contributor and room attribution not yet wired')
   // TFSA room belongs to one person, so a couple's contribution cannot be
   // attributed to a room ledger. It is refused rather than parked on an
   // unidentified owner, exactly as the RRSP share above is.
-  if (plan.people.length > 1 && allocation.voluntary.tfsa > 0) return fail('unsupported', 'couple TFSA contributor and room attribution not yet wired')
+  if (plan.people.length > 1 && allocation.voluntary.tfsa > 0 && !householdWorkingTfsaSettlement) return fail('unsupported', 'couple TFSA contributor and room attribution not yet wired')
   const rrspDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'rrsp')
   if (allocation.voluntary.rrsp > 0 && rrspDestinations.length !== 1) return fail('unsupported', 'ambiguous rrsp contribution destination')
   const nonRegDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'nonReg')
@@ -879,12 +897,14 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   // The statement year drives the addition and the restoration, and both come
   // from the same functions the panel uses, so the two cannot drift.
   const tfsaDestinations = Object.entries(state.byAccount).filter(([, account]) => account.kind === 'tfsa')
-  if (allocation.voluntary.tfsa > 0 && tfsaDestinations.length !== 1) return fail('unsupported', 'ambiguous tfsa contribution destination')
+  if (allocation.voluntary.tfsa > 0 && tfsaDestinations.length !== 1 && !householdWorkingTfsaSettlement) return fail('unsupported', 'ambiguous tfsa contribution destination')
   const tfsaAccountId = tfsaDestinations.length === 1 ? tfsaDestinations[0][0] : null
   const tfsaLedger: Record<string, TfsaRoomYear> = {}
   for (const person of plan.people) {
     const facts = state.byPerson[person.id]
     const statement = tfsaStatement(plan, person.id)
+    const elected = householdWorkingTfsaSettlement?.contributions.find(line => line.ownerId === person.id)
+    const destination = elected?.accountId ?? tfsaAccountId
     const row = tfsaRoomYear({
       personId: person.id, year,
       // The recorded CRA figure is the plan year's own room, exactly as the RRSP
@@ -894,15 +914,26 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       openingRoom: facts.tfsaRoom,
       annualAddition: annualTfsaAdditionFor(year, plan.baseYear),
       withdrawals: [...(statement?.withdrawals ?? []), ...(working && 'household' in working ? (state.tfsaWithdrawalHistory ?? []).filter(h => h.personId === person.id) : [])],
-      lines: plannedTfsaLines({ personId: person.id, year, savingsShare: plan.people.length === 1 ? allocation.voluntary.tfsa : 0 }),
+      lines: elected ? [{ id: `annual:${year}:tfsa:${elected.accountId}`, calendarYear: year, amount: elected.amountNominal }] : plannedTfsaLines({ personId: person.id, year, savingsShare: plan.people.length === 1 ? allocation.voluntary.tfsa : 0 }),
     })
     tfsaLedger[person.id] = row
+    if (elected && (row.applied !== elected.amountNominal || row.retained !== 0 || row.closingRoom.status !== 'known')) return fail('unsupported', 'household working TFSA: owner room cannot execute the entire contribution without clipping')
+    if (elected) {
+      // Preserve the shared ledger everywhere else, but never let its cents
+      // rounding create room or alter an opted owner's exact debit/carry.
+      if (row.openingRoom.status !== 'known' || row.annualAddition.status !== 'known' || row.restored.status !== 'known' || row.availableRoom.status !== 'known' || row.closingRoom.status !== 'known')
+        return fail('unsupported', 'household working TFSA: exact owner room debit and carry cannot be established')
+      const available = mortgageAdd(mortgageAdd(mortgageDecimal(row.openingRoom.value), mortgageDecimal(row.annualAddition.value)), mortgageDecimal(row.restored.value))
+      const closing = mortgageSubtract(available, mortgageDecimal(elected.amountNominal))
+      if (mortgageSubtract(available, mortgageDecimal(row.availableRoom.value)).coefficient !== '0' || mortgageSubtract(closing, mortgageDecimal(row.closingRoom.value)).coefficient !== '0')
+        return fail('unsupported', 'household working TFSA: shared room ledger cannot represent exact owner room debit and carry')
+    }
     facts.tfsaRoom = row.closingRoom
     for (const line of row.lines) {
       if (line.applied <= 0) continue
-      if (!tfsaAccountId) return fail('unsupported', `TFSA contribution has no account: ${person.id}`)
-      accountRows[tfsaAccountId].contribution += line.applied
-      state.contributionHistory.push({ id: line.id, accountId: tfsaAccountId, contributorId: person.id, calendarYear: line.calendarYear, amount: line.applied, deductionYear: null })
+      if (!destination) return fail('unsupported', `TFSA contribution has no account: ${person.id}`)
+      accountRows[destination].contribution += line.applied
+      state.contributionHistory.push({ id: line.id, accountId: destination, contributorId: person.id, calendarYear: line.calendarYear, amount: line.applied, deductionYear: null })
     }
   }
   const rrspLedger: Record<string, RrspRoomYear> = {}
@@ -963,7 +994,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     accountRows[nonRegDestinations[0][0]].contribution += nonRegAmount
     state.contributionHistory.push({ id: `annual:${year}:nonReg`, accountId: nonRegDestinations[0][0], contributorId: plan.people.length === 1 ? self.id : null, calendarYear: year, amount: nonRegAmount, deductionYear: null })
   }
-  const totalContributions = sum(Object.values(accountRows).map(row => row.contribution))
+  const totalContributions = householdWorkingTfsaSettlement ? mortgageNumber(householdWorkingTfsaSettlement.arithmetic.allocated) : sum(Object.values(accountRows).map(row => row.contribution))
   if (working) {
     const bound = 0.005 + Math.min(1e-9, 4 * Number.EPSILON * (totalContributions + cash))
     if (Math.abs(totalContributions - cash) > bound) return fail('unsupported', 'canonical TFSA cash requires representable cent contribution; no rounding sink')
@@ -1079,6 +1110,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
+  if (householdWorkingTfsaSettlement) row.householdWorkingTfsaSettlement = householdWorkingTfsaSettlement
   if (householdExpense) { row.householdExpense = clone(householdExpense); row.cashLedger.expensePayments = householdExpense.paid }
   if (householdSaleSettlement) row.retirementSettlement = householdSaleSettlement
   if (householdWithdrawalSettlement) {
@@ -1112,6 +1144,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
 export type AnnualStopCause = 'mortgageRrsp' | 'mortgageBenefits' | 'householdExpense' | 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+  | 'householdWorkingTfsa'
   | 'mortgageFundingAuthorization' | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
@@ -1121,6 +1154,7 @@ export type AnnualStopCause = 'mortgageRrsp' | 'mortgageBenefits' | 'householdEx
 export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
   if (issue.detail.startsWith("household expense:")) return "householdExpense"
   const detail = issue.detail
+  if (detail.startsWith('household working TFSA:')) return 'householdWorkingTfsa'
   if (detail.startsWith('household mortgage RRSP')) return 'mortgageRrsp'
   if (detail === HOUSEHOLD_MORTGAGE_BENEFITS_REFUSAL) return 'mortgageBenefits'
   if (detail.startsWith("nonReg:")) return "nonRegSale"
