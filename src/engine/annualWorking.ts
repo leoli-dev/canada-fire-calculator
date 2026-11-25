@@ -150,7 +150,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     // Only this authenticated composition can consume current positive cash
     // with an already due, validated ordinary expense. Future/invalid events
     // cannot become a surplus destination or relax unrelated household paths.
-    const reachedExpense = generated && plan.annualHouseholdMortgageBenefitsEvidence !== undefined && phase === 'both-retired' &&
+    const reachedExpense = generated && (plan.annualHouseholdMortgageBenefitsEvidence !== undefined || plan.annualHouseholdMortgageRrspEvidence !== undefined) && phase === 'both-retired' &&
       !generatedState!.householdExpenseReceipt && expense !== undefined && expense.effectiveYear === year &&
       !expenseEvidenceProblem(plan, expense, year) && expense.amountNominal.status === 'known' ? expense.amountNominal.value / startCpi : 0
     if (residual - reachedExpense > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')

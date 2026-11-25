@@ -364,16 +364,18 @@ describe('recorded scope and atomic refusal', () => {
       blocked: { year: MIXED, status: 'unsupported', issues: [{ detail: 'TFSA withdrawal statement evidence missing' }] } })
   })
 
-  it('stops only when an incompatible one-time expense is reached', () => {
+  it('stops only when a one-time expense with post-anchor provenance is reached', () => {
     const { plan, evidence } = fixture({ benefits: true, mixed: 25_000, retired: 25_000, rrsp: 20_000 })
     plan.annualHouseholdExpenseEvidence = { id: 'household-extra', effectiveYear: RETIRED, timing: 'after-mortgage-and-living',
       amountNominal: known(400), amountBasis: 'event-year-nominal-CAD', noncapital: true, nonDeductible: true,
-      allowPartialPayment: true, excludesFromLivingBudget: true, useExistingFundingOrder: true, provenance: recorded }
+      allowPartialPayment: true, excludesFromLivingBudget: true, useExistingFundingOrder: true,
+      provenance: { ...recorded, sourceYear: BASE_YEAR + 1 } }
     const prefix = ok(projectCanonicalCoverage(plan, evidence, 2))
     expect(prefix.blocked).toBeNull()
     expect(prefix.rows[1].householdWithdrawalSettlement!.rrspFunding!.gross).toBeGreaterThan(0)
     expect(ok(projectCanonicalCoverage(plan, evidence, 4))).toMatchObject({ rows: prefix.rows, state: prefix.state,
-      blocked: { year: RETIRED, status: 'unsupported', issues: [{ detail: expect.stringMatching(/RRSP reached one-time expense/) }] },
+      blocked: { year: RETIRED, status: 'unsupported', causes: ['householdExpense'],
+        issues: [{ detail: expect.stringMatching(/^household expense:/) }] },
       uncomputedYears: [RETIRED + 1] })
   })
 })
