@@ -88,7 +88,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const fact = evidence[spendingSource]
     if (fact?.status !== 'known') return fail('unsupported', `working spending evidence missing: ${spendingSource}`)
     if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
-    const housingProblem = generated ? heldMortgageProblem(plan, evidence) : null
+    const housingProblem = generated ? heldMortgageProblem(plan, evidence, generatedState) : null
     if (housingProblem) return fail('unsupported', housingProblem)
     if (plan.dependents.length || (!generated && (plan.debts.length || plan.properties.length))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
@@ -102,7 +102,10 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     for (const p of plan.people) {
       const age = ageReachedInYear(p, plan.baseYear, year)
       if (![p.ageInBaseYear, p.retirementAge, plan.lifeExpectancy].every(Number.isInteger)) return fail('invalid', 'working age clocks must use whole years')
-      if (p.role === 'self' && age >= plan.lifeExpectancy) return fail('unsupported', 'household end-life settlement not yet wired')
+      // The authenticated continuous runner may settle the existing self-age
+      // endpoint. Estate evidence is priced afterward as a memo; it cannot
+      // authorize provider/standalone execution or truncate ordinary rows.
+      if (p.role === 'self' && age >= plan.lifeExpectancy && !(generated && plan.annualTerminalEstateEvidence !== undefined && age === plan.lifeExpectancy)) return fail('unsupported', 'household end-life settlement not yet wired')
       if (age < 19 || age >= 70 && !(generated && phase === 'both-retired' && (generatedState?.primaryHomeSaleCash || plan.properties.some(home => home.sellAtAge === ageReachedInYear(plan.people.find(person => person.role === 'self')!, plan.baseYear, year) && plan.annualPrimaryHomeSaleEvidence?.[home.id])))) return fail('unsupported', 'household working chain supports ages 19 through 69')
       const oas = generated && plan.annualBenefitsEvidence ? annualHouseholdOas(plan, p, age) : undefined
       if ((!generated && p.cppAnnualAt65 !== 0) || (!oas && p.oasAnnualAt65 !== 0) || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) return fail('unsupported', 'working benefits require explicit supplied zero evidence')

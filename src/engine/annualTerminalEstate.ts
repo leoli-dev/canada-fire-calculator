@@ -3,8 +3,13 @@ import type { AnnualState, YearRow } from './annualState'
 import { isCanonicalGeneratedState } from './annualState'
 import { anchorTaxRules, incomeTax, rulesForCalendarYear, taxRuleProvenance, type TaxRuleProvenance } from './tax'
 import { terminalTax } from './terminalTax'
+import { annualCpp } from './annualCpp'
+import { annualHouseholdOas } from './annualOas'
 
 export interface AnnualTerminalEstateEvidence {
+  modeledDecedent?: 'self-only'
+  survivingPersonId?: string
+  noSurvivorProjection?: true
   provenance: Provenance
   effectiveYear: number
   personId: string
@@ -16,7 +21,8 @@ export interface AnnualTerminalEstateEvidence {
 }
 export type TerminalEstateEstimate =
   | { status: 'unavailable'; reason: 'evidence-missing' | 'evidence-invalid' | 'unsupported-estate' | 'tax-basis-unavailable' }
-  | { status: 'estimated'; closingNetWorth: number; closingRegisteredFairMarketValue: number;
+  | { status: 'estimated'; scope?: 'self-estate-only'; personId?: string; survivingPersonId?: string;
+      excludedSurvivorClosingNetWorth?: number; householdClosingNetWorth?: number; closingNetWorth: number; closingRegisteredFairMarketValue: number;
       estateAdministrationTaxBase: number; incrementalFinalReturnIncomeTax: number;
       estateAdministrationTax: number; netEstate: number; evidence: AnnualTerminalEstateEvidence;
       taxRules: TaxRuleProvenance; taxBasis: 'start-CPI-annual-return'; startCpi: number; endCpi: number }
@@ -34,14 +40,59 @@ export function ontarioEstateAdministrationTax(value: number): number {
   return priced <= 50_000 ? 0 : 15 * Math.ceil((priced - 50_000) / 1_000)
 }
 
+/** Estate-only passport checks. Never feed these stricter evidence gates back
+ * into ordinary annual pricing: a settled zero receipt is not proof of absence. */
+function householdTerminalBenefitsSupported(plan: InputsV2, row: YearRow): boolean {
+  const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
+  const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value))
+  const dated = (value: unknown) => record(value) && own(value, 'origin') && value.origin === 'user' && own(value, 'sourceYear') &&
+    Number.isSafeInteger(value.sourceYear) && (value.sourceYear as number) >= 0 && (value.sourceYear as number) <= plan.baseYear && (value.note === undefined || typeof value.note === 'string')
+  const excluded = (value: unknown) => record(value) && ['status', 'reason', 'provenance'].every(key => own(value, key)) &&
+    ['excluded', 'not-applicable'].includes(value.status as string) && typeof value.reason === 'string' && !!value.reason.trim() && dated(value.provenance)
+  try {
+    // A positive eligibility record contradicts the explicit zero OAS/GIS
+    // passport even when the ordinary household path does not price GIS.
+    if (plan.annualGisEvidence !== undefined && (!own(plan, 'annualGisEvidence') || !record(plan.annualGisEvidence) || Reflect.ownKeys(plan.annualGisEvidence).length !== 0)) return false
+    const benefits = plan.annualBenefitsEvidence
+    if (benefits !== undefined && (!record(benefits) || Object.keys(benefits).length !== plan.people.length)) return false
+    for (const person of plan.people) {
+      for (const field of ['cppAmountSource', 'oasAmountSource'] as const) {
+        const proof = person[field]
+        if (!own(person, field) || !record(proof) || !['source', 'sourceYear', 'basis', 'dollarBasis', 'ageBasis'].every(key => own(proof, key)) ||
+            !['manual', 'statement'].includes(proof.source) || !Number.isSafeInteger(proof.sourceYear) || proof.sourceYear! < 0 || proof.sourceYear! > plan.baseYear ||
+            !['annual', 'monthly'].includes(proof.basis) || proof.dollarBasis !== 'today' ||
+            !(proof.ageBasis === null || Number.isInteger(proof.ageBasis) && proof.ageBasis >= (field === 'cppAmountSource' ? 60 : 65) && proof.ageBasis <= 70) ||
+            proof.premisesNeedReview !== undefined && (!own(proof, 'premisesNeedReview') || proof.premisesNeedReview !== false) ||
+            proof.premises !== undefined && (!own(proof, 'premises') || !record(proof.premises) || !own(proof.premises, 'retirementAge') || !Number.isSafeInteger(proof.premises.retirementAge) ||
+              [proof.premises.startWorkAge, proof.premises.avgEarningsRatio, proof.premises.residenceYearsBy65].some(value => value !== undefined && (typeof value !== 'number' || !Number.isFinite(value)))) ||
+            proof.source === 'statement' && proof.premises?.retirementAge !== person.retirementAge) return false
+      }
+      // Reuse the ordinary CPP statement/premise validator, including zeros.
+      if (annualCpp(plan, person, row.byPerson[person.id].age).amountReal !== 0) return false
+      if (benefits !== undefined) {
+        const proof = benefits[person.id]
+        if (!own(benefits, person.id) || !record(proof) || !(['gis', 'allowance', 'otherBenefits'] as const).every(key => own(proof, key) && excluded(proof[key]))) return false
+        const oas = annualHouseholdOas(plan, person, row.byPerson[person.id].age)
+        if (oas.grossReal !== 0 || oas.netReal !== 0 || oas.recoveryReal !== 0) return false
+      }
+    }
+    return true
+  } catch { return false }
+}
+
 /** Internal receipt builder: called exclusively by the authenticated continuous
  * runner after a committed working prefix and a successful terminal retirement
  * settlement. Never mutates annual cash, accounts, or affordability. */
 export function annualTerminalEstate(plan: InputsV2, state: AnnualState, row: YearRow): TerminalEstateEstimate {
   const unavailable = (reason: Extract<TerminalEstateEstimate, { status: 'unavailable' }>['reason']): TerminalEstateEstimate => ({ status: 'unavailable', reason })
   try {
-    const person = plan.people[0]
-    const settlement = row.retirementSettlement
+    const household = plan.people.length === 2
+    const person = household ? plan.people.find(p => p.role === 'self')! : plan.people[0]
+    const survivor = household ? plan.people.find(p => p.role === 'partner') : undefined
+    const working = row.workingSettlement
+    const settlement = household ? working : row.retirementSettlement
+    const accounts = household ? plan.accounts.filter(a => a.ownerId === person.id) : plan.accounts
     const annual = row.byPerson[person.id]
     const verifiedExclusion = (e: unknown): boolean => {
       if (!e || typeof e !== 'object' || Array.isArray(e)) return false
@@ -49,8 +100,9 @@ export function annualTerminalEstate(plan: InputsV2, state: AnnualState, row: Ye
       return ['excluded', 'not-applicable'].includes(fact.status ?? '') && typeof fact.reason === 'string' && !!fact.reason.trim() &&
         fact.provenance?.origin === 'user' && Number.isSafeInteger(fact.provenance.sourceYear) && fact.provenance.sourceYear! >= 0 && fact.provenance.sourceYear! <= plan.baseYear
     }
-    const zeroOas = !settlement?.oas || settlement.oas.grossReal === 0 && settlement.oas.netReal === 0 && settlement.oas.recoveryReal === 0 &&
-      [settlement.oas.evidence.gis, settlement.oas.evidence.allowance, settlement.oas.evidence.otherBenefits].every(verifiedExclusion)
+    const soloSettlement = row.retirementSettlement
+    const zeroOas = !soloSettlement?.oas || soloSettlement.oas.grossReal === 0 && soloSettlement.oas.netReal === 0 && soloSettlement.oas.recoveryReal === 0 &&
+      [soloSettlement.oas.evidence.gis, soloSettlement.oas.evidence.allowance, soloSettlement.oas.evidence.otherBenefits].every(verifiedExclusion)
     // A historical ordinary source can remain in the plan. The annual runner
     // still owns every earlier year's activity/funding gates; this does not
     // introduce an income source into the final return.
@@ -62,16 +114,30 @@ export function annualTerminalEstate(plan: InputsV2, state: AnnualState, row: Ye
         [s.fromAge, s.startAge].every(age => age === undefined || Number.isSafeInteger(age) && age >= 0 && age <= s.toAge!) &&
         s.provenance.origin === 'user' && Number.isSafeInteger(s.provenance.sourceYear) && s.provenance.sourceYear! >= 0 && s.provenance.sourceYear! <= plan.baseYear)
     })
-    if (!isCanonicalGeneratedState(plan, state) || plan.people.length !== 1 || plan.province !== 'ON' || !settlement || state.year !== row.year + 1 ||
+    if (!isCanonicalGeneratedState(plan, state) || ![1, 2].includes(plan.people.length) || plan.province !== 'ON' || !settlement || state.year !== row.year + 1 ||
         row.year !== plan.baseYear + plan.lifeExpectancy - person.ageInBaseYear ||
         plan.debts.length || plan.properties.length || plan.dependents.length ||
         state.rrifConversions && Object.keys(state.rrifConversions).length ||
         person.cppAnnualAt65 !== 0 || person.oasAnnualAt65 !== 0 || person.pensionAnnual !== 0 || person.pension || person.cppWork ||
-        outsideIncome || !zeroOas || annual.income !== 0 || annual.earnedIncome !== 0 || annual.benefits !== 0 ||
+        outsideIncome || !zeroOas || !household && annual.income !== 0 || annual.earnedIncome !== 0 || annual.benefits !== 0 ||
         [annual.cpp, annual.oasGross, annual.oasNet, annual.oasRecovery, annual.gis].some(amount => amount !== undefined && amount !== 0) ||
-        settlement.cpp && settlement.cpp.amountReal !== 0 || settlement.gis || settlement.rrif ||
-        plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.ownerId !== person.id || a.jurisdiction || a.accessibleAge !== undefined ||
-          state.byAccount[a.id].kind !== a.kind || row.byAccount[a.id].ownerId !== person.id)) return unavailable('unsupported-estate')
+        soloSettlement?.cpp && soloSettlement.cpp.amountReal !== 0 || soloSettlement?.gis || soloSettlement?.rrif ||
+        plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || (!household && a.ownerId !== person.id || household && !plan.people.some(p => p.id === a.ownerId)) || a.jurisdiction || a.accessibleAge !== undefined ||
+          state.byAccount[a.id].kind !== a.kind || row.byAccount[a.id].ownerId !== a.ownerId)) return unavailable('unsupported-estate')
+    if (household) {
+      const support = plan.taxProfile?.spouseSupported
+      if (!householdTerminalBenefitsSupported(plan, row) || !survivor || person.id === survivor.id || !working || !('household' in working) ||
+          working.household.phase !== 'both-retired' || !row.householdWithdrawalSettlement ||
+          !support || !Object.prototype.hasOwnProperty.call(support, 'value') || support.status !== 'known' || support.value !== false || plan.taxProfile?.pensionSplit ||
+          plan.people.some(p => p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || p.pensionAnnual !== 0 || p.pension || p.cppWork ||
+            row.byPerson[p.id].earnedIncome !== 0 || row.byPerson[p.id].benefits !== 0 ||
+            [row.byPerson[p.id].cpp, row.byPerson[p.id].oasGross, row.byPerson[p.id].oasNet, row.byPerson[p.id].oasRecovery, row.byPerson[p.id].gis].some(n => n !== undefined && n !== 0)) ||
+          plan.accounts.some(a => a.rrifFactorCategory !== undefined && (a.rrifFactorCategory?.status !== 'unknown' || !a.rrifFactorCategory.reason?.trim()) || a.rrifAgeElection != null || a.taxableOwnerShares.status !== 'known' || Object.keys(a.taxableOwnerShares.shares).length !== 1 || a.taxableOwnerShares.shares[a.ownerId!] !== 1) ||
+          plan.people.some(p => {
+            const posted = (row.householdWithdrawalSettlement?.postings ?? []).filter(a => a.ownerId === p.id && a.kind === 'rrsp').reduce((sum, a) => sum + a.amount, 0)
+            return row.byPerson[p.id].income !== 0 || Math.abs(row.byPerson[p.id].taxableIncome - posted) > 0.005
+          })) return unavailable('unsupported-estate')
+    }
     const evidence = plan.annualTerminalEstateEvidence?.[row.year]
     if (evidence === undefined) return unavailable('evidence-missing')
     if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return unavailable('evidence-invalid')
@@ -83,10 +149,16 @@ export function annualTerminalEstate(plan: InputsV2, state: AnnualState, row: Ye
         evidence.timing !== 'end-of-terminal-year' || evidence.certificateRequired !== true || evidence.completeEstate !== true ||
         !own(evidence, 'noDeathBenefitsOrOtherTerminalIncome') || evidence.noDeathBenefitsOrOtherTerminalIncome !== true ||
         !own(evidence, 'accounts') || !evidence.accounts || typeof evidence.accounts !== 'object' || Array.isArray(evidence.accounts) ||
-        ![Object.prototype, null].includes(Object.getPrototypeOf(evidence.accounts)) || Object.keys(evidence.accounts).length !== plan.accounts.length ||
-        plan.accounts.some(a => !own(evidence.accounts, a.id) || evidence.accounts[a.id]?.ownerId !== person.id ||
+        ![Object.prototype, null].includes(Object.getPrototypeOf(evidence.accounts)) || Object.keys(evidence.accounts).length !== accounts.length ||
+        accounts.some(a => !own(evidence.accounts, a.id) || evidence.accounts[a.id]?.ownerId !== person.id ||
           evidence.accounts[a.id].estateIncluded !== true || evidence.accounts[a.id].noBeneficiaryRollover !== true ||
           a.kind === 'tfsa' && evidence.accounts[a.id].tfsaNoDeathIncome !== true)) return unavailable('evidence-invalid')
+    if (household && (['effectiveYear', 'personId', 'timing', 'certificateRequired', 'completeEstate'].some(key => !own(evidence, key)) ||
+        accounts.some(a => { const proof = evidence.accounts[a.id]; return !proof || typeof proof !== 'object' || Array.isArray(proof) ||
+          ['ownerId', 'estateIncluded', 'noBeneficiaryRollover', ...(a.kind === 'tfsa' ? ['tfsaNoDeathIncome'] : [])].some(key => !own(proof, key)) }) ||
+        !own(evidence, 'modeledDecedent') || evidence.modeledDecedent !== 'self-only' ||
+        !own(evidence, 'survivingPersonId') || evidence.survivingPersonId !== survivor!.id ||
+        !own(evidence, 'noSurvivorProjection') || evidence.noSurvivorProjection !== true)) return unavailable('evidence-invalid')
     const startCpi = settlement.startCpi
     const endCpi = startCpi * (1 + plan.inflation)
     const rules = rulesForCalendarYear(anchorTaxRules('ON'), row.year)
@@ -95,13 +167,13 @@ export function annualTerminalEstate(plan: InputsV2, state: AnnualState, row: Ye
     if (!Number.isFinite(startCpi) || startCpi <= 0 || !Number.isFinite(endCpi) || endCpi <= 0 ||
         taxRules.rulePackId !== settlement.taxRules.rulePackId || taxRules.ruleYear !== settlement.taxRules.ruleYear ||
         Math.abs(incomeTax(annual.taxableIncome / startCpi, 'ON', credits, rules) * startCpi - annual.tax) > 0.005) return unavailable('tax-basis-unavailable')
-    const closingNetWorth = Object.values(row.byAccount).reduce((s, a) => s + a.closing, 0)
-    const closingRegisteredFairMarketValue = plan.accounts.filter(a => a.kind === 'rrsp').reduce((s, a) => s + row.byAccount[a.id].closing, 0)
+    const closingNetWorth = accounts.reduce((s, a) => s + row.byAccount[a.id].closing, 0)
+    const closingRegisteredFairMarketValue = accounts.filter(a => a.kind === 'rrsp').reduce((s, a) => s + row.byAccount[a.id].closing, 0)
     const incrementalFinalReturnIncomeTax = terminalTax({ province: 'ON', people: [{ taxableIncome: annual.taxableIncome / startCpi, credits }], remainingRegistered: closingRegisteredFairMarketValue / startCpi, nonRegisteredGain: 0, investmentPropertyGain: 0, rules }).incrementalTax * startCpi
     const estateAdministrationTax = ontarioEstateAdministrationTax(closingNetWorth)
     const netEstate = closingNetWorth - incrementalFinalReturnIncomeTax - estateAdministrationTax
     if (![closingNetWorth, closingRegisteredFairMarketValue, incrementalFinalReturnIncomeTax, netEstate].every(Number.isFinite)) return unavailable('tax-basis-unavailable')
-    return { status: 'estimated', closingNetWorth, closingRegisteredFairMarketValue, estateAdministrationTaxBase: closingNetWorth,
+    return { status: 'estimated', ...(household ? { scope: 'self-estate-only' as const, personId: person.id, survivingPersonId: survivor!.id, excludedSurvivorClosingNetWorth: plan.accounts.filter(a => a.ownerId === survivor!.id).reduce((sum, a) => sum + row.byAccount[a.id].closing, 0), householdClosingNetWorth: Object.values(row.byAccount).reduce((sum, a) => sum + a.closing, 0) } : {}), closingNetWorth, closingRegisteredFairMarketValue, estateAdministrationTaxBase: closingNetWorth,
       incrementalFinalReturnIncomeTax, estateAdministrationTax, netEstate, evidence: structuredClone(evidence), taxRules,
       taxBasis: 'start-CPI-annual-return', startCpi, endCpi }
   } catch { return unavailable('evidence-invalid') }

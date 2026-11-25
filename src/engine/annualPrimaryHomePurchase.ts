@@ -1,3 +1,4 @@
+import { isCanonicalGeneratedState } from './annualState'
 import { tfsaStatement } from "./tfsaRoom"
 import type { InputsV2 } from './model'
 import type { AnnualState, AnnualStepValue, PrimaryHomePurchaseState } from './annualState'
@@ -57,7 +58,7 @@ export function purchaseContext(plan: InputsV2, opening: AnnualState): PrimaryHo
     const fields = (v: unknown, keys: string[]): v is Record<string, unknown> => !!v && typeof v === "object" && keys.every(k => own(v, k))
     const dated = (v: unknown) => fields(v, ["origin", "sourceYear"]) && v.origin === "user" && Number.isInteger(v.sourceYear) && (v.sourceYear as number) >= 0 && (v.sourceYear as number) <= plan.baseYear
     const title = e!.householdTitle, authorization = e!.fundingAuthorization, a = plan.accounts[0]
-    if (plan.people.some(p => opening.byPerson[p.id].age < p.retirementAge || p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !["manual", "statement"].includes(p.cppAmountSource?.source ?? "") || !["manual", "statement"].includes(p.oasAmountSource?.source ?? "")) || plan.annualTerminalEstateEvidence || plan.strategy === "meltdownPaced" ||
+    if (plan.people.some(p => opening.byPerson[p.id].age < p.retirementAge || p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !["manual", "statement"].includes(p.cppAmountSource?.source ?? "") || !["manual", "statement"].includes(p.oasAmountSource?.source ?? "")) || plan.annualTerminalEstateEvidence && !isCanonicalGeneratedState(plan, opening) || plan.strategy === "meltdownPaced" ||
         !own(e!, "householdTitle") || !fields(title, ["shares", "verified", "provenance", "policy"]) || title.verified !== true || title.policy !== "user-verified-title" || !dated(title.provenance) || !fields(title.shares, Object.keys(p.taxableOwnerShares.status === "known" ? p.taxableOwnerShares.shares : {})) ||
         p.taxableOwnerShares.status !== "known" || Object.keys(title.shares).length !== Object.keys(p.taxableOwnerShares.shares).length || Object.entries(p.taxableOwnerShares.shares).some(([id, share]) => title.shares[id] !== share) ||
         !own(e!, "fundingAuthorization") || !fields(authorization, ["accountId", "ownerId", "authorized", "purpose", "provenance"]) || authorization.accountId !== a.id || authorization.ownerId !== a.ownerId || authorization.authorized !== true || authorization.purpose !== "household-primary-home-purchase" || !dated(authorization.provenance)) refuse("requires verified household title and dated actual account-owner purchase authorization in a both-retired year")
