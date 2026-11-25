@@ -579,6 +579,7 @@
   "valDownPaymentExceedsAssets": "Down payment exceeds today's liquid assets (TFSA + RRSP + non-registered + FHSA) - you'd need growth between now and the purchase year to cover it",
   "valPurchaseMortgageRequired": "Purchase at age {{age}} is missing financing for ${{amount}}. Enter a valid mortgage payment and term, or pay the full price in cash.",
   "valPurchaseInvalid": "Purchase at age {{age}} has an invalid price or down payment. The down payment must be between zero and the purchase price.",
+  "valHouseholdExpenseUnfunded": "The one-time household expense has an unpaid amount of ${{amount}}.",
   "valDownPaymentUnfunded": "Purchase at age {{age}} is short ${{amount}} for the down payment. Increase available funds or reduce the down payment.",
   "valPurchaseCostUnfunded": "Housing costs at age {{age}} exceed this year's savings by ${{amount}}.",
   "valSaleDischargeUnfunded": "Selling at age {{age}} needs ${{amount}} more at the start of that year to clear the mortgage. The unpaid amount remains a debt.",

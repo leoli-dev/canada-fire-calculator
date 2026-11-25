@@ -50,6 +50,7 @@ export const stageIds: Record<string, string> = {
 
 /** Compact, native labels share the same reason mapping as validation and results. */
 const gapLabels: Record<ReturnType<typeof fundingGapMessageKey>, AnnualSheetText> = {
+ valHouseholdExpenseUnfunded: sheetText('One-time household expense shortfall','Déficit de dépense ponctuelle du ménage','家庭一次性支出缺口'),
  valPurchaseInvalid: sheetText('Invalid purchase terms','Conditions d’achat invalides','购房条件无效'),
  valPurchaseMortgageRequired: sheetText('Mortgage terms missing','Conditions hypothécaires manquantes','房贷条件缺失'),
  valFhsaContributionUnfunded: sheetText('FHSA contribution funding gap','Déficit de financement de cotisation CELIAPP','FHSA 供款融资缺口'),
@@ -61,6 +62,7 @@ const gapLabels: Record<ReturnType<typeof fundingGapMessageKey>, AnnualSheetText
  valDownPaymentUnfunded: sheetText('Down-payment funding gap','Déficit de financement de la mise de fonds','首付融资缺口'),
 }
 export function annualGapLabel(gap: FundingGap): AnnualSheetText {
+ if (gap.reason === 'householdExpense') return sheetText('One-time household expense shortfall', 'Déficit de dépense ponctuelle du ménage', '家庭一次性支出缺口')
  const label = gapLabels[fundingGapMessageKey(gap.reason)]
  return /^(principalResidence|investmentProperties)/.test(gap.field) ? joinSheetText(propertyLabel(gap.field), label) : label
 }

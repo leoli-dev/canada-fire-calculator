@@ -157,6 +157,7 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  annualHouseholdExpenseEvidence?: import("./annualHouseholdExpense").HouseholdExpenseEvidence
   /** Both owners explicitly authorize this exhaustive debit order for held mortgage and living cash. */
   annualHouseholdMortgageFundingEvidence?: { orderedAccounts: [{ accountId: string; ownerId: string }, { accountId: string; ownerId: string }]; authorized: true; purpose: "household-held-mortgage-and-living"; provenance: Provenance }
   annualTerminalEstateEvidence?: Record<number, import('./annualTerminalEstate').AnnualTerminalEstateEvidence>
