@@ -288,7 +288,6 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   const expense = plan.annualHouseholdExpenseEvidence
   const expenseReached = !!working && 'household' in working && isCanonicalGeneratedState(plan, opening) && expense !== undefined && (!Number.isInteger(expense?.effectiveYear) || expense.effectiveYear <= year) && !opening.householdExpenseReceipt
   if (expenseReached) {
-    if (plan.annualHouseholdMortgageRrspEvidence !== undefined) return fail('unsupported', 'household mortgage RRSP reached one-time expense composition is not supported')
     const problem = expenseEvidenceProblem(plan, expense, year)
     if (problem || !working || !("household" in working) || working.household.phase !== "both-retired" || !isCanonicalGeneratedState(plan, opening) || !plan.debts.length || opening.primaryHomeSaleCash || opening.primaryHomePurchase || plan.properties.some(p => p.sellAtAge !== null && opening.byPerson[self.id].age >= p.sellAtAge || p.plannedPurchaseAge !== null)) return fail("unsupported", problem ?? "household expense: authenticated both-retired held mortgage required")
   }
@@ -514,7 +513,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const baselineBenefits = benefits
     // The admitted contract has exactly one fixed nominal installment.
     const expenseDue = expenseReached ? mortgageDecimal(expense!.amountNominal.status === "known" ? expense!.amountNominal.value : NaN) : mortgageDecimal(0)
-    const due = mortgageAdd(mortgageAdd(exactLiving, mortgageDecimal(debtPayments)), expenseDue)
+    const ordinaryDue = mortgageAdd(exactLiving, mortgageDecimal(debtPayments))
+    const due = mortgageAdd(ordinaryDue, expenseDue)
     if (publicBenefitsCash) {
       publicBenefitsCash.beforeDrawsAfterDebt = mortgageSubtract(availableBeforeDraws, mortgageDecimal(debtPayments))
       publicBenefitsCash.livingDue = exactLiving
@@ -557,13 +557,13 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     }
     // Actual authorized TFSA draws have already been accepted. Only a remaining
     // mandatory/living shortage reaches the separately authorized RRSP owner.
-    if (rrspAuthorization && working.household.phase !== 'both-working' && mortgageNegative(mortgageSubtract(available, due))) {
+    if (rrspAuthorization && working.household.phase !== 'both-working' && mortgageNegative(mortgageSubtract(available, ordinaryDue))) {
       if (plan.strategy === 'meltdownPaced') return fail('unsupported', 'household mortgage RRSP withdrawal strategy unsupported')
       const account = plan.accounts.find(a => a.id === rrspAuthorization.accountId)!
       const capacity = ownMortgageBalance(opening.mortgageExactBalances, account.id) ?? mortgageDecimal(state.byAccount[account.id].balance)
       if (capacity.coefficient !== '0') {
         try {
-          const accepted = quoteHouseholdMortgageRrsp(plan, year, working, capacity, available, due, exactTax, exactBenefits)
+          const accepted = quoteHouseholdMortgageRrsp(plan, year, working, capacity, available, ordinaryDue, exactTax, exactBenefits)
           rrspFunding = accepted.receipt
           available = accepted.availableAfterDraw
           mortgageDraws.set(account.id, accepted.receipt.arithmetic.gross)
@@ -604,13 +604,15 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     if (rrspFunding) rrspFunding.cashProof = { debtDue: mortgageDecimal(debtPayments), afterDebt, livingDue: exactLiving, livingFunded: living, livingUnmet: unmet, residual: mortgageSubtract(afterDebt, living) }
     if (working.household.phase === "both-working" && unmet.coefficient !== "0") return fail("unsupported", "mortgage working cash cannot be fully funded")
     if (expenseReached) {
-      const paid = decimalMin(mortgageSubtract(afterDebt, living), expenseDue)
+      // An ordinary RRSP shortage means the ordered TFSAs were exhausted.
+      // Its accepted quote may leave precision excess, but none is event cash.
+      const paid = rrspFunding ? mortgageDecimal(0) : decimalMin(mortgageSubtract(afterDebt, living), expenseDue)
       const expensePostings: HouseholdExpenseReceipt['postings'] = []
       // Apply accepted income/benefit cash before owner withdrawals. Only the
       // remaining mandatory/living need consumes a draw before the event.
       const ordinaryNeed = mortgageSubtract(mortgageAdd(mortgageDecimal(debtPayments), living), availableBeforeDraws)
       let livingDraws = mortgageNegative(ordinaryNeed) ? mortgageDecimal(0) : ordinaryNeed
-      for (const posting of postings) {
+      for (const posting of postings.filter(p => p.kind === "tfsa")) {
         const draw = mortgageDraws.get(posting.accountId)!
         const ordinary = decimalMin(livingDraws, draw)
         livingDraws = mortgageSubtract(livingDraws, ordinary)
