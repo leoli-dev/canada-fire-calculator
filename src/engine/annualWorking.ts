@@ -6,6 +6,7 @@ import { annualGis } from './annualGis'
 import { annualOas, annualHouseholdOas, settleHouseholdOas, type AnnualOas } from './annualOas'
 import { annualCpp, type AnnualCpp } from './annualCpp'
 import { expenseEvidenceProblem } from './annualHouseholdExpense'
+import { reachedHouseholdWorkingTfsa, householdWorkingTfsaProblem } from './annualHouseholdWorkingTfsa'
 import type { InputsV2, Known } from './model'
 import { ageReachedInYear } from './model'
 import { initializeState, isCanonicalGeneratedState, type AnnualState, type AnnualEvaluation, type KernelResult } from './annualState'
@@ -91,6 +92,11 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     if (!safeMoney(fact.value)) return fail('invalid', 'household transition spending amount')
     const housingProblem = generated ? heldMortgageProblem(plan, evidence, generatedState) : null
     if (housingProblem) return fail('unsupported', housingProblem)
+    const workingTfsa = generated && reachedHouseholdWorkingTfsa(plan, year)
+    if (workingTfsa) {
+      const problem = householdWorkingTfsaProblem(plan, generatedState!, phase === 'both-working')
+      if (problem) return fail('unsupported', problem)
+    }
     if (plan.dependents.length || (!generated && (plan.debts.length || plan.properties.length))) return fail('unsupported', 'working dependents/property/debt pricing not yet wired')
     if (plan.taxProfile?.pensionSplit || plan.taxProfile?.qcPensionSplit) return fail('unsupported', 'working tax elections not supported')
     const support = plan.taxProfile?.spouseSupported
@@ -145,7 +151,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const mortgagePayment = generated && plan.debts.length ? Object.values(generatedState!.byDebt).reduce((s, d) => s + (d.principal > 0 && d.yearsRemaining > 0 ? d.annualPayment : 0), 0) / startCpi : 0
     const residual = gross - deductions - priced.total - fact.value - mortgagePayment
     const bound = Math.min(0.004, 0.004 / startCpi, 4 * Number.EPSILON * (gross + deductions + priced.total + fact.value))
-    if (residual < -bound && (!generated || phase === 'both-working')) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
+    if (residual < -bound && (!generated || phase === 'both-working')) return fail('unsupported', workingTfsa ? 'household working TFSA: wage cash cannot fund mandatory mortgage and living' : 'negative working cash requires withdrawal funding rule')
     const expense = plan.annualHouseholdExpenseEvidence
     // Only this authenticated composition can consume current positive cash
     // with an already due, validated ordinary expense. Future/invalid events
@@ -153,7 +159,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const reachedExpense = generated && (plan.annualHouseholdMortgageBenefitsEvidence !== undefined || plan.annualHouseholdMortgageRrspEvidence !== undefined) && phase === 'both-retired' &&
       !generatedState!.householdExpenseReceipt && expense !== undefined && expense.effectiveYear === year &&
       !expenseEvidenceProblem(plan, expense, year) && expense.amountNominal.status === 'known' ? expense.amountNominal.value / startCpi : 0
-    if (residual - reachedExpense > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
+    if (residual - reachedExpense > bound && !workingTfsa) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
     const evaluation: AnnualEvaluation = { byPerson: {} }
     for (const p of plan.people) {
       const tax = priced.byPerson[p.id]
