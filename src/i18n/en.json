@@ -1806,5 +1806,38 @@
       "candidate-invalid": "Enter a whole retirement age between your current age and life expectancy (at most 105), and a finite nonnegative living budget within the supported amount range.",
       "benefit-premise-review": "The changed retirement age conflicts with a recorded CPP/OAS statement premise or a pending premise review. Amounts and dated evidence were retained; reconfirm them in the source plan before replaying this change."
     }
+  },
+  "canonicalMc": {
+    "title": "Canonical Monte Carlo",
+    "scope": "Sampled annual investment returns on the same elected canonical annual chain. Complete means every requested year settled, not FIRE or estate certainty. Deterministic results and plan facts stay unchanged.",
+    "assumptions": "Enter an explicit annual gross real-return standard deviation for every listed account (0–100%). Blank is unknown; 0 reproduces fixed returns. One normal market shock is shared across all accounts each calendar year. Annual fees are subtracted once from real returns, then inflation converts to nominal; nominal losses are capped at 100%. No sampled inflation or property growth. Up to 200 trials and 120 years; an 8-second budget is checked between trials, so one trial may run beyond it. Cancel terminates the worker.",
+    "seed": "Seed (0–4294967295)",
+    "trials": "Trials (1–200)",
+    "volatility": "{{account}}: annual volatility (%)",
+    "trace": "Request {{request}} · source {{source}} · seed {{seed}} · revision {{revision}} · {{version}}",
+    "counts": "Requested {{total}}: complete with zero gaps {{completeZeroGaps}}; complete with actual gaps {{completeWithGaps}}; partial {{partial}}; blocked {{blocked}}; invalid {{invalid}}; uncomputed {{uncomputed}}.",
+    "incomplete": "Overall zero-gap rate unavailable: some requested trials are incomplete, blocked, invalid or uncomputed. These are not counted as financial failures. Bands show only available committed years.",
+    "rate": "{{numerator}} / {{denominator}} fully computed trials had zero living/event gaps ({{percent}}). This is a modeled zero-gap frequency, not a definitive financial success probability.",
+    "bands": "Per-year closing net-worth percentiles, CAD · {{mode}} (base year {{year}}). n is the available committed-row cohort, including partial paths; it can shrink each year. Percentiles are not one full path or a complete-trial cohort. Real display divides closing values by year-end CPI.",
+    "columns": {
+      "year": "Year",
+      "n": "Available n",
+      "p10": "10th percentile",
+      "p50": "Median",
+      "p90": "90th percentile"
+    },
+    "status": {
+      "idle": "Ready to sample; confirm account volatility assumptions first.",
+      "running": "Sampling in a background worker…",
+      "cancelled": "Cancelled; no sampled figures retained.",
+      "done": "Sampling finished. Review coverage counts and limits below.",
+      "error": "Run unavailable. Check trial count, seed and source validity, then retry."
+    },
+    "stop": {
+      "assumptions": "Unavailable assumptions: require explicit account volatility, a valid horizon and valid underlying deterministic returns. No missing value is treated as zero.",
+      "scope": "Sampled pricing unavailable for this exact purchase or recorded unit-price/nonregistered evidence. No replacement quote or deterministic growth is invented.",
+      "budget": "Time budget reached. Remaining trials are uncomputed; no overall rate is shown."
+    },
+    "run": "Run {{count}} canonical trials"
   }
 }

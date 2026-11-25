@@ -92,6 +92,23 @@ export const fixedReturnProvider: ReturnProvider = ({ plan }, accountId) => {
   if (!account) return Number.NaN
   return (1 + account.realReturn - account.annualFee) * (1 + plan.inflation) - 1
 }
+const sampledReturnProviders = new WeakSet<ReturnProvider>()
+/** Marks providers produced by the sampler without changing legacy injected providers. */
+export function sampledReturnProvider(provider: ReturnProvider): ReturnProvider {
+  sampledReturnProviders.add(provider)
+  return provider
+}
+export const SAMPLED_RETURN_SCOPE_UNAVAILABLE = 'sampled-return-scope-unavailable'
+/** Exact purchase carry and recorded taxable unit prices cannot price a market shock.
+ * The continuous sampled entry requires proven fixed identity on those paths.
+ * Pre-existing standalone injected providers retain their original contract;
+ * a sampler-produced provider cannot use them to bypass this restriction.
+ */
+export function sampledReturnScopeProblem(plan: InputsV2, returns: ReturnProvider, requireProvenFixed = false): string | null {
+  if (returns === fixedReturnProvider || !requireProvenFixed && !sampledReturnProviders.has(returns)) return null
+  return plan.annualNonRegEvidence || plan.properties.some(p => p.plannedPurchaseAge !== null)
+    ? SAMPLED_RETURN_SCOPE_UNAVAILABLE : null
+}
 /** Exact mortgage carry contains only explicitly written account IDs. */
 function ownMortgageBalance(balances: Record<string, MortgageDecimal> | undefined, id: string): MortgageDecimal | undefined {
   return balances && Object.prototype.hasOwnProperty.call(balances, id) ? balances[id] : undefined
@@ -277,6 +294,8 @@ export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedB
 
 function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: AnnualProviders, working?: ContinuousWorkingEvaluation): KernelResult<AnnualStepValue> {
   try { assertCanonicalPlan(plan) } catch { return fail('invalid', 'canonical plan shape') }
+  const returnScope = sampledReturnScopeProblem(plan, providers.returns)
+  if (returnScope) return fail('unsupported', returnScope)
   const gate = pricingGate(plan)
   if (!gate.allowed) return fail('unsupported', `pricing gate: ${gate.reasons.join(', ')}`)
   const self = plan.people.find(person => person.role === 'self')!
@@ -1245,11 +1264,18 @@ export const isCanonicalGeneratedState = (plan: InputsV2, state: AnnualState): b
 
 /** Internal continuous slice: no supplied snapshots, evaluators, or state splice. */
 export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendingEvidence, years: number): KernelResult<AnnualCoverage> {
+  return projectCanonicalCoverageWithReturns(plan, evidence, years, fixedReturnProvider)
+}
+
+/** Same admission and private state identities; only investment returns vary. */
+export function projectCanonicalCoverageWithReturns(plan: InputsV2, evidence: WorkingSpendingEvidence, years: number, returns: ReturnProvider): KernelResult<AnnualCoverage> {
   try {
     if (!Number.isInteger(years) || years < 0 || years > 120) return fail('invalid', 'projection years')
     plan = clone(plan)
     const initialized = initializeState(plan)
     if (initialized.status !== 'ok') return initialized
+    const returnScope = sampledReturnScopeProblem(plan, returns, true)
+    if (returnScope) return fail('unsupported', returnScope)
     for (const person of plan.people) {
       const problem = cppInputProblem(person)
       if (problem) return fail('invalid', problem)
@@ -1297,7 +1323,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
         else if (quote.value.netCash > 0 && Object.entries(plan.savingsAllocation.shares).some(([kind, share]) => share !== (kind === 'tfsa' ? 1 : 0))) result = fail('unsupported', 'continuous working allocation supports TFSA only')
         else {
           generatedStates.set(state, plan)
-          try { result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value) }
+          try { result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns }, quote.value) }
           catch (error) {
             if (error instanceof MortgagePrecisionError && plan.people.length === 2 && plan.annualHouseholdExpenseEvidence !== undefined) {
               result = fail('unsupported', 'household expense: decimal precision boundary')
@@ -1315,7 +1341,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       } else {
         if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')
         generatedStates.set(state, plan)
-        result = annualRetirementContinuation(plan, state, evidence)
+        result = annualRetirementContinuation(plan, state, evidence, returns)
         generatedStates.delete(state)
       }
       if (result.status !== 'ok') { blocked = { year: state.year, status: result.status, issues: result.issues, causes: [...new Set(result.issues.map(annualStopCause))] }; break }

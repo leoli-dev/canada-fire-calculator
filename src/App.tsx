@@ -17,6 +17,7 @@ import { YearTable } from './components/YearTable'
 import { ResultsPanel } from './components/ResultsPanel'
 import { ResultPeek } from './components/ResultPeek'
 import { MonteCarloCard } from './components/MonteCarloCard'
+import { CanonicalMonteCarloCard } from './components/CanonicalMonteCarloCard'
 import { MC_RULE_VERSION } from './mcProtocol'
 import { StrategyCard } from './components/StrategyCard'
 import { TimingCard } from './components/TimingCard'
@@ -173,6 +174,7 @@ export default function App() {
           {canonicalResult.coverage && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>
           {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {canonical && <CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
+          {canonical && <CanonicalMonteCarloCard inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
           <ScenarioCard />
         </section>}
         {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>

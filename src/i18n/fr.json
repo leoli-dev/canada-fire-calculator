@@ -1815,5 +1815,38 @@
       "candidate-invalid": "Saisissez un âge entier entre votre âge actuel et votre espérance de vie (105 au maximum), et un budget fini non négatif dans la plage admise.",
       "benefit-premise-review": "Le nouvel âge de retraite contredit une hypothèse de relevé RPC/SV ou une révision en attente. Montants et preuves datées restent consignés; confirmez-les dans le plan source avant de rejouer ce changement."
     }
+  },
+  "canonicalMc": {
+    "title": "Monte Carlo canonique",
+    "scope": "Rendements annuels simulés dans la même chaîne canonique choisie. Complet signifie que chaque année demandée est calculée, sans certitude FIRE ou successorale. Le plan et le résultat déterministe restent inchangés.",
+    "assumptions": "Saisir pour chaque compte un écart-type annuel explicite du rendement réel brut (0–100 %). Vide signifie inconnu; 0 reproduit le rendement fixe. Un choc normal commun par année civile. Frais annuels soustraits une fois du rendement réel, puis conversion nominale par inflation; perte nominale plafonnée à 100 %. Inflation et immobilier non simulés. Maximum 200 essais et 120 ans; budget de 8 secondes vérifié entre essais, donc un essai peut le dépasser. Annuler termine le worker.",
+    "seed": "Graine (0–4294967295)",
+    "trials": "Essais (1–200)",
+    "volatility": "{{account}} : volatilité annuelle (%)",
+    "trace": "Requête {{request}} · source {{source}} · graine {{seed}} · révision {{revision}} · {{version}}",
+    "counts": "Demandés {{total}} : complets sans manque {{completeZeroGaps}}; complets avec manques réels {{completeWithGaps}}; partiels {{partial}}; bloqués {{blocked}}; invalides {{invalid}}; non calculés {{uncomputed}}.",
+    "incomplete": "Taux global sans manque indisponible : certains essais sont incomplets, bloqués, invalides ou non calculés. Ils ne sont pas des échecs financiers. Les bandes utilisent les années réellement calculées.",
+    "rate": "{{numerator}} / {{denominator}} essais entièrement calculés sans manque de dépenses courantes ou événementielles ({{percent}}). Fréquence modélisée, pas une probabilité définitive de réussite financière.",
+    "bands": "Centiles annuels de valeur nette de clôture, CAD · {{mode}} (année de base {{year}}). n représente les lignes calculées disponibles, y compris les parcours partiels; il peut diminuer. Les centiles ne forment pas un parcours complet ni une cohorte uniquement complète. Affichage réel : division par IPC de fin année.",
+    "columns": {
+      "year": "Année",
+      "n": "n disponible",
+      "p10": "10e centile",
+      "p50": "Médiane",
+      "p90": "90e centile"
+    },
+    "status": {
+      "idle": "Prêt; confirmer la volatilité des comptes.",
+      "running": "Simulation en arrière-plan…",
+      "cancelled": "Annulé; aucun chiffre simulé conservé.",
+      "done": "Simulation terminée. Examiner les décomptes et limites.",
+      "error": "Calcul indisponible. Vérifier nombre essais, graine et validité source, puis réessayer."
+    },
+    "stop": {
+      "assumptions": "Hypothèses indisponibles : volatilité explicite, horizon valide et rendements déterministes valides requis. Une valeur absente ne vaut pas zéro.",
+      "scope": "Simulation indisponible pour cet achat exact ou ces preuves de prix unitaire/compte non enregistré. Aucun prix ni rendement fixe inventé.",
+      "budget": "Budget de temps atteint. Essais restants non calculés; aucun taux global affiché."
+    },
+    "run": "Lancer {{count}} essais canoniques"
   }
 }
