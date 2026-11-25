@@ -579,6 +579,7 @@
   "valDownPaymentExceedsAssets": "La mise de fonds dépasse les actifs liquides actuels (CELI + REER + non enregistré + CELIAPP) - il faudrait une croissance d'ici l'année d'achat pour combler l'écart",
   "valPurchaseMortgageRequired": "À {{age}} ans, il manque {{amount}} $ de financement pour l'achat. Saisissez un versement et une durée hypothécaires valides, ou payez le prix entier comptant.",
   "valPurchaseInvalid": "À {{age}} ans, le prix ou la mise de fonds est invalide. La mise de fonds doit être comprise entre zéro et le prix d'achat.",
+  "valHouseholdExpenseUnfunded": "La dépense ponctuelle du ménage comporte un montant impayé de {{amount}} $.",
   "valDownPaymentUnfunded": "À {{age}} ans, il manque {{amount}} $ pour la mise de fonds. Augmentez les fonds disponibles ou réduisez la mise de fonds.",
   "valPurchaseCostUnfunded": "À {{age}} ans, les frais de logement dépassent l'épargne annuelle de {{amount}} $.",
   "valSaleDischargeUnfunded": "La vente à {{age}} ans exige {{amount}} $ de plus en début d’année pour rembourser l’hypothèque. Le montant impayé reste une dette.",

@@ -579,6 +579,7 @@
   "valDownPaymentExceedsAssets": "首付超过了今天的流动资产（TFSA+RRSP+非注册+FHSA）——需要靠购房前的增值来补足",
   "valPurchaseMortgageRequired": "{{age}} 岁购房缺少 ${{amount}} 融资。请填写有效的房贷年付款和期限，或用现金支付全价。",
   "valPurchaseInvalid": "{{age}} 岁购房价格或首付无效。首付须介于零和房价之间。",
+  "valHouseholdExpenseUnfunded": "家庭一次性支出尚欠 ${{amount}}。",
   "valDownPaymentUnfunded": "{{age}} 岁购房首付缺少 ${{amount}}。请增加可用资金或降低首付。",
   "valPurchaseCostUnfunded": "{{age}} 岁住房费用超过当年储蓄 ${{amount}}。",
   "valSaleDischargeUnfunded": "在 {{age}} 岁出售房产时，年初还需 ${{amount}} 才能清偿房贷；未付金额仍计为债务。",

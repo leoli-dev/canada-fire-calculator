@@ -1,3 +1,4 @@
+import { expenseEvidenceProblem, expenseSnapshotProblem, type HouseholdExpenseReceipt } from "./annualHouseholdExpense"
 import { primaryHomeSale, exactHomeReceipt, decimalMin, homeLivingDecimal } from './annualPrimaryHomeSale'
 import { PAYROLL_2026 } from './payroll'
 import { annualTerminalEstate } from './annualTerminalEstate'
@@ -70,6 +71,7 @@ export interface AnnualState {
    */
   fhsaLedgers?: Record<string, FhsaRoomYear>
   tfsaWithdrawalHistory?: { id: string; calendarYear: number; amount: number; personId: string }[]
+  householdExpenseReceipt?: HouseholdExpenseReceipt
   unfundedEvents: FundingGap[]
 }
 
@@ -95,6 +97,7 @@ function ownMortgageBalance(balances: Record<string, MortgageDecimal> | undefine
 export interface AnnualIssue { code: 'invalid' | 'unsupported' | 'unfunded'; detail: string; eventId?: string }
 export interface YearRow {
   terminalEstateEstimate?: import('./annualTerminalEstate').TerminalEstateEstimate
+  householdExpense?: HouseholdExpenseReceipt
   householdWithdrawalSettlement?: { orderedFundingAuthorization?: InputsV2["annualHouseholdMortgageFundingEvidence"]; primaryHomePurchaseCashReconciliation?: number; mortgageCashReconciliation?: number; /** Actual nominal receipts before and after the accepted draw; memo amounts only. */ baselineBenefits?: number; settledBenefits?: number; postings?: { accountId: string; ownerId: string; kind: 'tfsa' | 'rrsp'; amount: number }[]; taxIncrement?: number; taxTotal?: number; accountId: string | null; ownerId: string | null; withdrawal: number; spendingDue: number; spendingFunded: number; spendingUnmet: number; startCpi: number }
   workingSettlement?: ContinuousWorkingEvaluation & { payrollRuleId: string; payrollPolicy: string }
   payrollContributions?: number
@@ -106,7 +109,7 @@ export interface YearRow {
   /** Recorded at settlement, never reconstructed from rounded presentation values. */
   byDebt: Record<string, { payoffPrincipalReconciliation?: number; salePayoff?: number; opening: number; interest: number; principal: number; payment: number; closing: number; propertyId: string | null }>
   byProperty: Record<string, { held: boolean; opening: number; growth: number; closing: number }>
-  cashLedger: { income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
+  cashLedger: { expensePayments?: number; income: number; benefits: number; tax: number; spending: number; debtPayments: number; fhsaContributions: number; employeeContributions: number; employerContributions: number; voluntaryContributions: number; retainedContributions: number; unallocated: number }
   /** Budget reservation and final-posting bridge. Final postings and retained
    * amounts are memo facts, not additional budget uses. Ownership and
    * contributor attribution are intentionally separate. */
@@ -179,6 +182,8 @@ export function initializeState(plan: InputsV2): KernelResult<AnnualState> {
 /** Only supported, settled events commit. No trial may mutate the caller's state. */
 export function snapshotProblem(plan: InputsV2, opening: AnnualState, generatedBasis?: AnnualState): string | null {
   try {
+    const expenseProblem = expenseSnapshotProblem(plan, opening, !!generatedBasis && isCanonicalGeneratedState(plan, generatedBasis))
+    if (expenseProblem) return expenseProblem
     if (Object.values(opening.byAccount).some(a => 'nonRegPool' in a)) {
       if (!generatedBasis || !isCanonicalGeneratedState(plan, generatedBasis)) return 'nonReg: pool metadata requires authenticated generated state'
       const problem = nonRegProblem(plan, opening)
@@ -276,6 +281,14 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
   if (opening.year >= plan.baseYear + plan.lifeExpectancy - self.ageInBaseYear + 1) return fail('invalid', 'year beyond plan horizon')
   const state = clone(opening)
   const year = opening.year
+  state.unfundedEvents = state.unfundedEvents.filter(g => g.reason !== "householdExpense")
+  let householdExpense: HouseholdExpenseReceipt | undefined
+  const expense = plan.annualHouseholdExpenseEvidence
+  const expenseReached = !!working && 'household' in working && isCanonicalGeneratedState(plan, opening) && expense !== undefined && (!Number.isInteger(expense?.effectiveYear) || expense.effectiveYear <= year) && !opening.householdExpenseReceipt
+  if (expenseReached) {
+    const problem = expenseEvidenceProblem(plan, expense, year)
+    if (problem || !working || !("household" in working) || working.household.phase !== "both-retired" || !isCanonicalGeneratedState(plan, opening) || !plan.debts.length || opening.primaryHomeSaleCash || opening.primaryHomePurchase || plan.properties.some(p => p.sellAtAge !== null && opening.byPerson[self.id].age >= p.sellAtAge || p.plannedPurchaseAge !== null)) return fail("unsupported", problem ?? "household expense: authenticated both-retired held mortgage required")
+  }
   // A snapshot written before BE-36 A has no ledger map; an absent entry means
   // the prior year's FHSA room is not established, not that it was zero.
   const fhsaLedgerByPerson: Record<string, FhsaRoomYear> = state.fhsaLedgers ?? (state.fhsaLedgers = {})
@@ -476,7 +489,8 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const exactLiving = mortgageMultiply(mortgageDecimal(working.household.spendingReal), exactCpi)
     let available = mortgageSubtract(mortgageSubtract(mortgageAdd(exactIncome, exactBenefits), exactTax), exactPayroll)
     // The admitted contract has exactly one fixed nominal installment.
-    const due = mortgageAdd(exactLiving, mortgageDecimal(debtPayments))
+    const expenseDue = expenseReached ? mortgageDecimal(expense!.amountNominal.status === "known" ? expense!.amountNominal.value : NaN) : mortgageDecimal(0)
+    const due = mortgageAdd(mortgageAdd(exactLiving, mortgageDecimal(debtPayments)), expenseDue)
     const shortage = mortgageSubtract(due, available)
     const orderedAuthorization = householdMortgage ? plan.annualHouseholdMortgageFundingEvidence : undefined
     const candidates = orderedAuthorization ? orderedAuthorization.orderedAccounts.map(ref => plan.accounts.find(a => a.id === ref.accountId && a.ownerId === ref.ownerId)!) : plan.accounts.filter(a => a.kind === "tfsa" && state.byAccount[a.id].balance > 0)
@@ -516,6 +530,22 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     const living = mortgageNegative(mortgageSubtract(afterDebt, exactLiving)) ? afterDebt : exactLiving
     const unmet = mortgageSubtract(exactLiving, living)
     if (working.household.phase === "both-working" && unmet.coefficient !== "0") return fail("unsupported", "mortgage working cash cannot be fully funded")
+    if (expenseReached) {
+      const paid = decimalMin(mortgageSubtract(afterDebt, living), expenseDue)
+      const expensePostings: HouseholdExpenseReceipt['postings'] = []
+      let livingDraws = mortgageAdd(mortgageDecimal(debtPayments), living)
+      for (const posting of postings) {
+        const draw = mortgageDraws.get(posting.accountId)!
+        const ordinary = decimalMin(livingDraws, draw)
+        livingDraws = mortgageSubtract(livingDraws, ordinary)
+        const eventDraw = mortgageSubtract(draw, ordinary)
+        if (eventDraw.coefficient !== "0") expensePostings.push({ accountId: posting.accountId, ownerId: posting.ownerId, amount: mortgageNumber(eventDraw) })
+      }
+      const unpaid = mortgageSubtract(expenseDue, paid)
+      householdExpense = { eventId: expense!.id, year, due: mortgageNumber(expenseDue), paid: mortgageNumber(paid), unmet: mortgageNumber(unpaid), evidence: clone(expense!), arithmetic: { due: expenseDue, paid, unmet: unpaid }, postings: expensePostings }
+      state.householdExpenseReceipt = clone(householdExpense)
+      if (unpaid.coefficient !== "0") state.unfundedEvents.push({ eventId: expense!.id, field: "annualHouseholdExpenseEvidence.amountNominal", amount: mortgageNumber(unpaid), reason: "householdExpense" })
+    }
     const nominalAvailable = income + benefits - tax - working.payrollContributions + sum(postings.map(p => p.amount))
     const postedCash = mortgageAdd(mortgageSubtract(mortgageSubtract(mortgageAdd(mortgageDecimal(income), mortgageDecimal(benefits)), mortgageDecimal(tax)), mortgageDecimal(working.payrollContributions)), mortgageDecimal(sum(postings.map(p => p.amount))))
     const reconciliation = mortgageNumber(available) - nominalAvailable ||
@@ -968,6 +998,7 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
     cashLedger: { income, benefits, tax, spending, debtPayments, fhsaContributions: allocation.fhsa, employeeContributions: allocation.employee,
       employerContributions: allocation.employer, voluntaryContributions: sum(Object.values(allocation.voluntary)), retainedContributions, unallocated: 0 },
     taxLedger: Object.fromEntries(Object.entries(personRows).map(([id, p]) => [id, { taxableIncome: p.taxableIncome, tax: p.tax }])), rrspLedger, fhsaLedger, tfsaLedger, issues: [] }
+  if (householdExpense) { row.householdExpense = clone(householdExpense); row.cashLedger.expensePayments = householdExpense.paid }
   if (householdSaleSettlement) row.retirementSettlement = householdSaleSettlement
   if (householdWithdrawalSettlement) {
     row.householdWithdrawalSettlement = householdWithdrawalSettlement
@@ -999,7 +1030,7 @@ export function annualStep(plan: InputsV2, opening: AnnualState, providers: Annu
  * Only rows successfully returned by annualStep are settled. state is never advanced
  * through a blocked year; its year is the first year that remains to be evaluated.
  */
-export type AnnualStopCause = 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
+export type AnnualStopCause = 'householdExpense' | 'nonRegSale' | 'retirement' | 'propertyPurchase' | 'propertySale' | 'registeredWithdrawal' | 'registeredConversion'
   | 'mortgageFundingAuthorization' | 'withdrawalOwnership' | 'tfsaWithdrawalEvidence'
   | 'fhsaRules' | 'rrspRoom' | 'withdrawalFunding' | 'cashMismatch' | 'contributionAttribution'
   | 'contributionFunding' | 'invalidEvaluation' | 'invalidReturn' | 'invalidState' | 'unsupported'
@@ -1007,6 +1038,7 @@ export type AnnualStopCause = 'nonRegSale' | 'retirement' | 'propertyPurchase' |
 /** Diagnostic classification stays internal: detail strings never become display text.
  * The strict API returns its original issue objects, without extra fields. */
 export function annualStopCause(issue: AnnualIssue): AnnualStopCause {
+  if (issue.detail.startsWith("household expense:")) return "householdExpense"
   const detail = issue.detail
   if (detail.startsWith("nonReg:")) return "nonRegSale"
   if (issue.code === 'unfunded') return 'contributionFunding'
@@ -1121,6 +1153,12 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
     for (let i = 0; i < years; i++) {
       let result: KernelResult<AnnualStepValue>
       const person = plan.people.find(p => p.role === 'self')!
+      const expense = plan.annualHouseholdExpenseEvidence
+      if (plan.people.length === 2 && expense !== undefined && !state.householdExpenseReceipt && (!Number.isInteger(expense?.effectiveYear) || expense.effectiveYear <= state.year) &&
+          (expenseEvidenceProblem(plan, expense, state.year) || !plan.debts.length)) {
+        blocked = { year: state.year, status: 'unsupported', issues: [{ code: 'unsupported', detail: 'household expense: explicit evidence and household held mortgage required' }], causes: ['householdExpense'] }
+        break
+      }
       if (plan.people.length === 2 || state.byPerson[person.id].age < person.retirementAge) {
         const safeMoney = (n: number) => Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER / 100
         const unsafe = Object.values(state.byAccount).some(a => !safeMoney(a.balance)) || !safeMoney(sum(Object.values(state.byAccount).map(a => a.balance))) || Object.values(state.byPerson).some(p => p.tfsaRoom.status === 'known' && !safeMoney(p.tfsaRoom.value))
@@ -1144,11 +1182,15 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
           generatedStates.set(state, plan)
           try { result = annualStepUnchecked(plan, state, { evaluate: () => clone(quote.value.evaluation), returns: fixedReturnProvider }, quote.value) }
           catch (error) {
+            if (error instanceof MortgagePrecisionError && plan.people.length === 2 && plan.annualHouseholdExpenseEvidence !== undefined) {
+              result = fail('unsupported', 'household expense: decimal precision boundary')
+            } else {
             // Only the authenticated household sale route owns this precision
             // boundary. Keep its failed year atomic, preserving the prior rows.
             if (!(error instanceof MortgagePrecisionError) || plan.people.length !== 2 ||
                 !(state.primaryHomeSaleCash || plan.properties.some(p => p.sellAtAge !== null && state.byPerson[person.id].age >= p.sellAtAge && state.byProperty[p.id]?.held))) throw error
             result = fail('unsupported', 'primary home sale: decimal precision boundary')
+            }
           }
           finally { generatedStates.delete(state) }
         }
