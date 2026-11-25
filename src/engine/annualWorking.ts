@@ -5,6 +5,7 @@ import { nonRegProblem } from "./annualNonReg"
 import { annualGis } from './annualGis'
 import { annualOas, annualHouseholdOas, settleHouseholdOas, type AnnualOas } from './annualOas'
 import { annualCpp, type AnnualCpp } from './annualCpp'
+import { expenseEvidenceProblem } from './annualHouseholdExpense'
 import type { InputsV2, Known } from './model'
 import { ageReachedInYear } from './model'
 import { initializeState, isCanonicalGeneratedState, type AnnualState, type AnnualEvaluation, type KernelResult } from './annualState'
@@ -120,7 +121,7 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
         payroll[p.id] = sideIncomeDeductions(gross, 'employment', plan.province, age)
         events.push({ id: `annual:${year}:wage:${p.id}`, personId: p.id, kind: 'employment', amount: gross })
       }
-      const cpp = generated && plan.people.some(p => p.cppAnnualAt65 > 0) ? annualCpp(plan, p, age) : undefined
+      const cpp = generated && (plan.people.some(p => p.cppAnnualAt65 > 0) || plan.annualHouseholdMortgageBenefitsEvidence !== undefined) ? annualCpp(plan, p, age) : undefined
       if (cpp) events.push({ id: `annual:${year}:cpp:${p.id}`, personId: p.id, kind: 'cpp', amount: cpp.amountReal })
       byPerson[p.id] = { phase: working ? 'working' : 'retired', grossWagesReal: gross, ...(oas ? { oas } : {}), ...(cpp ? { cpp } : {}), payrollReal: payroll[p.id] ?? null }
     }
@@ -145,7 +146,14 @@ export function evaluateCanonicalHouseholdWorkingYear(plan: InputsV2, evidence: 
     const residual = gross - deductions - priced.total - fact.value - mortgagePayment
     const bound = Math.min(0.004, 0.004 / startCpi, 4 * Number.EPSILON * (gross + deductions + priced.total + fact.value))
     if (residual < -bound && (!generated || phase === 'both-working')) return fail('unsupported', 'negative working cash requires withdrawal funding rule')
-    if (residual > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
+    const expense = plan.annualHouseholdExpenseEvidence
+    // Only this authenticated composition can consume current positive cash
+    // with an already due, validated ordinary expense. Future/invalid events
+    // cannot become a surplus destination or relax unrelated household paths.
+    const reachedExpense = generated && plan.annualHouseholdMortgageBenefitsEvidence !== undefined && phase === 'both-retired' &&
+      !generatedState!.householdExpenseReceipt && expense !== undefined && expense.effectiveYear === year &&
+      !expenseEvidenceProblem(plan, expense, year) && expense.amountNominal.status === 'known' ? expense.amountNominal.value / startCpi : 0
+    if (residual - reachedExpense > bound) return fail('unsupported', 'couple contribution attribution not yet wired; positive household cash')
     const evaluation: AnnualEvaluation = { byPerson: {} }
     for (const p of plan.people) {
       const tax = priced.byPerson[p.id]

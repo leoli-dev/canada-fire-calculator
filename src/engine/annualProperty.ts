@@ -1,4 +1,5 @@
 import { mortgageDecimal, mortgageMultiply, mortgageSubtract, mortgageNegative } from './mortgageDecimal'
+import { householdMortgageBenefitsProblem } from './annualHouseholdMortgageBenefits'
 import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
 import { isCanonicalGeneratedState, type AnnualState, type YearRow } from './annualState'
@@ -113,6 +114,11 @@ export function householdMortgageOrderProblem(plan: InputsV2, opening?: AnnualSt
  * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
  */
 export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence, opening?: AnnualState): string | null {
+  const composedBenefits = plan.annualHouseholdMortgageBenefitsEvidence !== undefined
+  if (composedBenefits) {
+    const problem = householdMortgageBenefitsProblem(plan)
+    if (problem) return problem
+  }
   if (!plan.debts.length && plan.annualPrimaryHomePurchaseEvidence && plan.properties.length === 1 && plan.properties[0].plannedPurchaseAge !== null) {
     const p = plan.properties[0]
     return (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
@@ -139,7 +145,7 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
     return 'mortgage spending evidence must explicitly exclude scheduled payments'
-  if (plan.people.some(p => p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0) || plan.annualBenefitsEvidence || plan.annualNonRegEvidence || plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))
+  if ((!composedBenefits && (plan.people.some(p => p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0) || plan.annualBenefitsEvidence)) || plan.annualNonRegEvidence || plan.accounts.some(a => !['tfsa', 'rrsp'].includes(a.kind) || a.jurisdiction || a.accessibleAge !== undefined))
     return plan.people.length === 2 ? 'household passive home mortgage supports ordinary TFSA accounts and explicit zero public benefits only' : 'mortgage supports ordinary TFSA/RRSP accounts and explicitly excluded benefits only'
   return null
 }
