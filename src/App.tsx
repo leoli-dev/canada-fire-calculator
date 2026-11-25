@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { pensionStartAge, runProjection, validateInputs } from './engine'
+import { pensionStartAge, validateInputs } from './engine'
 import { setLanguage } from './i18n'
 import { useGlossary } from './glossary'
 import { downloadStoredPlan, getStorageReadOnlyReason, isStorageUnavailable, useStore } from './store'
@@ -29,6 +29,10 @@ import { MigrationReview } from './components/MigrationReview'
 import { AnnualSheetDialog } from './components/AnnualSheetDialog'
 import { annualSheetText } from './annualSheet'
 import { annualDetailsTitle, legacyAnnualSheet } from './legacyAnnualSheet'
+import { CanonicalEvidenceControl } from './components/CanonicalEvidenceControl'
+import { CanonicalResults } from './components/CanonicalResults'
+import { selectDeterministicResult } from './deterministicResult'
+import { canonicalAnnualSheet } from './canonicalAnnualSheet'
 import { PersonTaxTable } from './components/PersonTaxTable'
 
 /** Precision reasons the pooled household tools do not depend on. */
@@ -59,9 +63,14 @@ export default function App() {
   const resultRevision = useStore((s) => s.resultRevision)
   const sharedFieldsPending = useStore(hasUnusableSharedFields)
   const showGuidedResults = entryMode === 'guided' && guidedView === 'results' && resultRevision === inputRevision && !sharedFieldsPending
-  const result = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? runProjection(inputs, undefined, canonical ?? undefined, { captureAnnualDetails: true }) : null, [entryMode, showGuidedResults, inputs, canonical, storageIssue, sharedFieldsPending])
-  const [annualToken, setAnnualToken] = useState<{ revision: number; result: typeof result; entryMode: typeof entryMode } | null>(null)
-  const annualOpen = annualToken?.revision === inputRevision && annualToken.result === result && annualToken.entryMode === entryMode
+  const nonRegMeta = useStore(s => s.answerMeta['balances.nonReg'])
+  const nonRegAbsent = nonRegMeta?.status === 'notApplicable' && nonRegMeta.origin === 'user'
+  const selected = useMemo(() => !storageIssue && !sharedFieldsPending && (entryMode === 'professional' || showGuidedResults) ? selectDeterministicResult(inputs, canonical, { nonRegAbsent }) : null, [entryMode, showGuidedResults, inputs, canonical, nonRegAbsent, storageIssue, sharedFieldsPending])
+  const canonicalModel = useMemo(() => selected?.route === 'canonical' && selected.coverage ? canonicalAnnualSheet(selected.coverage, { scenarioId: 'current', revision: inputRevision }) : null, [selected, inputRevision])
+  const result = selected?.route === 'legacy' ? selected.result : null
+  const canonicalResult = selected?.route === 'canonical' ? selected : null
+  const [annualToken, setAnnualToken] = useState<{ revision: number; result: typeof selected; entryMode: typeof entryMode } | null>(null)
+  const annualOpen = annualToken?.revision === inputRevision && annualToken.result === selected && annualToken.entryMode === entryMode
   // Adapt only for an explicitly opened, current result. An old token cannot
   // render even one frame of a revised scenario before effect cleanup.
   const precisionBlocked = migrationBlocked
@@ -93,8 +102,8 @@ export default function App() {
   }) : null, [annualOpen, result, inputs, inputRevision, migrationBlocked, coupleTools, taxWarning, precision?.reasons.join(','), t])
 
   const hasBlockingIssues = useMemo(
-    () => validateInputs(inputs).some((issue) => issue.severity === 'error'),
-    [inputs],
+    () => validateInputs(inputs, { canonical: !!canonical?.deterministicProjection }).some((issue) => issue.severity === 'error'),
+    [inputs, canonical],
   )
   const pensionAge = pensionStartAge(inputs)
   const inflation = inputs.inflation ?? 0.021
@@ -155,13 +164,20 @@ export default function App() {
           </div>
           {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
             estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
+          {!storageIssue && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
+        {canonicalResult && <section className="results-column" id="results" tabIndex={-1}>
+          <CanonicalResults result={canonicalResult} model={canonicalModel} />
+          {canonicalResult.coverage && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>
+          {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
+          <ScenarioCard />
+        </section>}
         {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
-          {result && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
+          {result && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}

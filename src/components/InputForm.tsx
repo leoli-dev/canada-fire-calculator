@@ -128,7 +128,7 @@ export function InputForm() {
   const cad = useCad()
   const setGoalFromProfessional = useStore((s) => s.setGoalFromProfessional)
   const {
-    inputs, set,
+    inputs, set, canonical,
     mixPresets, applyMixPreset,
     worksheet, setWorksheet,
     displayMode, setDisplayMode,
@@ -145,7 +145,7 @@ export function InputForm() {
     ? inputs.partner.currentAge + (inputs.fireAge - inputs.currentAge)
     : inputs.fireAge
 
-  const issues = useMemo(() => validateInputs(inputs), [inputs])
+  const issues = useMemo(() => validateInputs(inputs, { canonical: !!canonical?.deterministicProjection }), [inputs, canonical])
   // errors outrank warnings when a field has both
   const issueFor = (field: string) =>
     issues.find((i) => i.field === field && i.severity === 'error') ??

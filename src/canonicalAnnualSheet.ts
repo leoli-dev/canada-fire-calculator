@@ -3,7 +3,8 @@ import { PRIMARY_HOME_PURCHASE_SHORTFALL } from "./engine/annualPrimaryHomePurch
 import { GIS_OAS_RECOVERY_UNSUPPORTED } from './engine/annualGis'
 import type { MortgageDecimal } from './engine/mortgageDecimal'
 import { mortgageDecimal, mortgageNegative, mortgageNumber, mortgageSubtract } from './engine/mortgageDecimal'
-import type { AnnualCoverage, AnnualStopCause, YearRow } from './engine/annualState'
+import { annualStopCause } from './engine/annualState'
+import type { AnnualIssue, AnnualCoverage, AnnualStopCause, YearRow } from './engine/annualState'
 import type { AnnualSheetCell, AnnualSheetExplanation, AnnualSheetModel, AnnualSheetRow, AnnualSheetText } from './annualSheet'
 
 const exactDecimalReference = (exact: MortgageDecimal): string => {
@@ -212,6 +213,8 @@ const stopCopy: Record<AnnualStopCause, AnnualSheetText> = {
   invalidState: copy.invalid,
   unsupported: copy.unsupported,
 }
+
+export const canonicalStopText = (issue: AnnualIssue): AnnualSheetText => stopCopy[annualStopCause(issue)]
 
 /** Pure selector: consumes one canonical settled chain. No provider calls or legacy splicing.
  * Callers must pass the unmodified successful value of projectAnnualCoverage; a failed

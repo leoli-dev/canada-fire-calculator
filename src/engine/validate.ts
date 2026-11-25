@@ -25,7 +25,7 @@ const AGE_MAX = 105
  * function (it clamps or tolerates out-of-range values), so issues here never
  * block computation — they flag results the user shouldn't trust.
  */
-export function validateInputs(inputs: Inputs): ValidationIssue[] {
+export function validateInputs(inputs: Inputs, options: { canonical?: boolean } = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const err = (field: string, key: string, params?: ValidationIssue['params']) =>
     issues.push({ field, severity: 'error', key, params })
@@ -203,7 +203,7 @@ export function validateInputs(inputs: Inputs): ValidationIssue[] {
 
   // Use the same event ledger as projection. Current assets alone are not a
   // valid proxy for purchase-year funds: growth and earlier contributions matter.
-  if ((pr?.mode === 'planned' || pr?.sellAtAge !== null && pr?.sellAtAge !== undefined ||
+  if (!options.canonical && (pr?.mode === 'planned' || pr?.sellAtAge !== null && pr?.sellAtAge !== undefined ||
       inputs.investmentProperties?.some((property) => property.sellAtAge !== null) ||
       inputs.lockedRetirement || inputs.fhsa) &&
       inputs.lifeExpectancy >= inputs.currentAge && inputs.lifeExpectancy <= AGE_MAX &&

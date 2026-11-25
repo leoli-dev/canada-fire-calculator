@@ -76,6 +76,7 @@ export function BudgetMethodPanel() {
   return <section className="budget-method" data-testid="budget-method">
     <h3>{t('budget.title')}</h3>
     <p className="hint">{t('budget.intro')}</p>
+    {canonical?.deterministicProjection && <p className="hint">{t('canonical.currentBudgetHint')}</p>}
 
     <div className="budget-mode" role="radiogroup" aria-label={t('budget.title')}>
       <div className="choice-group">

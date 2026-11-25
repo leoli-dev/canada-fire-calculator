@@ -157,6 +157,18 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  /** Explicit current-plan deterministic ledger selection; never inferred by migration. */
+  deterministicProjection?: {
+    mode: 'canonical'
+    spending: import('./annualWorking').WorkingSpendingEvidence
+    provenance: Provenance
+    /** Estimate mode to restore on opt-out; explicit later mode edits replace it.
+     * Amounts are not snapshotted, so restoring cannot undo later user edits. */
+    estimateBudgetMode?: BudgetMode['kind']
+    /** Material form refresh requires the user to record the budgets again. */
+    invalidated?: true
+  }
+
   annualHouseholdWorkingTfsaEvidence?: import('./annualHouseholdWorkingTfsa').HouseholdWorkingTfsaEvidence
   /** Explicit owner consent for ordinary RRSP funding after authorized TFSAs. */
   annualHouseholdMortgageRrspEvidence?: { accountId: string; ownerId: string; authorized: true; purpose: 'household-held-mortgage-and-living'; priority: 'tfsa-before-rrsp'; provenance: Provenance }
