@@ -68,7 +68,10 @@ async function expectNoLegacyResults(page: Page) {
   const column = page.locator('.results-column')
   await expect(column.locator('.recharts-wrapper, .summary')).toHaveCount(0)
   await expect(column.getByRole('tablist')).toHaveCount(0)
-  await expect(column.getByRole('heading', { name: /Monte Carlo|Withdrawal order|Timing/i })).toHaveCount(0)
+  await expect(column.getByRole('heading', { name: /Withdrawal order|Timing/i })).toHaveCount(0)
+  await expect(column.locator('.mc-rate')).toHaveCount(0)
+  await expect(column.getByRole('button', { name: 'Run 1,000 simulations', exact: true })).toHaveCount(0)
+  await expect(column.getByTestId('canonical-mc')).toBeVisible()
   await expect(column.getByText(/Estimate: the money runs out|modeled balance lasts/i)).toHaveCount(0)
 }
 

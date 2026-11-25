@@ -13,7 +13,7 @@ import { annualCpp } from './annualCpp'
 import type { InputsV2 } from './model'
 import { pricingGate } from './model'
 import { assertCanonicalPlan } from './modelValidation'
-import { rrifConversionFor, isCanonicalGeneratedState, annualStopCause, fixedReturnProvider, snapshotProblem, type AnnualState, type AnnualStepValue, type AnnualCoverage, type KernelResult, type ReturnProvider, type YearRow } from './annualState'
+import { rrifConversionFor, isCanonicalGeneratedState, annualStopCause, fixedReturnProvider, sampledReturnScopeProblem, snapshotProblem, type AnnualState, type AnnualStepValue, type AnnualCoverage, type KernelResult, type ReturnProvider, type YearRow } from './annualState'
 import { PLAN_TAX_YEAR } from './tax'
 import { calculateHouseholdTax } from './householdTax'
 import { allocateOrderedWithdrawals, searchWithdrawalTarget } from './withdrawalSearch'
@@ -62,6 +62,8 @@ function retirementSnapshotProblem(plan: InputsV2, state: AnnualState, generated
 function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnProvider, generated = false, evidence?: WorkingSpendingEvidence): KernelResult<AnnualStepValue> {
   try {
     assertCanonicalPlan(plan)
+    const returnScope = sampledReturnScopeProblem(plan, returns)
+    if (returnScope) return fail('unsupported', returnScope)
     if (!generated && opening.rrifConversions) return fail("unsupported", "RRIF continuation requires internally generated state")
     if (generated && plan.baseYear !== PLAN_TAX_YEAR) return fail('unsupported', 'continuous retirement requires tax anchor')
     const gate = pricingGate(plan)
@@ -458,7 +460,7 @@ function retirementStep(plan: InputsV2, opening: AnnualState, returns: ReturnPro
         // Same post-settlement nominal rate as the existing return provider;
         // preserve all decimal digits across carry years, converting for display only.
         const exactOpening = state.primaryHomeSaleCash!.exactAccountBalances[account.id]
-        const exactFactor = mortgageMultiply(mortgageSubtract(mortgageAdd(mortgageDecimal(1), mortgageDecimal(account.realReturn)), mortgageDecimal(account.annualFee)), mortgageAdd(mortgageDecimal(1), mortgageDecimal(plan.inflation)))
+        const exactFactor = rates[account.id] === fixedReturnProvider({ plan, state: settled }, account.id) ? mortgageMultiply(mortgageSubtract(mortgageAdd(mortgageDecimal(1), mortgageDecimal(account.realReturn)), mortgageDecimal(account.annualFee)), mortgageAdd(mortgageDecimal(1), mortgageDecimal(plan.inflation))) : mortgageAdd(mortgageDecimal(1), mortgageDecimal(rates[account.id]))
         const exactClosing = mortgageMultiply(exactOpening, exactFactor)
         state.primaryHomeSaleCash!.exactAccountBalances[account.id] = exactClosing
         current.balance = mortgageNumber(exactClosing)
@@ -539,7 +541,7 @@ export function annualRetirementStep(plan: InputsV2, opening: AnnualState, retur
   return retirementStep(plan, opening, returns)
 }
 /** Only the initializing continuous runner can issue a live state identity. */
-export function annualRetirementContinuation(plan: InputsV2, opening: AnnualState, evidence?: WorkingSpendingEvidence): KernelResult<AnnualStepValue> {
+export function annualRetirementContinuation(plan: InputsV2, opening: AnnualState, evidence?: WorkingSpendingEvidence, returns: ReturnProvider = fixedReturnProvider): KernelResult<AnnualStepValue> {
   if (!isCanonicalGeneratedState(plan, opening)) return fail('invalid', 'retirement continuation requires internally generated state')
-  return retirementStep(plan, opening, fixedReturnProvider, true, evidence)
+  return retirementStep(plan, opening, returns, true, evidence)
 }
