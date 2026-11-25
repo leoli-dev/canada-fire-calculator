@@ -1777,5 +1777,34 @@
     "returnBudgetTitle": "Budget mode when returning to the planning estimate",
     "returnBudgetHint": "Choose the budget mode to use when you select “Use existing planning estimate”. This changes only that return choice; the current canonical budget, recorded savings answers and spending amounts stay as recorded.",
     "currentBudgetHint": "These radios select the current budget mode. To change only the mode used after returning to the estimate, use “Budget mode when returning to the planning estimate” in the canonical ledger settings. Changing the current mode also updates that return choice."
+  },
+  "planning": {
+    "title": "Try retirement ages and living budgets",
+    "scope": "Replay an explicit candidate using this plan’s deterministic annual ledger. Only your retirement age and the household retirement living budget change. Your partner’s retirement age stays as recorded. These comparisons do not edit or save your plan.",
+    "evidence": "Claim ages, benefit amounts and statement premises, ownership, title, tax, contribution room, and dated authorizations and events stay recorded. Stale benefit premises require reconfirmation. Working, transition and separately recorded post-sale or post-purchase budgets stay unchanged.",
+    "bounds": "Evaluate only the candidates you enter: up to {{count}} comparisons, each up to 120 years. No automatic search, assumed monotonicity, earliest age or maximum budget claim. Zero recorded gaps is not an overall FIRE conclusion. Asset or estate targets, strategy optimization, Monte Carlo and sampled returns are not evaluated by this tool; existing annual capability stops still apply.",
+    "age": "Your retirement age (whole years)",
+    "spending": "Annual retirement living budget ({{year}} real CAD)",
+    "evaluate": "Replay candidate",
+    "reset": "Clear comparisons",
+    "count": "{{count}} of {{max}} comparisons used",
+    "candidate": "Candidate {{index}}",
+    "facts": "Your retirement age: {{age}} (calendar year {{year}}). Household retirement living budget: {{amount}} CAD per year in {{baseYear}} purchasing power.",
+    "sheet": "Open candidate annual details",
+    "livingGaps": "Recorded living gaps in: {{years}}",
+    "eventGaps": "Recorded event gaps in: {{years}}",
+    "status": {
+      "complete-zero-gaps": "Completed horizon — zero recorded living or event gaps",
+      "complete-with-gaps": "Completed horizon — recorded living or event gaps",
+      "partial": "Partial projection — remaining years unverified",
+      "unsupported": "Unsupported — candidate not verified",
+      "invalid": "Invalid — candidate not verified",
+      "search-limit": "Comparison limit reached — further candidates not computed. Clear comparisons to try another explicit candidate."
+    },
+    "reason": {
+      "canonical-required": "Explicit canonical projection selection is required; no legacy estimate was substituted.",
+      "candidate-invalid": "Enter a whole retirement age between your current age and life expectancy (at most 105), and a finite nonnegative living budget within the supported amount range.",
+      "benefit-premise-review": "The changed retirement age conflicts with a recorded CPP/OAS statement premise or a pending premise review. Amounts and dated evidence were retained; reconfirm them in the source plan before replaying this change."
+    }
   }
 }

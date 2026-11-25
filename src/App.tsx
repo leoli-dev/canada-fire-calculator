@@ -31,6 +31,7 @@ import { annualSheetText } from './annualSheet'
 import { annualDetailsTitle, legacyAnnualSheet } from './legacyAnnualSheet'
 import { CanonicalEvidenceControl } from './components/CanonicalEvidenceControl'
 import { CanonicalResults } from './components/CanonicalResults'
+import { CanonicalPlanningTool } from './components/CanonicalPlanningTool'
 import { selectDeterministicResult } from './deterministicResult'
 import { canonicalAnnualSheet } from './canonicalAnnualSheet'
 import { PersonTaxTable } from './components/PersonTaxTable'
@@ -171,6 +172,7 @@ export default function App() {
           <CanonicalResults result={canonicalResult} model={canonicalModel} />
           {canonicalResult.coverage && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>
           {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
+          {canonical && <CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
           <ScenarioCard />
         </section>}
         {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>

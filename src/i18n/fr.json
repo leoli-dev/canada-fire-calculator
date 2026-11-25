@@ -1786,5 +1786,34 @@
     "returnBudgetTitle": "Mode budgétaire au retour à l’estimation",
     "returnBudgetHint": "Choisissez le mode à utiliser avec « Utiliser l’estimation existante ». Ce choix concerne seulement le retour ; le budget canonique actuel, les réponses sur l’épargne et les dépenses consignées restent tels quels.",
     "currentBudgetHint": "Ces boutons sélectionnent le mode budgétaire actuel. Pour choisir seulement le mode du retour à l’estimation, utilisez « Mode budgétaire au retour à l’estimation » dans les paramètres du registre canonique. Modifier le mode actuel met aussi à jour ce choix de retour."
+  },
+  "planning": {
+    "title": "Essayer des âges de retraite et des budgets",
+    "scope": "Rejouez un scénario explicite avec le registre annuel déterministe de ce plan. Seuls votre âge de retraite et le budget courant du ménage à la retraite changent. L’âge de retraite du partenaire reste consigné. Ces comparaisons ne modifient ni ne sauvegardent votre plan.",
+    "evidence": "Âges de demande, montants et hypothèses des relevés de prestations, titulaires, titres, impôts, droits de cotisation, autorisations et événements datés restent consignés. Les hypothèses périmées nécessitent une confirmation. Les budgets de travail, de transition et ceux consignés après vente ou achat restent inchangés.",
+    "bounds": "Seuls les scénarios saisis sont calculés : jusqu’à {{count}} comparaisons de 120 ans maximum chacune. Aucune recherche automatique, monotonie supposée, affirmation d’âge minimal ou de budget maximal. Aucun déficit consigné ne constitue une conclusion FIRE globale. Cibles d’actifs ou de succession, optimisation des stratégies, Monte Carlo et rendements échantillonnés ne sont pas évalués ici; les limites annuelles existantes restent applicables.",
+    "age": "Votre âge de retraite (années entières)",
+    "spending": "Budget courant annuel à la retraite (CAD réels de {{year}})",
+    "evaluate": "Rejouer le scénario",
+    "reset": "Effacer les comparaisons",
+    "count": "{{count}} comparaisons sur {{max}} utilisées",
+    "candidate": "Scénario {{index}}",
+    "facts": "Votre âge de retraite : {{age}} (année civile {{year}}). Budget courant du ménage à la retraite : {{amount}} CAD par an en pouvoir d’achat de {{baseYear}}.",
+    "sheet": "Ouvrir les détails annuels du scénario",
+    "livingGaps": "Déficits courants consignés en : {{years}}",
+    "eventGaps": "Déficits événementiels consignés en : {{years}}",
+    "status": {
+      "complete-zero-gaps": "Horizon terminé — aucun déficit courant ou événementiel consigné",
+      "complete-with-gaps": "Horizon terminé — déficits courants ou événementiels consignés",
+      "partial": "Projection partielle — années restantes non vérifiées",
+      "unsupported": "Non pris en charge — scénario non vérifié",
+      "invalid": "Invalide — scénario non vérifié",
+      "search-limit": "Limite de comparaisons atteinte — scénarios suivants non calculés. Effacez les comparaisons pour essayer un autre scénario explicite."
+    },
+    "reason": {
+      "canonical-required": "La projection canonique doit être sélectionnée explicitement; aucune estimation historique ne la remplace.",
+      "candidate-invalid": "Saisissez un âge entier entre votre âge actuel et votre espérance de vie (105 au maximum), et un budget fini non négatif dans la plage admise.",
+      "benefit-premise-review": "Le nouvel âge de retraite contredit une hypothèse de relevé RPC/SV ou une révision en attente. Montants et preuves datées restent consignés; confirmez-les dans le plan source avant de rejouer ce changement."
+    }
   }
 }
