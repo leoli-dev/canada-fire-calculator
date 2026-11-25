@@ -1138,7 +1138,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
           }
           finally { generatedStates.delete(state) }
         }
-        if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory ??= []; committedWorking = true }
+        if (result.status === 'ok') { result.value.state.tfsaWithdrawalHistory ??= []; if (plan.people.some(p => state.byPerson[p.id].age < p.retirementAge)) committedWorking = true }
       } else {
         if (!committedWorking) return fail('unsupported', 'retirement handoff requires a committed canonical working prefix')
         generatedStates.set(state, plan)
@@ -1147,7 +1147,7 @@ export function projectCanonicalCoverage(plan: InputsV2, evidence: WorkingSpendi
       }
       if (result.status !== 'ok') { blocked = { year: state.year, status: result.status, issues: result.issues, causes: [...new Set(result.issues.map(annualStopCause))] }; break }
       state = result.value.state
-      if (committedWorking && plan.annualTerminalEstateEvidence !== undefined && result.value.row.retirementSettlement &&
+      if (committedWorking && plan.annualTerminalEstateEvidence !== undefined && (result.value.row.retirementSettlement || plan.people.length === 2) &&
           result.value.row.year === plan.baseYear + plan.lifeExpectancy - person.ageInBaseYear) {
         generatedStates.set(state, plan)
         try { result.value.row.terminalEstateEstimate = annualTerminalEstate(plan, state, result.value.row) }

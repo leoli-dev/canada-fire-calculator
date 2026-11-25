@@ -1,3 +1,4 @@
+import { isCanonicalGeneratedState } from './annualState'
 import type { InputsV2 } from './model'
 import type { AnnualState, PrimaryHomeSaleReceipt } from './annualState'
 import { passiveHomeProblem, householdPassiveHomeProblem } from './annualProperty'
@@ -62,7 +63,7 @@ export function primaryHomeSale(plan: InputsV2, opening: AnnualState, household 
         !own(held.acb, 'status') || !own(held.acb, 'value') || !own(e!.sellingCostsNominal, 'status') || !own(e!.sellingCostsNominal, 'value') || !own(e!.postSaleAnnualSpendingReal, 'status') || !own(e!.postSaleAnnualSpendingReal, 'value') ||
         plan.people.some(p => opening.byPerson[p.id].age < p.retirementAge || p.pension || p.pensionAnnual !== 0 || p.cppWork || p.cppAnnualAt65 !== 0 || p.oasAnnualAt65 !== 0 || !['manual', 'statement'].includes(p.cppAmountSource?.source ?? '') || !['manual', 'statement'].includes(p.oasAmountSource?.source ?? '')) ||
         plan.accounts.filter(a => a.kind === 'tfsa' && a.balance > 0).length !== 1 || plan.accounts.some(a => a.kind !== 'tfsa' || a.jurisdiction || a.accessibleAge !== undefined) ||
-        plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || (!plan.debts.length && e!.mortgagePayoff) || plan.strategy === 'meltdownPaced')
+        plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !isCanonicalGeneratedState(plan, opening) || (!plan.debts.length && e!.mortgagePayoff) || plan.strategy === 'meltdownPaced')
       refuse('requires dated complete owner exclusions and authorization of all cash for joint living in a both-retired ordinary TFSA household')
   }
   if (held.acb.status !== 'known' || !money(held.acb.value) || !money(held.value)) refuse('requires known nominal ACB and opening value')

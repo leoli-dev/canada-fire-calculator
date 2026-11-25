@@ -1,7 +1,7 @@
 import { mortgageDecimal, mortgageMultiply, mortgageSubtract, mortgageNegative } from './mortgageDecimal'
 import type { WorkingSpendingEvidence } from './annualWorking'
 import type { InputsV2 } from './model'
-import type { AnnualState, YearRow } from './annualState'
+import { isCanonicalGeneratedState, type AnnualState, type YearRow } from './annualState'
 
 /** Only the authenticated household runner calls this guard. Title shares are
  * recorded facts; no ownership is inferred from array order or account owners. */
@@ -83,7 +83,7 @@ export function growHeldProperties(plan: InputsV2, state: AnnualState): YearRow[
  * CRA personal borrowing interest is not deductible (verified 2026-11-24):
  * https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/report-business-income-expenses/completing-form-t2125/line-8710-interest.html
  */
-export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence): string | null {
+export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEvidence, opening?: AnnualState): string | null {
   if (!plan.debts.length && plan.annualPrimaryHomePurchaseEvidence && plan.properties.length === 1 && plan.properties[0].plannedPurchaseAge !== null) {
     const p = plan.properties[0]
     return (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, properties: [{ ...p, plannedPurchaseAge: null, plannedDownPayment: null, plannedMortgage: null }] })
@@ -99,7 +99,7 @@ export function heldMortgageProblem(plan: InputsV2, evidence?: WorkingSpendingEv
     return 'mortgage requires recorded debt provenance'
   const homeProblem = (plan.people.length === 2 ? householdPassiveHomeProblem : passiveHomeProblem)({ ...plan, debts: [], properties: [{ ...p, mortgageDebtId: null }] })
   if (homeProblem) return homeProblem
-  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence || plan.annualGisEvidence))
+  if (plan.people.length === 2 && (plan.accounts.some(a => a.kind !== "tfsa" && a.balance > 0) || plan.accounts.filter(a => a.kind === "tfsa" && a.balance > 0).length > 1 || plan.annualPrimaryHomePurchaseEvidence || plan.annualTerminalEstateEvidence && !(opening && isCanonicalGeneratedState(plan, opening)) || plan.annualGisEvidence))
     return "household mortgage requires ordinary single funded TFSA and no special slice evidence"
   const fact = evidence?.scheduledMortgagePaymentsExcluded
   if (!fact || typeof fact !== 'object' || Array.isArray(fact) || !Object.prototype.hasOwnProperty.call(fact, 'status') || !Object.prototype.hasOwnProperty.call(fact, 'value') || fact.status !== 'known' || fact.value !== true)
