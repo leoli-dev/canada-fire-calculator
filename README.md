@@ -24,6 +24,10 @@ before it generates results. *Professional* mode is the full form with live resu
 Both edit the same plan, so you can switch at any time, and one confirmed
 "Reset all data" clears it in either mode.
 
+**Looking for the new annual details?** The [illustrated walkthrough](#annual-ledger-walkthrough)
+shows where to open the table, when to enable the optional **Canonical annual ledger**,
+and what to enter in each of its fields.
+
 ![Overview](docs/screenshots/hero.png)
 
 ## Quick start
@@ -43,7 +47,159 @@ Tax and benefit figures live in dated, versioned rule packs under
 [docs/rule-coverage.md](docs/rule-coverage.md) and, for the quarterly OAS/GIS update,
 [docs/quarterly-benefit-refresh.md](docs/quarterly-benefit-refresh.md)).
 
+## Annual ledger walkthrough
+
+**Just want the year-by-year table?** Generate results in **Guided**, or open the
+live results in **Professional**, then choose **Annual financial details**. You can
+do this with the existing planning estimate. Its full-screen table is labelled
+**Household annual estimate**.
+
+**Want to see which person or account a number belongs to?** Open **Canonical
+annual ledger** in the input area and record the living budgets below. This is an
+optional calculation mode for supported Ontario plans anchored in 2026. It uses
+the recorded facts in your plan, including account ownership, contribution room
+and benefit information where needed. If a fact is missing or a transaction cannot
+be modelled, the result shows where calculation stopped.
+
+[Budget setup](#1-set-the-living-budgets) · [Results and full-screen table](#3-read-the-results-and-open-the-table)
+· [Retirement comparisons](#4-try-a-retirement-age-or-budget) · [Monte Carlo](#5-run-monte-carlo)
+
+The English screenshots below were captured in Thorium using an illustrative
+Ontario household with staggered retirement. The amounts illustrate how to read
+the interface.
+
+### 1. Set the living budgets
+
+In **Professional**, expand **Canonical annual ledger** under the inputs. In
+**Guided**, open it on the **Review** page. Enter household totals **per year in
+2026 purchasing power**, even when the results are displayed in nominal dollars.
+
+![Professional budget settings with the working, retirement and mixed-phase amounts entered, mortgage exclusion checked, and TFSA first selected](docs/screenshots/annual-ledger/01-budget.png)
+
+| Field or control | What to enter or choose |
+| --- | --- |
+| **Annual working living spending** | Your yearly living costs while working. For a couple, enter the household total while both are working. Include ordinary housing costs, groceries, transport and other living expenses. |
+| **Annual retirement living spending** | Your yearly living costs after retirement. For a couple, enter the household total after both retire. Record pensions and benefits in their own inputs so the ledger can apply them as income. |
+| **Annual mixed-phase living spending** | For a couple, enter the yearly household total for the period when one person is working and the other is retired. The field appears for couples and must be filled to record their budgets, even if their retirement dates coincide. A solo plan has no mixed-phase field. |
+| **These living budgets exclude scheduled mortgage payments** | If the plan has a separately recorded mortgage, exclude its scheduled payments from the living amounts and check this box to confirm. The ledger pays that mortgage on its own line. With no mortgage, the box can remain unchecked. |
+| **Withdrawal strategy** | Sets the plan's withdrawal preference when investments are needed to fund spending. The menu offers non-registered first, paced RRSP withdrawals, RRSP first and TFSA first. Availability depends on the plan and the year. For example, paced RRSP withdrawals can stop a canonical retirement calculation. |
+| **Confirm I have no non-registered account** | Use this only if you actually have no taxable investment account. The button appears when the displayed non-registered balance is zero. The confirmation lets the ledger skip an empty placeholder account. A real account can have a zero balance and still belong in the plan. |
+
+For example, a couple could enter **$54,000** while both work, **$49,000**
+during staggered retirement and **$45,000** after both retire. If a separately
+recorded mortgage costs **$18,000 a year**, leave that amount out of all three
+figures and check the mortgage box. Enter `0` only when the amount really is
+zero. A blank required budget or an unconfirmed mortgage exclusion keeps the
+record button disabled.
+
+Select **Record budgets and use canonical ledger**. This updates the plan's
+shared working and retirement spending values as well as choosing the ledger.
+In **Professional**, the result updates with the plan. In **Guided**, return to
+**Review**, finish any unanswered questions, then select **Generate my results**.
+
+![Canonical annual ledger settings on the Guided review page](docs/screenshots/annual-ledger/03-guided-budget.png)
+
+### 2. Switch back or keep a scenario
+
+![Recorded ledger settings with the return budget options and Use existing planning estimate button](docs/screenshots/annual-ledger/02-return.png)
+
+- **Budget mode when returning to the planning estimate** picks the budget basis
+  for the next time you switch back. Choose **Saving amount (net money to invest)**
+  to use your annual investable savings, or **Income and spending** to use the
+  recorded income and expenses. This choice leaves the current ledger untouched.
+- **Use existing planning estimate** switches the result back. It restores the
+  saved return mode and any recorded savings-basis answers. Amounts you deliberately
+  edited are retained. If an older plan has no recorded return mode, switching
+  back keeps its current budget mode unless you choose one first.
+- **Scenario A** can save, restore or clear a plan. Side-by-side legacy comparison
+  is unavailable when either scenario uses the canonical ledger. A material
+  form edit can require recording the living budgets again. If the app warns
+  that advanced authorizations were dropped during a plan rebuild, re-entering
+  budgets only confirms the budgets. A saved scenario can restore its original
+  recorded facts.
+
+### 3. Read the results and open the table
+
+![Canonical results summary with real and nominal controls, three computed years, an evidenced self-only estate, and the Annual financial details button below the table](docs/screenshots/annual-ledger/04-summary.png)
+
+| On the result card | How to read it |
+| --- | --- |
+| **Real / Nominal** | **Real** shows base-year purchasing power. **Nominal** shows dollars in the displayed year. The toggle changes how amounts are shown. Year-end balances use year-end inflation, and cash flows follow their recorded timing. |
+| **Requested years / committed years** | Requested years are the full projection horizon. Committed years are the ones the ledger finished. Open **Coverage and limitations** to see which rules and facts supported the run. |
+| **Wages and benefits / Income tax / Payroll** | Cash from work and benefits, estimated income tax, and payroll deductions. View **Annual financial details** for the underlying person or category where available. |
+| **Funded living / Unmet living / Debt payments** | Living costs paid, living costs still unfunded, and separately scheduled debt payments. A living shortfall indicates an amount the model could not fund in that year. |
+| **One-time expense paid / Unmet one-time expense** | The amount paid and the separate funding gap for a modelled event. In the example, 2028 has **$0** unmet living costs and a **$31** one-time expense gap. |
+| **Closing accounts / Closing property / Closing net worth** | Year-end account and property totals, followed by net worth after debts and with any tracked sale cash. The headline shows the last **computed** year's net worth. |
+| **Evidenced terminal estate estimate** | Appears when the terminal year and the required estate facts support an estimate. Read the stated scope. The example shows **$638,880** in household closing net worth and **$158,070** for the modelled person's estate, with the surviving partner outside that estate scope. |
+
+Choose **Annual financial details** below the summary. Years are columns and
+people, accounts, property, debts and events are grouped into rows. Expand a row
+group to see its components. Use **Jump to year**, scroll the table, or click an
+amount directly. With the keyboard, choose a year and use the row's **Cell details**
+button. The detail panel shows the status, amount, timing, conversion and any
+available source or formula. Press **Esc** or **Close** to return to results.
+
+![Full-screen annual table with the 2028 closing net-worth cell opened and its amount, timing and source visible](docs/screenshots/annual-ledger/05-sheet.png)
+
+**When a year stops:** Start with **First blocked year** and the reason beneath
+the summary. For example, the following run committed 2026 and 2027, stopped in
+2028, and left 2029 and 2030 uncomputed. Earlier figures remain visible. If the
+first year is blocked, there are no committed rows to review. If the page
+reports invalid inputs, correct the listed errors and generate the result again.
+In the table, **Unknown** means a value is unavailable, **Not applicable**
+means the item does not apply, and **Not computed** means the calculation did
+not reach a result for that year. A displayed zero in a computed year is an
+amount. A completed ledger means the model processed its requested years.
+Read the separate gaps before interpreting it.
+
+![Partial result showing the first blocked year, uncomputed later years, and two previously committed rows](docs/screenshots/annual-ledger/08-stopped.png)
+
+### 4. Try a retirement age or budget
+
+![Retirement candidate controls and a completed comparison with no recorded gaps and its own annual details button](docs/screenshots/annual-ledger/06-compare.png)
+
+| Field or control | What it does |
+| --- | --- |
+| **Your retirement age (whole years)** | Enter your proposed retirement age. Your partner's recorded date stays the same. A change can require you to reconfirm CPP/OAS statement assumptions in the source plan. |
+| **Annual retirement living budget** | Enter the proposed annual household retirement spending in base-year CAD. The working, mixed-phase and separately recorded post-sale or post-purchase budgets retain their own amounts. |
+| **Replay candidate** | Runs those two inputs through the same ledger on a separate copy. The result reports completed years, living and event gaps, or a stop. You can explicitly test up to eight comparisons. |
+| **Open candidate annual details / Clear comparisons** | Inspect the selected comparison's own ledger or clear the comparison list. Neither action edits your source plan. |
+
+Replay the prefilled values to reproduce the source result. Then change one field
+to see its effect. The screenshot uses a **$0** retirement budget as a test case.
+The tool reports outcomes for the scenarios you enter. See the recorded gaps
+and coverage before comparing them.
+
+### 5. Run Monte Carlo
+
+![Canonical Monte Carlo card with seed, trial count, account volatility inputs, six outcome counts and annual percentile bands](docs/screenshots/annual-ledger/07-monte-carlo.png)
+
+| Field or control | What to enter or choose |
+| --- | --- |
+| **Seed** | A whole number from **0 to 4,294,967,295**. Reuse the same seed with the same plan, assumptions and count to replay the run. |
+| **Trials** | The number of simulated paths, **1–200**. The default is 100. |
+| **Annual volatility (%)** | For each listed account, enter how variable its annual real investment return is, as a percentage from **0 to 100**. Enter `12` for 12%. Enter `0` to keep that account on fixed returns. A blank is unknown and blocks Run. |
+| **Run / Cancel** | Run starts the selected number of trials in the background. Cancel stops the worker and discards the run's results. The worker checks its eight-second budget between trials, so unfinished trials may remain. |
+
+All accounts share the same market shock in a given year, scaled by their own
+volatility. With every account at **0%**, the simulation replays the fixed-return
+ledger. Inflation and property appreciation stay at the plan's recorded
+assumptions. Nonzero sampling can stop for unsupported calculations such as some
+exact purchase or recorded non-registered investment paths.
+
+Read the **trial counts** first. A complete path can have zero gaps or actual
+living or event gaps. Partial, blocked, invalid and uncomputed trials each have
+their own counts. The overall zero-gap percentage is available when all
+requested trials complete. In the table, **n** is the number of paths that
+actually finished that year. **P10**, **P50** (median) and **P90** summarize
+those paths' ending net worth for that year. The cohort can shrink over time,
+and each percentile is a separate annual statistic. The run also shows its seed
+and revision so you can identify the assumptions behind the result.
+
 ## What it calculates
+
+The next sections describe the existing planning estimate and its tools. For
+the optional canonical calculation, see the walkthrough above.
 
 **A three-phase, year-by-year simulation** in real (inflation-adjusted) dollars:
 
@@ -247,7 +403,7 @@ taxes all income together on one bracket ladder), but the slices always sum exac
 to the tax line above. Hovering a point also shows taxable income per person, the
 average tax rate, and the marginal bracket for that year.
 
-**Year-by-year detail** (collapsed by default) — the audit table: every retirement
+**Year-by-year detail** (collapsed by default) — the compact table for the existing planning estimate: every retirement
 year's withdrawals per account, benefits, gross, tax, after-tax cash, taxable income
 per person and the marginal bracket it lands in.
 
