@@ -162,6 +162,9 @@ export interface InputsV2 {
     mode: 'canonical'
     spending: import('./annualWorking').WorkingSpendingEvidence
     provenance: Provenance
+    /** Estimate mode to restore on opt-out; explicit later mode edits replace it.
+     * Amounts are not snapshotted, so restoring cannot undo later user edits. */
+    estimateBudgetMode?: BudgetMode['kind']
     /** Material form refresh requires the user to record the budgets again. */
     invalidated?: true
   }

@@ -159,6 +159,7 @@ export function assertCanonicalPlan(value: unknown): asserts value is InputsV2 {
     provenance(e.provenance, 'deterministicProjection.provenance')
     requireShape(e.provenance.origin === 'user' && integer(e.provenance.sourceYear), 'deterministicProjection.userSource')
     requireShape(e.invalidated === undefined || e.invalidated === true, 'deterministicProjection.invalidated')
+    requireShape(e.estimateBudgetMode === undefined || ['savingsBudget', 'incomeBudget'].includes(e.estimateBudgetMode), 'deterministicProjection.estimateBudgetMode')
     for (const key of ['workingSpending', 'retirementSpending', 'transitionSpending'] as const) {
       if (key !== 'transitionSpending' || e.spending[key] !== undefined)
         knownNonnegative(e.spending[key], `deterministicProjection.spending.${key}`)

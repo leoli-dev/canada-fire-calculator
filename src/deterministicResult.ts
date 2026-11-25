@@ -1,6 +1,7 @@
 import { runProjection, type Inputs, type ProjectionResult } from './engine'
 import type { InputsV2 } from './engine/model'
 import { projectCanonicalCoverage, type AnnualCoverage, type AnnualIssue } from './engine/annualState'
+import { validateInputs, type ValidationIssue } from './engine/validate'
 
 export type CanonicalDeterministicResult = {
   route: 'canonical'
@@ -9,6 +10,8 @@ export type CanonicalDeterministicResult = {
   issues: AnnualIssue[]
   requestedStartYear: number
   requestedYears: number
+  /** Ordinary input errors are distinct from a reached canonical coverage stop. */
+  validationIssues?: ValidationIssue[]
 }
 export type DeterministicResult = { route: 'legacy'; result: ProjectionResult } | CanonicalDeterministicResult
 
@@ -19,6 +22,8 @@ export function selectDeterministicResult(inputs: Inputs, plan: InputsV2 | null,
   const years = self ? plan.lifeExpectancy - self.ageInBaseYear + 1 : NaN
   const requestedYears = Number.isInteger(years) && years > 0 && years <= 120 ? years : 0
   const base = { route: 'canonical' as const, requestedStartYear: plan.baseYear, requestedYears }
+  const validationIssues = validateInputs(inputs, { canonical: true }).filter(issue => issue.severity === 'error')
+  if (validationIssues.length) return { ...base, status: 'invalid', coverage: null, issues: [], validationIssues }
   if (plan.deterministicProjection.invalidated || !requestedYears) return { ...base, status: 'invalid', coverage: null,
     issues: [{ code: 'invalid', detail: plan.deterministicProjection.invalidated ? 'deterministic-spending-reconfirmation-required' : 'projection-horizon-invalid' }] }
   // Omit only the migration placeholder after an explicit absence answer.

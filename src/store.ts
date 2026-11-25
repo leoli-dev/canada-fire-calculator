@@ -171,7 +171,7 @@ interface Store {
   editSharedField: (field: SharedFieldId, raw: string, unit?: 'canonical' | 'monthly', origin?: AnswerOrigin) => void
   setBudgetChoice: (choice: BudgetChoice) => void
   setAccountPresence: (account: 'tfsa' | 'rrsp' | 'nonReg', present: boolean) => void
-  commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string> }) => void
+  commitPlan: (transaction: { inputs: Inputs; canonical: InputsV2; answerMeta: Record<string, AnswerMeta>; draftByField: Record<string, string>; questionAnswers?: Record<string, string | boolean | string[]> }) => void
   setDisplayMode: (m: DisplayMode) => void
   setEntryMode: (m: EntryMode) => void
   setActiveStep: (step: number) => void
@@ -448,8 +448,9 @@ export const useStore = create<Store>()(
         trackOnce('adjust_inputs')
         set((s) => changeAccountPresence(s, account, present))
       },
-      commitPlan: ({ inputs, canonical, answerMeta, draftByField }) => set((s) => ({
+      commitPlan: ({ inputs, canonical, answerMeta, draftByField, questionAnswers }) => set((s) => ({
         inputs, canonical, answerMeta, draftByField,
+        questionAnswers: questionAnswers ?? s.questionAnswers,
         inputRevision: s.inputRevision + 1, resultRevision: null,
       })),
       setDisplayMode: (m) => {

@@ -135,3 +135,26 @@ export function recordedBasis(reconciliation: BudgetReconciliation | undefined):
     taxBenefitIncluded: { status: 'unknown', reason: 'not answered yet' },
   }
 }
+
+/** Lossless mode transition shared by the budget editor and ledger opt-in.
+ * Archive unknown facts as unknown too; changing mode cannot settle a review.
+ * Amounts always come from current inputs, never an old restoration snapshot.
+ */
+export function transitionBudgetMode(plan: InputsV2, inputs: Inputs, mode: BudgetMode['kind']): Pick<InputsV2, 'budget' | 'migration'> {
+  if (plan.budget.kind === mode) return { budget: plan.budget, migration: plan.migration }
+  if (mode === 'incomeBudget') {
+    const budget = plan.budget
+    const prior = plan.migration.budgetReconciliation
+    return {
+      budget: canonicalBudgetForChoice(inputs, { mode }),
+      migration: { ...plan.migration, budgetReconciliation: {
+        answered: prior?.answered ?? false,
+        legacyAnnualDebtPayments: prior?.legacyAnnualDebtPayments ?? listedAnnualDebtPayments(plan),
+        savingsBasis: structuredClone({ debtIncluded: budget.kind === 'savingsBudget' ? budget.debtIncluded : recordedBasis(prior).debtIncluded,
+          taxBenefitIncluded: budget.kind === 'savingsBudget' ? budget.taxBenefitIncluded : recordedBasis(prior).taxBenefitIncluded }),
+      } },
+    }
+  }
+  return { budget: { kind: 'savingsBudget', annualNetSavings: inputs.annualSavings, retirementSpending: inputs.retirementSpending,
+    ...structuredClone(recordedBasis(plan.migration.budgetReconciliation)) }, migration: plan.migration }
+}

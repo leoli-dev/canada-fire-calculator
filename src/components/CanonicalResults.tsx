@@ -13,7 +13,7 @@ export function CanonicalResults({ result, model }: { result: CanonicalDetermini
   const setDisplayMode = useStore(s => s.setDisplayMode)
   const factor = (year: number, closing = false) => displayMode === 'real' && result.coverage ? (1 + result.coverage.inflation) ** -(year - result.coverage.baseYear + (closing ? 1 : 0)) : 1
   const coverage = result.coverage
-  const blockedYear = result.requestedYears > 0 ? coverage?.blocked?.year ?? (result.status !== 'complete' ? result.requestedStartYear : null) : null
+  const blockedYear = result.requestedYears > 0 && !result.validationIssues?.length ? coverage?.blocked?.year ?? (result.status !== 'complete' ? result.requestedStartYear : null) : null
   const uncomputed = coverage?.uncomputedYears ?? (blockedYear !== null ? Array.from({ length: Math.max(0, result.requestedYears - 1) }, (_, i) => result.requestedStartYear + i + 1) : [])
   return <section className="chart-card" data-testid="canonical-results">
     <h2>{t('canonical.title')}</h2>
@@ -21,6 +21,8 @@ export function CanonicalResults({ result, model }: { result: CanonicalDetermini
     <p role="status" data-testid="canonical-status">{t(`canonical.status.${result.status}`)}</p>
     {result.requestedYears > 0 ? <p>{t('canonical.horizon', { from: result.requestedStartYear, to: result.requestedStartYear + result.requestedYears - 1, count: coverage?.rows.length ?? 0 })}</p> : <p>{t('canonical.invalidHorizon')}</p>}
     <p>{t('canonical.limitations')}</p>
+    {!!result.validationIssues?.length && <div role="alert" data-testid="canonical-validation-errors"><p>{t('canonical.invalidFields')}</p>
+      <ul>{result.validationIssues.map((issue, index) => <li key={index}>{t(issue.key, issue.params)}</li>)}</ul></div>}
     {model && <details><summary>{t('canonical.coverage')}</summary><p>{annualSheetText(model.scope, i18n.language)}</p></details>}
     {blockedYear !== null && <p data-testid="canonical-blocked-year">{t('canonical.blockedYear', { year: blockedYear })}</p>}
     {!!uncomputed.length && <p data-testid="canonical-uncomputed">{t('canonical.uncomputed', { years: uncomputed.join(', ') })}</p>}

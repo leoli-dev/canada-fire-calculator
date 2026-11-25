@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
-import { refreshCanonicalFromLegacy } from '../engine/migration'
-import { assertCanonicalPlan } from '../engine/modelValidation'
+import { recordCanonicalBudgets, disableCanonicalProjection, setCanonicalEstimateBudgetMode } from '../forms/canonicalProjectionCommands'
 import { parseBudgetAmount } from '../forms/localeBudgetAmount'
 
 /** Deliberate current-plan evidence entry, shared by Guide and Pro. */
@@ -21,35 +20,40 @@ export function CanonicalEvidenceControl() {
   const record = () => {
     if (!valid || workingAmount === null || retiredAmount === null || useStore.getState().inputRevision !== state.inputRevision) return
     const current = useStore.getState()
-    const plan = structuredClone(current.canonical ?? refreshCanonicalFromLegacy(null, current.inputs))
-    const inputs = { ...current.inputs, budgetWorkingSpending: workingAmount, retirementSpending: retiredAmount }
-    plan.budget = { kind: 'incomeBudget', workingSpending: workingAmount, retirementSpending: retiredAmount }
-    plan.legacyProjection = { ...inputs }
-    plan.deterministicProjection = { mode: 'canonical', provenance: { origin: 'user', sourceYear: new Date().getFullYear() }, spending: {
-      workingSpending: { status: 'known', value: workingAmount }, retirementSpending: { status: 'known', value: retiredAmount },
-      ...(current.inputs.partner ? { transitionSpending: { status: 'known' as const, value: mixedAmount! } } : {}),
-      ...(excluded ? { scheduledMortgagePaymentsExcluded: { status: 'known' as const, value: true as const } } : {}),
-    } }
-    assertCanonicalPlan(plan)
-    const draftByField = { ...current.draftByField }
-    delete draftByField.retirementSpending
-    current.commitPlan({ inputs, canonical: plan, draftByField, answerMeta: { ...current.answerMeta,
-      retirementSpending: { status: 'confirmed', origin: 'user', updatedAt: new Date().toISOString() } } })
+    current.commitPlan(recordCanonicalBudgets(current, { working: workingAmount, retired: retiredAmount,
+      ...(current.inputs.partner ? { mixed: mixedAmount! } : {}), mortgageExcluded: excluded }))
     if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
     setWorking(''); setRetired(''); setMixed(''); setExcluded(false)
   }
   const disable = () => {
     const current = useStore.getState()
     if (!current.canonical || current.inputRevision !== state.inputRevision) return
-    const plan = structuredClone(current.canonical)
-    delete plan.deterministicProjection
-    current.commitPlan({ inputs: current.inputs, canonical: plan, answerMeta: current.answerMeta, draftByField: current.draftByField })
+    const transaction = disableCanonicalProjection(current)
+    if (!transaction) return
+    current.commitPlan(transaction)
+    if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
+  }
+  const chooseReturnMode = (mode: 'savingsBudget' | 'incomeBudget') => {
+    const current = useStore.getState()
+    if (current.inputRevision !== state.inputRevision) return
+    const transaction = setCanonicalEstimateBudgetMode(current, mode)
+    if (!transaction) return
+    current.commitPlan(transaction)
     if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
   }
   return <details className="chart-card" data-testid="canonical-evidence">
     <summary>{t('canonical.title')}</summary>
     <p>{t('canonical.entryScope')}</p>
     <p>{t(state.canonical?.deterministicProjection ? 'canonical.selected' : 'canonical.optional')}</p>
+    {state.canonical?.deterministicProjection && !state.canonical.deterministicProjection.estimateBudgetMode && <p className="hint">{t('canonical.priorModeUnavailable')}</p>}
+    {state.canonical?.deterministicProjection && <fieldset data-testid="canonical-return-budget">
+      <legend>{t('canonical.returnBudgetTitle')}</legend>
+      <p className="hint">{t('canonical.returnBudgetHint')}</p>
+      <label><input type="radio" name="canonical-return-budget" data-testid="canonical-return-savings"
+        checked={state.canonical.deterministicProjection.estimateBudgetMode === 'savingsBudget'} onChange={() => chooseReturnMode('savingsBudget')} />{t('budget.modeSavings')}</label>
+      <label><input type="radio" name="canonical-return-budget" data-testid="canonical-return-income"
+        checked={state.canonical.deterministicProjection.estimateBudgetMode === 'incomeBudget'} onChange={() => chooseReturnMode('incomeBudget')} />{t('budget.modeIncome')}</label>
+    </fieldset>}
     <label>{t('canonical.working')}<input data-testid="canonical-working-spending" type="text" inputMode="decimal" autoComplete="off" aria-invalid={working.trim() !== '' && workingAmount === null || undefined} value={working} onChange={e => setWorking(e.target.value)} /></label>
     <label>{t('canonical.retired')}<input data-testid="canonical-retirement-spending" type="text" inputMode="decimal" autoComplete="off" aria-invalid={retired.trim() !== '' && retiredAmount === null || undefined} value={retired} onChange={e => setRetired(e.target.value)} /></label>
     {state.inputs.partner && <label>{t('canonical.mixed')}<input data-testid="canonical-transition-spending" type="text" inputMode="decimal" autoComplete="off" aria-invalid={mixed.trim() !== '' && mixedAmount === null || undefined} value={mixed} onChange={e => setMixed(e.target.value)} /></label>}

@@ -5,7 +5,7 @@ import type { AnswerMeta } from '../store'
 import type { PlanningIntent } from '../store'
 import type { PensionBenefitField, PensionBenefitRewrite } from '../engine'
 import { refreshPensionProvenanceReport } from '../engine'
-import { canonicalBudgetForChoice, listedAnnualDebtPayments, recordedBasis, reconciledBudget } from '../engine/budgetSemantics'
+import { listedAnnualDebtPayments, reconciledBudget, transitionBudgetMode } from '../engine/budgetSemantics'
 import { fieldRegistry, parseField, type SharedFieldId } from './fieldRegistry'
 
 export interface PlanFieldSnapshot {
@@ -278,26 +278,17 @@ export function setBudgetChoice(state: PlanFieldSnapshot, choice: BudgetChoice):
   let nextBudget = budget
 
   if (choice.kind === 'mode') {
-    if (budget.kind === choice.mode) return { answerMeta: { ...state.answerMeta, [label]: { status: 'confirmed', origin: 'user', updatedAt } } }
-    if (choice.mode === 'incomeBudget') {
-      // An explicit switch to the income budget is its own decision. The
-      // recorded savings answers are archived on the plan for the way back, so
-      // switching modes can neither lose nor rewrite what the user answered.
-      nextBudget = canonicalBudgetForChoice(state.inputs, { mode: 'incomeBudget' })
-      // Only a settled savings answer is archived: an unanswered one must come
-      // back as unanswered, never as a restored default.
-      if (budget.kind === 'savingsBudget' && migration.budgetReconciliation?.answered) migration = {
-        ...migration,
-        budgetReconciliation: { ...migration.budgetReconciliation, savingsBasis: { debtIncluded: budget.debtIncluded, taxBenefitIncluded: budget.taxBenefitIncluded } },
-      }
-    } else {
-      // Returning to the savings budget restores the archived answers exactly,
-      // or states nothing at all when there are none to restore.
-      nextBudget = {
-        kind: 'savingsBudget', annualNetSavings: state.inputs.annualSavings, retirementSpending: state.inputs.retirementSpending,
-        ...recordedBasis(migration.budgetReconciliation),
-      }
+    if (budget.kind === choice.mode) return {
+      answerMeta: { ...state.answerMeta, [label]: { status: 'confirmed', origin: 'user', updatedAt } },
+      ...(previous.deterministicProjection ? {
+        canonical: { ...previous, deterministicProjection: { ...previous.deterministicProjection, estimateBudgetMode: choice.mode } },
+        questionAnswers: { ...(state.questionAnswers ?? {}), [label]: choice.mode },
+        inputRevision: state.inputRevision + 1, resultRevision: null,
+      } : {}),
     }
+    const transition = transitionBudgetMode(previous, state.inputs, choice.mode)
+    nextBudget = transition.budget
+    migration = transition.migration
   } else if (choice.kind === 'migratedBasis') {
     // The migrated answer IS the two flags: keeping the legacy approximation
     // states on the plan that the figure is still net of the debt and excludes
@@ -330,6 +321,9 @@ export function setBudgetChoice(state: PlanFieldSnapshot, choice: BudgetChoice):
 
   const decision = nextBudget === budget && migration === previous.migration ? previous : { ...previous, budget: nextBudget, migration }
   const canonical = refreshCanonicalFromLegacy(decision, state.inputs)
+  if ((choice.kind === 'mode' || nextBudget.kind !== budget.kind) && canonical.deterministicProjection) canonical.deterministicProjection = {
+    ...canonical.deterministicProjection, estimateBudgetMode: nextBudget.kind,
+  }
   return {
     inputs: canonical.legacyProjection,
     canonical,

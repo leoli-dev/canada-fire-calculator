@@ -58,4 +58,14 @@ describe('production deterministic routing and persisted evidence', () => {
     plan.lifeExpectancy = 56
     expect(selectDeterministicResult(plan.legacyProjection, plan, { nonRegAbsent: false })).toMatchObject({ route: 'canonical', status: 'invalid', requestedYears: 0, coverage: null })
   })
+
+  it('reports ordinary input errors without computing an apparently complete canonical outcome', () => {
+    const plan = selected()
+    plan.lifeExpectancy = 110
+    plan.legacyProjection.lifeExpectancy = 110
+    const result = selectDeterministicResult(plan.legacyProjection, plan, { nonRegAbsent: false })
+    expect(result).toMatchObject({ route: 'canonical', status: 'invalid', coverage: null,
+      validationIssues: [{ field: 'lifeExpectancy', severity: 'error', key: 'valAgeRange', params: { min: 18, max: 105 } }] })
+    expect(result).not.toHaveProperty('result')
+  })
 })
