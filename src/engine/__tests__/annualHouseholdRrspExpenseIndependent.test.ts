@@ -166,6 +166,47 @@ describe('authenticated mortgage expense alongside RRSP cash', () => {
     expect(paid.explanation?.formula?.filter(term => term.value !== 0) ?? []).toEqual([])
   })
 
+  it('attributes zero event cash or owner debits when a depleted RRSP has slightly negative net cash', () => {
+    const { plan, evidence } = fixture({ rrsp: 3.7e-12, cpp: 45_000.5, oas: 9_001.7, living: 59_002.2,
+      selfTfsa: 1_500, partnerTfsa: 1_500 })
+    const ordinary = ok(projectCanonicalCoverage(withoutExpense(plan), evidence, 2))
+    const actual = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(ordinary.blocked).toBeNull()
+    expect(actual.blocked).toBeNull()
+    const base = ordinary.rows[1]
+    const row = actual.rows[1]
+    const funding = row.householdWithdrawalSettlement!
+    expect(funding.rrspFunding).toMatchObject({ search: 'capacity-exhausted', gross: 3.7e-12, netCash: -3e-13 })
+    expect(funding.rrspFunding).toStrictEqual(base.householdWithdrawalSettlement!.rrspFunding)
+    expect(funding.postings).toStrictEqual(base.householdWithdrawalSettlement!.postings)
+    expect(funding.spendingFunded).toBe(base.householdWithdrawalSettlement!.spendingFunded)
+    expect(funding.spendingUnmet).toBe(base.householdWithdrawalSettlement!.spendingUnmet)
+    expect(row.byAccount).toStrictEqual(base.byAccount)
+    expect(row.byDebt).toStrictEqual(base.byDebt)
+    expect(row.byPerson).toStrictEqual(base.byPerson)
+    expect(row.taxLedger).toStrictEqual(base.taxLedger)
+    expect(actual.state.tfsaWithdrawalHistory).toStrictEqual(ordinary.state.tfsaWithdrawalHistory)
+    expect(actual.state.mortgageExactBalances).toStrictEqual(ordinary.state.mortgageExactBalances)
+    expect(row.cashLedger).toStrictEqual({ ...base.cashLedger, expensePayments: 0 })
+    expect(row.householdExpense).toMatchObject({ due: 250, paid: 0, unmet: 250, postings: [],
+      arithmetic: { paid: { coefficient: '0', scale: 0 }, unmet: { coefficient: '250', scale: 0 } } })
+    const sheet = canonicalAnnualSheet(actual, context)
+    for (const field of ['expensePaid', 'expenseUnmet']) {
+      const { cell, explanation } = sheetCell(sheet, YEAR, 'event', EVENT, field)
+      expect(cell.value).toBe(field === 'expensePaid' ? 0 : 250)
+      const sources = explanation!.sources!.filter(source =>
+        source.field === 'annualHouseholdExpenseEvidence' || source.field?.startsWith('householdExpense.'))
+      expect(sources.map(source => source.field)).toEqual(['annualHouseholdExpenseEvidence'])
+      expect(explanation!.formula?.map(term => [term.field, term.direction, term.value]) ?? []).toEqual(
+        field === 'expensePaid' ? [] : [['householdExpense.due', 'add', 250], ['householdExpense.paid', 'subtract', 0]],
+      )
+      for (const locale of ['en', 'fr', 'zh'] as const) {
+        const visibleSources = sources.map(source => annualSheetText(source.displayReference!, locale))
+        expect(visibleSources.join(' ')).not.toMatch(/3e-13|0\.0000000000003/)
+      }
+    }
+  })
+
   it('uses actual residual CPP and OAS cash before an authorized TFSA draw', () => {
     const { plan, evidence } = fixture({ cpp: 6_000, oas: 8_000, living: 12_550, amount: 200, partnerTfsa: 50, selfTfsa: 60 })
     const ordinary = ok(projectCanonicalCoverage(withoutExpense(plan), evidence, 2))
@@ -260,6 +301,30 @@ describe('authenticated mortgage expense alongside RRSP cash', () => {
 })
 
 describe('exact mortgage and expense priority boundaries', () => {
+  it('replays the no-benefit pre-withdrawal cash amount with a localized signed display adjustment', () => {
+    const living = 5_000.02
+    const amount = 250.01
+    const { plan, evidence } = fixture({ living, amount })
+    const coverage = ok(projectCanonicalCoverage(plan, evidence, 2))
+    expect(coverage.blocked).toBeNull()
+    expect(coverage.rows[1].householdWithdrawalSettlement!.publicBenefitsCash).toBeUndefined()
+    const { cell, explanation } = sheetCell(canonicalAnnualSheet(coverage, context), YEAR, 'cash', 'canonicalNetCash')
+    const terms = explanation!.formula!
+    const unadjusted = -living - PAYMENT - amount
+    expect(unadjusted).toBe(-6_581.030000000001)
+    expect(cell.value).toBe(-6_581.03)
+    expect(terms.map(({ field, direction, value }) => [field, direction, value])).toEqual([
+      ['spendingDue', 'subtract', living], ['debtPayments', 'subtract', PAYMENT], ['expenseDue', 'subtract', amount],
+      ['householdWithdrawalSettlement.before-draws-numeric-reconciliation', 'add', -6_581.03 - unadjusted],
+    ])
+    expect(terms.reduce((sum, term) => sum + (term.direction === 'add' ? term.value : -term.value), 0)).toBe(cell.value)
+    for (const [locale, memo] of [
+      ['en', /signed pre-withdrawal display reconciliation.*no cash/i],
+      ['fr', /rapprochement signé d’affichage avant retraits.*aucune trésorerie/i],
+      ['zh', /提款前显示带符号核对.*不提供现金/],
+    ] as const) expect(annualSheetText(terms.at(-1)!.label, locale)).toMatch(memo)
+  })
+
   it.each([
     { capacity: 1_130.9999999999998, funded: null, gap: null },
     { capacity: 1_131, funded: 0, gap: '500' },

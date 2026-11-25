@@ -612,7 +612,10 @@ function annualStepUnchecked(plan: InputsV2, opening: AnnualState, providers: An
       // remaining mandatory/living need consumes a draw before the event.
       const ordinaryNeed = mortgageSubtract(mortgageAdd(mortgageDecimal(debtPayments), living), availableBeforeDraws)
       let livingDraws = mortgageNegative(ordinaryNeed) ? mortgageDecimal(0) : ordinaryNeed
-      for (const posting of postings.filter(p => p.kind === "tfsa")) {
+      // A depleted RRSP can have negative incremental net cash at the tax
+      // precision boundary. All TFSA debits still belong to ordinary costs;
+      // no residual attribution may invent an event debit in an RRSP year.
+      for (const posting of rrspFunding ? [] : postings.filter(p => p.kind === "tfsa")) {
         const draw = mortgageDraws.get(posting.accountId)!
         const ordinary = decimalMin(livingDraws, draw)
         livingDraws = mortgageSubtract(livingDraws, ordinary)
