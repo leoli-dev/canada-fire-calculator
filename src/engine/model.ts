@@ -157,6 +157,8 @@ export interface BenefitExclusion {
   provenance: Provenance
 }
 export interface InputsV2 {
+  /** Internal generated household composition; existing verified claims remain mandatory. */
+  annualHouseholdMortgageBenefitsEvidence?: { authorized: true; purpose: 'household-held-mortgage-with-verified-public-benefits'; provenance: Provenance }
   annualHouseholdExpenseEvidence?: import("./annualHouseholdExpense").HouseholdExpenseEvidence
   /** Both owners explicitly authorize this exhaustive debit order for held mortgage and living cash. */
   annualHouseholdMortgageFundingEvidence?: { orderedAccounts: [{ accountId: string; ownerId: string }, { accountId: string; ownerId: string }]; authorized: true; purpose: "household-held-mortgage-and-living"; provenance: Provenance }
