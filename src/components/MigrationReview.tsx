@@ -2,8 +2,7 @@ import { Button } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { InputsV2 } from '../engine/model'
 import { migrationReview } from '../engine/migrationReview'
-import { settleSingleHousehold } from '../engine/migration'
-import { commitCanonicalEdit } from '../forms/canonicalEdit'
+import { commitSingleHouseholdSettlement } from '../forms/canonicalEdit'
 import { accountNameKey } from './TaxFactsPanel'
 
 function PlanStatus({ label, plan }: { label: string; plan: InputsV2 | null }) {
@@ -26,7 +25,7 @@ function PlanStatus({ label, plan }: { label: string; plan: InputsV2 | null }) {
       {label === t('scenarioCurrent') && plan.people.length === 1 && <div className="migration-settle">
         <p>{t('migrationSettleSingleHelp')}</p>
         <Button variant="primary" type="button" className="primary-action" data-testid="migration-settle-single"
-          onClick={() => commitCanonicalEdit(draft => { Object.assign(draft, settleSingleHousehold(draft)) })}>{t('migrationSettleSingle')}</Button>
+          onClick={commitSingleHouseholdSettlement}>{t('migrationSettleSingle')}</Button>
       </div>}
     </>}
   </section>
