@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator, type Page } from '@playwright/test'
@@ -21,6 +22,7 @@ async function seed(page: Page, variant: AppPlanVariant = 'settled') {
     localStorage.setItem('fire-inputs', JSON.stringify(envelope))
   }, canonicalAppPlan(variant))
   await page.reload()
+  await showProfessionalResults(page)
 }
 
 const results = (page: Page) => page.getByTestId('canonical-results')
@@ -34,8 +36,9 @@ const record = (page: Page) => page.getByTestId('canonical-enable')
 const disable = (page: Page) => page.getByTestId('canonical-disable')
 
 async function showEvidence(page: Page) {
+  await revealProfessionalEditor(page, page.locator('[data-group="advanced"]'))
   if (!(await evidence(page).locator('summary').evaluate(summary => (summary.parentElement as HTMLDetailsElement).open)))
-    await evidence(page).locator('summary').click()
+    await (await prepareProfessionalTarget(evidence(page).locator('summary'))).press('Enter')
 }
 
 async function storeState(page: Page) {
@@ -43,7 +46,8 @@ async function storeState(page: Page) {
 }
 
 async function openSheet(page: Page) {
-  await opener(page).click()
+  await showProfessionalResults(page)
+  await (await prepareProfessionalTarget(opener(page))).click()
   const sheet = page.getByRole('dialog', { name: 'Canonical annual ledger' })
   await expect(sheet).toBeVisible()
   return sheet
@@ -58,20 +62,20 @@ function cell(sheet: Locator, year: number, ...parts: string[]) {
 }
 
 async function inspectAmount(sheet: Locator, year: number, expected: number, ...parts: string[]) {
-  await yearPicker(sheet).selectOption(String(year))
-  await row(sheet, ...parts).getByRole('button', { name: /^Inspect row:/ }).click()
+  await (await prepareProfessionalTarget(yearPicker(sheet))).selectOption(String(year))
+  await (await prepareProfessionalTarget(row(sheet, ...parts).getByRole('button', { name: /^Inspect row:/ }), row(sheet, ...parts).getByRole('button', { name: /^Inspect row:/, includeHidden: true }))).click()
   const detail = sheet.getByRole('complementary', { name: 'Cell details' })
   await expect(detail.getByRole('heading')).toContainText(cad(expected, 'en', 2))
-  await detail.getByRole('button', { name: 'Hide details' }).click()
+  await (await prepareProfessionalTarget(detail.getByRole('button', { name: 'Hide details' }), detail.getByRole('button', { name: 'Hide details', includeHidden: true }))).click()
 }
 
 async function expectNoLegacyResults(page: Page) {
   const column = page.locator('.results-column')
   await expect(column.locator('.recharts-wrapper, .summary')).toHaveCount(0)
-  await expect(column.getByRole('tablist')).toHaveCount(0)
-  await expect(column.getByRole('heading', { name: /Withdrawal order|Timing/i })).toHaveCount(0)
+  await expect(column.getByRole('tablist', { includeHidden: true })).toHaveCount(0)
+  await expect(column.getByRole('heading', { name: /Withdrawal order|Timing/i, includeHidden: true })).toHaveCount(0)
   await expect(column.locator('.mc-rate')).toHaveCount(0)
-  await expect(column.getByRole('button', { name: 'Run 1,000 simulations', exact: true })).toHaveCount(0)
+  await expect(column.getByRole('button', { name: 'Run 1,000 simulations', exact: true, includeHidden: true })).toHaveCount(0)
   await expect(column.getByTestId('canonical-mc')).toBeVisible()
   await expect(column.getByText(/Estimate: the money runs out|modeled balance lasts/i)).toHaveCount(0)
 }
@@ -119,7 +123,7 @@ test('nominal display and base-year display use the same #78 ledger with closing
   const nominalHome = realHome * closingCpi
   const nominalEstate = nominalHome / 4 - 1_800
   for (const mode of ['real', 'nominal'] as const) {
-    await results(page).getByRole('button', { name: mode === 'real' ? /^Real/ : /^Nominal/ }).click()
+    await (await prepareProfessionalTarget(results(page).getByRole('button', { name: mode === 'real' ? /^Real/ : /^Nominal/ }), results(page).getByRole('button', { name: mode === 'real' ? /^Real/ : /^Nominal/, includeHidden: true }))).click()
     const factor = mode === 'real' ? 1 / closingCpi : 1
     await expect(results(page)).toContainText(cad(nominalEstate * factor, 'en', 2))
     const sheet = await openSheet(page)
@@ -150,8 +154,8 @@ test('partial #78 keeps the committed prefix, the stop and suffix, with no legac
     await expect(cell(sheet, year, 'value', 'netWorth')).toContainText(/Unsupported|Not computed/)
     await expect(cell(sheet, year, 'value', 'estate')).toContainText(/Unsupported|Not computed/)
   }
-  await yearPicker(sheet).selectOption('2030')
-  await row(sheet, 'value', 'netWorth').getByRole('button', { name: /^Inspect row:/ }).click()
+  await (await prepareProfessionalTarget(yearPicker(sheet))).selectOption('2030')
+  await (await prepareProfessionalTarget(row(sheet, 'value', 'netWorth').getByRole('button', { name: /^Inspect row:/ }), row(sheet, 'value', 'netWorth').getByRole('button', { name: /^Inspect row:/, includeHidden: true }))).click()
   await expect(sheet.getByRole('complementary')).toContainText('Not computed after the first blocked year')
 })
 
@@ -163,7 +167,8 @@ test('legacy sale funding cannot suppress the separate selected canonical stop',
   await expect(results(page)).toContainText('2028')
   await expectNoLegacyResults(page)
   await showEvidence(page)
-  await disable(page).click()
+  await (await prepareProfessionalTarget(disable(page))).click()
+  await revealProfessionalEditor(page, page.locator('[data-group="housing"]'))
   await expect(page.getByText(/needs .+ more at the start of that year to clear the mortgage/)).toBeVisible()
   await expect(page.locator('.results-column')).toHaveCount(0)
 })
@@ -173,28 +178,28 @@ test('preflight refusal keeps the selected route and reports the first year and 
   await expect(page.getByTestId('canonical-blocked-year')).toContainText('2026')
   await expect(page.getByTestId('canonical-uncomputed')).toContainText(/2027.*2028/)
   await expect(overview(page)).toHaveCount(0)
-  await expect(opener(page)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
   await expectNoLegacyResults(page)
 })
 
 test('an invalid empty horizon has no reversed interval, blocked year or result amounts', async ({ page }) => {
   await seed(page)
   await expect(results(page)).toContainText(summaryCad(158_070))
-  await page.locator('label.field').filter({ hasText: /^Life expectancy/ }).locator('input').fill('56')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^Life expectancy/ }).locator('input'))).fill('56')
   await expect(results(page)).toContainText('The requested horizon is invalid or empty.')
   await expect(results(page)).not.toContainText(/2026\s*[–-]\s*2025/)
   await expect(page.getByTestId('canonical-blocked-year')).toHaveCount(0)
   await expect(page.getByTestId('canonical-uncomputed')).toHaveCount(0)
   await expect(overview(page)).toHaveCount(0)
   await expect(page.getByTestId('canonical-estate')).toHaveCount(0)
-  await expect(opener(page)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
 })
 
 test('Guide regenerates the persisted household ledger after revision and restores evidence with Scenario A', async ({ page }) => {
   await seed(page)
-  const scenario = page.locator('details').filter({ has: page.getByText('Scenario comparison', { exact: true }) })
-  await scenario.locator('summary').click()
-  await scenario.getByRole('button', { name: 'Save current as A' }).click()
+  const scenario = page.locator('details:not(.professional-group)').filter({ has: page.getByText('Scenario comparison', { exact: true }) })
+  await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }), scenario.getByRole('button', { name: 'Save current as A', includeHidden: true }))).click()
   expect((await storeState(page)).scenarioACanonical.deterministicProjection).toMatchObject({
     mode: 'canonical', spending: { transitionSpending: { status: 'known', value: 350 } },
   })
@@ -204,34 +209,35 @@ test('Guide regenerates the persisted household ledger after revision and restor
   await page.goto('/#/guided/review')
   await expect(results(page)).toHaveCount(0)
   await expect(generate, 'recorded Guide answers make this household ready for review').toBeEnabled()
-  await generate.click()
+  await (await prepareProfessionalTarget(generate)).click()
   await expect(results(page)).toContainText(summaryCad(158_070))
   let sheet = await openSheet(page)
   await expect(cell(sheet, 2028, 'value', 'estate')).toContainText(cad(158_070))
   await page.keyboard.press('Escape')
 
-  await page.getByRole('button', { name: 'Modify answers' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Modify answers' }), page.getByRole('button', { name: 'Modify answers', includeHidden: true }))).click()
   await page.goto('/#/guided/family/family.ages')
-  await page.getByLabel('Current age', { exact: true }).fill('56')
-  await page.getByLabel('Current age', { exact: true }).blur()
+  await (await prepareProfessionalTarget(page.getByLabel('Current age', { exact: true }))).fill('56')
+  await (await prepareProfessionalTarget(page.getByLabel('Current age', { exact: true }))).blur()
   await page.goto('/#/guided/results')
   await expect(results(page)).toHaveCount(0)
-  await expect(opener(page)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
   expect((await storeState(page)).resultRevision).toBeNull()
   // A legacy-facing edit to the restored household asks the user to review
   // ownership rather than silently reassigning the persisted owner IDs.
   await expect(generate).toBeDisabled()
   await chooseMode(page, 'professional')
+  await showProfessionalResults(page)
   await expect(page.getByTestId('canonical-blocked-year')).toBeVisible()
   await expect(results(page)).not.toContainText(summaryCad(158_070))
   await expectNoLegacyResults(page)
-  if (!(await scenario.locator('summary').evaluate(summary => (summary.parentElement as HTMLDetailsElement).open))) await scenario.locator('summary').click()
-  await scenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  if (!(await scenario.locator('summary').evaluate(summary => (summary.parentElement as HTMLDetailsElement).open))) await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Restore A as current inputs' }), scenario.getByRole('button', { name: 'Restore A as current inputs', includeHidden: true }))).click()
   await expect(results(page)).toContainText(summaryCad(158_070))
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/results')
-  await expect(opener(page)).toHaveCount(0)
-  await generate.click()
+  await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
+  await (await prepareProfessionalTarget(generate)).click()
   sheet = await openSheet(page)
   await expect(cell(sheet, 2026, 'value', 'person', ids.self, 'age')).toContainText('57')
   await expect(cell(sheet, 2028, 'value', 'estate')).toContainText(cad(158_070))
@@ -240,18 +246,19 @@ test('Guide regenerates the persisted household ledger after revision and restor
 
 test('restoring A drops an unrecorded other-plan budget draft', async ({ page }) => {
   await seed(page)
-  const scenario = page.locator('details').filter({ has: page.getByText('Scenario comparison', { exact: true }) })
-  await scenario.locator('summary').click()
-  await scenario.getByRole('button', { name: 'Save current as A' }).click()
-  await page.locator('label.field').filter({ hasText: /^Current age/ }).locator('input').fill('56')
+  const scenario = page.locator('details:not(.professional-group)').filter({ has: page.getByText('Scenario comparison', { exact: true }) })
+  await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }), scenario.getByRole('button', { name: 'Save current as A', includeHidden: true }))).click()
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^Current age/ }).locator('input'))).fill('56')
+  await showProfessionalResults(page)
   await expect(page.getByTestId('canonical-blocked-year')).toBeVisible()
   await showEvidence(page)
-  await working(page).fill('1234')
-  await retired(page).fill('5678')
-  await page.getByTestId('canonical-transition-spending').fill('9012')
-  await page.getByTestId('canonical-mortgage-excluded').check()
+  await (await prepareProfessionalTarget(working(page))).fill('1234')
+  await (await prepareProfessionalTarget(retired(page))).fill('5678')
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-transition-spending'))).fill('9012')
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-mortgage-excluded'))).check()
   await expect(record(page)).toBeEnabled()
-  await scenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Restore A as current inputs' }), scenario.getByRole('button', { name: 'Restore A as current inputs', includeHidden: true }))).click()
   await showEvidence(page)
   await expect(working(page)).toHaveValue('')
   await expect(retired(page)).toHaveValue('')
@@ -265,16 +272,16 @@ test('an incomplete Guide cannot generate by recording or disabling canonical ev
   const generate = page.getByRole('button', { name: 'Generate my results' })
   await expect(generate).toBeDisabled()
   await showEvidence(page)
-  await working(page).fill('30200')
-  await retired(page).fill('26400')
-  await record(page).click()
+  await (await prepareProfessionalTarget(working(page))).fill('30200')
+  await (await prepareProfessionalTarget(retired(page))).fill('26400')
+  await (await prepareProfessionalTarget(record(page))).click()
   await expect(generate).toBeDisabled()
-  await expect(opener(page)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
   expect((await storeState(page)).resultRevision).toBeNull()
   expect((await storeState(page)).canonical.deterministicProjection.spending.retirementSpending).toEqual({ status: 'known', value: 26_400 })
 
   await showEvidence(page)
-  await disable(page).click()
+  await (await prepareProfessionalTarget(disable(page))).click()
   await expect(generate).toBeDisabled()
   await expect(page.locator('.results-column')).toHaveCount(0)
   expect((await storeState(page)).canonical.deterministicProjection).toBeUndefined()
@@ -293,20 +300,21 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
     [ /Estimated CPP\/QPP per year at 65/, '0' ], [ /OAS per year at 65/, '0' ],
   ] as const
   for (const [name, value] of edits) {
+    await prepareProfessionalTarget(fields.filter({ hasText: name }).first())
     const input = fields.filter({ hasText: name }).locator('input:visible')
     await expect(input, String(name)).toBeVisible()
-    await input.fill(value)
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill(value)
+    await (await prepareProfessionalTarget(input)).blur()
   }
   for (const [id, value] of [['earned-self', '12000'], ['rrsp-unused-undeducted-self', '0'], ['tfsa-available-room-self', '0']]) {
     const input = page.getByTestId(id)
-    await input.fill(value)
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill(value)
+    await (await prepareProfessionalTarget(input)).blur()
   }
-  await page.getByTestId('tfsa-withdrawal-add-self').click()
-  await page.getByTestId(/^tfsa-withdrawal-remove-/).click()
+  await (await prepareProfessionalTarget(page.getByTestId('tfsa-withdrawal-add-self'))).click()
+  await (await prepareProfessionalTarget(page.getByTestId(/^tfsa-withdrawal-remove-/))).click()
   await showEvidence(page)
-  await evidence(page).locator('select').filter({ has: page.locator('option[value="tfsaFirst"]') }).selectOption('tfsaFirst')
+  await (await prepareProfessionalTarget(evidence(page).locator('select').filter({ has: page.locator('option[value="tfsaFirst"]') }))).selectOption('tfsaFirst')
   await showEvidence(page)
   await expect(working(page)).toHaveValue('')
   await expect(retired(page)).toHaveValue('')
@@ -314,9 +322,10 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
   await expect(results(page)).toHaveCount(0)
 
   const fillBudgets = async () => {
-    await working(page).fill('11298.65')
-    await retired(page).fill('12000')
-    await record(page).click()
+    await (await prepareProfessionalTarget(working(page))).fill('11298.65')
+    await (await prepareProfessionalTarget(retired(page))).fill('12000')
+    await (await prepareProfessionalTarget(record(page))).click()
+    await showProfessionalResults(page)
   }
   // A numeric zero before the separate absence affirmation remains unknown
   // for this calculation. Ordinary legacy inputs do not establish that fact.
@@ -324,7 +333,7 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
   await expect(page.getByTestId('canonical-blocked-year')).toContainText('2026')
   await expect(overview(page)).toHaveCount(0)
   await showEvidence(page)
-  await page.getByTestId('canonical-no-nonreg').click()
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-no-nonreg'))).click()
   await showEvidence(page)
   await fillBudgets()
 
@@ -368,7 +377,7 @@ for (const locale of [
     await chooseLanguage(page, locale.switcher)
     await expect(results(page)).toContainText(cad(158_070, locale.language, 2))
     const trigger = page.getByRole('button', { name: locale.opener, exact: true })
-    await trigger.focus()
+    await (await prepareProfessionalTarget(trigger)).focus()
     await page.keyboard.press('Enter')
     const sheet = page.getByRole('dialog', { name: locale.title })
     const close = sheet.getByRole('button', { name: locale.close, exact: true })
@@ -394,7 +403,8 @@ test('S1 uses its pinned stored-plan values and known annual limitations with no
   const summary = page.locator('.results-column .summary').first()
   await expect(summary).toContainText('Final net worth: CA$638,880')
   await expect(summary).toContainText("First shortfall at age 59: CA$473")
-  await opener(page).click()
+  await showProfessionalResults(page)
+  await (await prepareProfessionalTarget(opener(page))).click()
   const sheet = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(sheet).toHaveAccessibleDescription(/Salary, working-year living expenses and working-year tax are not modeled/)
   const netWorth = sheet.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Closing net worth', exact: true }) })
@@ -418,7 +428,8 @@ test('a pre-v11 default plan migrates without opt-in and keeps the same S1 summa
   await expect(results(page)).toHaveCount(0)
   const migrated = await storeState(page)
   expect(migrated.canonical.deterministicProjection).toBeUndefined()
-  await opener(page).click()
+  await showProfessionalResults(page)
+  await (await prepareProfessionalTarget(opener(page))).click()
   const sheet = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(sheet).toHaveAccessibleDescription(/Salary, working-year living expenses and working-year tax are not modeled/)
   const netWorth = sheet.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Closing net worth', exact: true }) })

@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -20,7 +21,7 @@ test('the tax rule pack and year are visible and identical in both modes', async
     id: await pack.getAttribute('data-rule-pack-id'),
     year: await pack.getAttribute('data-rule-year'),
     assumed: await pack.getAttribute('data-rule-assumed'),
-    text: await pack.innerText(),
+    text: await (await prepareProfessionalTarget(pack)).innerText(),
   })
 
   const onProfessional = await read()
@@ -31,7 +32,7 @@ test('the tax rule pack and year are visible and identical in both modes', async
   expect(onProfessional.text).toContain('published figures')
 
   // A different jurisdiction selects that jurisdiction's own pack, same year.
-  await page.getByLabel('Province').selectOption('AB')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('AB')
   const alberta = await read()
   expect(alberta.id).toBe('CA-AB-tax-2026-legacy-v1')
   expect(alberta.year).toBe('2026')
@@ -57,9 +58,9 @@ test('the tax rule pack and year are visible and identical in both modes', async
 
   // Ontario's own premiums and levies are declared only for Ontario.
   await chooseMode(page, 'professional')
-  await page.getByLabel('Province').selectOption('ON')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('ON')
   await expect(page.getByTestId('rule-tax-not-modelled')).toContainText('Ontario surtax')
-  await page.getByLabel('Province').selectOption('SK')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('SK')
   await expect(page.getByTestId('rule-tax-not-modelled')).not.toContainText('Ontario surtax')
   await expect(page.getByTestId('rule-tax-not-modelled')).toContainText('GST/HST credit')
 })

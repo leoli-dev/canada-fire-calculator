@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -64,7 +65,7 @@ const inViewport = (page: import('@playwright/test').Page) =>
 test('professional mode states the allowance-category row for a 65/60 zero-income couple', async ({ page }) => {
   await seed(page)
   const panel = page.getByTestId('benefit-category-panel')
-  await panel.locator('summary').click()
+  await (await prepareProfessionalTarget(panel.locator('summary'))).press('Enter')
   await expect(page.getByTestId('benefit-category-name-65'))
     .toHaveText('Couple, one pensioner + Allowance spouse')
   await expect(page.getByTestId('benefit-category-cutoff-65')).toHaveText('CA$42,768')
@@ -85,7 +86,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   await expect(page.getByTestId('benefit-total-70')).toHaveText('CA$16,210')
   // Reload keeps the same plan and the same priced row.
   await page.reload()
-  await panel.locator('summary').click()
+  await (await prepareProfessionalTarget(panel.locator('summary'))).press('Enter')
   await expect(page.getByTestId('benefit-category-name-65')).toHaveText('Couple, one pensioner + Allowance spouse')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   // The same recorded plan prices identically in guided mode. Entering guided
@@ -104,7 +105,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   const guidedPage = await page.context().newPage()
   await guidedPage.goto('/#/guided/results')
   const guidedPanel = guidedPage.getByTestId('benefit-category-panel')
-  await guidedPanel.locator('summary').click()
+  await (await prepareProfessionalTarget(guidedPanel.locator('summary'))).press('Enter')
   await expect(guidedPage.getByTestId('benefit-category-name-65'))
     .toHaveText('Couple, one pensioner + Allowance spouse')
   await expect(guidedPage.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
@@ -118,7 +119,7 @@ test('guided mode agrees with professional and the panel stays inside a 320px vi
   await page.setViewportSize({ width: 320, height: 720 })
   await seed(page, { guided: true })
   await page.goto('/#/guided/results')
-  await page.getByTestId('benefit-category-panel').locator('summary').click()
+  await (await prepareProfessionalTarget(page.getByTestId('benefit-category-panel').locator('summary'))).press('Enter')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   expect(await inViewport(page)).toBe(true)
   await chooseMode(page, 'professional')

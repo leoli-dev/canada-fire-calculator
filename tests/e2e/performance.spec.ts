@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -11,25 +12,27 @@ test('comparison scans start only when their card opens, off the main thread', a
   const workers: string[] = []
   page.on('worker', (worker) => workers.push(worker.url()))
   await chooseMode(page, 'professional')
-  await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
-  await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('41')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Goal' }).locator('select'))).selectOption('dieWithZero')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Current age' }).locator('input'))).fill('41')
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
   expect(workers.filter((url) => url.includes('analysis.worker'))).toEqual([])
 
-  const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
-  await timing.locator('summary').click()
+  const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
+  await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
   await expect(timing.locator('.combo')).toBeVisible({ timeout: 15_000 })
   expect(workers.some((url) => url.includes('analysis.worker'))).toBe(true)
 
   // A later edit keeps the older table visible while the new one computes.
-  await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('42')
-  await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').press('Tab')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Current age' }).locator('input'))).fill('42')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Current age' }).locator('input'))).press('Tab')
+  await showProfessionalResults(page)
   await expect(timing.locator('.compare-table').first()).toBeVisible()
   await expect(timing.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 })
 
   // Reopening an unchanged plan uses the cached result straight away.
-  await timing.locator('summary').click()
-  await timing.locator('summary').click()
+  await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
+  await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
   await expect(timing.getByTestId('analysis-pending')).toHaveCount(0)
   await expect(timing.locator('.combo')).toBeVisible()
 })
@@ -44,7 +47,7 @@ test('only the chosen translation is downloaded', async ({ page }) => {
   await expect(page.locator('.app-bar')).toBeVisible()
   const checkProfessionalLabel = async (label: string) => {
     const menu = page.getByTestId('app-menu')
-    if (await menu.isVisible()) await menu.click()
+    if (await menu.isVisible()) await (await prepareProfessionalTarget(menu)).click()
     await expect(page.locator('.entry-mode:visible').getByRole('button', { name: label, exact: true })).toBeVisible()
     if (await menu.isVisible()) await page.keyboard.press('Escape')
   }

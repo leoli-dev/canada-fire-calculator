@@ -51,7 +51,10 @@ for (const [language, copy] of [['en', en], ['fr', fr], ['zh', zh]] as const) {
         const firstChoice = (await page.locator('.choice-group label').first().boundingBox())!
         expect(firstChoice.y).toBeGreaterThanOrEqual(bounds.y + bounds.height)
       } else await expect(prompt).toHaveCount(0)
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+      const widths = await page.evaluate(() => ({ viewport: innerWidth, available: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
+      expect(widths.viewport).toBe(390)
+      // Headed Thorium may reserve a native scrollbar gutter; content must fill its layout viewport exactly.
+      expect(widths.content).toBe(widths.available)
       measurements.push({ language, state, heading, actions })
       await testInfo.attach(`${language}-${state}.png`, { body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png' })
     }

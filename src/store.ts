@@ -8,6 +8,7 @@ import { completeCanonicalFacts, migratePersistedPlan, refreshCanonicalFromLegac
 import { assertCanonicalPlan, assertLegacyInputs } from './engine/modelValidation'
 import { applyBenefitAnswerMeta, changeAccountPresence, changeIntent, editField, reconcileDirectFields, setBudgetChoice as applyBudgetChoice, writtenBenefitFields, type BudgetChoice, type RewrittenBenefitField } from './forms/planCommands'
 import type { SharedFieldId } from './forms/fieldRegistry'
+import { answersForPartnerCreation } from './forms/partnerAnswerMeta'
 
 export const DEFAULT_PARTNER: Partner = {
   currentAge: 35,
@@ -420,9 +421,9 @@ export const useStore = create<Store>()(
           const provenance = applyPensionProvenance(s.inputs, merged, patch)
           const reconciled = reconcileLegacyInputs(s, provenance.inputs)
           const shared = reconcileDirectFields(s, patch, reconciled.inputs)
-          const answerMeta = applyBenefitAnswerMeta(
+          const answerMeta = answersForPartnerCreation(s, reconciled.canonical, applyBenefitAnswerMeta(
             shared.answerMeta, provenance.rewritten, provenance.written, reconciled.inputs,
-          )
+          ))
           return {
             ...reconciled,
             draftByField: shared.draftByField,

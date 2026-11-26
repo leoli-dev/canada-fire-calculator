@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { expect, test, type Page } from '@playwright/test'
 
 /** FE-37: gates lower the wording to an estimate; they never hide the verdict or the charts. */
@@ -15,6 +16,7 @@ async function seed(page: Page, options: { province: 'ON' | 'QC'; couple?: boole
     } }))
   }, options)
   await page.reload()
+  await showProfessionalResults(page)
 }
 
 test('a failing single Quebec plan gets the full results as disclosed estimates', async ({ page }) => {
@@ -26,7 +28,7 @@ test('a failing single Quebec plan gets the full results as disclosed estimates'
   await expect(summary).toHaveClass(/bad/)
   await expect(page.getByTestId('person-tax-limit')).toContainText('simplified Quebec rules')
   await expect(page.locator('.results-column .recharts-wrapper').first()).toBeVisible()
-  await expect(page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })).toHaveCount(1)
+  await expect(page.locator('details:not(.professional-group)').filter({ hasText: 'Withdrawal-order comparison' })).toHaveCount(1)
 })
 
 test('a couple with unconfirmed ownership sees an estimate verdict and the charts', async ({ page }) => {
@@ -44,27 +46,27 @@ test('a failing plan offers next steps and shades the uncovered spending', async
   await expect(summary).toHaveClass(/bad/)
   const next = page.getByTestId('next-steps')
   await expect(next).toBeVisible()
-  await page.getByTestId('next-step-sustainable').click()
+  await (await prepareProfessionalTarget(page.getByTestId('next-step-sustainable'))).click()
   await expect(page.getByTestId('next-step-sustainable-answer')).toContainText('CA$')
   await expect(page.locator('.results-column')).toContainText('Not covered')
   await expect(page.locator('.results-column')).toContainText('Needed (spending plus tax)')
   // A single plan never sees the note about which partner dies first.
   await expect(summary).not.toContainText('which partner dies first')
-  await next.getByRole('button', { name: 'See the earliest age this plan works' }).click()
+  await (await prepareProfessionalTarget(next.getByRole('button', { name: 'See the earliest age this plan works' }), next.getByRole('button', { name: 'See the earliest age this plan works', includeHidden: true }))).click()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveAttribute('aria-selected', 'true')
 })
 
 test('a sustainable-spending answer is retired when the plan changes', async ({ page }) => {
   await seed(page, { province: 'ON' })
-  await page.getByTestId('next-step-sustainable').click()
+  await (await prepareProfessionalTarget(page.getByTestId('next-step-sustainable'))).click()
   const answer = page.getByTestId('next-step-sustainable-answer')
   await expect(answer).toContainText('CA$')
-  const first = await answer.innerText()
-  await page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input').fill('1000')
-  await page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input').press('Tab')
+  const first = await (await prepareProfessionalTarget(answer)).innerText()
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input'))).fill('1000')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^TFSA$/ }).first().locator('input'))).press('Tab')
   await expect(answer).toHaveCount(0)
   // Asking again answers for the edited plan.
-  await page.getByTestId('next-step-sustainable').click()
+  await (await prepareProfessionalTarget(page.getByTestId('next-step-sustainable'))).click()
   await expect(answer).toBeVisible()
   expect(await answer.innerText()).not.toBe(first)
 })
@@ -79,7 +81,7 @@ test('the default CA$750,000 accumulation target keeps the existing tax uncertai
     } }))
   })
   await page.reload()
-  await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Will I hit my target?' }), page.getByRole('tab', { name: 'Will I hit my target?', includeHidden: true }))).click()
   const card = page.locator('.summary')
   await expect(card).toHaveClass(/uncertain/)
   await expect(card.locator('.conclusion-heading .ui-status')).toHaveText('Needs checks')
@@ -100,7 +102,7 @@ for (const uncertainty of ['tax', 'locked'] as const) {
         localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, entryMode: 'professional', inputRevision: 0, resultRevision: null } }))
       }, { uncertainty, target })
       await page.reload()
-      await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+      await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Will I hit my target?' }), page.getByRole('tab', { name: 'Will I hit my target?', includeHidden: true }))).click()
       const card = page.locator('.summary')
       const chip = card.locator('.conclusion-heading .ui-status')
       await expect(card).toHaveClass(/uncertain bad/)
@@ -123,7 +125,7 @@ for (const uncertainty of ['tax', 'locked'] as const) {
       expect(colors.background).toBe(colors.expectedBackground)
       // The FIRE-number branch already gives a definite failure priority over tax uncertainty.
       if (uncertainty === 'tax' && target === 1500000) {
-        await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+        await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
         await expect(chip).toHaveText('Shortfall')
         await expect(chip).toHaveClass(/ui-status-bad/)
         await expect(page.getByTestId('person-tax-limit')).toBeVisible()

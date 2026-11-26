@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -42,8 +43,8 @@ test('both entry modes record the saving basis, which survives a reload and a mo
   // A plan first entered here has no earlier figure to reconcile, so it is
   // never told that its own amount came from "an earlier plan".
   await expect(page.getByTestId('budget-method')).not.toContainText('earlier plan')
-  await page.getByTestId('budget-debt-yes').check()
-  await page.getByTestId('budget-tax-yes').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-debt-yes'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-tax-yes'))).check()
   await expect(page.getByTestId('budget-state')).toContainText('Ready')
   expect(await canonicalBudget(page)).toMatchObject({ kind: 'savingsBudget', debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } })
   expect(await insideViewport(page)).toBe(true)
@@ -58,7 +59,7 @@ test('both entry modes record the saving basis, which survives a reload and a mo
   expect(await insideViewport(page)).toBe(true)
 
   // A recorded "no" is a fact, not a gap, and it stays recorded across a reload.
-  await page.getByTestId('budget-tax-no').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-tax-no'))).check()
   await expect(page.getByTestId('budget-state')).toContainText('cannot add that refund as cash yet')
   await page.reload()
   await expect(page.getByTestId('budget-tax-no')).toBeChecked()
@@ -66,9 +67,9 @@ test('both entry modes record the saving basis, which survives a reload and a mo
 
   // The income budget is a different decision with its own reason, and its
   // working spending round-trips through the reload.
-  await page.getByTestId('budget-mode-income').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-mode-income'))).check()
   await expect(page.getByTestId('budget-state')).toContainText('cannot price an income budget yet')
-  await page.getByTestId('budget-working-spending').locator('input').fill('61000')
+  await (await prepareProfessionalTarget(page.getByTestId('budget-working-spending').locator('input'))).fill('61000')
   expect(await canonicalBudget(page)).toMatchObject({ kind: 'incomeBudget', workingSpending: 61_000 })
   await page.reload()
   await expect(page.getByTestId('budget-mode-income')).toBeChecked()
@@ -93,7 +94,7 @@ test('a migrated v10 plan presents its legacy figure for review instead of reint
   // own sentence says, so assert the copy and the recorded flags together.
   await expect(page.getByTestId('budget-method')).toContainText('already net of your loan payments')
   await expect(page.getByTestId('budget-method')).toContainText('without the RRSP tax refund')
-  await page.getByTestId('budget-basis-legacy').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-basis-legacy'))).check()
   await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
   await expect(page.getByTestId('budget-tax-no')).toBeChecked()
   await expect(page.getByTestId('budget-state')).toContainText('cannot add that refund as cash yet')
@@ -110,8 +111,8 @@ test('an answered-excluded budget basis labels the headline result as an estimat
   // Review fix B2. Unknown facts are an unanswered question, not a
   // contradiction: the default plan keeps its precise summary.
   await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)
-  await page.getByTestId('budget-debt-no').check()
-  await page.getByTestId('budget-tax-no').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-debt-no'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-tax-no'))).check()
   await expect(page.getByTestId('budget-state')).toContainText('cannot add them back yet')
   // Once a fact is recorded as excluded, the caveat sits where the number does.
   const estimate = page.getByTestId('legacy-estimate')
@@ -120,8 +121,8 @@ test('an answered-excluded budget basis labels the headline result as an estimat
   await expect(estimate).toContainText('Final net worth:')
   // Only the shape the projection actually prices loses the label: answering the
   // same two facts "Yes" is the basis the projection already assumes.
-  await page.getByTestId('budget-debt-yes').check()
-  await page.getByTestId('budget-tax-yes').check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-debt-yes'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('budget-tax-yes'))).check()
   await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)
   expect(await canonicalBudget(page)).toMatchObject({ debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } })
   await expect(page.locator('.results-column')).not.toContainText('estimate rather than a precise number')

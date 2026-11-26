@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -32,16 +33,16 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   await expect(type.locator('input:checked')).toHaveCount(0)
   await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toHaveCount(0)
   const before = await pageCount(page)
-  await page.getByTestId('registered-type-legacy:account:rrsp-rrif').check()
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-rrif'))).check()
   await expect.poll(() => pageCount(page)).toBe(before + 1)
-  await page.locator('.question-pager button').last().click()
+  await (await prepareProfessionalTarget(page.locator('.question-pager button').last())).click()
   await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'account.rrif.details')
   const opened = page.getByTestId('guided-rrif-opened-legacy:account:rrsp')
-  await opened.fill('2024')
-  await opened.blur()
+  await (await prepareProfessionalTarget(opened)).fill('2024')
+  await (await prepareProfessionalTarget(opened)).blur()
   // A calendar year is never shown with a thousands separator.
   await expect(opened).toHaveValue('2024')
-  await page.getByTestId('guided-rrif-category-legacy:account:rrsp-allOther').check()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-rrif-category-legacy:account:rrsp-allOther'))).check()
   // A single person has no age election to make.
   await expect(page.getByTestId('guided-rrif-election-legacy:account:rrsp')).toHaveCount(0)
   const rrsp = (await canonical(page)).accounts.find((account: { id: string }) => account.id === 'legacy:account:rrsp')
@@ -53,7 +54,7 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   await expect(page.getByTestId('rrif-opened-year')).toHaveValue('2024')
   await expect(page.getByTestId('rrif-factor-category-legacy:account:rrsp')).toHaveValue('allOther')
   // Back to a plain RRSP in professional mode removes the guided RRIF page.
-  await page.getByTestId('registered-type-legacy:account:rrsp').selectOption('rrsp')
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp'))).selectOption('rrsp')
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/account.rrsp.type')
   await expect.poll(() => pageCount(page)).toBe(before)
@@ -62,11 +63,11 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
 test('a couple can record a spousal RRSP and a RRIF age election', async ({ page }) => {
   await seed(page, { couple: true })
   await page.goto('/#/guided/assets/account.rrsp.type')
-  await page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp').check()
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp'))).check()
   expect((await canonical(page)).accounts.find((account: { id: string }) => account.id === 'legacy:account:rrsp').kind).toBe('spousalRrsp')
-  await page.getByTestId('registered-type-legacy:account:rrsp-rrif').check()
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-rrif'))).check()
   await page.goto('/#/guided/assets/account.rrif.details')
-  await page.getByTestId('guided-rrif-election-legacy:account:rrsp-legacy:person:partner').check()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-rrif-election-legacy:account:rrsp-legacy:person:partner'))).check()
   expect((await canonical(page)).accounts.find((account: { id: string }) => account.id === 'legacy:account:rrsp').rrifAgeElection)
     .toEqual({ personId: 'legacy:person:partner', electedAtOpening: true })
 })
@@ -75,9 +76,9 @@ test('employment income is optional, per person, and clearable', async ({ page }
   await seed(page, { couple: true })
   await page.goto('/#/guided/saving/saving.earned')
   await expect(page.getByTestId('guided-earned-income')).toBeVisible()
-  await page.getByTestId('earned-self').fill('92000')
-  await page.getByTestId('earned-partner').fill('55000')
-  await page.getByTestId('earned-partner').blur()
+  await (await prepareProfessionalTarget(page.getByTestId('earned-self'))).fill('92000')
+  await (await prepareProfessionalTarget(page.getByTestId('earned-partner'))).fill('55000')
+  await (await prepareProfessionalTarget(page.getByTestId('earned-partner'))).blur()
   await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
   let people = (await canonical(page)).people
   expect(people.map((person: { earnedIncome: unknown }) => person.earnedIncome)).toEqual([
@@ -87,7 +88,7 @@ test('employment income is optional, per person, and clearable', async ({ page }
   await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/saving/saving.earned')
-  await page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first().click()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first(), page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear', includeHidden: true }).first())).click()
   people = (await canonical(page)).people
   expect(people[0].earnedIncome.status).toBe('unknown')
   await expect(page.getByTestId('earned-self')).toHaveValue('')
@@ -96,7 +97,7 @@ test('employment income is optional, per person, and clearable', async ({ page }
 test('the new pages are translated in EN, FR and ZH', async ({ page }) => {
   await seed(page, { couple: true })
   await page.goto('/#/guided/assets/account.rrsp.type')
-  await page.getByTestId('registered-type-legacy:account:rrsp-rrif').check()
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-rrif'))).check()
   const titles: Record<string, string[]> = {}
   for (const language of ['EN', 'FR', '中文']) {
     await chooseLanguage(page, language)

@@ -1,3 +1,5 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
+import { revealProfessionalEditor } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -5,13 +7,14 @@ const languages = ['EN', 'FR', '中文'] as const
 
 async function compareGuidedAndProfessionalHelp(page: Page, fieldId: string) {
   const guided = page.locator('.question-help')
-  await guided.locator('summary').click()
-  const why = await guided.locator('p').first().innerText()
+  await (await prepareProfessionalTarget(guided.locator('summary'))).press('Enter')
+  const why = await (await prepareProfessionalTarget(guided.locator('p').first())).innerText()
   const find = await guided.locator('p').nth(1).evaluate(element => element.textContent?.replace(element.querySelector('strong')?.textContent ?? '', '').trim() ?? '')
-  const facts = await guided.locator(`[data-content-field="${fieldId}"]`).innerText()
+  const facts = await (await prepareProfessionalTarget(guided.locator(`[data-content-field="${fieldId}"]`))).innerText()
   await chooseMode(page, 'professional')
   const professional = page.getByTestId(`professional-help-${fieldId}`)
-  await professional.locator('.ui-field-help').click()
+  await revealProfessionalEditor(page, professional)
+  await (await prepareProfessionalTarget(professional.locator('.ui-field-help'))).click()
   await expect(professional.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
   await page.keyboard.press('Shift+Tab')
   await expect(professional.getByRole('dialog').getByRole('button')).toBeFocused()
@@ -43,7 +46,7 @@ test('savings question and Professional field share source, unit and unknown mea
 
 test('planned mortgage content appears only when applicable and stays shared in EN/FR/ZH', async ({ page }) => {
   await page.goto('/#/guided/housing/home.situation')
-  await page.getByRole('radio', { name: 'Planned purchase' }).check()
+  await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Planned purchase' }), page.getByRole('radio', { name: 'Planned purchase', includeHidden: true }))).check()
   for (const language of languages) {
     await chooseLanguage(page, language)
     await page.goto('/#/guided/housing/purchase.loan')

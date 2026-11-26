@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -24,6 +25,7 @@ async function seed(page: Page, kind: 'nonReg' | 'property', mode: 'guided' | 'p
     } }))
   }, { kind, mode })
   await page.reload()
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
 }
 
@@ -40,7 +42,7 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
     await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
     await page.evaluate(() => {
       const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
@@ -50,7 +52,7 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
     await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
@@ -87,7 +89,7 @@ for (const mode of ['guided', 'professional'] as const) {
     })
     await page.reload()
     const comparison = page.getByTestId('scenario-comparison')
-    await comparison.locator('summary').click()
+    await (await prepareProfessionalTarget(comparison.locator('summary'))).press('Enter')
     await expect(comparison).toContainText('Comparison unavailable')
     await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
@@ -96,7 +98,7 @@ for (const mode of ['guided', 'professional'] as const) {
     // BE-42: the 500,000 the plan holds falls 16,018 short once the eroded
     // cost base is taxed, so the number is labelled an estimate and shows a gap.
     await seed(page, 'nonReg', mode)
-    await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
     await expect(page.locator('.summary .verdict')).toContainText('FIRE number')
     await expect(page.locator('.summary')).toHaveClass(/uncertain/)
     await expect(page.getByTestId('fire-number-projected')).toContainText('cost base your plan projects for age 60')
@@ -110,7 +112,7 @@ for (const mode of ['guided', 'professional'] as const) {
 
   test(`${mode} target tab withholds investment-property sale verdict and amount`, async ({ page }) => {
     await seed(page, 'property', mode)
-    await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Will I hit my target?' }), page.getByRole('tab', { name: 'Will I hit my target?', includeHidden: true }))).click()
     await expect(page.locator('.summary .verdict')).toContainText('needs verified nominal cost, selling expenses')
     await expect(page.locator('.summary .verdict')).not.toContainText('475,000')
     for (const [language, phrase] of [['FR', 'frais de vente'], ['中文', '出售费用']] as const) {
@@ -122,7 +124,7 @@ for (const mode of ['guided', 'professional'] as const) {
 
   test(`${mode} retirement age and spending ceiling withhold an untaxed property sale`, async ({ page }) => {
     await seed(page, 'property', mode)
-    await page.getByRole('tab', { name: 'When can I retire?' }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }), page.getByRole('tab', { name: 'When can I retire?', includeHidden: true }))).click()
     await expect(page.locator('.summary .verdict')).toContainText('investment-property sale')
     await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
     for (const [language, phrase] of [['FR', 'immeuble de placement'], ['中文', '投资房出售']] as const) {
@@ -160,7 +162,7 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await page.getByRole('tab', { name: 'When can I retire?' }).click()
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }), page.getByRole('tab', { name: 'When can I retire?', includeHidden: true }))).click()
     await expect(page.locator('.summary .verdict')).toContainText('confirmed non-registered cost base')
     await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
   })

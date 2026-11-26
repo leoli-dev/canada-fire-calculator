@@ -1,3 +1,5 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
+import { showProfessionalResults } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -19,13 +21,13 @@ test('usage statistics stay off until allowed, and the answer can be changed', a
   await expect(prompt).toBeVisible()
   await expect(footer).toContainText('Anonymous usage statistics are off.')
   expect(await page.evaluate(() => typeof window.gtag)).toBe('undefined')
-  await prompt.getByRole('button', { name: 'No thanks' }).click()
+  await (await prepareProfessionalTarget(prompt.getByRole('button', { name: 'No thanks' }), prompt.getByRole('button', { name: 'No thanks', includeHidden: true }))).click()
   await expect(prompt).toHaveCount(0)
   await page.reload()
   await expect(prompt).toHaveCount(0)
-  await footer.getByRole('button', { name: 'Allow them' }).click()
+  await (await prepareProfessionalTarget(footer.getByRole('button', { name: 'Allow them' }), footer.getByRole('button', { name: 'Allow them', includeHidden: true }))).click()
   await expect(footer).toContainText('Anonymous usage statistics are on.')
-  await footer.getByRole('button', { name: 'Turn them off' }).click()
+  await (await prepareProfessionalTarget(footer.getByRole('button', { name: 'Turn them off' }), footer.getByRole('button', { name: 'Turn them off', includeHidden: true }))).click()
   await expect(footer).toContainText('Anonymous usage statistics are off.')
 })
 
@@ -44,10 +46,11 @@ test('blocked site storage still starts the calculator and says the plan is not 
   await page.goto('/')
   await expect(page.getByTestId('storage-unavailable')).toBeVisible()
   await chooseMode(page, 'professional')
-  await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('40')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Current age' }).locator('input'))).fill('40')
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
   // The consent answer holds for the session even though it cannot be stored.
-  await page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks' }).click()
+  await (await prepareProfessionalTarget(page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks' }), page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks', includeHidden: true }))).click()
   await expect(page.getByTestId('analytics-prompt')).toHaveCount(0)
 })
 
@@ -65,11 +68,11 @@ test('on a phone the headline sits above the form and every result question fits
   await chooseMode(page, 'professional')
   const peek = page.getByTestId('result-peek')
   await expect(peek).toBeInViewport()
-  const verdict = (await page.locator('.summary .verdict').first().innerText()).trim()
+  const verdict = (await (await prepareProfessionalTarget(page.locator('.summary .verdict').first())).innerText()).trim()
   await expect(peek).toContainText(verdict)
-  await peek.getByRole('button', { name: 'See the full results' }).click()
+  await (await prepareProfessionalTarget(peek.getByRole('button', { name: 'See the full results' }), peek.getByRole('button', { name: 'See the full results', includeHidden: true }))).click()
   await expect(page.locator('#results')).toBeFocused()
-  const tabs = page.getByRole('tab')
+  const tabs = page.locator('.summary').getByRole('tab')
   await expect(tabs).toHaveCount(4)
   const width = page.viewportSize()!.width
   for (const box of await tabs.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON())))

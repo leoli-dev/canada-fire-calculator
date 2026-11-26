@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -21,7 +22,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
     id: await pack.getAttribute('data-rule-pack-id'),
     period: await pack.getAttribute('data-rule-period'),
     assumed: await pack.getAttribute('data-rule-assumed'),
-    text: await pack.innerText(),
+    text: await (await prepareProfessionalTarget(pack)).innerText(),
   })
 
   const onProfessional = await read()
@@ -33,7 +34,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
 
   // The CCB pack is federal: a different jurisdiction may change the tax pack
   // but must not change which CCB pack or period priced the child benefit.
-  await page.getByLabel('Province').selectOption('AB')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('AB')
   const alberta = await read()
   expect(alberta).toEqual(onProfessional)
   await expect(page.getByTestId('rule-tax-pack')).toHaveAttribute('data-rule-pack-id', 'CA-AB-tax-2026-legacy-v1')

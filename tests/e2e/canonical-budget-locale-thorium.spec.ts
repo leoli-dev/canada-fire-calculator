@@ -1,3 +1,5 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
+import { revealProfessionalEditor } from './fixtures/professional'
 import { chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator } from '@playwright/test'
@@ -29,7 +31,8 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
       const summary = evidence.locator('summary')
       await expect(summary).toHaveText('Registre annuel canonique')
       const open = async () => {
-        if (!await evidence.evaluate(element => (element as HTMLDetailsElement).open)) await summary.click()
+        await revealProfessionalEditor(page, evidence)
+        if (!await evidence.evaluate(element => (element as HTMLDetailsElement).open)) await (await prepareProfessionalTarget(summary)).press('Enter')
       }
       const persistedSpending = () => page.evaluate(() =>
         JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.deterministicProjection.spending)
@@ -38,11 +41,11 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
       await expect(retirement).toHaveValue('')
       await expect(mixed).toHaveValue('')
       await expect(record).toBeDisabled()
-      await working.pressSequentially('11298,65')
-      await retirement.pressSequentially('12000,50')
-      await mixed.pressSequentially('350,25')
-      await mortgage.check()
-      await record.click()
+      await (await prepareProfessionalTarget(working)).pressSequentially('11298,65')
+      await (await prepareProfessionalTarget(retirement)).pressSequentially('12000,50')
+      await (await prepareProfessionalTarget(mixed)).pressSequentially('350,25')
+      await (await prepareProfessionalTarget(mortgage)).check()
+      await (await prepareProfessionalTarget(record)).click()
       expect(await persistedSpending()).toEqual({
         workingSpending: { status: 'known', value: 11_298.65 },
         retirementSpending: { status: 'known', value: 12_000.50 },
@@ -52,23 +55,23 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
 
       const paste = async (field: Locator, value: string) => {
         await page.evaluate(text => navigator.clipboard.writeText(text), value)
-        await field.focus()
-        await field.press('ControlOrMeta+V')
+        await (await prepareProfessionalTarget(field)).focus()
+        await (await prepareProfessionalTarget(field)).press('ControlOrMeta+V')
       }
       await open()
-      await working.pressSequentially('0')
+      await (await prepareProfessionalTarget(working)).pressSequentially('0')
       await paste(retirement, '12\u202f000,50')
       await paste(mixed, '35,0,25')
-      await mortgage.check()
+      await (await prepareProfessionalTarget(mortgage)).check()
       await expect(record).toBeDisabled()
-      await mixed.fill('')
+      await (await prepareProfessionalTarget(mixed)).fill('')
       await expect(record).toBeDisabled()
       await paste(mixed, '350.25')
       await expect(record).toBeEnabled()
-      await retirement.fill('')
+      await (await prepareProfessionalTarget(retirement)).fill('')
       await expect(record).toBeDisabled()
       await paste(retirement, '12\u202f000,50')
-      await record.click()
+      await (await prepareProfessionalTarget(record)).click()
       expect(await persistedSpending()).toMatchObject({
         workingSpending: { status: 'known', value: 0 },
         retirementSpending: { status: 'known', value: 12_000.50 },
@@ -76,7 +79,7 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
       })
 
       await open()
-      await working.pressSequentially('11,298')
+      await (await prepareProfessionalTarget(working)).pressSequentially('11,298')
       await chooseLanguage(page, 'EN')
       await expect(page.locator('html')).toHaveAttribute('lang', 'en')
       await expect(summary).toHaveText('Canonical annual ledger')

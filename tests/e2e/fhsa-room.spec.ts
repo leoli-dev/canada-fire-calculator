@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -28,6 +29,7 @@ async function seed(page: Page, options: { guided?: boolean; couple?: boolean } 
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 /**
@@ -57,6 +59,7 @@ async function seedLegacyPlan(page: Page, annualContribution: number, openedYear
     } }))
   }, { annualContribution, openedYear })
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 /**
@@ -103,6 +106,7 @@ async function seedScheduledFhsa(page: Page, options: { history: boolean }) {
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 /** The plan the panel shows, the rows it is recorded in, and the amount the
@@ -186,8 +190,8 @@ async function recordStatement(page: Page, role: string, values: { openedYear?: 
   for (const [testId, value] of fields) {
     if (value === undefined) continue
     const input = page.getByTestId(testId)
-    await input.fill(value)
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill(value)
+    await (await prepareProfessionalTarget(input)).blur()
   }
 }
 
@@ -233,7 +237,7 @@ test('guided mode records the same FHSA facts and keeps explicit generate', asyn
   await seed(page, { guided: true })
   // FE-43 C: guided asks the participation room on its own optional page.
   await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
-  await page.getByTestId('guided-fhsa-more-self').click()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-fhsa-more-self'))).click()
   await expect(page.getByTestId('fhsa-statement-self')).toBeVisible()
   await recordStatement(page, 'self', { openedYear: '2026', prior: '0', opening: '0' })
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('8,000')
@@ -368,8 +372,8 @@ test('a scheduled FHSA row is priced by participation room, never by the RRSP le
   // An explicit edit owns the plan year: the scheduled row is replaced, not
   // added to or left behind for the ledger to price alongside the box.
   const planned = page.getByTestId('fhsa-planned-self')
-  await planned.fill('3000')
-  await planned.blur()
+  await (await prepareProfessionalTarget(planned)).fill('3000')
+  await (await prepareProfessionalTarget(planned)).blur()
   await expect(planned).toHaveValue('3,000')
   await expect(page.getByTestId('fhsa-scheduled-self')).toHaveCount(0)
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('contributions 3,000')
@@ -428,8 +432,8 @@ test('the panel and the kernel price the same default legacy plan', async ({ pag
 test('recording a planned amount replaces the plan instead of adding to it', async ({ page }) => {
   await seedLegacyPlan(page, 8000)
   const planned = page.getByTestId('fhsa-planned-self')
-  await planned.fill('6000')
-  await planned.blur()
+  await (await prepareProfessionalTarget(planned)).fill('6000')
+  await (await prepareProfessionalTarget(planned)).blur()
   await expect(planned).toHaveValue('6,000')
   const state = await fhsaPlanState(page)
   // One row, mirrored once, priced once: 8,000 + 6,000 must never appear.
@@ -446,8 +450,8 @@ test('recording a planned amount replaces the plan instead of adding to it', asy
 test('a recorded plan survives an unrelated shared-field edit and a reload', async ({ page }) => {
   await seedLegacyPlan(page, 8000)
   const planned = page.getByTestId('fhsa-planned-self')
-  await planned.fill('6000')
-  await planned.blur()
+  await (await prepareProfessionalTarget(planned)).fill('6000')
+  await (await prepareProfessionalTarget(planned)).blur()
   await expect(planned).toHaveValue('6,000')
   // The reviewer's exact reproduction: edit only annualSavings through the
   // app's own shared-field command.
@@ -510,6 +514,7 @@ async function seedCoupleFhsa(page: Page, options: { balance: number; guided?: b
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 /**
@@ -538,6 +543,7 @@ async function seedLegacyOpenedYearsAgo(page: Page, openedYearsAgo: number, opti
     } }))
   }, { openedYearsAgo, guided: options.guided ?? false })
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 /**
@@ -565,8 +571,8 @@ const legacyFhsaAnswer = (page: Page) => page.evaluate(async () => {
 async function editUnrelatedEarned(page: Page, guided: boolean) {
   if (guided) await page.goto('/#/guided/saving/saving.earned')
   const earned = page.getByTestId('earned-self')
-  await earned.fill('90000')
-  await earned.blur()
+  await (await prepareProfessionalTarget(earned)).fill('90000')
+  await (await prepareProfessionalTarget(earned)).blur()
   await expect(earned).toHaveValue('90,000')
   return legacyFhsaAnswer(page)
 }
@@ -618,9 +624,9 @@ const ownershipState = (page: Page) => page.evaluate(async () => {
 /** Attribute the household's other registered accounts so the ownership gate
  * the FHSA control closes is the one under test. */
 async function attributeHouseholdAccounts(page: Page) {
-  await page.getByTestId('owner-legacy:account:tfsa').selectOption('legacy:person:self')
-  await page.getByTestId('owner-legacy:account:rrsp').selectOption('legacy:person:partner')
-  await page.getByTestId('owner-legacy:account:nonReg').selectOption('legacy:person:self')
+  await (await prepareProfessionalTarget(page.getByTestId('owner-legacy:account:tfsa'))).selectOption('legacy:person:self')
+  await (await prepareProfessionalTarget(page.getByTestId('owner-legacy:account:rrsp'))).selectOption('legacy:person:partner')
+  await (await prepareProfessionalTarget(page.getByTestId('owner-legacy:account:nonReg'))).selectOption('legacy:person:self')
 }
 
 test('professional records a couple FHSA holder and can then enter its statement', async ({ page }) => {
@@ -630,7 +636,7 @@ test('professional records a couple FHSA holder and can then enter its statement
   // The row is offered and starts unowned: the control's whole job.
   await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('')
   await attributeHouseholdAccounts(page)
-  await page.getByTestId('owner-legacy:account:fhsa').selectOption('legacy:person:self')
+  await (await prepareProfessionalTarget(page.getByTestId('owner-legacy:account:fhsa'))).selectOption('legacy:person:self')
   // The control itself must never escape an exception.
   await page.waitForTimeout(50)
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
@@ -660,10 +666,10 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   await page.goto('/#/guided/assets/assets.ownership')
   await expect(page.getByTestId('guided-ownership-row-legacy:account:fhsa')).toBeVisible()
   await expect(page.getByTestId('owner-choice-legacy:account:fhsa-partner')).not.toBeChecked()
-  await page.getByTestId('owner-choice-legacy:account:tfsa-self').check()
-  await page.getByTestId('owner-choice-legacy:account:rrsp-partner').check()
-  await page.getByTestId('owner-choice-legacy:account:nonReg-self').check()
-  await page.getByTestId('owner-choice-legacy:account:fhsa-partner').check()
+  await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:tfsa-self'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:rrsp-partner'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:nonReg-self'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:fhsa-partner'))).check()
   await page.waitForTimeout(50)
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
   expect(await ownershipState(page)).toMatchObject({
@@ -672,7 +678,7 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   await page.goto('/#/guided/taxDetails/tax.fhsaRoom')
   await expect(page.getByTestId('guided-fhsa-room').locator('.ownership-row')).toHaveCount(1)
   await expect(page.getByTestId('fhsa-opening-room-self')).toHaveCount(0)
-  await page.getByTestId('guided-fhsa-more-partner').click()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-fhsa-more-partner'))).click()
   await recordStatement(page, 'partner', { openedYear: '2026', prior: '0', opening: '0', planned: '6000' })
   await expect(page.getByTestId('fhsa-ledger-partner')).toContainText('contributions 6,000')
   await page.reload()
@@ -696,9 +702,9 @@ test('a genuine couple FHSA split reaches the typed multiple-active refusal, nev
   await seedCoupleFhsa(page, { balance: 12000 })
   await attributeHouseholdAccounts(page)
   // The user records a genuine per-person split: 6,000 to each spouse.
-  await page.getByTestId('account-self-amount-legacy:account:fhsa').fill('6000')
-  await page.getByTestId('account-partner-amount-legacy:account:fhsa').fill('6000')
-  await page.getByTestId('account-partner-amount-legacy:account:fhsa').blur()
+  await (await prepareProfessionalTarget(page.getByTestId('account-self-amount-legacy:account:fhsa'))).fill('6000')
+  await (await prepareProfessionalTarget(page.getByTestId('account-partner-amount-legacy:account:fhsa'))).fill('6000')
+  await (await prepareProfessionalTarget(page.getByTestId('account-partner-amount-legacy:account:fhsa'))).blur()
   await page.waitForTimeout(50)
   expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([])
   // Two person-owned FHSAs, the household total conserved to the cent.
@@ -725,9 +731,9 @@ test('a two-way FHSA split keeps both balances and the partner plan across a leg
   page.on('pageerror', error => errors.push(String(error)))
   await seedCoupleFhsa(page, { balance: 12000 })
   await attributeHouseholdAccounts(page)
-  await page.getByTestId('account-self-amount-legacy:account:fhsa').fill('6000')
-  await page.getByTestId('account-partner-amount-legacy:account:fhsa').fill('6000')
-  await page.getByTestId('account-partner-amount-legacy:account:fhsa').blur()
+  await (await prepareProfessionalTarget(page.getByTestId('account-self-amount-legacy:account:fhsa'))).fill('6000')
+  await (await prepareProfessionalTarget(page.getByTestId('account-partner-amount-legacy:account:fhsa'))).fill('6000')
+  await (await prepareProfessionalTarget(page.getByTestId('account-partner-amount-legacy:account:fhsa'))).blur()
   // Record a plan on the partner-owned account, then edit an unrelated shared
   // field: the legacy form can mirror only one FHSA, so the partner row must be
   // carried across the rebuild instead of silently disappearing.

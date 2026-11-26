@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -30,6 +31,7 @@ async function seed(page: import('@playwright/test').Page, options: { guided?: b
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 test('QC couple confirms a whole-year status with no month-by-month work in professional mode', async ({ page }) => {
@@ -38,12 +40,14 @@ test('QC couple confirms a whole-year status with no month-by-month work in prof
   // Default: one annual status per person, no month grid, no change toggle.
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   await expect(page.getByTestId('qc-coverage-changed-self')).not.toBeChecked()
+  await showProfessionalResults(page)
   await expect(page.getByTestId('person-tax-limit')).toBeVisible()
   // Two annual picks confirm the whole year for both people.
-  await page.getByTestId('qc-coverage-all-self').selectOption('private')
-  await page.getByTestId('qc-coverage-all-partner').selectOption('waived')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self'))).selectOption('private')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner'))).selectOption('waived')
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   await expect(page.getByTestId('qc-coverage-changed-self')).not.toBeChecked()
+  await showProfessionalResults(page)
   await expect(page.getByTestId('person-tax-table')).toBeVisible()
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
   // The whole-year status is recorded as twelve identical months per person.
@@ -64,13 +68,13 @@ test('guided mode records a genuine mid-year change that survives reload and mod
   await expect(page.getByTestId('guided-qc-drug')).toBeVisible()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // Guided shows the whole-year status as choice cards, like every other page.
-  await page.getByTestId('qc-coverage-all-self-private').check()
-  await page.getByTestId('qc-coverage-all-partner-private').check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self-private'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner-private'))).check()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // A genuine mid-year change: reveal the month detail, then edit one month.
-  await page.getByTestId('qc-coverage-changed-self').check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self'))).check()
   await expect(page.getByTestId('qc-coverage-self-7')).toBeVisible()
-  await page.getByTestId('qc-coverage-self-7').selectOption('public')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-7'))).selectOption('public')
   await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
   await expect(page.getByTestId('qc-coverage-all-self-private')).not.toBeChecked()
   // Guided never auto-regenerates results on an edit: generate stays explicit.
@@ -84,6 +88,7 @@ test('guided mode records a genuine mid-year change that survives reload and mod
   // Professional shows the same recorded facts; the public month stays a
   // labelled estimate and the 320px layout stays inside the viewport.
   await chooseMode(page, 'professional')
+  await showProfessionalResults(page)
   await expect(page.getByTestId('person-tax-limit')).toBeVisible()
   await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
   await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
@@ -104,6 +109,6 @@ test('the QC coverage block explains its purpose in EN, FR and ZH', async ({ pag
   await expect(panel).toContainText('第447行')
   await expect(panel).toContainText('全年保险状态')
   await chooseLanguage(page, 'EN')
-  await page.getByTestId('qc-coverage-changed-self').check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self'))).check()
   await expect(panel).toContainText('Only needed when coverage changed mid-year')
 })

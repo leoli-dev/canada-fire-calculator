@@ -1,3 +1,5 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
+import { revealProfessionalEditor } from './fixtures/professional'
 import { expect, test } from '@playwright/test'
 import { chooseLanguage, chooseMode } from './fixtures/app-bar'
 
@@ -9,7 +11,7 @@ test('shell puts the first question within 200px and retains focused headings wi
   await expect(title).toHaveCSS('box-shadow', 'none')
   expect((await title.boundingBox())!.y).toBeLessThanOrEqual(200)
   await expect(page.getByTestId('canonical-evidence')).toHaveCount(0)
-  await page.locator('.question-pager button').last().click()
+  await (await prepareProfessionalTarget(page.locator('.question-pager button').last())).click()
   await expect(title).toBeFocused()
   await expect(title).toHaveCSS('box-shadow', 'none')
   await page.keyboard.press('Tab')
@@ -22,7 +24,7 @@ test('mobile shell menu closes with Escape and returns focus, while mode and pri
   await page.setViewportSize({ width: 320, height: 740 })
   await page.goto('/')
   const menu = page.getByTestId('app-menu')
-  await menu.focus()
+  await (await prepareProfessionalTarget(menu)).focus()
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog', { name: 'Menu' })
   await expect(dialog.getByText('Privacy settings')).toBeVisible()
@@ -37,6 +39,7 @@ test('mobile shell menu closes with Escape and returns focus, while mode and pri
   await expect(menu).toBeFocused()
   await chooseMode(page, 'professional')
   await expect(page.locator('.input-form')).toBeVisible()
+  await revealProfessionalEditor(page, page.getByTestId('canonical-evidence'))
   await expect(page.getByTestId('canonical-evidence')).toBeVisible()
   await chooseMode(page, 'guided')
   await expect(page.getByTestId('canonical-evidence')).toHaveCount(0)
@@ -50,13 +53,13 @@ test('desktop rails follow the breakpoint and localized directory labels fit wit
   for (const [language, width] of [['EN', 1440], ['FR', 320], ['中文', 390]] as const) {
     await page.setViewportSize({ width, height: 844 })
     await chooseLanguage(page, language)
-    if (width <= 640) await page.locator('.mobile-directory-trigger').click()
+    if (width <= 640) await (await prepareProfessionalTarget(page.locator('.mobile-directory-trigger'))).click()
     for (const label of await page.locator('.category-navigation details[open] button > span:not(.sr-only)').all()) {
       const style = await label.evaluate(element => ({ overflow: getComputedStyle(element).textOverflow, width: element.clientWidth, scrollWidth: element.scrollWidth }))
       expect(style.overflow).not.toBe('ellipsis')
       expect(style.scrollWidth).toBeLessThanOrEqual(style.width)
     }
-    if (width <= 640) await page.locator('.directory-close').click()
+    if (width <= 640) await (await prepareProfessionalTarget(page.locator('.directory-close'))).click()
     const metric = await page.evaluate(() => ({ width: innerWidth, titleTop: document.querySelector('#question-title')!.getBoundingClientRect().top, overflow: document.documentElement.scrollWidth > innerWidth, headerHeight: document.querySelector('.app-bar')!.getBoundingClientRect().height }))
     expect(metric.overflow).toBe(false)
     if (width === 390) expect(metric.titleTop).toBeLessThanOrEqual(200)

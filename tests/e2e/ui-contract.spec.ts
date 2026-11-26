@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage, expectSelectedLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -81,13 +82,25 @@ for (const language of ['EN', 'FR', '中文']) {
     }
     await chooseMode(page, 'professional')
     await expect(page.locator('.input-form')).toBeVisible()
-    await page.evaluate(() => document.querySelectorAll('details').forEach(details => { details.open = true }))
+    // Inspect every input group through its native disclosures, including on one-open phones.
+    for (const group of await page.locator('.professional-group').all()) {
+      await revealProfessionalEditor(page, group)
+      for (const summary of await group.locator('details:not([open]) > summary').all()) {
+        if (await summary.isVisible()) await summary.press('Enter')
+      }
+      await checkContract(page)
+    }
+    await showProfessionalResults(page)
+    // Inspect the original Results disclosure surfaces as contract targets, never as a search for an input.
+    for (const summary of await page.locator('.results-column details:not([open]) > summary').all()) {
+      if (await summary.isVisible()) await summary.press('Enter')
+    }
     await checkContract(page)
     const display = page.locator('.ui-segmented[aria-labelledby="display-mode-label"]')
-    await display.getByRole('button').nth(1).click()
+    await (await prepareProfessionalTarget(display.getByRole('button').nth(1), display.getByRole('button', { includeHidden: true }).nth(1))).click()
     await expect(display.getByRole('button').nth(1)).toHaveAttribute('aria-pressed', 'true')
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.displayMode)).toBe('nominal')
-    await display.getByRole('button').first().click()
+    await (await prepareProfessionalTarget(display.getByRole('button').first(), display.getByRole('button', { includeHidden: true }).first())).click()
     await expect(display.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true')
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.displayMode)).toBe('real')
   })
@@ -106,7 +119,7 @@ for (const consent of ['default', 'eligible', 'granted', 'denied'] as const) {
     if (consent === 'eligible') await expect(page.getByTestId('analytics-prompt')).toBeVisible()
     await phoneContract(page)
     expect(await page.evaluate(() => scrollY)).toBe(0)
-    await page.locator('.question-pager button').last().click()
+    await (await prepareProfessionalTarget(page.locator('.question-pager button').last())).click()
     await expect(page.locator('#question-title')).toBeFocused()
   })
 }
@@ -115,7 +128,7 @@ test('phone Contents uses one Sheet, traps focus and restores it on close and na
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   const trigger = page.locator('.mobile-directory-trigger')
-  await trigger.focus()
+  await (await prepareProfessionalTarget(trigger)).focus()
   await page.keyboard.press('Enter')
   const sheet = page.getByRole('dialog', { name: 'Contents' })
   await expect(page.getByRole('dialog')).toHaveCount(1)
@@ -129,26 +142,26 @@ test('phone Contents uses one Sheet, traps focus and restores it on close and na
   await expect(close).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
-  await trigger.click()
-  await sheet.locator('details[open] button').nth(1).click()
+  await (await prepareProfessionalTarget(trigger)).click()
+  await (await prepareProfessionalTarget(sheet.locator('details[open] button').nth(1))).click()
   await expect(sheet).toHaveCount(0)
   await expect(page.locator('#question-title')).toBeFocused()
   await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'family.ages')
-  await trigger.click()
-  await close.click()
+  await (await prepareProfessionalTarget(trigger)).click()
+  await (await prepareProfessionalTarget(close)).click()
   await expect(trigger).toBeFocused()
 })
 
 test('phone progress stays below the app bar and final content clears the fixed pager', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 })
   await page.goto('/#/guided/family/time.work')
-  await page.locator('.question-help summary').click()
+  await (await prepareProfessionalTarget(page.locator('.question-help summary'))).press('Enter')
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight))
   expect((await page.locator('.app-bar').boundingBox())!.y).toBe(0)
   expect((await page.locator('.mobile-question-progress').boundingBox())!.y).toBe(52)
-  const pager = (await page.locator('.question-pager').boundingBox())!
+  const pager = (await (await prepareProfessionalTarget(page.locator('.question-pager'))).boundingBox())!
   expect(pager.y + pager.height).toBe(740)
-  const question = (await page.locator('.question-page').boundingBox())!
+  const question = (await (await prepareProfessionalTarget(page.locator('.question-page'))).boundingBox())!
   expect(question.y + question.height).toBeLessThanOrEqual(pager.y)
   await expect(page.locator('.question-pager button').last()).toBeEnabled()
 })

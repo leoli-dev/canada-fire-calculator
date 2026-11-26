@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
@@ -22,8 +23,8 @@ const trialsInput = (page: Page) => page.getByTestId('canonical-mc-trials')
 
 async function recordExplicitVolatility(page: Page, percent: string) {
   for (const id of [ids.selfTfsa, ids.partnerTfsa]) {
-    await volatility(page, id).fill(percent)
-    await volatility(page, id).blur()
+    await (await prepareProfessionalTarget(volatility(page, id))).fill(percent)
+    await (await prepareProfessionalTarget(volatility(page, id))).blur()
   }
 }
 
@@ -32,12 +33,13 @@ async function persistedApp(page: Page, variant: Parameters<typeof canonicalAppP
     if (!localStorage.getItem('fire-inputs')) localStorage.setItem('fire-inputs', JSON.stringify(envelope))
   }, canonicalAppPlan(variant))
   await page.goto('/')
+  await showProfessionalResults(page)
 }
 
 async function chooseSeedAndTrials(page: Page, trials = 4) {
-  await seedInput(page).fill(String(0x5eed2026))
-  await trialsInput(page).fill(String(trials))
-  await trialsInput(page).blur()
+  await (await prepareProfessionalTarget(seedInput(page))).fill(String(0x5eed2026))
+  await (await prepareProfessionalTarget(trialsInput(page))).fill(String(trials))
+  await (await prepareProfessionalTarget(trialsInput(page))).blur()
 }
 
 // Leave every request on a real worker thread. Queue its actual response at
@@ -90,20 +92,20 @@ test('persisted #78 requires explicit volatility and fixed draws preserve the Ap
   await persistedApp(page)
   await expect(overview(page).locator('tbody tr')).toHaveCount(3)
   await expect(page.getByTestId('canonical-estate')).toContainText('158,070')
-  const before = await overview(page).innerText()
+  const before = await (await prepareProfessionalTarget(overview(page))).innerText()
   await expect(card(page)).toBeVisible()
   await expect(volatility(page, ids.selfTfsa)).toHaveValue('')
   await expect(volatility(page, ids.partnerTfsa)).toHaveValue('')
   await expect(run(page)).toBeDisabled()
   await expect(counts(page)).toHaveCount(0)
 
-  await volatility(page, ids.selfTfsa).fill('101')
-  await volatility(page, ids.partnerTfsa).fill('0')
+  await (await prepareProfessionalTarget(volatility(page, ids.selfTfsa))).fill('101')
+  await (await prepareProfessionalTarget(volatility(page, ids.partnerTfsa))).fill('0')
   await expect(run(page)).toBeDisabled()
   await recordExplicitVolatility(page, '0')
   await chooseSeedAndTrials(page)
   await expect(run(page)).not.toContainText('1,000')
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await expect(counts(page)).toContainText('complete with zero gaps 0')
   await expect(counts(page)).toContainText('complete with actual gaps 4')
   await expect(rate(page)).toContainText('0 / 4')
@@ -121,10 +123,10 @@ test('the actual Guide runs the selected household while the partial control ret
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await expect(card(page)).toHaveCount(0)
-  await page.getByRole('button', { name: 'Generate my results' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Generate my results' }), page.getByRole('button', { name: 'Generate my results', includeHidden: true }))).click()
   await recordExplicitVolatility(page, '0')
   await chooseSeedAndTrials(page)
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await expect(counts(page)).toContainText('partial 4')
   await expect(counts(page)).toContainText('complete with actual gaps 0')
   await expect(bands(page)).toContainText('2027')
@@ -149,29 +151,29 @@ test('the real canonical worker is cancellable and an older reply cannot replace
     gate!.deliver(index, changed)
   }, { index, changed })
 
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await expect(cancel(page)).toBeEnabled()
   await hasWorkerResponse(0)
-  await cancel(page).click()
+  await (await prepareProfessionalTarget(cancel(page))).click()
   await deliver(0)
   await expect(counts(page)).toHaveCount(0)
   await expect(status(page)).toContainText(/Cancelled/)
 
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await hasWorkerResponse(1)
   await deliver(1, { sourceId: 'obsolete-source' })
   await expect(status(page)).toContainText(/unavailable/i)
   await expect(counts(page)).toHaveCount(0)
 
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await hasWorkerResponse(2)
   await deliver(2)
   await expect(counts(page)).toBeVisible()
-  const before = await counts(page).innerText()
+  const before = await (await prepareProfessionalTarget(counts(page))).innerText()
   await deliver(0, { result: null })
   await expect(counts(page)).toHaveText(before)
 
-  await page.locator('label.field').filter({ hasText: /^Life expectancy/ }).locator('input').fill('56')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^Life expectancy/ }).locator('input'))).fill('56')
   await expect(counts(page)).toHaveCount(0)
   await deliver(2)
   await expect(counts(page)).toHaveCount(0)
@@ -182,11 +184,11 @@ test('fixed #78 bands use closing CPI in real display and remain localized in Fr
   const results = page.getByTestId('canonical-results')
   await recordExplicitVolatility(page, '0')
   await chooseSeedAndTrials(page)
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   const final = bands(page).getByRole('row').filter({ has: page.getByRole('rowheader', { name: '2028', exact: true }) })
   const fixed = overview(page).getByRole('row').filter({ has: page.getByRole('rowheader', { name: '2028', exact: true }) })
   for (const basis of ['Nominal', 'Real']) {
-    await results.getByRole('button', { name: new RegExp(`^${basis}`) }).click()
+    await (await prepareProfessionalTarget(results.getByRole('button', { name: new RegExp(`^${basis}`) }), results.getByRole('button', { name: new RegExp(`^${basis}`), includeHidden: true }))).click()
     await expect(final.getByRole('cell').nth(2)).toHaveText(await fixed.getByRole('cell').last().innerText())
     await expect(final.getByRole('cell').nth(2)).toContainText(basis === 'Nominal' ? '678,038' : '638,930')
   }
@@ -201,7 +203,7 @@ test('fixed #78 bands use closing CPI in real display and remain localized in Fr
     await chooseSeedAndTrials(page)
     await expect(run(page)).toContainText('4')
     await expect(run(page)).not.toContainText(/1[,.\s]?000/)
-    await run(page).click()
+    await (await prepareProfessionalTarget(run(page))).click()
     await expect(status(page)).toContainText(finished)
     await expect(bands(page).getByRole('columnheader', { name: label }).first()).toBeVisible()
     await expect(rate(page)).toContainText('4 / 4')
@@ -219,56 +221,60 @@ test('Pro authors a long Ontario solo plan and can interact with the App while t
     [/^Annual after-tax savings/, '0'], [/^TFSA$/, '190000'], [/^RRSP \/ RRIF$/, '0'],
     [/^Non-registered$/, '0'], [/^Non-registered cost base/, '0'], [/Estimated CPP\/QPP per year at 65/, '0'], [/OAS per year at 65/, '0'],
   ] as const) {
+    await prepareProfessionalTarget(fields.filter({ hasText: label }).first())
     const input = fields.filter({ hasText: label }).locator('input:visible')
-    await input.fill(value)
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill(value)
+    await (await prepareProfessionalTarget(input)).blur()
   }
   for (const [id, value] of [['earned-self', '12000'], ['rrsp-unused-undeducted-self', '0'], ['tfsa-available-room-self', '0']]) {
     const input = page.getByTestId(id)
-    await input.fill(value)
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill(value)
+    await (await prepareProfessionalTarget(input)).blur()
   }
-  await page.getByTestId('tfsa-withdrawal-add-self').click()
-  await page.getByTestId(/^tfsa-withdrawal-remove-/).click()
+  await (await prepareProfessionalTarget(page.getByTestId('tfsa-withdrawal-add-self'))).click()
+  await (await prepareProfessionalTarget(page.getByTestId(/^tfsa-withdrawal-remove-/))).click()
   const evidence = page.getByTestId('canonical-evidence')
   const showEvidence = async () => {
-    if (!(await evidence.evaluate(panel => (panel as HTMLDetailsElement).open))) await evidence.locator('summary').click()
+    await revealProfessionalEditor(page, page.locator('[data-group="advanced"]'))
+    if (!(await evidence.evaluate(panel => (panel as HTMLDetailsElement).open))) await (await prepareProfessionalTarget(evidence.locator('summary'))).press('Enter')
   }
   await showEvidence()
-  await evidence.locator('select').filter({ has: page.locator('option[value="tfsaFirst"]') }).selectOption('tfsaFirst')
+  await (await prepareProfessionalTarget(evidence.locator('select').filter({ has: page.locator('option[value="tfsaFirst"]') }))).selectOption('tfsaFirst')
   await showEvidence()
-  await page.getByTestId('canonical-no-nonreg').click()
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-no-nonreg'))).click()
   await showEvidence()
-  await page.getByTestId('canonical-working-spending').fill('11298.65')
-  await page.getByTestId('canonical-retirement-spending').fill('12000')
-  await page.getByTestId('canonical-enable').click()
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-working-spending'))).fill('11298.65')
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-retirement-spending'))).fill('12000')
+  await (await prepareProfessionalTarget(page.getByTestId('canonical-enable'))).click()
+  await showProfessionalResults(page)
   await expect(overview(page).getByRole('rowheader')).toHaveCount(28)
   await expect(volatility(page, 'legacy:account:nonReg')).toHaveCount(0)
+  await showProfessionalResults(page)
   await expect(volatility(page, 'legacy:account:tfsa')).toBeVisible()
   for (const input of await card(page).getByTestId(/^canonical-mc-volatility-/).all()) {
-    await input.fill('10')
-    await input.blur()
+    await (await prepareProfessionalTarget(input)).fill('10')
+    await (await prepareProfessionalTarget(input)).blur()
   }
 
   await chooseSeedAndTrials(page, 200)
   const nominalButton = page.getByTestId('canonical-results').getByRole('button', { name: /^Nominal/ })
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await expect(cancel(page)).toBeEnabled()
-  await nominalButton.click()
+  await (await prepareProfessionalTarget(nominalButton)).click()
   await expect(nominalButton).toHaveAttribute('aria-pressed', 'true')
   await expect(cancel(page)).toBeEnabled()
-  await cancel(page).click()
+  await (await prepareProfessionalTarget(cancel(page))).click()
   await expect(status(page)).toContainText(/Cancelled/)
   await expect(bands(page)).toHaveCount(0)
 
   await chooseSeedAndTrials(page)
-  await run(page).click()
+  await (await prepareProfessionalTarget(run(page))).click()
   await expect(counts(page)).toContainText('Requested 4')
   await expect(bands(page).getByRole('rowheader')).toHaveCount(28)
   const start = bands(page).getByRole('row').filter({ has: page.getByRole('rowheader', { name: '2026', exact: true }) })
   await expect(start.getByRole('cell').first()).toHaveText('4')
-  const p10 = await start.getByRole('cell').nth(1).innerText()
-  const p90 = await start.getByRole('cell').nth(3).innerText()
+  const p10 = await (await prepareProfessionalTarget(start.getByRole('cell').nth(1), start.getByRole('cell', { includeHidden: true }).nth(1))).innerText()
+  const p90 = await (await prepareProfessionalTarget(start.getByRole('cell').nth(3), start.getByRole('cell', { includeHidden: true }).nth(3))).innerText()
   expect(p10).not.toBe(p90)
 })
 
@@ -276,9 +282,10 @@ test('ordinary Pro results keep the legacy mode and actual legacy worker output'
   await page.goto('/')
   await chooseMode(page, 'professional')
   await expect(card(page)).toHaveCount(0)
+  await showProfessionalResults(page)
   await expect(page.locator('.summary')).toBeVisible()
   const legacyRun = page.getByRole('button', { name: 'Run 1,000 simulations' })
-  await legacyRun.click()
+  await (await prepareProfessionalTarget(legacyRun)).click()
   await expect(page.locator('.mc-rate')).toContainText('Pass rate under these model assumptions', { timeout: 45_000 })
   await expect(legacyRun).toBeEnabled()
   await expect(card(page)).toHaveCount(0)

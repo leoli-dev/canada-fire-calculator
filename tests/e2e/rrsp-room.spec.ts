@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -24,14 +25,15 @@ async function seed(page: import('@playwright/test').Page, options: { guided?: b
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 async function enterStatement(page: import('@playwright/test').Page, values: { limit?: string; unused?: string; room?: string; planned?: string }) {
   for (const [testId, value] of [['rrsp-deduction-limit-self', values.limit], ['rrsp-available-room-self', values.room],
     ['rrsp-unused-undeducted-self', values.unused], ['rrsp-planned-self', values.planned]] as const) {
     if (value === undefined) continue
-    await page.getByTestId(testId).fill(value)
-    await page.getByTestId(testId).blur()
+    await (await prepareProfessionalTarget(page.getByTestId(testId))).fill(value)
+    await (await prepareProfessionalTarget(page.getByTestId(testId))).blur()
   }
 }
 
@@ -84,7 +86,7 @@ test('guided mode records the statement and keeps it through reload and a mode s
   await page.goto('/#/guided/taxDetails/tax.rrspRoom')
   // One number on the page; the rest of the statement is advanced detail.
   await expect(page.getByTestId('rrsp-statement-self')).toBeHidden()
-  await page.getByTestId('guided-rrsp-more-self').click()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-rrsp-more-self'))).click()
   await expect(page.getByTestId('rrsp-statement-self')).toBeVisible()
   await enterStatement(page, { room: '15000', planned: '16000' })
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
@@ -150,7 +152,7 @@ test('a later deduction year is stored separately from the contribution year', a
   const baseYear = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.baseYear)
   await enterStatement(page, { room: '15000', planned: '4000' })
   await expect(page.getByTestId('rrsp-statement-self')).toContainText(`is deducted in ${baseYear}`)
-  await page.getByTestId('rrsp-deduct-later-self').check()
+  await (await prepareProfessionalTarget(page.getByTestId('rrsp-deduct-later-self'))).check()
   await expect(page.getByTestId('rrsp-statement-self')).toContainText(`is deducted in ${baseYear + 1}`)
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(saved.canonical.contributions[0].calendarYear).toBe(baseYear)

@@ -22,7 +22,7 @@ for (const [locale, width, height] of [['fr', 320, 740], ['en', 390, 844], ['zh'
     const title = page.locator('#question-title')
     for (const scroll of [100, 'bottom'] as const) {
       await page.goto(work)
-      await page.locator('.question-help summary').click()
+      await page.locator('.question-help summary').press('Enter')
       await page.evaluate(position => scrollTo(0, position === 'bottom' ? document.documentElement.scrollHeight : position), scroll)
       await page.locator('.question-pager button').last().click()
       await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'time.horizon')
@@ -35,7 +35,7 @@ for (const [locale, width, height] of [['fr', 320, 740], ['en', 390, 844], ['zh'
       await expect(title).toBeFocused()
       await expectFocusUncovered(page)
     }
-    await page.locator('.question-help summary').click()
+    await page.locator('.question-help summary').press('Enter')
     await page.evaluate(() => scrollTo(0, 100))
     const trigger = page.locator('.mobile-directory-trigger')
     await trigger.click()
@@ -83,6 +83,8 @@ for (const [locale, width, height] of [['fr', 320, 740], ['en', 390, 844], ['zh'
     await presets.first().click()
     await expect(presets.first()).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-field="fees"] input')).toHaveValue(new Intl.NumberFormat(locale).format(0.2))
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+    const widths = await page.evaluate(() => ({ viewport: innerWidth, available: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
+    expect(widths.viewport).toBe(width)
+    expect(widths.content).toBe(widths.available)
   })
 }

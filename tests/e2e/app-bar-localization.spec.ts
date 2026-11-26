@@ -21,9 +21,10 @@ test('app-bar heading retains localized desktop and tablet titles and compact ph
       const metric = await heading.evaluate(element => {
         const bounds = element.getBoundingClientRect()
         const bar = element.closest('.app-bar')!.getBoundingClientRect()
-        return { width: innerWidth, documentWidth: document.documentElement.scrollWidth, heading: bounds.toJSON(), bar: bar.toJSON(), textWidth: element.scrollWidth, availableWidth: element.clientWidth }
+        return { width: innerWidth, documentWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, heading: bounds.toJSON(), bar: bar.toJSON(), textWidth: element.scrollWidth, availableWidth: element.clientWidth }
       })
-      expect(metric.documentWidth).toBe(width)
+      expect(metric.width).toBe(width)
+      expect(metric.documentWidth).toBe(metric.clientWidth)
       expect(metric.heading.left).toBeGreaterThanOrEqual(0)
       expect(metric.heading.right).toBeLessThanOrEqual(width)
       expect(metric.textWidth).toBeLessThanOrEqual(metric.availableWidth)

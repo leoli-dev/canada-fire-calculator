@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -26,9 +27,9 @@ test('guided and professional expose the same pinned rule versions, policy and s
   const professional = page.getByTestId('rule-assumptions')
   await expect(professional).toContainText('CA-ON-tax-2026-legacy-v1')
   await expect(professional).toContainText('CA-CCB-2026-07-v1')
-  await page.getByLabel('Province').selectOption('BC')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('BC')
   await expect(professional).toContainText('CA-BC-tax-2026-legacy-v1')
-  const text = await professional.innerText()
+  const text = await (await prepareProfessionalTarget(professional)).innerText()
   const links = await professional.getByTestId('rule-sources').locator('a')
     .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   // Four tax sources, three CCB sources (amounts, thresholds and, since BE-38
@@ -67,7 +68,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   expect(text).toBe(await guided.innerText())
 
   await chooseMode(page, 'professional')
-  await page.getByLabel('Province').selectOption('MB')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('MB')
   await expect(professional).toContainText('Manitoba\'s dedicated 2026 CRA guide')
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
@@ -75,7 +76,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(guided.getByTestId('rule-sources').locator('a')).toHaveCount(11)
 
   await chooseMode(page, 'professional')
-  await page.getByLabel('Province').selectOption('NL')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('NL')
   const nlLinks = await professional.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(nlLinks[3]).toContain('t4008nl-july')
   await chooseMode(page, 'guided')
@@ -83,7 +84,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   expect(await guided.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(nlLinks)
 
   await chooseMode(page, 'professional')
-  await page.getByLabel('Province').selectOption('PE')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('PE')
   // BE-38 B3 resolved the PE conflict against the dedicated July 2026 guide:
   // the retained $142,250 is gone and the resolution is what the panel states.
   await expect(professional).toContainText('Resolved 2026-09-15')
@@ -165,7 +166,7 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   // rendered next to their links, including the words that make the citation
   // honest — the RAMQ derivation pending the 2026 Schedule K, and the bot gate
   // on the Revenu Québec rates page.
-  await page.getByLabel('Province').selectOption('QC')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('QC')
   await expect(professional.getByTestId('rule-coverage-implemented-quebec-ramq-premium')
     .locator('a').first()).toHaveAttribute('href',
     coverageFor('QC').implemented['quebec-ramq-premium'].sourceURL)
@@ -175,11 +176,11 @@ test('the credit coverage matrix is visible in both modes and claims no complete
     .toContainText('403')
   await expect(professional.getByTestId('rule-coverage-implemented-quebec-income-tax-brackets'))
     .toContainText('Ministry of Finance')
-  await page.getByLabel('Province').selectOption('ON')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('ON')
 
   // Every province must render the matrix with both directions populated.
   for (const province of ['BC', 'MB', 'PE', 'QC', 'NL', 'NU']) {
-    await page.getByLabel('Province').selectOption(province)
+    await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption(province)
     await expect(coverage, province).toHaveAttribute('data-coverage-jurisdiction', province)
     expect(Number(await coverage.getAttribute('data-coverage-implemented')), `${province} implemented`).toBeGreaterThan(5)
     expect(Number(await coverage.getAttribute('data-coverage-unsupported')), `${province} unsupported`).toBeGreaterThan(3)
@@ -198,22 +199,22 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   // qualification. Without NT/NU in this loop the guard could not reach the one
   // recorded block the territory slice left behind.
   for (const province of ['ON', 'QC', 'PE', 'BC', 'NL', 'MB', 'NT', 'NU']) {
-    await page.getByLabel('Province').selectOption(province)
+    await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption(province)
     for (const authority of renderedAuthorities(province)) {
       if (!BLOCKED_SOURCES[authority.url]) continue
       const link = professional.locator(`a[href="${authority.url}"]`)
       expect(await link.count(), `${province} ${authority.url} is rendered`).toBeGreaterThan(0)
       const marker = BLOCKED_SOURCES[authority.url].gateMarker
       const rowText = authority.rowId
-        ? await professional.getByTestId(`rule-coverage-implemented-${authority.rowId}`).innerText()
-        : await professional.getByTestId('rule-sources').innerText()
+        ? await (await prepareProfessionalTarget(professional.getByTestId(`rule-coverage-implemented-${authority.rowId}`))).innerText()
+        : await (await prepareProfessionalTarget(professional.getByTestId('rule-sources'))).innerText()
       expect(rowText, `${province} ${authority.url} must name its gate ${marker}`).toContain(marker)
       if (authority.rowId)
         await expect(professional.getByTestId(`rule-coverage-limitation-${authority.rowId}`),
           `${province} ${authority.rowId} must render its qualification`).toBeVisible()
     }
   }
-  await page.getByLabel('Province').selectOption('ON')
+  await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('ON')
 
   // Same matrix, same caveat, in guided mode.
   await chooseMode(page, 'guided')
@@ -239,10 +240,10 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
   // The Province field's label is translated, so select by the option value,
   // which is the jurisdiction code in every language.
   const provinceSelect = page.locator('select:has(option[value="QC"])')
-  await provinceSelect.selectOption('QC')
-  const caveatEn = await page.getByTestId('rule-coverage-caveat').innerText()
-  const ramqEn = await page.getByTestId('rule-coverage-limitation-quebec-ramq-premium').innerText()
-  const bracketsEn = await page.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets').innerText()
+  await (await prepareProfessionalTarget(provinceSelect)).selectOption('QC')
+  const caveatEn = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-caveat'))).innerText()
+  const ramqEn = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-limitation-quebec-ramq-premium'))).innerText()
+  const bracketsEn = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-limitation-quebec-income-tax-brackets'))).innerText()
   expect(caveatEn).toContain('does not model the GST/HST credit')
   expect(ramqEn).toContain('Schedule K')
   expect(bracketsEn).toContain('403')
@@ -252,7 +253,7 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
     await chooseMode(page, 'professional')
-    await page.locator('select:has(option[value="QC"])').selectOption('QC')
+    await (await prepareProfessionalTarget(page.locator('select:has(option[value="QC"])'))).selectOption('QC')
     const caveat = page.getByTestId('rule-coverage-caveat')
     await expect(caveat, lang).toContainText(marker)
     await expect(caveat, lang).not.toHaveText(caveatEn)
@@ -279,24 +280,24 @@ test('the two authority states and the gate label render natively in all three l
   // are in `CONTENT_VERIFIED_AUTHORITIES`, so both statuses carry the date and
   // the figures a person read. The federal brackets row is the merely-listed
   // case, so the two labels are both observable on one surface.
-  await page.locator('select:has(option[value="ON"])').selectOption('ON')
+  await (await prepareProfessionalTarget(page.locator('select:has(option[value="ON"])'))).selectOption('ON')
   const probateRow = page.getByTestId('rule-coverage-implemented-probate-and-estate-fees')
-  const en = await probateRow.innerText()
+  const en = await (await prepareProfessionalTarget(probateRow)).innerText()
   expect(en, 'ON probate must render its checked citation').toContain('content-checked 2026-09-17')
   expect(en).toContain('$15 for each $1,000')
   const bracketsRow = page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets')
-  const bracketsEn = await bracketsRow.innerText()
+  const bracketsEn = await (await prepareProfessionalTarget(bracketsRow)).innerText()
   expect(bracketsEn).toContain('listed only, content not checked')
   expect(bracketsEn, 'a merely-listed row may not claim checked figures').not.toContain('content-checked')
   // PE's own page is the round-4 blocked authority; a real navigation is the
   // only way to see its gate, and the panel must name it there.
-  await page.locator('select:has(option[value="PE"])').selectOption('PE')
+  await (await prepareProfessionalTarget(page.locator('select:has(option[value="PE"])'))).selectOption('PE')
   const peRow = page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets')
-  const peEn = await peRow.innerText()
+  const peEn = await (await prepareProfessionalTarget(peRow)).innerText()
   expect(peEn).toContain('CAPTCHA')
   expect(peEn).toContain('listed only, content not checked')
   expect(peEn).toContain('142,520')
-  const peSources = await page.getByTestId('rule-sources').innerText()
+  const peSources = await (await prepareProfessionalTarget(page.getByTestId('rule-sources'))).innerText()
   expect(peSources, 'the sources block must name the gate on the PE government link').toContain('CAPTCHA')
   for (const [lang, checked, listed, gate] of [
     ['fr', 'contenu vérifié', 'seulement citée', 'CAPTCHA'],
@@ -305,15 +306,15 @@ test('the two authority states and the gate label render natively in all three l
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
     await chooseMode(page, 'professional')
-    await page.locator('select:has(option[value="ON"])').selectOption('ON')
-    const frText = await page.getByTestId('rule-coverage-implemented-probate-and-estate-fees').innerText()
+    await (await prepareProfessionalTarget(page.locator('select:has(option[value="ON"])'))).selectOption('ON')
+    const frText = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-implemented-probate-and-estate-fees'))).innerText()
     expect(frText, `${lang} checked label`).toContain(checked)
     expect(frText, `${lang} probate row is not an English placeholder`).not.toBe(en)
-    const listedText = await page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets').innerText()
+    const listedText = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-implemented-federal-income-tax-brackets'))).innerText()
     expect(listedText, `${lang} listed label`).toContain(listed)
     expect(listedText, `${lang} listed row is not an English placeholder`).not.toBe(bracketsEn)
-    await page.locator('select:has(option[value="PE"])').selectOption('PE')
-    const peText = await page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets').innerText()
+    await (await prepareProfessionalTarget(page.locator('select:has(option[value="PE"])'))).selectOption('PE')
+    const peText = await (await prepareProfessionalTarget(page.getByTestId('rule-coverage-implemented-provincial-income-tax-brackets'))).innerText()
     expect(peText, `${lang} gate label`).toContain(gate)
     expect(peText, `${lang} PE row is not an English placeholder`).not.toBe(peEn)
   }

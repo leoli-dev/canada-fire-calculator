@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { expect, test } from '@playwright/test'
 
 /**
@@ -24,6 +25,7 @@ async function seedCouple(page: import('@playwright/test').Page, debtIncluded: b
       inputRevision: 0, resultRevision: null } }))
   }, debtIncluded)
   await page.reload()
+  await showProfessionalResults(page)
 }
 
 test('a couple with unconfirmed ownership gets the planning tools, labelled as estimates', async ({ page }) => {

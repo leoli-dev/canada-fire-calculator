@@ -1,0 +1,430 @@
+[
+  {
+    "type": "text",
+    "label": "Current age",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Target FIRE age",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Life expectancy",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "Province",
+    "testId": "",
+    "options": [
+      "ON",
+      "QC",
+      "BC",
+      "AB",
+      "MB",
+      "SK",
+      "NS",
+      "NB",
+      "PE",
+      "NL",
+      "YT",
+      "NT",
+      "NU"
+    ]
+  },
+  {
+    "type": "text",
+    "label": "Annual after-tax savings",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "Saving amount (net money to invest)You enter the amount left for investing; the two questions below settle exactly what it already takes off.",
+    "testId": "budget-mode-savings",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "Income and spendingYou enter working-period spending and the plan draws on your income. The plan does not price this option yet.",
+    "testId": "budget-mode-income",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "Yes, already included",
+    "testId": "budget-debt-yes",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "No, not included yet",
+    "testId": "budget-debt-no",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "Yes, already included",
+    "testId": "budget-tax-yes",
+    "options": []
+  },
+  {
+    "type": "radio",
+    "label": "No, not included yet",
+    "testId": "budget-tax-no",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Desired after-tax annual spending in retirement",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Housing (tax, condo fees, maintenance)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Utilities & internet",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Groceries",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Transportation",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Health (dental, vision, drugs, insurance)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Travel",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Entertainment & hobbies",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Other / one-time reserves",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Target investable assets at FIRE",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "Optimization goal",
+    "testId": "",
+    "options": [
+      "legacy",
+      "dieWithZero"
+    ]
+  },
+  {
+    "type": "select-one",
+    "label": "Inflation assumption (avg/yr)",
+    "testId": "",
+    "options": [
+      "0.015",
+      "0.021",
+      "0.03",
+      "custom"
+    ]
+  },
+  {
+    "type": "select-one",
+    "label": "Household",
+    "testId": "",
+    "options": [
+      "single",
+      "couple"
+    ]
+  },
+  {
+    "type": "checkbox",
+    "label": "Post-FIRE side income (Barista FIRE)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "checkbox",
+    "label": "Children (Canada Child Benefit)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "TFSA",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "RRSP / RRIF",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Non-registered",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "checkbox",
+    "label": "Use a locked DC pension / LIRA account",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Non-registered cost base (ACB)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Annual distributions (interest/dividends, %/yr)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Working-years marginal tax rate (%)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "TFSA",
+    "testId": "",
+    "options": [
+      "allStocks",
+      "aggressive",
+      "balanced",
+      "conservative",
+      "gic"
+    ]
+  },
+  {
+    "type": "select-one",
+    "label": "RRSP / RRIF",
+    "testId": "",
+    "options": [
+      "allStocks",
+      "aggressive",
+      "balanced",
+      "conservative",
+      "gic"
+    ]
+  },
+  {
+    "type": "select-one",
+    "label": "Non-registered",
+    "testId": "",
+    "options": [
+      "allStocks",
+      "aggressive",
+      "balanced",
+      "conservative",
+      "gic"
+    ]
+  },
+  {
+    "type": "text",
+    "label": "Investment fees (MER, %/yr)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "TFSA",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "RRSP / RRIF",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Non-registered",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "checkbox",
+    "label": "Use an FHSA (First Home Savings Account)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "CPP/QPP start age (60–70; QPP up to 72)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Estimated CPP/QPP per year at 65",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "Where this amount comes from",
+    "testId": "",
+    "options": [
+      "",
+      "manual",
+      "statement"
+    ]
+  },
+  {
+    "type": "text",
+    "label": "Age full-time work began",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Average earnings while working, as % of the YMPE cap (2026: ~$74,600)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "OAS start age (65–70)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "OAS per year at 65",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "Where this amount comes from",
+    "testId": "",
+    "options": [
+      "",
+      "manual",
+      "statement"
+    ]
+  },
+  {
+    "type": "text",
+    "label": "Years lived in Canada by 65 (from age 18)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "checkbox",
+    "label": "Employer pension (DB)",
+    "testId": "",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "You: current annual employment income (CAD)",
+    "testId": "earned-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "RRSP deduction limit (CRA statement)",
+    "testId": "rrsp-deduction-limit-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Available contribution room (CRA statement)",
+    "testId": "rrsp-available-room-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Contributions made but not yet deducted",
+    "testId": "rrsp-unused-undeducted-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Pension adjustment (PA)",
+    "testId": "rrsp-pa-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Past service pension adjustment (PSPA)",
+    "testId": "rrsp-pspa-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Pension adjustment reversal (PAR)",
+    "testId": "rrsp-par-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Planned contribution to your own RRSP this year",
+    "testId": "rrsp-planned-self",
+    "options": []
+  },
+  {
+    "type": "checkbox",
+    "label": "Deduct this contribution in a later year",
+    "testId": "rrsp-deduct-later-self",
+    "options": []
+  },
+  {
+    "type": "text",
+    "label": "Available TFSA contribution room (CRA account)",
+    "testId": "tfsa-available-room-self",
+    "options": []
+  },
+  {
+    "type": "select-one",
+    "label": "Registered account type",
+    "testId": "registered-type-legacy:account:rrsp",
+    "options": [
+      "rrsp",
+      "spousalRrsp",
+      "rrif",
+      "lif"
+    ]
+  }
+]
