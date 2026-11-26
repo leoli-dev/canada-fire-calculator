@@ -23,6 +23,8 @@
 .ui-button-link { min-height: auto; padding: 0; text-decoration: underline; }
 .ui-button-sm { min-height: var(--h-control-sm); padding: var(--s-1) var(--s-3); }
 .ui-button[hidden] { display: none; }
+.category-navigation details .ui-button { background: transparent; border-color: transparent; color: var(--ink-2); padding: 6px 7px; }
+.category-navigation details .ui-button[aria-current='page'] { background: var(--accent-tint); color: var(--accent); }
 .ui-button-label-loading { opacity: 0; }
 .ui-spinner { position: absolute; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--r-pill); animation: ui-spin 1s linear infinite; }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
@@ -85,7 +87,7 @@
   .question-page h2 { font-size: var(--fs-display-sm); }
   .field.ui-field { grid-template-columns: minmax(0, 1fr); }
   .field.ui-field .field-issue { grid-column: 1; }
-  .ui-button { min-height: var(--h-touch); }
+  .ui-button:where(:not(.ui-button-link)) { min-height: var(--h-touch); }
   .ui-field-help.ui-button { width: var(--h-touch); min-height: var(--h-touch); }
   .ui-button-primary { min-height: var(--h-touch-primary); }
   .ui-field :is(input:not([type='checkbox']):not([type='radio']), select) { min-height: var(--h-touch-primary); font-size: var(--fs-body); }

@@ -22,7 +22,7 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
       const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
         <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <Button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
+        <div>{categoryPages.map((page) => <Button variant="ghost" type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
       </details>
     })}
     <Button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</Button>

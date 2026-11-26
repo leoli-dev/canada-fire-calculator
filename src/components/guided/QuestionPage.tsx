@@ -72,7 +72,7 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
       }} className="question-number" />
     <div className="answer-actions">
       <StatusChip as="small" status={meta?.status === 'confirmed' ? 'ok' : meta?.status === 'estimated' ? 'est' : meta?.status === 'unknown' ? 'unknown' : 'info'} id={`q-${props.field}-status`}>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</StatusChip>
-      <Button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</Button>
+      <Button variant="link" type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</Button>
     </div>
     {issue && <em className="field-issue error" id={`q-${props.field}-issue`}>{t(issue.key, issue.params)}</em>}
     {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error" id={issue ? undefined : `q-${props.field}-issue`}>{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
@@ -409,7 +409,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <div className="allocation-editor">
         <p className="allocation-instruction">{t('questionnaire.allocationInstruction')}</p>
         <div className="question-pair">{accounts.map((account) => <FactNumber key={account} field={`savingsSplit.${account}`} label={`${t(account)} %`} value={Math.round(inputs.savingsSplit[account] * 100)} onValue={(value) => set({ savingsSplit: { ...inputs.savingsSplit, [account]: value / 100 } })} />)}</div>
-        <Callout variant="warn" className={`allocation-total ${isComplete ? 'complete' : 'incomplete'}`} role="status" aria-live="polite">
+        <Callout variant={isComplete ? 'info' : 'warn'} className={`allocation-total ${isComplete ? 'complete' : 'incomplete'}`} role="status" aria-live="polite">
           <strong>{t('questionnaire.allocationTotal', { total })}</strong>
           <span>{isComplete ? t('questionnaire.allocationComplete') : total < 100 ? t('questionnaire.allocationRemaining', { difference }) : t('questionnaire.allocationOver', { difference })}</span>
         </Callout>
