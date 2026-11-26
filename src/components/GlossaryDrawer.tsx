@@ -50,6 +50,7 @@ export function GlossaryDrawer() {
     <>
       <div className="drawer-backdrop" onClick={close} />
       <aside ref={panel} className="drawer" role="dialog" aria-modal="true" aria-labelledby="glossary-title" tabIndex={-1}>
+        <div className="drawer-handle" aria-hidden="true" />
         <header>
           <div className="drawer-title-row">
             {history.length > 1 && (

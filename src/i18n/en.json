@@ -68,6 +68,13 @@
       "estimates_other": "{{count}} estimates",
       "needsReview": "Needs review",
       "none": "None"
+    },
+    "annual": {
+      "view": "Annual view",
+      "year": "Year",
+      "table": "Table",
+      "previous": "Previous year",
+      "next": "Next year"
     }
   },
   "title": "🇨🇦 Canada FIRE Calculator",

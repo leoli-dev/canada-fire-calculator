@@ -1,3 +1,4 @@
+import { showAnnualTable } from './fixtures/annual-sheet'
 import { prepareProfessionalTarget, revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
@@ -48,6 +49,7 @@ async function storeState(page: Page) {
 async function openSheet(page: Page) {
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener(page))).click()
+  await showAnnualTable(page)
   const sheet = page.getByRole('dialog', { name: 'Canonical annual ledger' })
   await expect(sheet).toBeVisible()
   return sheet
@@ -384,6 +386,7 @@ for (const locale of [
     await expect(sheet).toHaveAccessibleDescription(locale.deterministic)
     await expect(close).toBeFocused()
     await expect(close).toBeInViewport({ ratio: 1 })
+    await showAnnualTable(page)
     await expect(sheet.getByRole('columnheader')).toHaveText([locale.item, '2026', '2027', '2028'])
     await expect(cell(sheet, 2028, 'value', 'estate')).toContainText(cad(158_070, locale.language))
     for (const key of ['Shift+Tab', 'Tab', 'Tab']) {
@@ -405,6 +408,7 @@ test('S1 uses its pinned stored-plan values and known annual limitations with no
   await expect(summary).toContainText("First shortfall at age 59: CA$473")
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener(page))).click()
+  await showAnnualTable(page)
   const sheet = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(sheet).toHaveAccessibleDescription(/Salary, working-year living expenses and working-year tax are not modeled/)
   const netWorth = sheet.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Closing net worth', exact: true }) })
@@ -430,6 +434,7 @@ test('a pre-v11 default plan migrates without opt-in and keeps the same S1 summa
   expect(migrated.canonical.deterministicProjection).toBeUndefined()
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener(page))).click()
+  await showAnnualTable(page)
   const sheet = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(sheet).toHaveAccessibleDescription(/Salary, working-year living expenses and working-year tax are not modeled/)
   const netWorth = sheet.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Closing net worth', exact: true }) })
