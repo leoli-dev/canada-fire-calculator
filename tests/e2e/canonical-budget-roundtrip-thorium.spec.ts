@@ -10,10 +10,10 @@ test.use({ browserName: 'chromium', launchOptions: { executablePath } })
 test.skip(!existsSync(executablePath), 'This suite requires the Thorium executable')
 
 const state = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
-const results = (page: Page) => page.getByTestId('canonical-results')
+const results = (page: Page) => page.locator('#results-overview').getByTestId('canonical-results')
 const budget = (page: Page) => page.getByTestId('budget-method')
 const priorWorking = (page: Page) => budget(page).getByTestId('budget-working-spending').locator('input')
-const annual = (page: Page) => page.getByRole('button', { name: 'Annual financial details', exact: true })
+const annual = (page: Page) => page.locator('#results-overview').getByRole('button', { name: 'Annual financial details', exact: true })
 const scenario = (page: Page) => page.locator('details:not(.professional-group)').filter({ has: page.getByRole('heading', { name: 'Scenario comparison', includeHidden: true }) })
 
 async function openEvidence(page: Page) {
@@ -34,7 +34,7 @@ async function record(page: Page, working: string, retirement: string) {
 async function disable(page: Page) {
   await openEvidence(page)
   await (await prepareProfessionalTarget(page.getByTestId('canonical-disable'))).click()
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
 }
 
 async function professional(page: Page) {

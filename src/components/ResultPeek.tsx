@@ -2,6 +2,7 @@ import { Button, Callout, StatusChip } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { Inputs, ProjectionResult } from '../engine'
 import { headlineVerdict } from './ResultsPanel'
+import { focusResultTarget } from './ResultsNavigation'
 
 /**
  * FE-48: on a phone the professional form is several screens long and the
@@ -17,9 +18,7 @@ export function ResultPeek(props: { inputs: Inputs; result: ProjectionResult; es
       props.onOpen?.()
       requestAnimationFrame(() => {
         const results = document.getElementById('results')
-        if (props.onOpen && results) results.scrollTop = 0
-        results?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        results?.focus({ preventScroll: true })
+        if (results) focusResultTarget(results)
       })
     }}>{t('resultPeekJump')}</Button>
   </Callout>

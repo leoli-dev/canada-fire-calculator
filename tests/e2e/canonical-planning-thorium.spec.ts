@@ -18,8 +18,8 @@ const age = (page: Page) => planning(page).getByTestId('planning-retirement-age'
 const spending = (page: Page) => planning(page).getByTestId('planning-retirement-spending')
 const replay = (page: Page) => planning(page).getByTestId('planning-evaluate')
 const outcomes = (page: Page) => planning(page).getByTestId('planning-outcome')
-const source = (page: Page) => page.locator('#results > [data-testid="canonical-results"]')
-const sourceSheet = (page: Page) => page.getByRole('button', { name: 'Annual financial details', exact: true })
+const source = (page: Page) => page.locator('#results-overview > [data-testid="canonical-results"]')
+const sourceSheet = (page: Page) => page.locator('#results-overview').getByRole('button', { name: 'Annual financial details', exact: true })
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Canonical annual ledger' })
 const cad = (amount: number, decimals = 2) => new Intl.NumberFormat('en', {
   style: 'currency', currency: 'CAD', minimumFractionDigits: decimals, maximumFractionDigits: decimals,

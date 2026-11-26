@@ -1,4 +1,4 @@
-import { Field, Button } from '../ui'
+import { Field, Button, Disclosure } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Inputs } from '../engine'
@@ -74,7 +74,7 @@ function CanonicalPlanningDraft({ inputs, plan, nonRegAbsent, revision, entryMod
     {limited && outcomes.length >= CANONICAL_PLANNING_LIMIT && <p role="status" data-testid="planning-limit">{t('planning.status.search-limit')}</p>}
     {outcomes.map((outcome, index) => {
       const model = outcome.result?.coverage ? canonicalAnnualSheet(outcome.result.coverage, { scenarioId: `candidate-${index}`, revision }) : null
-      return <details key={index} open={index === outcomes.length - 1} data-testid="planning-outcome" data-status={outcome.status}>
+      return <Disclosure key={index} open={index === outcomes.length - 1} data-testid="planning-outcome" data-status={outcome.status}>
         <summary>{t('planning.candidate', { index: index + 1 })}: {t(`planning.status.${outcome.status}`)}</summary>
         <p>{t('planning.facts', { age: Number.isFinite(outcome.candidate.retirementAge) ? outcome.candidate.retirementAge : '—',
           year: self && Number.isFinite(outcome.candidate.retirementAge) ? plan.baseYear + outcome.candidate.retirementAge - self.ageInBaseYear : '—',
@@ -85,7 +85,7 @@ function CanonicalPlanningDraft({ inputs, plan, nonRegAbsent, revision, entryMod
         {!!outcome.eventGapYears.length && <p>{t('planning.eventGaps', { years: outcome.eventGapYears.join(', ') })}</p>}
         {outcome.result && <CanonicalResults result={outcome.result} model={model} />}
         {model && <Button type="button" data-testid="planning-sheet" onClick={() => { if (current()) setSheet(index) }}>{t('planning.sheet')}</Button>}
-      </details>
+      </Disclosure>
     })}
     {sheetModel && <AnnualSheetDialog open={true} model={sheetModel} moneyMode={moneyMode} onClose={() => setSheet(null)} />}
   </section>

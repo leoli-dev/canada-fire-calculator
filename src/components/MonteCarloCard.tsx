@@ -144,7 +144,7 @@ export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; r
           ) : (
             <p className="hint">{t('mcNoFail', { n: mc.trials })}</p>
           )}
-          <ResponsiveContainer width="100%" height={280}>
+          <div className="chart-plot"><ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
               <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" strokeOpacity={0.4} />
               <XAxis stroke={COLORS.axis} dataKey="age" type="number" allowDecimals={false}
@@ -174,7 +174,8 @@ export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; r
                 <Line dataKey="worst" stroke={COLORS.mcWorst} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name={t('mcWorst')} connectNulls />
               )}
             </ComposedChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></div>
+          <p className="chart-currency">{t('ui.results.currency')}</p>
           <p className="hint"><Jargon text={t('mcNote')} /></p>
         </>
       )}

@@ -35,6 +35,7 @@ import { CanonicalPlanningTool } from './components/CanonicalPlanningTool'
 import { selectDeterministicResult } from './deterministicResult'
 import { canonicalAnnualSheet } from './canonicalAnnualSheet'
 import { PersonTaxTable } from './components/PersonTaxTable'
+import { focusResultTarget, ResultSection, ResultsNavigation, type ResultSectionId } from './components/ResultsNavigation'
 
 /** Precision reasons the pooled household tools do not depend on. */
 const POOLED_IGNORES = new Set(['ownershipUnknown', 'recipientUnknown'])
@@ -87,8 +88,7 @@ export default function App() {
     switchPane('results')
     requestAnimationFrame(() => {
       const pane = document.getElementById('results')
-      if (pane) pane.scrollTop = 0
-      pane?.focus({ preventScroll: true })
+      if (pane) focusResultTarget(pane)
     })
   }
   useEffect(() => {
@@ -133,6 +133,12 @@ export default function App() {
   const coupleTools = !!inputs.partner && !singleLegacyPreview && !!precision &&
     precision.reasons.every((reason) => POOLED_IGNORES.has(reason))
   const planningTools = (!precisionBlocked && !taxBlocked && oldSingleTools) || coupleTools
+  const legacySections: ResultSectionId[] = [
+    'overview', 'balances', 'income', 'benefits',
+    ...(!precisionBlocked && !taxBlocked && (canonical || oldSingleTools) ? ['tax'] as const : []),
+    ...(planningTools ? ['strategies', 'risk'] as const : []),
+    'scenarios',
+  ]
   const annualModel = useMemo(() => annualOpen && result ? legacyAnnualSheet(result, inputs, {
     scenarioId: 'current', revision: inputRevision,
     disclosures: [
@@ -219,15 +225,23 @@ export default function App() {
         </aside>
         {professional && !canonicalResult && !(result && !hasBlockingIssues) && <section className="professional-results-unavailable" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}><p role="status">{t('ui.professional.unavailable')}</p></section>}
         {canonicalResult && <section className="results-column" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}>
+          <ResultsNavigation sections={['overview', ...(canonical ? ['strategies', 'risk'] as const : []), 'scenarios']} annualAction={canonicalResult.coverage ? () => setAnnualToken({ revision: inputRevision, result: selected, entryMode }) : undefined} />
+          <div className="results-content">
+          <ResultSection id="overview">
           <CanonicalResults result={canonicalResult} model={canonicalModel} />
           <div className="mobile-results-disclaimer"><CompactDisclaimer /></div>
           {canonicalResult.coverage && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>
           {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
-          {canonical && <CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
-          {canonical && <CanonicalMonteCarloCard inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
-          <ScenarioCard />
+          </ResultSection>
+          {canonical && <ResultSection id="strategies"><CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} /></ResultSection>}
+          {canonical && <ResultSection id="risk"><CanonicalMonteCarloCard inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} /></ResultSection>}
+          <ResultSection id="scenarios"><ScenarioCard /></ResultSection>
+          </div>
         </section>}
         {result && !hasBlockingIssues && <section className="results-column" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}>
+          <ResultsNavigation sections={legacySections} annualAction={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })} />
+          <div className="results-content">
+          <ResultSection id="overview">
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             annualAction={<Button size="sm" type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
@@ -239,6 +253,8 @@ export default function App() {
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}
           {coupleTools && <p role="status" className="hint" data-testid="couple-tools-estimate">{t('coupleToolsEstimate')}</p>}
           {planningTools && <WithdrawalOrderCard inputs={inputs} />}
+          </ResultSection>
+          <ResultSection id="balances">
           <ProjectionChart
             result={result}
             fireAge={inputs.fireAge}
@@ -254,20 +270,21 @@ export default function App() {
               {t('nominalNote', { pct: (inflation * 100).toFixed(1) })}
             </p>
           )}
-          <IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} />
+          </ResultSection>
+          <ResultSection id="income"><IncomeChart result={result} fireAge={inputs.fireAge} scale={scale} /></ResultSection>
           {/* BE-26 A: the GIS/Allowance household row is stated, not implied. */}
-          <BenefitCategoryPanel inputs={inputs} result={result} />
-          {!precisionBlocked && <>
+          <ResultSection id="benefits"><BenefitCategoryPanel inputs={inputs} result={result} /></ResultSection>
+          {!precisionBlocked && <ResultSection id="tax">
           {!taxBlocked && canonical && <PersonTaxTable plan={canonical} result={result} />}
           {!taxBlocked && oldSingleTools && <TaxChart result={result} inputs={inputs} scale={scale} />}
           {!taxBlocked && oldSingleTools && <YearTable result={result} inputs={inputs} />}
           {oldSingleTools && result.taxCapability?.status === 'person' && <p className="hint">{t('be11AuxiliaryEstimate')}</p>}
-          </>}
-          {planningTools && <StrategyCard inputs={inputs} />}
-          {planningTools && <TimingCard inputs={inputs} />}
-          {planningTools && <MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
-            inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} />}
-          <ScenarioCard />
+          </ResultSection>}
+          {planningTools && <ResultSection id="strategies"><StrategyCard inputs={inputs} /><TimingCard inputs={inputs} /></ResultSection>}
+          {planningTools && <ResultSection id="risk"><MonteCarloCard key={`${entryMode}:${inputRevision}:${MC_RULE_VERSION}`} inputs={inputs}
+            inputRevision={inputRevision} ruleVersion={MC_RULE_VERSION} scale={scale} /></ResultSection>}
+          <ResultSection id="scenarios"><ScenarioCard /></ResultSection>
+          </div>
         </section>}
       </main>
       {!professional && planFooter}

@@ -2,6 +2,7 @@
 @import './styles/tokens.css';
 @import './styles/review-conclusion.css';
 @import './styles/professional.css';
+@import './styles/results.css';
 @layer primitives, legacy;
 
 /* Existing screen geometry stays in a compatibility layer while primitives own control styles. */

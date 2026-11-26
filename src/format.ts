@@ -11,12 +11,13 @@ export function useCad(fractionDigits = 0) {
   return (v: number) => fmt.format(v)
 }
 
-/** Compact axis-tick formatter: CA$6M, CA$150K — keeps charts readable on mobile. */
+/** CAD is stated once below each chart; use the narrow symbol on compact axes. */
 export function useCadCompact() {
   const { i18n } = useTranslation()
   const fmt = new Intl.NumberFormat(i18n.language, {
     style: 'currency',
     currency: 'CAD',
+    currencyDisplay: 'narrowSymbol',
     notation: 'compact',
     maximumFractionDigits: 1,
   })
