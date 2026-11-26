@@ -23,9 +23,9 @@ import type { ReactNode } from 'react'
 type Mode = 'last' | 'when' | 'number' | 'target'
 const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
 
-function ConclusionVerdict({ children, tone, testId, statusLabel, statusTone = tone }: { children: ReactNode; tone: 'ok' | 'bad' | 'uncertain'; testId?: string; statusLabel?: string; statusTone?: 'ok' | 'bad' | 'uncertain' }) {
+function ConclusionVerdict({ children, tone, testId, statusLabel }: { children: ReactNode; tone: 'ok' | 'bad' | 'uncertain'; testId?: string; statusLabel?: string }) {
   const { t } = useTranslation()
-  return <div className="conclusion-heading"><StatusChip status={statusTone === 'uncertain' ? 'est' : statusTone}>{statusLabel ?? t(`ui.conclusion.${statusTone}`)}</StatusChip><p className={`verdict${tone === 'bad' ? ' verdict-bad' : ''}`} data-testid={testId}>{children}</p></div>
+  return <div className="conclusion-heading"><StatusChip status={tone === 'uncertain' ? 'est' : tone}>{statusLabel ?? t(`ui.conclusion.${tone}`)}</StatusChip><p className={`verdict${tone === 'bad' ? ' verdict-bad' : ''}`} data-testid={testId}>{children}</p></div>
 }
 
 function ConclusionMetrics({ items }: { items: readonly (readonly [string, ReactNode])[] }) {
@@ -358,7 +358,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           {!goal && <><StatusChip status="est">{t('ui.conclusion.uncertain')}</StatusChip><p className="hint">{t('targetUnset')}</p></>}
           {goal?.status === 'unsupported' && <ConclusionVerdict tone="uncertain">{quickEstimateMessage}</ConclusionVerdict>}
           {goal?.status === 'supported' && (
-            <ConclusionVerdict tone={!ok ? 'bad' : resultUnverified ? 'uncertain' : 'ok'} statusTone={resultUnverified ? 'uncertain' : undefined}
+            <ConclusionVerdict tone={!ok ? 'bad' : resultUnverified ? 'uncertain' : 'ok'}
               statusLabel={!resultUnverified && ok ? t('ui.conclusion.targetReached') : undefined}>
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge
                 ? t('targetReachedEarly', {

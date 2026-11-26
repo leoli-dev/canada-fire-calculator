@@ -10,7 +10,7 @@ import { ResultsPanel } from '../ResultsPanel'
 const solvers = vi.hoisted(() => ({
   earliest: { status: 'solved', value: 52 },
   number: { status: 'solved', value: 900000, assumptions: [] },
-  target: { status: 'supported', assetsAtFire: 650000, reachedAge: 55 },
+  target: { status: 'supported', assetsAtFire: 650000, reachedAge: 55 as number | null },
 }))
 vi.mock('../../engine', async importOriginal => ({
   ...await importOriginal<typeof import('../../engine')>(),
@@ -95,13 +95,29 @@ it.each([true, false])('keeps a reached accumulation target distinct from sustai
   expect(values()).toEqual(['CA$750,000', 'CA$650,000', '40'])
 })
 
-it('keeps an uncertain late target and an unsupported target labelled Needs checks without changing their facts', async () => {
-  const view = render(<ResultsPanel inputs={inputs} result={result} taxWarning />)
+it('keeps an unsupported target labelled Needs checks without reporting computed metrics', async () => {
+  solvers.target.status = 'unsupported'
+  render(<ResultsPanel inputs={inputs} result={result} taxWarning />)
   await userEvent.click(screen.getByRole('tab', { name: 'Will I hit my target?' }))
   expect(document.querySelector('.conclusion-heading .ui-status')?.textContent).toBe('Needs checks')
-  expect(values()).toEqual(['CA$750,000', 'CA$650,000', '55'])
-  solvers.target.status = 'unsupported'
-  view.rerender(<ResultsPanel inputs={{ ...inputs }} result={result} taxWarning />)
-  expect(document.querySelector('.conclusion-heading .ui-status')?.textContent).toBe('Needs checks')
   expect(values()).toEqual(['Not computed', 'Not computed', 'Not computed'])
+})
+
+it.each([
+  { uncertainty: 'tax', reachedAge: 55 }, { uncertainty: 'tax', reachedAge: null },
+  { uncertainty: 'locked', reachedAge: 55 }, { uncertainty: 'locked', reachedAge: null },
+])('keeps definite target failure prominent with $uncertainty uncertainty and reached age $reachedAge', async ({ uncertainty, reachedAge }) => {
+  solvers.target.reachedAge = reachedAge
+  const targetInputs = uncertainty === 'locked' ? { ...inputs, lockedRetirement: { balance: 300000, employeeContribution: 0, employerContribution: 0, accessibleAge: 55, jurisdiction: 'ON' as const, owner: 'self' as const } } : inputs
+  render(<ResultsPanel inputs={targetInputs} result={result} taxWarning={uncertainty === 'tax'} />)
+  await userEvent.click(screen.getByRole('tab', { name: 'Will I hit my target?' }))
+  const chip = document.querySelector('.conclusion-heading .ui-status')!
+  expect(chip.textContent).toBe('Shortfall')
+  expect(chip.classList.contains('ui-status-bad')).toBe(true)
+  expect(chip.classList.contains('ui-status-est')).toBe(false)
+  expect(document.querySelector('.summary')?.className).toContain('uncertain bad')
+  expect(document.querySelector('.verdict')?.classList.contains('verdict-bad')).toBe(true)
+  expect(document.querySelector('.verdict')?.textContent).toContain(reachedAge === null ? 'never reached' : 'Short:')
+  expect(values()).toEqual(reachedAge === null ? ['CA$750,000', 'Not computed', 'Not computed'] : ['CA$750,000', 'CA$650,000', '55'])
+  if (uncertainty === 'locked') expect(document.querySelector('.summary')?.textContent).toContain('LIF limits and transfer rules have not been verified')
 })
