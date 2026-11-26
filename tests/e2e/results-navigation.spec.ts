@@ -223,6 +223,60 @@ test('clamped anchor jumps retain the focused destination until actual scrolling
   }
 })
 
+test('manual scroll end selects Scenarios while an explicit clamped Strategies destination wins at the same offset', async ({ page }) => {
+  for (const [mode, width] of [['guided', 1440], ['guided', 390], ['professional', 1440], ['professional', 1099], ['professional', 390]] as const) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await seed(page, mode)
+    const nav = page.locator('.results-navigation')
+    const scenarios = nav.locator('[href="#results-scenarios"]')
+    const strategies = nav.locator('[href="#results-strategies"]')
+    await nav.locator('[href="#results-income"]').click()
+    const end = () => page.evaluate(() => {
+      const pane = document.getElementById('results')!
+      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollTo({ top: pane.scrollHeight, behavior: 'instant' })
+      else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+    })
+    const position = () => page.evaluate(() => {
+      const pane = document.getElementById('results')!
+      const root = getComputedStyle(pane).overflowY === 'auto' ? pane : document.documentElement
+      return { offset: root.scrollTop, max: root.scrollHeight - root.clientHeight }
+    })
+    await end()
+    await expect(scenarios).toHaveAttribute('aria-current', 'true')
+    const bottom = await position()
+    expect(bottom.offset).toBeCloseTo(bottom.max, 0)
+    await strategies.click()
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await expect(page.locator('#results-strategies')).toBeFocused()
+    await expect(strategies).toHaveAttribute('aria-current', 'true')
+    // These four ordinary layouts clamp Strategies at the same offset as manual end.
+    if (mode === 'professional' || width === 1440) expect((await position()).offset).toBe(bottom.offset)
+    await page.evaluate(() => {
+      const pane = document.getElementById('results')!
+      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, -80)
+      else window.scrollBy(0, -80)
+    })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    await end()
+    await expect(scenarios).toHaveAttribute('aria-current', 'true')
+  }
+})
+
+test('fitting pane and document layouts keep Overview current without a manual scroll end', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 6000 })
+  for (const mode of ['guided', 'professional'] as const) {
+    await seed(page, mode)
+    const geometry = await page.evaluate(() => {
+      const pane = document.getElementById('results')!
+      const root = getComputedStyle(pane).overflowY === 'auto' ? pane : document.documentElement
+      return { offset: root.scrollTop, max: root.scrollHeight - root.clientHeight }
+    })
+    expect(geometry.offset).toBe(0)
+    expect(geometry.max).toBeLessThanOrEqual(0)
+    await expect(page.locator('.results-navigation a[href="#results-overview"]')).toHaveAttribute('aria-current', 'true')
+  }
+})
+
 test('Guided phone legend tab stops clear both sticky UI edges including safe-area sized insets', async ({ page }) => {
   for (const inset of [false, true]) {
     await page.setViewportSize({ width: inset ? 320 : 390, height: inset ? 740 : 844 })

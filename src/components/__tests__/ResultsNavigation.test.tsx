@@ -53,6 +53,44 @@ it('uses the viewport for document-scrolling Guided results and only renders sup
   expect(screen.getAllByRole('link')).toHaveLength(2)
 })
 
+it.each(['pane', 'document'])('selects the last applicable section at a manual %s scroll end, but not in a no-scroll layout', async kind => {
+  vi.stubGlobal('IntersectionObserver', class {
+    observe() {}
+    disconnect() {}
+  })
+  const container = document.createElement('section')
+  container.id = 'results'
+  if (kind === 'pane') container.style.overflowY = 'auto'
+  document.body.append(container)
+  const root = kind === 'pane' ? container : document.documentElement
+  const scrollTarget = kind === 'pane' ? container : window
+  const height = kind === 'pane' ? 300 : innerHeight
+  let offset = 0, totalHeight = height + 100
+  vi.spyOn(root, 'clientHeight', 'get').mockReturnValue(height)
+  vi.spyOn(root, 'scrollHeight', 'get').mockImplementation(() => totalHeight)
+  vi.spyOn(root, 'scrollTop', 'get').mockImplementation(() => offset)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) { return new DOMRect(0, this.id === 'results-benefits' ? 200 : 0, 100, 100) })
+  render(<><ResultsNavigation sections={['overview', 'benefits']} /><ResultSection id="overview">Conclusion</ResultSection><ResultSection id="benefits">Last applicable section</ResultSection></>, { container })
+  const overview = screen.getByRole('link', { name: 'Overview' }), last = screen.getByRole('link', { name: 'Benefits' })
+  expect(overview.getAttribute('aria-current')).toBe('true')
+  offset = 100
+  act(() => scrollTarget.dispatchEvent(new Event('scroll')))
+  await waitFor(() => expect(last.getAttribute('aria-current')).toBe('true'))
+  // Even one pixel of overflow requires actual movement before end selection applies.
+  offset = 0
+  totalHeight = height + 1
+  act(() => scrollTarget.dispatchEvent(new Event('scroll')))
+  await waitFor(() => expect(overview.getAttribute('aria-current')).toBe('true'))
+  offset = 1
+  act(() => scrollTarget.dispatchEvent(new Event('scroll')))
+  await waitFor(() => expect(last.getAttribute('aria-current')).toBe('true'))
+  // A fitting document/pane is not a manual arrival at the last section.
+  offset = 0
+  totalHeight = height - 20
+  act(() => scrollTarget.dispatchEvent(new Event('scroll')))
+  await waitFor(() => expect(overview.getAttribute('aria-current')).toBe('true'))
+})
+
 it('toggles individual series with native button keyboard controls and retains their labels and colors', async () => {
   function Legend() {
     const state = useChartSeries()

@@ -36,6 +36,34 @@ const retired = (page: Page) => page.getByTestId('canonical-retirement-spending'
 const record = (page: Page) => page.getByTestId('canonical-enable')
 const disable = (page: Page) => page.getByTestId('canonical-disable')
 
+test('global canonical absence guards detect hidden results and coverage outside Overview', async ({ page }) => {
+  await seed(page, 'no-opt-in')
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
+  await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0)
+  await page.evaluate(() => {
+    const stray = document.createElement('aside')
+    stray.id = 'stray-canonical-absence-probe'
+    stray.hidden = true
+    stray.innerHTML = '<section data-testid="canonical-results"><table data-testid="canonical-coverage-table"></table></section>'
+    document.body.append(stray)
+  })
+  try {
+    // Contrast only: Overview cannot detect this deliberate stray; the actual guards below are page-wide.
+    await expect(results(page)).toHaveCount(0)
+    await expect(overview(page)).toHaveCount(0)
+    await expect(page.getByTestId('canonical-results')).toHaveCount(1)
+    await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(1)
+    const resultRejection = await expect(page.getByTestId('canonical-results')).toHaveCount(0, { timeout: 100 }).then(() => null, error => error)
+    const coverageRejection = await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0, { timeout: 100 }).then(() => null, error => error)
+    expect(resultRejection, 'A hidden canonical result outside Overview must fail the document-wide absence guard').not.toBeNull()
+    expect(coverageRejection, 'Hidden coverage outside Overview must fail the document-wide absence guard').not.toBeNull()
+  } finally {
+    await page.evaluate(() => document.getElementById('stray-canonical-absence-probe')?.remove())
+  }
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
+  await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0)
+})
+
 async function showEvidence(page: Page) {
   await revealProfessionalEditor(page, page.locator('[data-group="advanced"]'))
   if (!(await evidence(page).locator('summary').evaluate(summary => (summary.parentElement as HTMLDetailsElement).open)))
@@ -180,7 +208,7 @@ test('preflight refusal keeps the selected route and reports the first year and 
   await seed(page, 'unsupported-province')
   await expect(page.getByTestId('canonical-blocked-year')).toContainText('2026')
   await expect(page.getByTestId('canonical-uncomputed')).toContainText(/2027.*2028/)
-  await expect(overview(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
   await expectNoLegacyResults(page)
 })
@@ -193,7 +221,7 @@ test('an invalid empty horizon has no reversed interval, blocked year or result 
   await expect(results(page)).not.toContainText(/2026\s*[–-]\s*2025/)
   await expect(page.getByTestId('canonical-blocked-year')).toHaveCount(0)
   await expect(page.getByTestId('canonical-uncomputed')).toHaveCount(0)
-  await expect(overview(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0)
   await expect(page.getByTestId('canonical-estate')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
 })
@@ -210,7 +238,7 @@ test('Guide regenerates the persisted household ledger after revision and restor
   const generate = page.getByRole('button', { name: 'Generate my results' })
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
   await expect(generate, 'recorded Guide answers make this household ready for review').toBeEnabled()
   await (await prepareProfessionalTarget(generate)).click()
   await expect(results(page)).toContainText(summaryCad(158_070))
@@ -223,7 +251,7 @@ test('Guide regenerates the persisted household ledger after revision and restor
   await (await prepareProfessionalTarget(page.getByLabel('Current age', { exact: true }))).fill('56')
   await (await prepareProfessionalTarget(page.getByLabel('Current age', { exact: true }))).blur()
   await page.goto('/#/guided/results')
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })).toHaveCount(0)
   expect((await storeState(page)).resultRevision).toBeNull()
   // A legacy-facing edit to the restored household asks the user to review
@@ -322,7 +350,7 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
   await expect(working(page)).toHaveValue('')
   await expect(retired(page)).toHaveValue('')
   await expect(record(page)).toBeDisabled()
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
 
   const fillBudgets = async () => {
     await (await prepareProfessionalTarget(working(page))).fill('11298.65')
@@ -334,7 +362,7 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
   // for this calculation. Ordinary legacy inputs do not establish that fact.
   await fillBudgets()
   await expect(page.getByTestId('canonical-blocked-year')).toContainText('2026')
-  await expect(overview(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-coverage-table')).toHaveCount(0)
   await showEvidence(page)
   await (await prepareProfessionalTarget(page.getByTestId('canonical-no-nonreg'))).click()
   await showEvidence(page)
@@ -403,7 +431,7 @@ for (const locale of [
 
 test('S1 uses its pinned stored-plan values and known annual limitations with no opt-in', async ({ page }) => {
   await seed(page, 'no-opt-in')
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
   const summary = page.locator('.results-column .summary').first()
   await expect(summary).toContainText('Final net worth: CA$638,880')
   await expect(summary).toContainText("First shortfall at age 59: CA$473")
@@ -430,7 +458,7 @@ test('a pre-v11 default plan migrates without opt-in and keeps the same S1 summa
   })
   await page.reload()
   await expect(summary).toContainText('Final net worth: CA$601,940')
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
   const migrated = await storeState(page)
   expect(migrated.canonical.deterministicProjection).toBeUndefined()
   await showProfessionalResults(page)

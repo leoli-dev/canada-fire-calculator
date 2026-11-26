@@ -69,7 +69,11 @@ export function ResultsNavigation({ sections, annualAction }: { sections: Result
           return
         }
         destination.current = null
-        const current = targets.filter(target => target.getBoundingClientRect().top <= line + 1).at(-1) ?? targets[0]
+        const maxScroll = scrollElement.scrollHeight - scrollElement.clientHeight
+        // A manual scroll can expose the final short section without bringing it to the reading line.
+        // No-scroll layouts keep normal reading-line selection, and a valid explicit pin already won above.
+        const atEnd = maxScroll > 0 && scrollElement.scrollTop > 0 && scrollElement.scrollTop >= maxScroll - 1
+        const current = atEnd ? targets.at(-1) : targets.filter(target => target.getBoundingClientRect().top <= line + 1).at(-1) ?? targets[0]
         if (current) setActive(current.dataset.resultSection as ResultSectionId)
       }
       function schedule() { if (!frame) frame = requestAnimationFrame(sample) }

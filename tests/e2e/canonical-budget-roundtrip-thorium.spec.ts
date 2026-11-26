@@ -34,7 +34,7 @@ async function record(page: Page, working: string, retirement: string) {
 async function disable(page: Page) {
   await openEvidence(page)
   await (await prepareProfessionalTarget(page.getByTestId('canonical-disable'))).click()
-  await expect(results(page)).toHaveCount(0)
+  await expect(page.getByTestId('canonical-results')).toHaveCount(0)
 }
 
 async function professional(page: Page) {
