@@ -76,6 +76,21 @@
       "previous": "Previous year",
       "next": "Next year",
       "scope": "Scope and limitations"
+    },
+    "results": {
+      "navigation": "Result sections",
+      "overview": "Overview",
+      "balances": "Balances",
+      "income": "Income",
+      "benefits": "Benefits",
+      "tax": "Tax",
+      "strategies": "Strategies",
+      "risk": "Risk",
+      "scenarios": "Scenarios",
+      "annual": "Annual financial details",
+      "series": "Series for {{title}}",
+      "currency": "Amounts in Canadian dollars (CAD).",
+      "unfunded": "Unfunded from {{age}}"
     }
   },
   "title": "🇨🇦 Canada FIRE Calculator",

@@ -1,4 +1,4 @@
-import { Segmented, Button } from '../ui'
+import { Segmented, Button, Disclosure } from '../ui'
 import { annualSheetText, type AnnualSheetModel } from '../annualSheet'
 import { canonicalStopText } from '../canonicalAnnualSheet'
 import { useTranslation } from 'react-i18next'
@@ -24,7 +24,7 @@ export function CanonicalResults({ result, model }: { result: CanonicalDetermini
     <p>{t('canonical.limitations')}</p>
     {!!result.validationIssues?.length && <div role="alert" data-testid="canonical-validation-errors"><p>{t('canonical.invalidFields')}</p>
       <ul>{result.validationIssues.map((issue, index) => <li key={index}>{t(issue.key, issue.params)}</li>)}</ul></div>}
-    {model && <details><summary>{t('canonical.coverage')}</summary><p>{annualSheetText(model.scope, i18n.language)}</p></details>}
+    {model && <Disclosure><summary>{t('canonical.coverage')}</summary><p>{annualSheetText(model.scope, i18n.language)}</p></Disclosure>}
     {blockedYear !== null && <p data-testid="canonical-blocked-year">{t('canonical.blockedYear', { year: blockedYear })}</p>}
     {!!uncomputed.length && <p data-testid="canonical-uncomputed">{t('canonical.uncomputed', { years: uncomputed.join(', ') })}</p>}
     {result.issues.length > 0 && <div role="alert"><p>{t(result.issues.some(i => i.detail === 'deterministic-spending-reconfirmation-required') ? 'canonical.reconfirm' : 'canonical.stopReason')}</p>

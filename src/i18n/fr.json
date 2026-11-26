@@ -76,6 +76,21 @@
       "previous": "Année précédente",
       "next": "Année suivante",
       "scope": "Portée et limites"
+    },
+    "results": {
+      "navigation": "Sections des résultats",
+      "overview": "Aperçu",
+      "balances": "Soldes",
+      "income": "Revenu",
+      "benefits": "Prestations",
+      "tax": "Impôt",
+      "strategies": "Stratégies",
+      "risk": "Risque",
+      "scenarios": "Scénarios",
+      "annual": "Détails financiers annuels",
+      "series": "Séries pour {{title}}",
+      "currency": "Montants en dollars canadiens (CAD).",
+      "unfunded": "Non financé dès {{age}} ans"
     }
   },
   "title": "🇨🇦 Calculateur FIRE Canada",
