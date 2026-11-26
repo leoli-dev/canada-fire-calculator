@@ -37,6 +37,13 @@
 .field.ui-field:has(input[type='checkbox']) { grid-template-columns: minmax(0, 1fr) auto; }
 .field.ui-field .field-issue { grid-column: 2; }
 .field.ui-field :is(input:not([type='checkbox']), select) { width: 100%; }
+/* Both result modes share a control track; narrow cards stack independently of the viewport. */
+.withdrawal-order-card { container-type: inline-size; }
+.withdrawal-order-card .field.ui-field { grid-template-columns: minmax(0, 1fr) 260px; }
+.withdrawal-order-card .field.ui-field select { min-width: 0; }
+@container (max-width: 480px) {
+  .withdrawal-order-card .field.ui-field { grid-template-columns: minmax(0, 1fr); }
+}
 .ui-field :where(input:not([type='checkbox']):not([type='radio']), select) { min-height: var(--h-control); border-radius: var(--r-control); background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); padding: var(--s-2); font-size: var(--fs-ui); font-variant-numeric: tabular-nums; max-width: 100%; }
 .ui-field input[inputmode='decimal'], .ui-field input[type='number'] { text-align: right; }
 .ui-field :is(input, select):disabled { opacity: .45; }
