@@ -173,7 +173,7 @@ export function InputForm() {
       {errorCount > 0 && (
         <p className="validation-banner">{t('valBanner', { count: errorCount })}</p>
       )}
-      <ProfessionalGroup name="profile" title={t('profile')} fields={['currentAge', 'fireAge', 'lifeExpectancy', 'province', 'household', 'children', ...(inputs.partner ? ['partner.currentAge'] : [])]}>
+      <ProfessionalGroup name="profile" title={t('profile')} fields={['currentAge', 'fireAge', 'lifeExpectancy', 'province', 'household', ...(inputs.partner ? ['partner.currentAge'] : [])]} needsReview={!!inputs.children?.length}>
         <RuleAssumptions province={inputs.province} inflation={inputs.inflation ?? 0.021} />
         <Num field="currentAge" label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num field="fireAge" label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
@@ -337,7 +337,7 @@ export function InputForm() {
         </details>
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="accounts" title={t('accounts')} fields={['balances.tfsa', 'balances.rrsp', 'balances.nonReg', ...(inputs.balances.nonReg > 0 ? ['nonRegBook'] : []), 'fhsa', 'lockedRetirement', ...(inputs.fhsa ? ['fhsa.balance', 'fhsa.annualContribution', 'fhsa.openedYearsAgo'] : []), ...(inputs.lockedRetirement ? ['lockedRetirement.balance', 'lockedRetirement.employeeContribution', 'lockedRetirement.employerContribution', 'lockedRetirement.accessibleAge', ...(inputs.partner ? ['lockedRetirement.owner'] : [])] : [])]}>
+      <ProfessionalGroup name="accounts" title={t('accounts')} fields={['balances.tfsa', 'balances.rrsp', 'balances.nonReg', ...(inputs.balances.nonReg > 0 ? ['nonRegBook'] : [])]} needsReview={!!inputs.fhsa || !!inputs.lockedRetirement}>
         <p className="hint">{t('accountsHint')}</p>
         {ACCOUNTS.map((a) => (
           <Num
@@ -482,7 +482,7 @@ export function InputForm() {
         )}
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="housing" title={t('ui.professional.housing')} fields={[...(pr ? ['housingMode'] : []), ...(pr?.mode === 'planned' ? ['principalResidence.buyAtAge', 'principalResidence.price', 'principalResidence.downPayment', 'principalResidence.annualMortgagePayment', 'principalResidence.mortgageYears'] : pr ? ['principalResidence.value', 'principalResidence.sellAtAge', 'principalResidence.mortgage', ...(pr.mortgage ? ['principalResidence.mortgage.balance', 'principalResidence.mortgage.annualPayment', 'principalResidence.mortgage.yearsRemaining'] : [])] : [])]} needsReview={!!inputs.investmentProperties?.length || !!inputs.debts?.length} summary={!pr && !inputs.investmentProperties?.length && !inputs.debts?.length ? t('ui.professional.none') : undefined}>
+      <ProfessionalGroup name="housing" title={t('ui.professional.housing')} summary={t(pr || inputs.investmentProperties?.length || inputs.debts?.length ? 'ui.professional.needsReview' : 'ui.professional.none')}>
         <h3>{t('propertySection')}</h3>
 
         {pr && (
@@ -798,7 +798,7 @@ export function InputForm() {
         )}
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="benefits" title={t('ui.professional.benefits')} fields={['cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65', 'extraIncome', 'pension', ...(inputs.extraIncome ? ['extraIncome.annual', 'extraIncome.fromAge', 'extraIncome.toAge'] : []), ...(inputs.pension ? ['pension.annualAmount', 'pension.startAge', 'pension.indexation', 'pension.bridgeAnnual'] : []), ...(inputs.partner ? ['partner.cppStartAge', 'partner.cppAnnualAt65', 'partner.oasStartAge', 'partner.oasAnnualAt65', 'partner.pension', ...(inputs.partner.pension ? ['partner.pension.annualAmount', 'partner.pension.startAge', 'partner.pension.indexation', 'partner.pension.bridgeAnnual'] : [])] : [])]}>
+      <ProfessionalGroup name="benefits" title={t('ui.professional.benefits')} fields={['cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65', ...(inputs.partner ? ['partner.cppStartAge', 'partner.cppAnnualAt65', 'partner.oasStartAge', 'partner.oasAnnualAt65'] : [])]} needsReview={!!inputs.extraIncome || !!inputs.pension || !!inputs.partner?.pension}>
         <Field className="field">
           <span><Jargon text={t('extraIncomeToggle')} /></span>
           <input
