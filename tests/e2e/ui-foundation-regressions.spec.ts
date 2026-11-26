@@ -38,7 +38,8 @@ test('directory controls and row grids preserve desktop geometry and mobile visi
     expect(question!.x - directory!.x).toBe(296)
     expect(question!.y).toBe(directory!.y)
     const title = await page.locator('#question-title').boundingBox()
-    expect(title!.y).toBeLessThan(400)
+    // Content above the grid can grow; the question must still occupy its first row.
+    expect(question!.y).toBe(layout!.y)
     const rows = page.locator('.category-navigation details[open] > div > button')
     expect(await rows.count()).toBeGreaterThan(0)
     for (const row of await rows.all()) {
