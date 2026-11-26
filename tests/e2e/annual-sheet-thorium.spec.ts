@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
@@ -8,7 +9,7 @@ test.skip(!existsSync(executablePath), 'This suite requires /Applications/Thoriu
 
 test('professional household results open the current annual estimate and follow scenario restore', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fields = page.locator('label.field')
   await fields.filter({ hasText: 'Target FIRE age' }).locator('input').fill('44')
   await fields.filter({ hasText: /^Household/ }).locator('select').selectOption('couple')
@@ -75,9 +76,9 @@ for (const locale of [
 ]) {
   test(`professional annual tax limitations are localized in ${locale.button}`, async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     await page.locator('label.field').filter({ hasText: /^Household/ }).locator('select').selectOption('couple')
-    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await chooseLanguage(page, locale.button)
     await page.getByRole('button', { name: locale.opener, exact: true }).click()
     const dialog = page.getByRole('dialog', { name: locale.dialog })
     await dialog.getByRole('button', { name: new RegExp(`^${locale.retirement} \\(\\d{4}\\)$`) }).click()
@@ -98,7 +99,7 @@ test('French underwater-sale details show the event label without its technical 
     localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
   })
   await page.reload()
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await page.getByRole('button', { name: 'Détails financiers annuels', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Estimation annuelle du ménage' })
   const technicalId = 'sale:60:principalResidence.sellAtAge'
@@ -131,7 +132,7 @@ for (const locale of [
       localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, canonical, entryMode: 'professional' } }))
     })
     await page.reload()
-    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await chooseLanguage(page, locale.button)
     await page.getByRole('button', { name: locale.opener, exact: true }).click()
     const dialog = page.getByRole('dialog', { name: locale.dialog })
     const year = dialog.getByRole('combobox', { name: locale.year })

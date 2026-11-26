@@ -1,3 +1,4 @@
+import { chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 import en from '../../src/i18n/en.json' with { type: 'json' }
 import fr from '../../src/i18n/fr.json' with { type: 'json' }
@@ -9,20 +10,20 @@ for (const language of ['EN', 'FR'] as const) {
       await page.getByRole('checkbox', { name, exact: true }).check()
     }
     await page.goto('/#/guided/assets/allocation.tfsa')
-    await page.locator('.langs').getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await expect(page.locator('html')).toHaveAttribute('lang', language === 'FR' ? 'fr' : 'en')
     const copy = language === 'FR' ? fr : en
     const pager = page.locator('.question-pager')
     const progress = page.getByTestId('guided-progress')
     await expect(progress).toContainText(copy.questionnaire.categories.assets)
-    await expect(pager.locator('button').last()).toHaveText(copy.questionnaire.nextCategory)
     const measurements = []
 
     for (const width of [320, 390, 1440]) {
       await page.setViewportSize({ width, height: 844 })
+      await expect(pager.locator('button').last()).toHaveAccessibleName(width <= 640 ? copy.questionnaire.nextCategory : copy.guidedNext)
       await pager.scrollIntoViewIfNeeded()
       const measured = await pager.evaluate(element => {
-        const progress = element.querySelector('span')!
+        const progress = element.querySelector<HTMLElement>(innerWidth <= 640 ? '.pager-category-progress' : '.pager-next-label')!
         const style = getComputedStyle(progress)
         const text = progress.textContent!
         const range = document.createRange()
@@ -40,7 +41,7 @@ for (const language of ['EN', 'FR'] as const) {
         return {
           text, lineCount, wordCount: text.trim().split(/\s+/).length, splitWords,
           columns: getComputedStyle(element).gridTemplateColumns.split(' '), overflowWrap: style.overflowWrap,
-          pager: element.getBoundingClientRect().toJSON(), progress: progress.getBoundingClientRect().toJSON(),
+          pager: element.getBoundingClientRect().toJSON(), progress: element.querySelector('[data-testid="guided-progress"]')!.getBoundingClientRect().toJSON(),
           buttons: [...element.querySelectorAll('button')].map(button => ({ text: button.textContent, ...button.getBoundingClientRect().toJSON() })),
           documentOverflow: document.documentElement.scrollWidth > innerWidth,
         }
@@ -64,7 +65,7 @@ for (const language of ['EN', 'FR'] as const) {
         expect(measured.progress.bottom).toBeLessThanOrEqual(Math.min(back.top, next.top))
       } else {
         expect(measured.columns).toHaveLength(3)
-        expect(measured.pager.width).toBe(720)
+        expect(measured.pager.width).toBe(640)
         expect(measured.progress.left).toBeGreaterThan(back.right)
         expect(measured.progress.right).toBeLessThan(next.left)
         expect(measured.progress.top + measured.progress.height / 2).toBe(back.top + back.height / 2)

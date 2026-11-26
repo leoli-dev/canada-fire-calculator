@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -9,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 test('comparison scans start only when their card opens, off the main thread', async ({ page }) => {
   const workers: string[] = []
   page.on('worker', (worker) => workers.push(worker.url()))
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
   await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('41')
   await expect(page.locator('.results-column')).toBeVisible()
@@ -40,13 +41,20 @@ test('only the chosen translation is downloaded', async ({ page }) => {
     if (match) locales.push(match[1])
   })
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Professional', exact: true })).toBeVisible()
+  await expect(page.locator('.app-bar')).toBeVisible()
+  const checkProfessionalLabel = async (label: string) => {
+    const menu = page.getByTestId('app-menu')
+    if (await menu.isVisible()) await menu.click()
+    await expect(page.locator('.entry-mode:visible').getByRole('button', { name: label, exact: true })).toBeVisible()
+    if (await menu.isVisible()) await page.keyboard.press('Escape')
+  }
+  await checkProfessionalLabel('Professional')
   expect(locales).toEqual([])
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Professionnel', exact: true })).toBeVisible()
+  await chooseLanguage(page, 'FR')
+  await checkProfessionalLabel('Professionnel')
   expect(locales).toEqual(['fr'])
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
-  await expect(page.getByRole('button', { name: 'Professionnel', exact: true })).toBeVisible()
+  await checkProfessionalLabel('Professionnel')
   expect(locales).not.toContain('zh')
 })

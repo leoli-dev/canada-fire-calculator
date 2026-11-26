@@ -1,3 +1,4 @@
+import { chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /** FE-43 C: contribution room and the remaining tax elections live in one
@@ -106,7 +107,7 @@ test('the optional category is translated in EN, FR and ZH', async ({ page }) =>
   await seed(page, { couple: true })
   const titles: Record<string, string[]> = {}
   for (const language of ['EN', 'FR', '中文']) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     titles[language] = []
     for (const id of ['tax.intro', 'tax.tfsaRoom', 'tax.rrspRoom', 'tax.pensionSplit']) {
       await page.goto(`/#/guided/taxDetails/${id}`)

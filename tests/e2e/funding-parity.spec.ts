@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -15,7 +16,7 @@ test('planned-home financing gap follows guided and professional edits in both d
   await guidedLoan.locator('input').fill('40000')
   await expect(guidedLoan).not.toContainText('missing financing')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'TFSA' }).locator('input').first().fill('5000000')
   const professionalLoan = page.locator('label.field').filter({ hasText: 'Payment ($/yr)' })
   await expect(page.locator('.input-form')).toContainText('Planned purchase')
@@ -32,7 +33,7 @@ test('planned-home financing gap follows guided and professional edits in both d
   await payment.fill('')
   await payment.blur()
 
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/housing/purchase.loan')
   await expect(guidedLoan).toContainText('missing financing')
 })
@@ -50,12 +51,12 @@ test('FHSA plus employee DC uses one budget in both modes', async ({ page }) => 
   await employee.locator('input').fill('8000')
   await expect(employee).toContainText('6000')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.input-form')).toContainText('6000')
   await page.getByLabel('Annual after-tax savings').fill('16000')
   await expect(page.locator('.input-form')).not.toContainText('shared savings budget')
 
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/locked.contributions')
   await expect(employee.locator('input')).toHaveValue('8,000')
   await expect(employee).not.toContainText('shared savings budget')
@@ -72,18 +73,18 @@ test('FHSA-only unmet contribution is visible with the same amount in both modes
   const fhsa = page.locator('[data-field="fhsa.annualContribution"]')
   await expect(fhsa).toContainText('3000')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.input-form')).toContainText('3000')
   await expect(page.locator('.results-column')).toHaveCount(0)
   await page.getByLabel('Annual after-tax savings').fill('8000')
   await expect(page.locator('.input-form')).not.toContainText('3000')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/fhsa.details')
   await expect(fhsa).not.toContainText('3000')
 })
 
 test('later pension cannot close a year-start cash purchase in professional mode', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input').first()
   await field('Current age').fill('50')
   await field('Target FIRE age').fill('50')
@@ -169,6 +170,6 @@ test('the same funded purchase yields the same result after guided generation an
   expect(guidedSummary).toContain('Final-year taxable addition')
   expect(guidedSummary).toContain('adds remaining registered balances')
   expect(guidedSummary).toMatch(/Added final-return tax and repayment (?!CA\$0\b)/)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   expect(await page.locator('.summary').innerText()).toBe(guidedSummary)
 })

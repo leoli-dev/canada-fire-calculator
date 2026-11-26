@@ -1,9 +1,7 @@
-import { Button, Segmented } from './ui'
+import { Button } from './ui'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { pensionStartAge, validateInputs } from './engine'
-import { setLanguage } from './i18n'
-import { useGlossary } from './glossary'
 import { downloadStoredPlan, getStorageReadOnlyReason, isStorageUnavailable, useStore } from './store'
 import { AnalyticsFooter, AnalyticsPrompt } from './components/AnalyticsConsent'
 import { precisionGate } from './engine/model'
@@ -24,7 +22,7 @@ import { StrategyCard } from './components/StrategyCard'
 import { TimingCard } from './components/TimingCard'
 import { ScenarioCard } from './components/ScenarioCard'
 import { GlossaryDrawer } from './components/GlossaryDrawer'
-import { GithubCorner } from './components/GithubCorner'
+import { AppBar, CompactDisclaimer } from './components/AppBar'
 import { hasUnusableSharedFields } from './forms/fieldState'
 import { migrationReview } from './engine/migrationReview'
 import { MigrationReview } from './components/MigrationReview'
@@ -41,15 +39,8 @@ import { PersonTaxTable } from './components/PersonTaxTable'
 /** Precision reasons the pooled household tools do not depend on. */
 const POOLED_IGNORES = new Set(['ownershipUnknown', 'recipientUnknown'])
 
-const LANGS = [
-  { code: 'en', label: 'EN' },
-  { code: 'fr', label: 'FR' },
-  { code: 'zh', label: '中文' },
-]
-
 export default function App() {
   const { t, i18n } = useTranslation()
-  const openGlossary = useGlossary((s) => s.open)
   const inputs = useStore((s) => s.inputs)
   const canonical = useStore((s) => s.canonical)
   const scenarioACanonical = useStore((s) => s.scenarioACanonical)
@@ -60,7 +51,6 @@ export default function App() {
   const migrationBlocked = precision ? !precision.allowed : !!inputs.partner
   const displayMode = useStore((s) => s.displayMode)
   const entryMode = useStore((s) => s.entryMode)
-  const setEntryMode = useStore((s) => s.setEntryMode)
   const guidedView = useStore((s) => s.guidedView)
   const inputRevision = useStore((s) => s.inputRevision)
   const resultRevision = useStore((s) => s.resultRevision)
@@ -120,34 +110,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <GithubCorner href="https://github.com/leoli-dev/canada-fire-calculator" />
-      <header>
-        <div>
-          <h1>{t('title')}</h1>
-          <p className="tagline">{t('tagline')}</p>
-          {/* FE-46: one disclaimer line, with the simplifications behind a link,
-              instead of two sentences saying the same thing. */}
-          <p className="header-disclaimer">
-            <strong>{t('disclaimer')}</strong>{' '}
-            <Button variant="link" type="button" className="term" onClick={() => openGlossary('simplifications')}>
-              {t('simplificationsLink')}
-            </Button>
-          </p>
-        </div>
-        <Segmented as="nav" className="langs">
-          {LANGS.map((l) => (
-            <Button
-              key={l.code}
-              className={i18n.language === l.code ? 'active' : ''}
-              onClick={() => setLanguage(l.code)}
-            >
-              {l.label}
-            </Button>
-          ))}
-        </Segmented>
-      </header>
+      <AppBar showResults={!!canonicalResult || (!!result && !hasBlockingIssues)} />
+      {/* Match GuidedFlow's question branch, including a stale-result transition. */}
+      {!(entryMode === 'guided' && !storageIssue && guidedView !== 'review' && (guidedView !== 'results' || resultRevision !== inputRevision)) && <AnalyticsPrompt />}
 
-      <AnalyticsPrompt />
       {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
@@ -157,21 +123,14 @@ export default function App() {
       {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
-          <Segmented className="entry-mode" aria-label={t('entryModeLabel')}>
-            <Button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
-              {t('guidedMode')}
-            </Button>
-            <Button type="button" className={entryMode === 'professional' ? 'active' : ''} onClick={() => setEntryMode('professional')}>
-              {t('professionalMode')}
-            </Button>
-          </Segmented>
           {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
             estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
-          {!storageIssue && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
+          {!storageIssue && (entryMode === 'professional' || guidedView === 'review') && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {canonicalResult && <section className="results-column" id="results" tabIndex={-1}>
           <CanonicalResults result={canonicalResult} model={canonicalModel} />
+          <div className="mobile-results-disclaimer"><CompactDisclaimer /></div>
           {canonicalResult.coverage && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>
           {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {canonical && <CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
@@ -182,6 +141,7 @@ export default function App() {
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
+          <div className="mobile-results-disclaimer"><CompactDisclaimer /></div>
           {result && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}

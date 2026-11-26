@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /** BE-12 B: the spousal-plan premium history and the T2205 attribution are
@@ -100,7 +101,7 @@ test('professional records premiums, prices the contributor room and previews th
   await previewPayment(page, 12_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
   // The same recorded facts and split show in guided mode.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 C: the premium history is on the optional spousal-history page.
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
@@ -138,7 +139,7 @@ test('guided records the premium history and keeps it through reload and a mode 
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
   await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
   await previewPayment(page, 7_000)
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,000')
@@ -175,11 +176,11 @@ test('the spousal attribution block explains itself in EN, FR and ZH', async ({ 
   // Review fix B2: the base-year attribution convention is stated in the UI
   // rather than assumed silently.
   await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('attributed at most once')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(editor).toContainText('Attribution REER de conjoint (T2205)')
   await expect(editor).toContainText('premier entré, premier sorti')
   await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText("attribuée qu'une seule fois")
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(editor).toContainText('配偶 RRSP 归属（T2205）')
   await expect(editor).toContainText('先进先出')
   await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('最多只能归属一次')

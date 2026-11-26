@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** FE-38: a single user who tries "couple" and goes back is not stuck in the household estimate. */
@@ -5,7 +6,7 @@ test('single, couple, single settles in one step without resetting the plan', as
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const household = page.locator('label.field').filter({ hasText: 'Household' }).locator('select')
   await household.selectOption('couple')
   await household.selectOption('single')

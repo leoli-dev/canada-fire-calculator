@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
@@ -7,7 +8,7 @@ async function expectComparisonUnavailableInThreeLanguages(page: import('@playwr
     ['FR', 'Comparaison indisponible'],
     ['中文', '比较暂不可用'],
   ] as const) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     const rows = page.getByTestId('scenario-comparison').locator('.compare-table tbody tr')
     await expect(rows).toHaveCount(2)
     for (const row of await rows.all()) {
@@ -15,12 +16,12 @@ async function expectComparisonUnavailableInThreeLanguages(page: import('@playwr
       await expect(row.locator('td').nth(2)).toHaveText('—')
     }
   }
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
 }
 
 async function seedV10(page: import('@playwright/test').Page) {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const original = await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.version = 10
@@ -41,7 +42,7 @@ async function seedV10(page: import('@playwright/test').Page) {
 
 test('v10 missing ACB remains unknown in current and Scenario A after hydration and refresh', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const original = await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
     saved.version = 10
@@ -57,7 +58,7 @@ test('v10 missing ACB remains unknown in current and Scenario A after hydration 
   })
   await page.reload()
   for (const mode of ['Professional', 'Guided'] as const) {
-    await page.getByRole('button', { name: mode, exact: true }).click()
+    await chooseMode(page, mode === 'Professional' ? 'professional' : 'guided')
     const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
     for (const plan of [state.canonical, state.scenarioACanonical]) {
       expect(plan.accounts.find((a: { kind: string }) => a.kind === 'nonReg').acb.status).toBe('unknown')
@@ -83,7 +84,7 @@ test('v10 missing ACB remains unknown in current and Scenario A after hydration 
 
 test('single balance edited then combined with partner stays unassigned in both modes and after reload', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const tfsa = page.locator('label.field').filter({ hasText: /^TFSA$/ }).locator('input').first()
   await tfsa.fill('120000')
   const scenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
@@ -93,7 +94,7 @@ test('single balance edited then combined with partner stays unassigned in both 
   await tfsa.fill('220000')
   await expect(page.getByTestId('migration-gate')).toContainText('TFSA: 220,000 CAD unassigned')
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate')).toContainText('TFSA: 220,000 CAD unassigned')
   await page.reload()
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
@@ -102,7 +103,7 @@ test('single balance edited then combined with partner stays unassigned in both 
   expect(state.canonical.migration.ownershipNeedsConfirmation).toBe(true)
   expect(state.scenarioACanonical.people).toHaveLength(1)
   expect(state.scenarioACanonical.accounts.find((a: { kind: string }) => a.kind === 'tfsa')).toMatchObject({ balance: 120000, ownerId: state.scenarioACanonical.people[0].id })
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const currentScenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
   await currentScenario.locator('summary').click()
   await expect(currentScenario).toContainText('Household estimate')
@@ -122,7 +123,7 @@ test('v10 couple and Scenario A migrate once with shared mode gate and round tri
   expect(stored.plan.version).toBe(11)
   expect(stored.plan.state.canonical.accounts.slice(0, 3).map((a: { ownerId: string | null }) => a.ownerId)).toEqual([null, null, null])
   expect(stored.plan.state.scenarioACanonical.accounts.slice(0, 3).map((a: { balance: number }) => a.balance)).toEqual([1, 2, 3])
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate')).toContainText('120,000 CAD unassigned')
   await page.reload()
   await expect(page.getByTestId('migration-gate')).toBeVisible()
@@ -131,7 +132,7 @@ test('v10 couple and Scenario A migrate once with shared mode gate and round tri
 
 test('Scenario A ownership gate stays separate from a singly owned current plan across modes and refresh', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const original = await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.version = 10
@@ -155,7 +156,7 @@ test('Scenario A ownership gate stays separate from a singly owned current plan 
   await expect(comparison).toContainText('Precise Scenario A comparison is unavailable')
   await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
   await expect(comparison.getByRole('row', { name: /Current/ })).toContainText('—')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
   await page.reload()
   await expect(gate.getByTestId('migration-scenario-a')).toContainText('220,000 CAD unassigned')
@@ -167,7 +168,7 @@ test('Scenario A ownership gate stays separate from a singly owned current plan 
 
 test('single-person v10 age and savings uncertainty limits exact current advice in both modes', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.version = 10
@@ -187,7 +188,7 @@ test('single-person v10 age and savings uncertainty limits exact current advice 
   await page.getByLabel('Annual after-tax savings').fill('42000')
   await expect(page.getByTestId('legacy-estimate')).toBeVisible()
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.migration.sourcePersistVersion)).toBe(10)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.state.guidedView = 'results'
@@ -202,7 +203,7 @@ test('single-person v10 age and savings uncertainty limits exact current advice 
 
 test('age/savings-only legacy comparison uses neutral outcome labels in three languages', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.version = 10
@@ -222,7 +223,7 @@ test('age/savings-only legacy comparison uses neutral outcome labels in three la
 
 test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays gated through restore', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const card = page.locator('details').filter({ hasText: 'Scenario comparison' })
   await card.locator('summary').click()
   await card.getByRole('button', { name: 'Save current as A' }).click()
@@ -232,9 +233,9 @@ test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays
   expect(before.scenarioACanonical.budget).toMatchObject({ debtIncluded: { status: 'unknown' }, taxBenefitIncluded: { status: 'unknown' } })
   await expect(card).not.toContainText('Precise Scenario A comparison is unavailable')
   await expect(card.getByRole('row', { name: /Scenario A/ })).toContainText('CA$')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await card.locator('summary').click()
   await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
   await expect(page.getByRole('button', { name: 'Run 1,000 simulations' })).toBeVisible()
@@ -248,9 +249,9 @@ test('fresh Scenario A saves canonical snapshots; a missing saved snapshot stays
   await expect(card).toContainText('Precise Scenario A comparison is unavailable')
   await card.locator('summary').click()
   await expectComparisonUnavailableInThreeLanguages(page)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate').getByTestId('migration-scenario-a')).toContainText('cannot be verified')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await card.locator('summary').click()
   await card.getByRole('button', { name: 'Restore A as current inputs' }).click()
   if ((await card.getAttribute('open')) === null) await card.locator('summary').click()
@@ -263,7 +264,7 @@ test('future-version and corrupt bytes are not overwritten', async ({ page }) =>
     await page.evaluate(value => localStorage.setItem('fire-inputs', value), value)
     await page.reload()
     await expect(page.getByRole('alert')).toBeVisible()
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(value)
   }
 })
@@ -287,13 +288,13 @@ test('malformed Scenario A cannot make a valid v10 primary plan writable', async
   await page.getByRole('button', { name: 'Download original saved plan' }).click()
   const download = await downloadPromise
   expect(readFileSync((await download.path())!, 'utf8')).toBe(malformed)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(malformed)
 })
 
 test('structurally shallow v11 canonical or Scenario A canonical cannot hydrate or overwrite', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   for (const target of ['canonical', 'scenarioACanonical'] as const) {
     const original = await page.evaluate(target => {
       const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
@@ -314,7 +315,7 @@ test('structurally shallow v11 canonical or Scenario A canonical cannot hydrate 
     expect(await page.evaluate(() => localStorage.getItem('fire-inputs'))).toBe(original)
     await page.evaluate(() => localStorage.clear())
     await page.reload()
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
   }
 })
 
@@ -323,7 +324,7 @@ test('unassigned couple has no precise quick answer or Monte Carlo in either mod
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
   await expect(page.getByText('Monte Carlo simulation', { exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'When can I retire?' })).toHaveCount(0)
 })
@@ -357,7 +358,7 @@ test('rental deletion keeps B identity, tax owner and linked mortgage through mo
   const rentals = page.locator('.input-form .property-card').filter({ hasText: 'Investment property' })
   await expect(rentals).toHaveCount(2)
   await rentals.first().getByRole('button', { name: 'Remove' }).click()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.reload()
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(after.canonical.properties.filter((p: { kind: string }) => p.kind === 'investment')).toMatchObject([
@@ -379,7 +380,7 @@ test('professional locked owner edit updates the same canonical owner seen after
   })
   await page.reload()
   await page.locator('label.field').filter({ hasText: 'Account owner' }).locator('select').selectOption('partner')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.getByTestId('migration-gate')).toContainText('Locked retirement account: 85,000 CAD partner')
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(state.canonical.accounts.find((a: { kind: string }) => a.kind === 'lira').ownerId).toBe(state.canonical.people[1].id)
@@ -407,7 +408,7 @@ test('professional couple to single keeps partner rental but makes its ownership
   await page.reload()
   await page.locator('label.field').filter({ hasText: 'Household' }).locator('select').selectOption('single')
   await expect(page.getByTestId('migration-gate')).toBeVisible()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.reload()
   await expect(page.getByTestId('migration-gate')).toBeVisible()
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
@@ -433,7 +434,7 @@ test('professional FHSA and LIRA toggles delete nonzero canonical assets through
   await page.reload()
   await page.locator('label.field').filter({ hasText: 'Use a locked DC pension' }).locator('input').uncheck()
   await page.locator('label.field').filter({ hasText: 'Use an FHSA' }).locator('input').uncheck()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.reload()
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(state.inputs.fhsa).toBeNull()
@@ -563,7 +564,7 @@ test('single current and unassigned couple Scenario A cannot show an uncaveated 
   await expect(card.getByRole('cell', { name: 'Scenario A' })).toBeVisible()
   await expect(card.locator('.compare-table')).not.toContainText('Lasts')
   await expect(card.locator('.compare-table')).not.toContainText('CA$')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.state.guidedView = 'results'
@@ -592,7 +593,7 @@ test('professional TFSA mix preset synchronizes canonical and legacy projection 
 
 test('guided mix preset synchronizes every account and legacy projection after reload', async ({ page }) => {
   await seedV10(page)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/preferences/invest.mix')
   await page.getByRole('radio', { name: /GIC/ }).check()
   await page.reload()

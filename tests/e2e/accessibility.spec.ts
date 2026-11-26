@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -18,7 +19,7 @@ async function unnamedControls(page: import('@playwright/test').Page) {
 }
 
 test('every professional-mode control keeps its label when a glossary term sits inside it', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'Household' }).locator('select').selectOption('couple')
   await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true }))
   await expect(page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')).toBeVisible()
@@ -33,16 +34,16 @@ test('every professional-mode control keeps its label when a glossary term sits 
 
 test('the page language follows the selected language', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
 })
 
 test('result questions are tabs that control one labelled panel', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const tabs = page.getByRole('tablist', { name: 'Result question' })
   const first = tabs.getByRole('tab', { name: 'Will my money last?' })
   await expect(first).toHaveAttribute('aria-selected', 'true')
@@ -60,7 +61,7 @@ test('result questions are tabs that control one labelled panel', async ({ page 
 })
 
 test('charts are described in words', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const chart = page.getByRole('img', { name: 'Account balances by age' })
   await expect(chart).toHaveCount(1)
   const summaryId = await chart.getAttribute('aria-describedby')

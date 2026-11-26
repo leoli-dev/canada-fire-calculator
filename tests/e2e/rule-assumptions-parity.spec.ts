@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 // FE-41: the rule sources are collapsed by default; these checks read them opened.
@@ -21,7 +22,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await page.evaluate(() => localStorage.clear())
   await page.reload()
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const professional = page.getByTestId('rule-assumptions')
   await expect(professional).toContainText('CA-ON-tax-2026-legacy-v1')
   await expect(professional).toContainText('CA-CCB-2026-07-v1')
@@ -51,7 +52,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(professional.getByTestId('rule-tax-not-modelled')).toContainText('GST/HST credit')
   await expect(professional.getByTestId('rule-tax-not-modelled')).toContainText('low-income tax reductions')
 
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   const guided = page.getByTestId('rule-assumptions')
   await expect(guided).toContainText('CA-BC-tax-2026-legacy-v1')
@@ -65,23 +66,23 @@ test('guided and professional expose the same pinned rule versions, policy and s
     .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(links)
   expect(text).toBe(await guided.innerText())
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.getByLabel('Province').selectOption('MB')
   await expect(professional).toContainText('Manitoba\'s dedicated 2026 CRA guide')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await expect(guided).toContainText('Manitoba\'s dedicated 2026 CRA guide')
   await expect(guided.getByTestId('rule-sources').locator('a')).toHaveCount(11)
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.getByLabel('Province').selectOption('NL')
   const nlLinks = await professional.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(nlLinks[3]).toContain('t4008nl-july')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   expect(await guided.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(nlLinks)
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.getByLabel('Province').selectOption('PE')
   // BE-38 B3 resolved the PE conflict against the dedicated July 2026 guide:
   // the retained $142,250 is gone and the resolution is what the panel states.
@@ -93,7 +94,7 @@ test('guided and professional expose the same pinned rule versions, policy and s
   await expect(professional).toContainText("replacing January's $142,250")
   const peLinks = await professional.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(peLinks[2]).toContain('/2026/t4032-pe-7-26e.pdf')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await expect(guided).toContainText('$142,520')
   expect(await guided.getByTestId('rule-sources').locator('a').evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))).toEqual(peLinks)
@@ -104,7 +105,7 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   await page.evaluate(() => localStorage.clear())
   await page.reload()
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const professional = page.getByTestId('rule-assumptions')
   const coverage = professional.getByTestId('rule-coverage')
   await expect(coverage).toBeVisible()
@@ -215,7 +216,7 @@ test('the credit coverage matrix is visible in both modes and claims no complete
   await page.getByLabel('Province').selectOption('ON')
 
   // Same matrix, same caveat, in guided mode.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   const guided = page.getByTestId('rule-assumptions')
   const guidedCoverage = guided.getByTestId('rule-coverage')
@@ -234,7 +235,7 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.locator('.entry-mode button').nth(1).click()
+  await chooseMode(page, 'professional')
   // The Province field's label is translated, so select by the option value,
   // which is the jurisdiction code in every language.
   const provinceSelect = page.locator('select:has(option[value="QC"])')
@@ -250,7 +251,7 @@ test('the coverage caveat and the QC qualifications are native in French and Chi
   ] as const) {
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
-    await page.locator('.entry-mode button').nth(1).click()
+    await chooseMode(page, 'professional')
     await page.locator('select:has(option[value="QC"])').selectOption('QC')
     const caveat = page.getByTestId('rule-coverage-caveat')
     await expect(caveat, lang).toContainText(marker)
@@ -273,7 +274,7 @@ test('the two authority states and the gate label render natively in all three l
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.locator('.entry-mode button').nth(1).click()
+  await chooseMode(page, 'professional')
   // Ontario's probate row is the content-checked one: both of its authorities
   // are in `CONTENT_VERIFIED_AUTHORITIES`, so both statuses carry the date and
   // the figures a person read. The federal brackets row is the merely-listed
@@ -303,7 +304,7 @@ test('the two authority states and the gate label render natively in all three l
   ] as const) {
     await page.evaluate(l => localStorage.setItem('fire-lang', l), lang)
     await page.reload()
-    await page.locator('.entry-mode button').nth(1).click()
+    await chooseMode(page, 'professional')
     await page.locator('select:has(option[value="ON"])').selectOption('ON')
     const frText = await page.getByTestId('rule-coverage-implemented-probate-and-estate-fees').innerText()
     expect(frText, `${lang} checked label`).toContain(checked)

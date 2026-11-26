@@ -155,6 +155,10 @@ export function questionTitleKey(definition: QuestionDefinition, inputs: Inputs)
   return `questionnaire.pages.${definition.contentKey}.${asksCoupleTotal(definition, inputs) ? 'questionCouple' : 'question'}`
 }
 
+export function questionShortKey(definition: QuestionDefinition, inputs: Inputs): string {
+  return `questionnaire.short.${definition.contentKey}${asksCoupleTotal(definition, inputs) ? '_couple' : ''}`
+}
+
 export function questionForField(field: string): QuestionDefinition | undefined {
   return QUESTION_CATALOG.find((definition) => definition.fieldBindings.some(
     (binding) => field === binding || field.startsWith(`${binding}.`) || binding.startsWith(`${field}.`),

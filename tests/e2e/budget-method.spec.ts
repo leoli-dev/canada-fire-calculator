@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -50,7 +51,7 @@ test('both entry modes record the saving basis, which survives a reload and a mo
   // The answers survive a reload and switching to professional, which must not
   // flip the mode or rewrite a recorded fact.
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('budget-debt-yes')).toBeChecked()
   await expect(page.getByTestId('budget-state')).toContainText('Ready')
   expect(await canonicalBudget(page)).toMatchObject({ kind: 'savingsBudget', debtIncluded: { status: 'known', value: true }, taxBenefitIncluded: { status: 'known', value: true } })
@@ -105,7 +106,7 @@ test('a migrated v10 plan presents its legacy figure for review instead of reint
 })
 
 test('an answered-excluded budget basis labels the headline result as an estimate', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   // Review fix B2. Unknown facts are an unanswered question, not a
   // contradiction: the default plan keeps its precise summary.
   await expect(page.getByTestId('legacy-estimate')).toHaveCount(0)

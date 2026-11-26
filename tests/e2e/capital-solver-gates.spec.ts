@@ -1,3 +1,4 @@
+import { chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 async function seed(page: Page, kind: 'nonReg' | 'property', mode: 'guided' | 'professional') {
@@ -74,10 +75,10 @@ for (const mode of ['guided', 'professional'] as const) {
     await expect(page.locator('.summary')).not.toContainText('Estate value (after tax):')
     await expect(page.locator('.summary')).toContainText('required income or capital-gain tax facts')
     for (const [language, phrase] of [['FR', 'gains en capital'], ['中文', '资本利得税务事实']] as const) {
-      await page.getByRole('button', { name: language, exact: true }).click()
+      await chooseLanguage(page, language)
       await expect(page.locator('.summary')).toContainText(phrase)
     }
-    await page.getByRole('button', { name: 'EN', exact: true }).click()
+    await chooseLanguage(page, 'EN')
     await page.evaluate(() => {
       const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
       saved.state.inputs.investmentProperties = []
@@ -101,7 +102,7 @@ for (const mode of ['guided', 'professional'] as const) {
     await expect(page.getByTestId('fire-number-projected')).toContainText('cost base your plan projects for age 60')
     await expect(page.locator('.summary')).toContainText('a shortfall of')
     for (const [language, phrase] of [['FR', 'prix de base non enregistré'], ['中文', '非注册成本基础']] as const) {
-      await page.getByRole('button', { name: language, exact: true }).click()
+      await chooseLanguage(page, language)
       await expect(page.getByTestId('fire-number-projected')).toContainText(phrase)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
@@ -113,7 +114,7 @@ for (const mode of ['guided', 'professional'] as const) {
     await expect(page.locator('.summary .verdict')).toContainText('needs verified nominal cost, selling expenses')
     await expect(page.locator('.summary .verdict')).not.toContainText('475,000')
     for (const [language, phrase] of [['FR', 'frais de vente'], ['中文', '出售费用']] as const) {
-      await page.getByRole('button', { name: language, exact: true }).click()
+      await chooseLanguage(page, language)
       await expect(page.locator('.summary .verdict')).toContainText(phrase)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
@@ -125,10 +126,10 @@ for (const mode of ['guided', 'professional'] as const) {
     await expect(page.locator('.summary .verdict')).toContainText('investment-property sale')
     await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
     for (const [language, phrase] of [['FR', 'immeuble de placement'], ['中文', '投资房出售']] as const) {
-      await page.getByRole('button', { name: language, exact: true }).click()
+      await chooseLanguage(page, language)
       await expect(page.locator('.summary .verdict')).toContainText(phrase)
     }
-    await page.getByRole('button', { name: 'EN', exact: true }).click()
+    await chooseLanguage(page, 'EN')
     await page.evaluate(() => {
       const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
       saved.state.inputs.goal = 'dieWithZero'

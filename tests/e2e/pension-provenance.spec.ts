@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 // BE-39 A: the visible provenance of a CPP/QPP amount, and what a
@@ -41,7 +42,7 @@ test('guided: an estimator amount is repriced when the retirement age changes, a
   expect(saved.answerMeta.cppAnnualAt65.origin).toBe('default')
 
   // change the retirement age through the normal professional field
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
   await fireAge.fill('55')
   await fireAge.blur()
@@ -56,14 +57,14 @@ test('guided: an estimator amount is repriced when the retirement age changes, a
   await page.reload()
   await expect(page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')).toHaveValue('13,917')
   // and a mode switch back to guided shows the same figure and provenance
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/income/cpp.self')
   await expect(page.locator('[data-pension-kind="cpp"]')).toHaveAttribute('data-pension-source', 'estimator')
   await expect(page.locator('[data-field="cppAnnualAt65"] input')).toHaveValue('13,917')
 })
 
 test('professional: an estimator Apply is recorded as an estimate, not a user-confirmed fact', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const estimator = page.locator('details.estimator', { hasText: 'Estimate from work history' })
   await estimator.locator('summary').click()
   await estimator.getByRole('button', { name: 'Apply' }).click()
@@ -102,7 +103,7 @@ test('guided: a statement amount is never overwritten and asks for review instea
   await expect(panel.locator('[data-pension-warning]')).toHaveCount(0)
 
   // change the retirement age: the number must not move, the flag must appear
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
   await fireAge.fill('55')
   await fireAge.blur()
@@ -114,7 +115,7 @@ test('guided: a statement amount is never overwritten and asks for review instea
   // the flag survives a reload and a mode switch
   await page.reload()
   await expect(page.locator('[data-pension-warning="premisesNeedReview"]')).toBeVisible()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/income/cpp.self')
   await expect(page.locator('[data-pension-warning="premisesNeedReview"]')).toBeVisible()
   await expect(page.locator('[data-field="cppAnnualAt65"] input')).toHaveValue('1,000')
@@ -128,7 +129,7 @@ test('guided: a statement amount is never overwritten and asks for review instea
 })
 
 test('professional: a manual amount is a fact that a retirement-age change does not touch', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const cpp = page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')
   await cpp.fill('11000')
   await cpp.blur()
@@ -161,7 +162,7 @@ test('guided: a figure typed over an estimator amount is kept and recorded as ma
   await expect(page.locator('[data-pension-source-select="cpp"]')).toHaveValue('manual')
 
   // and it is now a fact: a later retirement-age change leaves it alone
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
   await fireAge.fill('55')
   await fireAge.blur()
@@ -175,7 +176,7 @@ test('professional: a figure typed over an estimator amount is kept and recorded
   await page.goto('/#/guided/income/cpp.self')
   await page.locator('details.estimator', { hasText: 'Estimate from work history' }).locator('summary').click()
   await page.getByRole('button', { name: 'Apply' }).click()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const amount = page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')
   await expect(amount).toHaveValue('9,278')
   await amount.fill('15000')
@@ -203,14 +204,14 @@ test('a FIRE-age change relabels an engine-replaced amount as an estimate, not a
   expect(applied.answerMeta.cppAnnualAt65.origin).toBe('default')
   expect(applied.inputs.cppAmountSource.source).toBe('estimator')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fireAge = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')
   await fireAge.fill('55')
   await fireAge.blur()
   await expect(page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input')).toHaveValue('13,917')
 
   // the guided page's own status line stops claiming a user-confirmed number
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/income/cpp.self')
   await expect(page.locator('[data-field="cppAnnualAt65"] small')).toHaveText('estimate')
   await expect(page.locator('[data-field="cppAnnualAt65"] small')).not.toHaveText('confirmed')

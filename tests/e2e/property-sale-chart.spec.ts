@@ -1,10 +1,11 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 test('a rental sale before FIRE is marked at its actual sale age', async ({ page }) => {
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input').first()
   await field('Current age').fill('50')
   await field('Target FIRE age').fill('52')

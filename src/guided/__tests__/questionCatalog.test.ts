@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, questionTitleKey, visibleQuestionPages } from '../questionCatalog'
+import { pageById, QUESTION_CATALOG, QUESTION_CATEGORIES, questionShortKey, questionTitleKey, visibleQuestionPages } from '../questionCatalog'
 import { pageIsComplete, type PageState } from '../pageState'
 import { DEFAULT_INPUTS, DEFAULT_PARTNER } from '../../store'
 import en from '../../i18n/en.json'
@@ -8,6 +8,19 @@ import zh from '../../i18n/zh.json'
 import { guidanceForPage, hasLocalizedGuidance, type GuidanceLanguage } from '../pageGuidance'
 
 describe('question catalog', () => {
+  it('provides a localized short directory label for every page and preserves couple-total wording', () => {
+    for (const locale of [en, fr, zh]) {
+      for (const page of QUESTION_CATALOG) {
+        for (const inputs of [DEFAULT_INPUTS, { ...DEFAULT_INPUTS, partner: DEFAULT_PARTNER }]) {
+          const key = questionShortKey(page, inputs).replace('questionnaire.short.', '')
+          expect((locale.questionnaire.short as Record<string, string>)[key]?.trim()).toBeTruthy()
+        }
+      }
+    }
+    const balance = pageById('account.tfsa.balance')!
+    expect(questionShortKey(balance, DEFAULT_INPUTS)).toBe('questionnaire.short.account_tfsa_balance')
+    expect(questionShortKey(balance, { ...DEFAULT_INPUTS, partner: DEFAULT_PARTNER })).toBe('questionnaire.short.account_tfsa_balance_couple')
+  })
   it('uses unique stable string IDs and at most two main questions per page', () => {
     const ids = QUESTION_CATALOG.map((page) => page.id)
     expect(new Set(ids).size).toBe(ids.length)

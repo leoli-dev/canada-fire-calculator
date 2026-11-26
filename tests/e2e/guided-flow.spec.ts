@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage, openLanguages, expectMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -73,7 +74,7 @@ async function completeGuidedQuestionnaire(page: Page, targetChoice: 'yes' | 'no
 
 test('guided mode completes a full UI flow and invalidates a stale result', async ({ page }) => {
   test.setTimeout(60_000)
-  await expect(page.getByRole('button', { name: 'Guided', exact: true })).toHaveClass(/active/)
+  await expectMode(page, 'guided')
   await expect(page.locator('.results-column')).toHaveCount(0)
   await completeGuidedQuestionnaire(page)
   await expect(page.getByRole('heading', { name: 'Review your answers' })).toBeVisible()
@@ -167,7 +168,7 @@ test('a working plan with non-registered money gets a labelled FIRE-number estim
   await expect(summary).not.toHaveClass(/\bok\b/)
   if (await summary.getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
   await expect(page.locator('.summary')).not.toHaveClass(/\bok\b/)
   if (await page.locator('.summary').getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
@@ -175,13 +176,13 @@ test('a working plan with non-registered money gets a labelled FIRE-number estim
   await expect(page.locator('.results-column')).not.toContainText('Infinity')
 })
 
-test('language buttons are clickable beside the GitHub corner across responsive widths', async ({ page }, testInfo) => {
+test('language choices are unobstructed through the responsive app bar', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
-  const english = page.locator('.langs').getByRole('button', { name: 'EN' })
-  const chinese = page.locator('.langs').getByRole('button', { name: '中文' })
   for (const width of [320, 640, 760, 761, 800, 900, 1100, 1280, 1320, 1440]) {
     await page.setViewportSize({ width, height: 800 })
-    await english.click()
+    await chooseLanguage(page, 'EN')
+    const languages = await openLanguages(page)
+    const chinese = languages.getByRole('button', { name: '中文' })
     const exposed = await chinese.evaluate((button) => {
       const bounds = button.getBoundingClientRect()
       const hit = document.elementFromPoint(bounds.right - 6, bounds.top + 6)
@@ -189,7 +190,9 @@ test('language buttons are clickable beside the GitHub corner across responsive 
     })
     expect(exposed, `Chinese button is covered at ${width}px`).toBe(true)
     await chinese.click({ position: { x: (await chinese.boundingBox())!.width - 6, y: 6 } })
-    await expect(chinese).toHaveClass(/active/)
+    const selectedLanguages = await openLanguages(page)
+    await expect(selectedLanguages.getByRole('button', { name: '中文' })).toHaveAttribute('aria-pressed', 'true')
+    if (await page.getByTestId('app-language').isVisible()) await page.keyboard.press('Escape')
   }
 })
 
@@ -200,7 +203,7 @@ test('question help follows the current page within one category', async ({ page
     await new Promise(resolve => setTimeout(resolve, 200))
     await route.continue()
   })
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
   await expect(page.getByRole('button', { name: '中文' })).toHaveAttribute('aria-pressed', 'true')
 
@@ -228,7 +231,7 @@ test('question help follows the current page within one category', async ({ page
 test('account selection explains the role of every account', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await page.goto('/#/guided/assets/assets.identify')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const roles = page.locator('.check-group small')
   await expect(roles).toHaveCount(5)
@@ -242,7 +245,7 @@ test('account selection explains the role of every account', async ({ page }, te
 test('future savings allocation is one page with a live 100 percent total', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await page.goto('/#/guided/assets/allocation.tfsa')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   await expect(page.getByRole('heading', { name: '未来新增储蓄准备如何分配到各账户？' })).toBeVisible()
   await expect(page.locator('[data-field^="savingsSplit."]')).toHaveCount(3)
@@ -263,7 +266,7 @@ test('non-registered value and cost base share one page', async ({ page }, testI
   await page.goto('/#/guided/assets/assets.identify')
   await page.getByRole('checkbox', { name: 'Non-registered account', exact: true }).check()
   await page.goto('/#/guided/assets/account.nonReg.balance')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   await expect(page.getByRole('heading', { name: '非注册投资现在值多少，成本基础是多少？' })).toBeVisible()
   await expect(page.locator('[data-field="balances.nonReg"]')).toBeVisible()
@@ -279,7 +282,7 @@ test('intent recommendation updates inline without a confirmation page', async (
   await page.goto('/#/guided/preferences/intent.legacy')
   await page.getByRole('radio', { name: /do not need to reserve/ }).check()
   await page.goto('/#/guided/preferences/intent.spending')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   await page.getByRole('radio', { name: '查看理论支出上限' }).check()
   await expect(page.locator('.intent-recommendation')).toContainText('根据你的选择，结果会这样比较')
@@ -293,7 +296,7 @@ test('intent recommendation updates inline without a confirmation page', async (
 test('investment mix explains annual real return percentages', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await page.goto('/#/guided/preferences/invest.mix')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const explanation = page.locator('.mix-return-explanation')
   await expect(explanation).toContainText('长期预计的年均实际收益率')
@@ -306,7 +309,7 @@ test('investment mix explains annual real return percentages', async ({ page }, 
 
 test('each withdrawal order explains its account sequence and trade-off', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.strategy')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const cards = page.locator('.strategy-question .choice-group label')
   await expect(cards).toHaveCount(4)
@@ -328,7 +331,7 @@ test('each withdrawal order explains its account sequence and trade-off', async 
 
 test('fee and inflation presets are sourced examples, independently editable and persisted', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.fees')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const fee = page.locator('[data-field="fees"] input')
   const inflation = page.locator('[data-field="inflation"] input')
@@ -355,7 +358,7 @@ test('fee and inflation presets are sourced examples, independently editable and
 
 test('tax assumptions explain both inputs and update the worked example', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.tax')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   await expect(page.getByRole('heading', { name: '非注册投资每年产生多少应税收入？按什么税率估算？' })).toBeVisible()
   await expect(page.getByText('未卖出的市值上涨不算在这里。', { exact: false })).toBeVisible()
@@ -378,7 +381,7 @@ test('tax assumptions explain both inputs and update the worked example', async 
 
 test('applying the CPP work-history estimate records an estimate, and age choices explain the trade-off', async ({ page }) => {
   await page.goto('/#/guided/income/cpp.self')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const amount = page.locator('[data-field="cppAnnualAt65"]')
   const age = page.locator('[data-field="cppStartAge"]')
@@ -411,7 +414,7 @@ test('applying the CPP work-history estimate records an estimate, and age choice
 
 test('the OAS estimate is recorded as an estimate while claim-age options confirm the planning inputs', async ({ page }) => {
   await page.goto('/#/guided/income/oas.self')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const amount = page.locator('[data-field="oasAnnualAt65"]')
   const age = page.locator('[data-field="oasStartAge"]')
@@ -448,7 +451,7 @@ test('partner OAS estimate and claim-age options update partner fields', async (
   await page.goto('/#/guided/family/family.people')
   await page.getByRole('radio', { name: /Plan with my partner/ }).check()
   await page.goto('/#/guided/income/oas.partner')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const amount = page.locator('[data-field="partner.oasAnnualAt65"]')
   await page.locator('.estimator summary').click()
@@ -474,7 +477,7 @@ test('Québec QPP offers age 72 guidance for both household members', async ({ p
   await page.goto('/#/guided/family/family.province')
   await page.getByLabel('Province').selectOption('QC')
   await page.goto('/#/guided/income/cpp.partner')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   await expect(page.getByRole('heading', { name: '不知道选几岁？先比较这四种情形' })).toBeVisible()
   await expect(page.getByRole('radio', { name: /72 岁 · 魁省 QPP/ })).toBeVisible()
@@ -489,7 +492,7 @@ test('Québec QPP offers age 72 guidance for both household members', async ({ p
 
 test('final review replaces the redundant assumption page without overwriting confirmed answers', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.fees')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await page.locator('[data-field="fees"] input').fill('0.8')
   await page.getByRole('button', { name: '加拿大央行目标 · 2.0%' }).click()
   await page.goto('/#/guided/preferences/invest.strategy')
@@ -519,7 +522,7 @@ test('final review replaces the redundant assumption page without overwriting co
 })
 
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input, select').first()
   await field('Current age').fill('40')
@@ -531,7 +534,7 @@ test('professional mode runs its full immediate-results UI flow', async ({ page 
 })
 
 test('legacy v6 stores retain professional mode', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
     delete saved.state.entryMode
@@ -543,7 +546,7 @@ test('legacy v6 stores retain professional mode', async ({ page }) => {
     localStorage.setItem('fire-inputs', JSON.stringify(saved))
   })
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Professional', exact: true })).toHaveClass(/active/)
+  await expectMode(page, 'professional')
   await expect(page.locator('.results-column')).toBeVisible()
 })
 

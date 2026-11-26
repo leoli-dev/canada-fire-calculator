@@ -1,6 +1,12 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
-async function fresh(page: import('@playwright/test').Page) {
+async function fresh(page: import('@playwright/test').Page, globalPrivacyControl = false) {
+  // Thorium enables DNT and GPC by default. Exercise each intended signal explicitly.
+  await page.addInitScript(gpc => {
+    Object.defineProperty(Navigator.prototype, 'doNotTrack', { get: () => '0' })
+    Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => gpc })
+  }, globalPrivacyControl)
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
@@ -24,19 +30,20 @@ test('usage statistics stay off until allowed, and the answer can be changed', a
 })
 
 test('a Global Privacy Control signal is a refusal that is never asked about', async ({ page }) => {
-  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true }))
-  await fresh(page)
+  await fresh(page, true)
   await expect(page.getByTestId('analytics-prompt')).toHaveCount(0)
   await expect(page.getByTestId('analytics-footer')).toContainText('usage statistics stay off')
 })
 
 test('blocked site storage still starts the calculator and says the plan is not saved', async ({ page }) => {
-  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', {
-    get() { throw new DOMException('Access is denied', 'SecurityError') },
-  }))
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'doNotTrack', { get: () => '0' })
+    Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => false })
+    Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Access is denied', 'SecurityError') } })
+  })
   await page.goto('/')
   await expect(page.getByTestId('storage-unavailable')).toBeVisible()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('40')
   await expect(page.locator('.results-column')).toBeVisible()
   // The consent answer holds for the session even though it cannot be stored.
@@ -55,7 +62,7 @@ test('the page carries a description and share preview', async ({ page }) => {
 test('on a phone the headline sits above the form and every result question fits', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-320')
   await fresh(page)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const peek = page.getByTestId('result-peek')
   await expect(peek).toBeInViewport()
   const verdict = (await page.locator('.summary .verdict').first().innerText()).trim()
@@ -72,7 +79,7 @@ test('on a phone the headline sits above the form and every result question fits
 test('the peek is hidden where results sit beside the form', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
   await fresh(page)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.results-column')).toBeVisible()
   await expect(page.getByTestId('result-peek')).toBeHidden()
 })

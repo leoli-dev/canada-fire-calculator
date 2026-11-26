@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 const languages = ['EN', 'FR', '中文'] as const
@@ -8,7 +9,7 @@ async function compareGuidedAndProfessionalHelp(page: Page, fieldId: string) {
   const why = await guided.locator('p').first().innerText()
   const find = await guided.locator('p').nth(1).evaluate(element => element.textContent?.replace(element.querySelector('strong')?.textContent ?? '', '').trim() ?? '')
   const facts = await guided.locator(`[data-content-field="${fieldId}"]`).innerText()
-  await page.locator('.entry-mode button').nth(1).click()
+  await chooseMode(page, 'professional')
   const professional = page.getByTestId(`professional-help-${fieldId}`)
   await professional.locator('.ui-field-help').click()
   await expect(professional.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
@@ -21,7 +22,7 @@ async function compareGuidedAndProfessionalHelp(page: Page, fieldId: string) {
   await expect(professional.getByRole('dialog')).toHaveCount(0)
   await expect(professional.locator('.ui-field-help')).toBeFocused()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.locator('.entry-mode button').first().click()
+  await chooseMode(page, 'guided')
 }
 
 test.beforeEach(async ({ page }) => {
@@ -33,7 +34,7 @@ test.beforeEach(async ({ page }) => {
 test('savings question and Professional field share source, unit and unknown meaning in EN/FR/ZH', async ({ page }) => {
   const initialRevision = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs') ?? '{"state":{"inputRevision":0}}').state.inputRevision)
   for (const language of languages) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await page.goto('/#/guided/saving/saving.amount')
     await compareGuidedAndProfessionalHelp(page, 'annualSavings')
   }
@@ -44,7 +45,7 @@ test('planned mortgage content appears only when applicable and stays shared in 
   await page.goto('/#/guided/housing/home.situation')
   await page.getByRole('radio', { name: 'Planned purchase' }).check()
   for (const language of languages) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await page.goto('/#/guided/housing/purchase.loan')
     await compareGuidedAndProfessionalHelp(page, 'principalResidence.annualMortgagePayment')
   }

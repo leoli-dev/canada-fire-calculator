@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
 const harness = '/tests/e2e/fixtures/ui-foundation-harness.html'
@@ -33,9 +34,9 @@ test('directory controls and row grids preserve desktop geometry and mobile visi
     const layout = await page.locator('.questionnaire-layout').boundingBox()
     const directory = await page.locator('.directory-shell').boundingBox()
     const question = await page.locator('.questionnaire-main').boundingBox()
-    expect(directory!.width).toBe(240)
-    expect(question!.width).toBeCloseTo(Math.min(720, layout!.width - 296), 0)
-    expect(question!.x - directory!.x).toBe(296)
+    expect(directory!.width).toBe(248)
+    expect(question!.width).toBeCloseTo(Math.min(640, layout!.width - 288 - (width >= 1280 ? 340 : 0)), 0)
+    expect(question!.x - directory!.x).toBe(288)
     expect(question!.y).toBe(directory!.y)
     const title = await page.locator('#question-title').boundingBox()
     // Content above the grid can grow; the question must still occupy its first row.
@@ -252,7 +253,7 @@ test('guided sibling fields use 48px inputs and professional errors retain seman
     } }))
   })
   await page.reload()
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
   async function checkInput(input: Locator) {
     await expect(input).toBeVisible()
@@ -268,9 +269,9 @@ test('guided sibling fields use 48px inputs and professional errors retain seman
   await checkInput(page.getByTestId('guided-rrif-opened-legacy:account:rrsp'))
   await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
   await checkInput(page.getByTestId('tfsa-available-room-self'))
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const field = page.locator('label.field').filter({ hasText: 'Target FIRE age' })
   const age = field.locator('input')
   await age.fill('21')

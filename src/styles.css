@@ -1,3 +1,4 @@
+@import "./styles/shell.css";
 @import './styles/tokens.css';
 @layer primitives, legacy;
 
@@ -612,20 +613,6 @@ footer {
 footer p { margin: 0 0 4px; }
 footer .credit a { color: var(--accent); text-decoration: none; }
 footer .credit a:hover { text-decoration: underline; }
-
-/* ---------- github corner ---------- */
-.github-corner { position: fixed; top: 0; right: 0; z-index: var(--z-scrim); }
-.github-corner svg { fill: var(--ink); color: var(--bg); display: block; }
-
-@keyframes octocat-wave {
-  0%, 100% { transform: rotate(0); }
-  20%, 60% { transform: rotate(-25deg); }
-  40%, 80% { transform: rotate(10deg); }
-}
-@media (max-width: 640px) {
-  .github-corner { display: none; }
-  .langs { margin-right: 0; }
-}
 
 /* ---------- glossary ---------- */
 .term {

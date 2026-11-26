@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 // FE-41: the rule sources are collapsed by default; these checks read them opened.
@@ -14,7 +15,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
   await page.evaluate(() => localStorage.clear())
   await page.reload()
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const pack = page.getByTestId('rule-ccb-pack')
   const read = async () => ({
     id: await pack.getAttribute('data-rule-pack-id'),
@@ -38,7 +39,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
   await expect(page.getByTestId('rule-tax-pack')).toHaveAttribute('data-rule-pack-id', 'CA-AB-tax-2026-legacy-v1')
 
   // Guided mode shows the very same pack and period — not a second copy.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   const onGuided = await read()
   expect(onGuided).toEqual(alberta)
@@ -48,9 +49,9 @@ test('the CCB rule pack and payment period are visible and identical in both mod
   await expect(page.getByTestId('rule-ccb-not-modelled')).toContainText('provincial child benefits')
 
   // Switching modes back and forth leaves the selection untouched.
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   expect(await read()).toEqual(alberta)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   expect(await read()).toEqual(alberta)
 

@@ -14,6 +14,8 @@ import { useCad } from '../../format'
 import type { QuestionDefinition } from '../../guided/schema'
 import { guidanceForPage } from '../../guided/pageGuidance'
 import { asksCoupleTotal, questionTitleKey } from '../../guided/questionCatalog'
+import { useGlossary } from '../../glossary'
+import { AnalyticsPrompt } from '../AnalyticsConsent'
 import { NumberInput } from '../NumberInput'
 import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
@@ -40,6 +42,18 @@ function QuestionHelp({ guidanceKey }: { guidanceKey: string }) {
     <Callout as="p" variant="example" className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {guidance.example}</Callout>
     {content && <FieldContentFacts content={content} />}
   </Disclosure>
+}
+
+export function QuestionHelpRail({ guidanceKey }: { guidanceKey: string }) {
+  const { i18n, t } = useTranslation()
+  const openGlossary = useGlossary(s => s.open)
+  const content = contentForPage(guidanceKey)
+  const guidance = content ? contentGuidance(content, i18n.resolvedLanguage ?? i18n.language) : guidanceForPage(guidanceKey, i18n.resolvedLanguage ?? i18n.language)
+  return <aside className="question-help-rail" aria-label={t('questionnaire.helpTitle')}>
+    <h3>{t('ui.whyWeAsk')}</h3><p>{guidance.why}</p>
+    <h3>{t('ui.whereToLook')}</h3><p>{guidance.find}</p>
+    <Button variant="link" onClick={() => openGlossary('fire')}>{t('ui.terms')}</Button>
+  </aside>
 }
 
 function FactNumber(props: { field: string; label: string; value: number; onValue: (value: number) => void; step?: number; unit?: 'canonical' | 'monthly' }) {
@@ -192,7 +206,7 @@ function PensionIndexing(props: {
   </div>
 }
 
-export function QuestionPage({ definition }: { definition: QuestionDefinition }) {
+export function QuestionPage({ definition, categoryProgress }: { definition: QuestionDefinition; categoryProgress?: string }) {
   const { i18n, t } = useTranslation()
   const cad = useCad()
   const {
@@ -741,8 +755,9 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
   }
 
   return <article className="question-page" data-page-id={definition.id}>
-    <p className="question-location">{t(`questionnaire.categories.${definition.categoryId}`)}</p>
+    <p className="question-location">{t(`questionnaire.categories.${definition.categoryId}`)}{categoryProgress && <span> {categoryProgress}</span>}</p>
     <h2 id="question-title" tabIndex={-1}>{t(questionTitleKey(definition, inputs))}</h2>
+    <AnalyticsPrompt />
     {control}
     <QuestionHelp guidanceKey={definition.guidanceKey} />
     {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <Callout as="p" variant="warn" className="pending-note">{t('questionnaire.pendingSaved')}</Callout>}

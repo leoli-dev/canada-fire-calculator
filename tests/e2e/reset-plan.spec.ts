@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /** FE-21: one confirmed reset in both modes; cancel changes nothing. */
@@ -57,7 +58,7 @@ test('confirming clears both plans and the backup, keeps preferences, and surviv
 
 test('guided review offers the same reset', async ({ page }) => {
   await seedWithScenario(page)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await page.getByTestId('reset-plan').click()
   await page.getByTestId('reset-confirm').click()

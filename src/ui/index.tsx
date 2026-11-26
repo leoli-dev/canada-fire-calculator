@@ -108,8 +108,13 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
         const active = document.activeElement as HTMLElement
         const index = items.indexOf(active)
         if (!items.length) { event.preventDefault(); panel.current?.focus() }
-        else if (event.shiftKey && (index < 0 || items.slice(0, index).every(item => sameRadioGroup(active, item)))) { event.preventDefault(); items[items.length - 1].focus() }
-        else if (!event.shiftKey && (index < 0 || items.slice(index + 1).every(item => sameRadioGroup(active, item)))) { event.preventDefault(); items[0].focus() }
+        else {
+          // A programmatically focused heading can sit between native tab stops.
+          const preceding = index < 0 ? items.filter(item => active.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_PRECEDING) : items.slice(0, index)
+          const following = index < 0 ? items.filter(item => active.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING) : items.slice(index + 1)
+          if (event.shiftKey && preceding.every(item => sameRadioGroup(active, item))) { event.preventDefault(); items[items.length - 1].focus() }
+          else if (!event.shiftKey && following.every(item => sameRadioGroup(active, item))) { event.preventDefault(); items[0].focus() }
+        }
       }
     }
     const focusIn = (event: FocusEvent) => { if (panel.current && !panel.current.contains(event.target as Node)) (focusable()[0] ?? panel.current).focus() }

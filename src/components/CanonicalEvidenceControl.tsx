@@ -1,4 +1,4 @@
-import { Field, Button } from '../ui'
+import { Field, Button, Segmented } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
@@ -50,10 +50,10 @@ export function CanonicalEvidenceControl() {
     {state.canonical?.deterministicProjection && <fieldset data-testid="canonical-return-budget">
       <legend>{t('canonical.returnBudgetTitle')}</legend>
       <p className="hint">{t('canonical.returnBudgetHint')}</p>
-      <Field><input type="radio" name="canonical-return-budget" data-testid="canonical-return-savings"
-        checked={state.canonical.deterministicProjection.estimateBudgetMode === 'savingsBudget'} onChange={() => chooseReturnMode('savingsBudget')} />{t('budget.modeSavings')}</Field>
-      <Field><input type="radio" name="canonical-return-budget" data-testid="canonical-return-income"
-        checked={state.canonical.deterministicProjection.estimateBudgetMode === 'incomeBudget'} onChange={() => chooseReturnMode('incomeBudget')} />{t('budget.modeIncome')}</Field>
+      <Segmented aria-label={t('canonical.returnBudgetTitle')}>
+        <Button data-testid="canonical-return-savings" aria-pressed={state.canonical.deterministicProjection.estimateBudgetMode === 'savingsBudget'} onClick={() => chooseReturnMode('savingsBudget')}>{t('budget.modeSavings')}</Button>
+        <Button data-testid="canonical-return-income" aria-pressed={state.canonical.deterministicProjection.estimateBudgetMode === 'incomeBudget'} onClick={() => chooseReturnMode('incomeBudget')}>{t('budget.modeIncome')}</Button>
+      </Segmented>
     </fieldset>}
     <Field>{t('canonical.working')}<input data-testid="canonical-working-spending" type="text" inputMode="decimal" autoComplete="off" aria-invalid={working.trim() !== '' && workingAmount === null || undefined} value={working} onChange={e => setWorking(e.target.value)} /></Field>
     <Field>{t('canonical.retired')}<input data-testid="canonical-retirement-spending" type="text" inputMode="decimal" autoComplete="off" aria-invalid={retired.trim() !== '' && retiredAmount === null || undefined} value={retired} onChange={e => setRetired(e.target.value)} /></Field>

@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { phaseTransitionPlan, phaseTransitionSpending } from '../../src/engine/__tests__/fixtures/phaseTransition'
@@ -36,7 +37,7 @@ async function disable(page: Page) {
 async function professional(page: Page) {
   await page.clock.setFixedTime(new Date('2026-11-25T12:00:00Z'))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
 }
 
 async function expectExcludedEstimate(page: Page) {
@@ -164,9 +165,9 @@ for (const activation of ['click', 'keyboard']) {
     if (hasReturnChoice) {
       await openEvidence(page)
       await expect(returnBudget).toHaveAccessibleName('Budget mode when returning to the planning estimate')
-      await expect(returnBudget.getByTestId('canonical-return-savings')).toBeChecked()
+      await expect(returnBudget.getByTestId('canonical-return-savings')).toHaveAttribute('aria-pressed', 'true')
       await expect(explicitIncome).toHaveAccessibleName(/Income and spending/)
-      await expect(explicitIncome).not.toBeChecked()
+      await expect(explicitIncome).toHaveAttribute('aria-pressed', 'false')
     }
     const control = hasReturnChoice ? explicitIncome : activeIncome
     const activate = async () => {
@@ -185,7 +186,7 @@ for (const activation of ['click', 'keyboard']) {
     expect(changed.questionAnswers['budget.method']).toBe(before.questionAnswers['budget.method'])
     await expect(activeIncome).toBeChecked()
     await openEvidence(page)
-    await expect(control).toBeChecked()
+    await expect(control).toHaveAttribute('aria-pressed', 'true')
     await activate()
     expect((await state(page)).inputRevision).toBe(changed.inputRevision)
     await page.reload()
@@ -208,13 +209,13 @@ test('a saved canonical plan with no return preference shows localized choices w
     { button: 'FR', lang: 'fr', ledger: 'Registre annuel canonique', legend: 'Mode budgétaire au retour à l’estimation' },
     { button: '中文', lang: 'zh-Hans', ledger: '标准年度账本', legend: '返回规划估算时的预算模式' },
   ]) {
-    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await chooseLanguage(page, locale.button)
     await expect(page.locator('html')).toHaveAttribute('lang', locale.lang)
     await expect(page.getByTestId('canonical-evidence').locator('summary')).toHaveText(locale.ledger)
     await openEvidence(page)
     await expect(returnBudget).toHaveAccessibleName(locale.legend)
-    await expect(returnBudget.getByTestId('canonical-return-savings')).not.toBeChecked()
-    await expect(returnBudget.getByTestId('canonical-return-income')).not.toBeChecked()
+    await expect(returnBudget.getByTestId('canonical-return-savings')).toHaveAttribute('aria-pressed', 'false')
+    await expect(returnBudget.getByTestId('canonical-return-income')).toHaveAttribute('aria-pressed', 'false')
   }
 })
 

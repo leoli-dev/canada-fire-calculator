@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -242,7 +243,7 @@ test('guided mode records the same FHSA facts and keeps explicit generate', asyn
   await expect(page.getByTestId('fhsa-opened-year-self')).toHaveValue('2026')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('8,000')
   // The same recorded facts show in professional mode.
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('fhsa-opened-year-self')).toHaveValue('2026')
   await expect(page.getByTestId('fhsa-ledger-self')).toContainText('8,000')
   expect(await inViewport(page)).toBe(true)
@@ -395,10 +396,10 @@ test('the FHSA room block explains itself in EN, FR and ZH', async ({ page }) =>
   const panel = page.getByTestId('fhsa-statement-self')
   await expect(page.getByTestId('person-tax-facts')).toContainText('FHSA contribution room')
   await expect(panel).toContainText('FHSA participation room belongs to the account holder')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(page.getByTestId('person-tax-facts')).toContainText('Droits de cotisation au CELIAPP')
   await expect(panel).toContainText('titulaire du compte')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.getByTestId('person-tax-facts')).toContainText('FHSA 供款空间')
   await expect(panel).toContainText('账户持有人')
   expect(await inViewport(page)).toBe(true)
@@ -680,7 +681,7 @@ test('guided records the same couple FHSA holder and survives the mode switch', 
   await expect(page.getByTestId('owner-choice-legacy:account:fhsa-partner')).toBeChecked()
   // The holder survives the guided/professional switch, which rebuilds the
   // canonical plan from the legacy form.
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('owner-legacy:account:fhsa')).toHaveValue('legacy:person:partner')
   await expect(page.getByTestId('fhsa-planned-partner')).toHaveValue('6,000')
   expect(await ownershipState(page)).toMatchObject({

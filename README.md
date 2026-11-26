@@ -2,6 +2,8 @@
 
 **English** · [Français](README_FR.md) · [中文](README_CN.md)
 
+Retire early, the Canadian way. TFSA, RRSP, CPP/QPP and OAS, modelled properly.
+
 A FIRE (Financial Independence, Retire Early) calculator built **specifically for
 Canadians**. Generic 4%-rule tools ignore everything that actually decides a Canadian
 early retirement: account tax treatment (TFSA / RRSP / non-registered), CPP/QPP and
