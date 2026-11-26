@@ -188,6 +188,56 @@ for (const position of ['middle', 'trailing']) {
   }
 }
 
+test('sheet preserves native stops between unchecked trailing radios in both directions', async ({ page }) => {
+  const query = '?radios=trailing&interleaved=suffix'
+  async function sequence(key: string, count: number) {
+    const names = []
+    for (let step = 0; step < count; step++) {
+      await page.keyboard.press(key)
+      names.push(await page.evaluate(() => {
+        const active = document.activeElement as HTMLInputElement
+        return active.type === 'radio' ? active.value : active.textContent
+      }))
+    }
+    return names
+  }
+  await page.goto(`${harness}${query}&native=1`)
+  await page.getByRole('button', { name: 'First action' }).focus()
+  const nativeForward = await sequence('Tab', 3)
+  expect(nativeForward).toEqual(['one', 'Between options', 'After fixture'])
+  await page.goto(`${harness}${query}&native=1`)
+  await page.getByRole('button', { name: 'After fixture' }).focus()
+  const nativeReverse = await sequence('Shift+Tab', 3)
+  expect(nativeReverse).toEqual(['two', 'Between options', 'First action'])
+
+  await page.goto(`${harness}${query}`)
+  await page.getByRole('button', { name: 'Open sheet' }).click()
+  await page.getByRole('button', { name: 'First action' }).focus()
+  expect(await sequence('Tab', 2)).toEqual(nativeForward.slice(0, 2))
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Close sheet' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Open sheet' }).click()
+  expect(await sequence('Shift+Tab', 3)).toEqual(nativeReverse)
+})
+
+test('sheet does not reverse-wrap past an independent stop between prefix radios', async ({ page }) => {
+  const query = '?radios=trailing&interleaved=prefix'
+  async function reverseEntry() {
+    await page.getByRole('radio', { name: 'Two', exact: true }).focus()
+    await expect(page.getByRole('radio', { name: 'Two', exact: true })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(page.getByRole('button', { name: 'Between options' })).toBeFocused()
+  }
+  await page.goto(`${harness}${query}&native=1`)
+  await reverseEntry()
+  await page.goto(`${harness}${query}`)
+  await page.getByRole('button', { name: 'Open sheet' }).click()
+  await reverseEntry()
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: 'First action' })).toBeFocused()
+})
+
 test('guided sibling fields use 48px inputs and professional errors retain semantic borders', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')

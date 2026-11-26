@@ -51,7 +51,7 @@ function tabbableElements(root: HTMLElement | null): HTMLElement[] {
   const candidates = Array.from(root?.querySelectorAll<HTMLElement>('a[href], area[href], button, input, select, textarea, summary, iframe, [contenteditable], [tabindex]') ?? [])
   const visible = candidates.filter(element => {
     const tabIndex = !element.hasAttribute('tabindex') && element.isContentEditable ? 0 : element.tabIndex
-    if (tabIndex < 0 || element.matches(':disabled, input[type="hidden"]') || element.closest('[hidden], [inert]')) return false
+    if (tabIndex < 0 || element.matches(':disabled, input[type="hidden"], [data-ui-focus-guard]') || element.closest('[hidden], [inert]')) return false
     if (element.tagName === 'SUMMARY' && element.parentElement?.querySelector(':scope > summary') !== element) return false
     const visibility = getComputedStyle(element).visibility
     if (visibility === 'hidden' || visibility === 'collapse') return false
@@ -81,10 +81,17 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
   const generatedId = useId()
   const titleId = `${id ?? generatedId}-title`
   const panel = useRef<HTMLDivElement>(null)
+  const backwards = useRef(false)
+  // Native radio traversal can skip remaining group members and reach a guard instead of a listed boundary.
+  const focusBoundary = () => {
+    const items = tabbableElements(panel.current)
+    ;(backwards.current ? items[items.length - 1] : items[0])?.focus()
+  }
   const close = useRef(onClose)
   close.current = onClose
   useEffect(() => {
     if (!open) return
+    backwards.current = false
     const previous = document.activeElement as HTMLElement | null
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -93,12 +100,16 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current() }
       if (event.key === 'Tab') {
+        backwards.current = event.shiftKey
         const items = focusable()
+        const startGuard = panel.current?.querySelector<HTMLElement>('[data-ui-focus-guard="start"]')
+        // A positive tabindex must not precede the reverse-wrap guard in native tab order.
+        if (startGuard) startGuard.tabIndex = items[0]?.tabIndex > 0 ? items[0].tabIndex : 0
         const active = document.activeElement as HTMLElement
         const index = items.indexOf(active)
         if (!items.length) { event.preventDefault(); panel.current?.focus() }
-        else if (event.shiftKey && (index <= 0 || sameRadioGroup(active, items[0]))) { event.preventDefault(); items[items.length - 1].focus() }
-        else if (!event.shiftKey && (index < 0 || index === items.length - 1 || sameRadioGroup(active, items[items.length - 1]))) { event.preventDefault(); items[0].focus() }
+        else if (event.shiftKey && (index < 0 || items.slice(0, index).every(item => sameRadioGroup(active, item)))) { event.preventDefault(); items[items.length - 1].focus() }
+        else if (!event.shiftKey && (index < 0 || items.slice(index + 1).every(item => sameRadioGroup(active, item)))) { event.preventDefault(); items[0].focus() }
       }
     }
     const focusIn = (event: FocusEvent) => { if (panel.current && !panel.current.contains(event.target as Node)) (focusable()[0] ?? panel.current).focus() }
@@ -107,7 +118,7 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
     return () => { document.removeEventListener('keydown', keyDown, true); document.removeEventListener('focusin', focusIn); document.body.style.overflow = overflow; previous?.focus() }
   }, [open])
   if (!open) return null
-  return <div className="ui-sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><div ref={panel} id={id} className="ui-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><div className="ui-sheet-handle" aria-hidden="true" /><div className="ui-sheet-header"><h2 id={titleId}>{title}</h2><Button aria-label={closeLabel} variant="ghost" onClick={onClose}>×</Button></div><div className="ui-sheet-body">{children}</div></div></div>
+  return <div className="ui-sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><div ref={panel} id={id} className="ui-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><span className="sr-only" tabIndex={0} data-ui-focus-guard="start" onFocus={focusBoundary} /><div className="ui-sheet-handle" aria-hidden="true" /><div className="ui-sheet-header"><h2 id={titleId}>{title}</h2><Button aria-label={closeLabel} variant="ghost" onClick={onClose}>×</Button></div><div className="ui-sheet-body">{children}</div><span className="sr-only" tabIndex={0} data-ui-focus-guard="end" onFocus={focusBoundary} /></div></div>
 }
 
 /** Kept outside its label to avoid nested interactive controls. */
