@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import '../../i18n'
+import i18n from '../../i18n'
 import { ResultSection, ResultsNavigation } from '../ResultsNavigation'
 import { ChartLegend, useChartSeries } from '../ChartLegend'
 
@@ -94,7 +94,7 @@ it.each(['pane', 'document'])('selects the last applicable section at a manual %
 it('toggles individual series with native button keyboard controls and retains their labels and colors', async () => {
   function Legend() {
     const state = useChartSeries()
-    return <ChartLegend title="Balances" series={[{ key: 'rrsp', label: 'RRSP', color: 'blue' }, { key: 'tfsa', label: 'TFSA', color: 'green' }]} {...state} />
+    return <ChartLegend title={i18n.t('ui.results.balances')} series={[{ key: 'rrsp', label: 'RRSP', color: 'blue' }, { key: 'tfsa', label: 'TFSA', color: 'green' }]} {...state} />
   }
   render(<Legend />)
   const rrsp = screen.getByRole('button', { name: 'RRSP' }), tfsa = screen.getByRole('button', { name: 'TFSA' })
