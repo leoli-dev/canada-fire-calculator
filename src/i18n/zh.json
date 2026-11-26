@@ -1,4 +1,5 @@
 {
+  "ui": { "close": "关闭" },
   "title": "🇨🇦 加拿大 FIRE 计算器",
   "budget": {
     "title": "储蓄金额的口径",

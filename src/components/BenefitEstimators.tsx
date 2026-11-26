@@ -1,3 +1,4 @@
+import { Field, Disclosure, Button } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -18,13 +19,13 @@ function Row(props: {
   onChange: (v: number) => void
 }) {
   return (
-    <label className="field">
+    <Field className="field">
       <span><Jargon text={props.label} /></span>
       <NumberInput
         value={props.value}
         onChange={(v) => props.onChange(v ?? 0)}
       />
-    </label>
+    </Field>
   )
 }
 
@@ -49,7 +50,7 @@ export function CppEstimator(props: {
   const estimate = estimateCppAt65(startWorkAge, props.retireAge, ratio / 100)
 
   return (
-    <details className="estimator"
+    <Disclosure className="estimator"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'cpp_estimator' })}>
       <summary>{t('estCppTitle')}</summary>
       <Row label={t('estStartWorkAge')} value={startWorkAge} onChange={setStartWorkAge} />
@@ -59,7 +60,7 @@ export function CppEstimator(props: {
         <span>
           {t('estResult')}: <strong>{cad(estimate)}</strong>
         </span>
-        <button
+        <Button
           type="button"
           onClick={() => {
             track('estimator_apply', { which: 'cpp' })
@@ -74,10 +75,10 @@ export function CppEstimator(props: {
           }}
         >
           {t('estApply')}
-        </button>
+        </Button>
       </div>
       <p className="hint"><Jargon text={t('cppEstNote')} /></p>
-    </details>
+    </Disclosure>
   )
 }
 
@@ -97,7 +98,7 @@ export function OasEstimator(props: {
   const estimate = estimateOasAt65(residence)
 
   return (
-    <details className="estimator"
+    <Disclosure className="estimator"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'oas_estimator' })}>
       <summary>{t('estOasTitle')}</summary>
       <Row label={t('estResidence')} value={residence} onChange={setResidence} />
@@ -106,7 +107,7 @@ export function OasEstimator(props: {
         <span>
           {t('estResult')}: <strong>{cad(estimate)}</strong>
         </span>
-        <button
+        <Button
           type="button"
           onClick={() => {
             track('estimator_apply', { which: 'oas' })
@@ -117,9 +118,9 @@ export function OasEstimator(props: {
           }}
         >
           {t('estApply')}
-        </button>
+        </Button>
       </div>
       <p className="hint"><Jargon text={t('oasEstNote')} /></p>
-    </details>
+    </Disclosure>
   )
 }

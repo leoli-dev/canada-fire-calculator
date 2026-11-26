@@ -1,3 +1,4 @@
+import { Disclosure, StatusChip } from '../ui'
 import { useTranslation } from 'react-i18next'
 import { marginalRate, type Inputs, type ProjectionResult } from '../engine'
 import { useCad } from '../format'
@@ -20,7 +21,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
   const hasDebt = rows.some((r) => r.debtPayment > 0 || r.debtBalance > 0)
 
   return (
-    <details className="chart-card collapsible"
+    <Disclosure className="chart-card collapsible"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'year_table' })}>
       <summary><h3>{t('yearTableTitle')}</h3></summary>
       <p className="hint"><Jargon text={t('yearTableNote')} /></p>
@@ -56,7 +57,7 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
                 <tr key={r.age} className={r.phase === 'pension' ? '' : 'bridge-row'}>
                   <td>
                     {r.age}
-                    {r.shortfall > 1 && <span className="tag poor-tag">!</span>}
+                    {r.shortfall > 1 && <StatusChip className="tag poor-tag">!</StatusChip>}
                   </td>
                   <td className="num">{cad(r.withdrawals.rrsp)}</td>
                   <td className="num">{cad(r.withdrawals.nonReg)}</td>
@@ -79,6 +80,6 @@ export function YearTable(props: { result: ProjectionResult; inputs: Inputs }) {
           </tbody>
         </table>
       </div>
-    </details>
+    </Disclosure>
   )
 }

@@ -1,3 +1,4 @@
+import { Button, Field } from '../ui'
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -116,11 +117,11 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
       <tr className={hasChildren || row.kind === 'group' ? 'annual-sheet-group' : undefined}>
         <th scope="row" aria-label={text(row.label)} id={`${id}-row-${row.id}`} ref={node => { if (node) rowHeaders.current.set(row.id, node); else rowHeaders.current.delete(row.id) }}>
           <div style={{ paddingInlineStart: depth * 10 }}>
-            {hasChildren && <button type="button" aria-expanded={expanded} aria-label={text(row.label)} onClick={() => setCollapsed(current => {
+            {hasChildren && <Button type="button" aria-expanded={expanded} aria-label={text(row.label)} onClick={() => setCollapsed(current => {
               const next = new Set(current); if (next.has(row.id)) next.delete(row.id); else next.add(row.id); return next
-            })}>{expanded ? '−' : '+'}</button>}
+            })}>{expanded ? '−' : '+'}</Button>}
             <span>{text(row.label)}</span>
-            {(row.kind !== 'group' || row.cells) && <button type="button" className="annual-sheet-inspect" aria-label={`${copy.inspect}: ${text(row.label)}, ${year}`} onClick={event => inspect(row, year, event.currentTarget)}>{copy.details}</button>}
+            {(row.kind !== 'group' || row.cells) && <Button type="button" className="annual-sheet-inspect" aria-label={`${copy.inspect}: ${text(row.label)}, ${year}`} onClick={event => inspect(row, year, event.currentTarget)}>{copy.details}</Button>}
           </div>
         </th>
         {model.years.map(column => <td key={column.year} headers={`${id}-row-${row.id} ${id}-year-${column.year}`} onClick={row.kind === 'group' && !row.cells ? undefined : event => inspect(row, column.year, event.currentTarget)}>
@@ -147,17 +148,17 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     <div className="annual-sheet-layout">
       <header className="annual-sheet-header">
         <div><h2 id={`${id}-title`}>{text(model.title) || copy.title}</h2><p id={`${id}-scope`}>{text(model.scope)} · {copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</p></div>
-        <button ref={closeButton} type="button" onClick={onClose}>{copy.close}</button>
+        <Button ref={closeButton} type="button" onClick={onClose}>{copy.close}</Button>
       </header>
       <div className="annual-sheet-tools"><div className="annual-sheet-controls">
-        <label>{copy.jump} <select value={year} onChange={event => { jump(Number(event.target.value)); setJumpReason('') }}>{model.years.map(column => <option key={column.year} value={column.year}>{column.year}</option>)}</select></label>
-        {model.jumps?.map(target => <button type="button" key={target.id} disabled={!model.years.some(column => column.year === target.year)} onClick={() => { jump(target.year, target.rowId); setJumpReason(`${text(target.label)}: ${target.year}${target.reason ? ` — ${text(target.reason)}` : ''}`) }}>{text(target.label)} ({target.year})</button>)}
+        <Field>{copy.jump} <select value={year} onChange={event => { jump(Number(event.target.value)); setJumpReason('') }}>{model.years.map(column => <option key={column.year} value={column.year}>{column.year}</option>)}</select></Field>
+        {model.jumps?.map(target => <Button type="button" key={target.id} disabled={!model.years.some(column => column.year === target.year)} onClick={() => { jump(target.year, target.rowId); setJumpReason(`${text(target.label)}: ${target.year}${target.reason ? ` — ${text(target.reason)}` : ''}`) }}>{text(target.label)} ({target.year})</Button>)}
       </div>
       <p className="annual-sheet-help">{copy.choose}</p>
       <span className="annual-sheet-announcement" role="status">{jumpReason}</span>
       </div>
       {selection && <aside ref={detail} tabIndex={-1} className="annual-sheet-detail" aria-label={copy.details}>
-        <button type="button" onClick={() => { setSelection(null); if (detailTrigger.current?.isConnected) detailTrigger.current.focus({ preventScroll: true }); else dialog.current?.querySelector('button')?.focus() }}>{copy.hide}</button>
+        <Button type="button" onClick={() => { setSelection(null); if (detailTrigger.current?.isConnected) detailTrigger.current.focus({ preventScroll: true }); else dialog.current?.querySelector('button')?.focus() }}>{copy.hide}</Button>
         <h3>{text(selection.row.label)} · {selection.year}: {cellValue(selectedCell, selection.year, true)}</h3>
         <dl>
           <dt>{copy.status}</dt><dd>{copy[selectedStatus]}</dd>

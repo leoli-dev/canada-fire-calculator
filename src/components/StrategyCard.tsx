@@ -1,3 +1,4 @@
+import { Disclosure, StatusChip, Button } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { Inputs } from '../engine'
 import { useAnalysis, useCardOpen } from '../analysis/useAnalysis'
@@ -14,14 +15,14 @@ export function StrategyCard(props: { inputs: Inputs }) {
   const [open, setOpen] = useCardOpen('strategy')
   const analysis = useAnalysis('strategy', props.inputs, open)
   return (
-    <details className="chart-card collapsible" open={open}
+    <Disclosure className="chart-card collapsible" open={open}
       onToggle={(e) => {
         setOpen(e.currentTarget.open)
         if (e.currentTarget.open && !open) track('panel_open', { panel: 'strategy_comparison' })
       }}>
       <summary><h3>{t('strategyTitle')}</h3></summary>
       {open && <AnalysisBody analysis={analysis}>{(scan, stale) => <StrategyBody inputs={props.inputs} scan={scan} stale={stale} />}</AnalysisBody>}
-    </details>
+    </Disclosure>
   )
 }
 
@@ -55,8 +56,8 @@ function StrategyBody(props: { inputs: Inputs; scan: AnalysisResult<'strategy'>;
               <tr key={r.strategy} className={isCurrent ? 'current-row' : ''}>
                 <td>
                   <Jargon text={t(`strat_${r.strategy}`)} />
-                  {isCurrent && <span className="tag">{t('current')}</span>}
-                  {isBest && <span className="tag best">{t('best')}</span>}
+                  {isCurrent && <StatusChip className="tag">{t('current')}</StatusChip>}
+                  {isBest && <StatusChip className="tag best">{t('best')}</StatusChip>}
                 </td>
                 <td>
                   {assessed.status === 'feasible'
@@ -72,7 +73,7 @@ function StrategyBody(props: { inputs: Inputs; scan: AnalysisResult<'strategy'>;
                 </td>
                 <td className="num">
                   {!isCurrent && assessed.status === 'feasible' && (
-                    <button
+                    <Button
                       type="button"
                       className="use-strategy"
                       disabled={props.stale}
@@ -82,7 +83,7 @@ function StrategyBody(props: { inputs: Inputs; scan: AnalysisResult<'strategy'>;
                       }}
                     >
                       {t('useStrategy')}
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

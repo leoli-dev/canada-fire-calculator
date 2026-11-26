@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
-    include: ['src/**/__tests__/**/*.test.ts'],
+    css: { include: [/tokens\.css/] },
+    include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
   },
 })

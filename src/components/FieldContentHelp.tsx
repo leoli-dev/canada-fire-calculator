@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { contentGuidance, type FieldContent } from '../content/fieldContent'
+import { FieldHelp } from '../ui'
 
 export function FieldContentFacts({ content }: { content: FieldContent }) {
   const { t } = useTranslation()
@@ -11,10 +12,11 @@ export function FieldContentFacts({ content }: { content: FieldContent }) {
 export function ProfessionalFieldHelp({ content }: { content: FieldContent }) {
   const { i18n, t } = useTranslation()
   const guidance = contentGuidance(content, i18n.resolvedLanguage ?? i18n.language)
-  return <details className="professional-field-help" data-testid={`professional-help-${content.fieldId}`}>
-    <summary>{t('fieldContent.helpTitle')}</summary>
+  return <div className="professional-field-help" data-testid={`professional-help-${content.fieldId}`}>
+    <FieldHelp title={t('fieldContent.helpTitle')} closeLabel={t('ui.close')}>
     <p>{guidance.why}</p>
     <p>{guidance.find}</p>
     <FieldContentFacts content={content} />
-  </details>
+    </FieldHelp>
+  </div>
 }

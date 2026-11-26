@@ -1,3 +1,4 @@
+import { ChoiceCard, Button } from '../../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2, Property } from '../../engine/model'
@@ -26,11 +27,11 @@ function OwnerChoices({ name, value, splitLabel, allowSplit, onChange }: {
     ...(allowSplit ? [{ value: 'split' as const, label: splitLabel }] : []),
   ]
   return <div className="owner-choices" role="radiogroup" data-testid={`owner-choice-${name}`}>
-    {options.map(option => <label key={option.value} className={value === option.value ? 'selected' : ''}>
+    {options.map(option => <ChoiceCard key={option.value} className={value === option.value ? 'selected' : ''}>
       <input type="radio" name={`owner-${name}`} value={option.value} checked={value === option.value}
         data-testid={`owner-choice-${name}-${option.value}`} onChange={() => onChange(option.value)} />
       <span>{option.label}</span>
-    </label>)}
+    </ChoiceCard>)}
   </div>
 }
 
@@ -169,14 +170,14 @@ export function SpouseSupportQuestion({ plan }: { plan: InputsV2 }) {
     { value: 'unknown', label: t('questionnaire.choice.unknown') },
   ]
   return <div className="choice-group" role="radiogroup" data-testid="guided-spouse-support">
-    {options.map(option => <label key={option.value} className={value === option.value ? 'selected' : ''}>
+    {options.map(option => <ChoiceCard key={option.value} className={value === option.value ? 'selected' : ''}>
       <input type="radio" name="family.spouseSupport" value={option.value} checked={value === option.value}
         onChange={() => {
           setQuestionAnswer('family.spouseSupport', option.value)
           commitCanonicalEdit(draft => setSpouseSupport(draft, option.value === 'unknown' ? null : option.value === 'yes'))
         }} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
-    </label>)}
+    </ChoiceCard>)}
   </div>
 }
 
@@ -208,8 +209,8 @@ export function QcDrugCoverageQuestion({ plan }: { plan: InputsV2 }) {
   return <div data-testid="guided-qc-drug">
     <p className="question-intro">{t('questionnaire.qcDrug.intro')}</p>
     <QcDrugCoverageEditor plan={plan} variant="cards" />
-    {!qcCoverageComplete(plan) && <button type="button" className="text-action" aria-pressed={answer === 'unknown'}
-      onClick={() => setQuestionAnswer('family.qcDrug', 'unknown')}>{t('guidedUnknown')}</button>}
+    {!qcCoverageComplete(plan) && <Button variant="link" type="button" className="text-action" aria-pressed={answer === 'unknown'}
+      onClick={() => setQuestionAnswer('family.qcDrug', 'unknown')}>{t('guidedUnknown')}</Button>}
     <p className="hint">{t('be35.publicLimit')}</p>
   </div>
 }

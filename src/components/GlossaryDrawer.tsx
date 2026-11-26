@@ -1,3 +1,4 @@
+import { Button } from '../ui'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useGlossary } from '../glossary'
@@ -28,15 +29,15 @@ export function GlossaryDrawer() {
         <header>
           <div className="drawer-title-row">
             {history.length > 1 && (
-              <button type="button" className="drawer-back" onClick={back} aria-label={t('drawerBack')}>
+              <Button type="button" className="drawer-back" onClick={back} aria-label={t('drawerBack')}>
                 ‹
-              </button>
+              </Button>
             )}
             <h2>{t(`glossary.${term}.title`)}</h2>
           </div>
-          <button type="button" className="drawer-close" onClick={close} aria-label={t('close')}>
+          <Button type="button" className="drawer-close" onClick={close} aria-label={t('close')}>
             ×
-          </button>
+          </Button>
         </header>
         <div className="drawer-body">
           <Jargon text={t(`glossary.${term}.body`)} />

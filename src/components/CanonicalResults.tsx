@@ -1,3 +1,4 @@
+import { Segmented, Button } from '../ui'
 import { annualSheetText, type AnnualSheetModel } from '../annualSheet'
 import { canonicalStopText } from '../canonicalAnnualSheet'
 import { useTranslation } from 'react-i18next'
@@ -17,7 +18,7 @@ export function CanonicalResults({ result, model }: { result: CanonicalDetermini
   const uncomputed = coverage?.uncomputedYears ?? (blockedYear !== null ? Array.from({ length: Math.max(0, result.requestedYears - 1) }, (_, i) => result.requestedStartYear + i + 1) : [])
   return <section className="chart-card" data-testid="canonical-results">
     <h2>{t('canonical.title')}</h2>
-    <div className="segmented"><button type="button" onClick={() => setDisplayMode('real')} aria-pressed={displayMode === 'real'}>{t('display_real')}</button><button type="button" onClick={() => setDisplayMode('nominal')} aria-pressed={displayMode === 'nominal'}>{t('display_nominal')}</button></div>
+    <Segmented className="segmented"><Button type="button" onClick={() => setDisplayMode('real')} aria-pressed={displayMode === 'real'}>{t('display_real')}</Button><Button type="button" onClick={() => setDisplayMode('nominal')} aria-pressed={displayMode === 'nominal'}>{t('display_nominal')}</Button></Segmented>
     <p role="status" data-testid="canonical-status">{t(`canonical.status.${result.status}`)}</p>
     {result.requestedYears > 0 ? <p>{t('canonical.horizon', { from: result.requestedStartYear, to: result.requestedStartYear + result.requestedYears - 1, count: coverage?.rows.length ?? 0 })}</p> : <p>{t('canonical.invalidHorizon')}</p>}
     <p>{t('canonical.limitations')}</p>

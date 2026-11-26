@@ -1,4 +1,5 @@
 {
+  "ui": { "close": "Fermer" },
   "title": "🇨🇦 Calculateur FIRE Canada",
   "budget": {
     "title": "Ce que signifie le montant d’épargne",

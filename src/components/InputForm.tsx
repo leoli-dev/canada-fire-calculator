@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { Field, Button, Segmented } from '../ui'
+import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_CHILD,
@@ -59,12 +60,15 @@ function Num(props: {
   const editSharedField = useStore((s) => s.editSharedField)
   const content = props.field ? contentForField(props.field) : undefined
   const inputs = useStore((s) => s.inputs)
+  const descriptionId = useId()
   return (
     <>
-      <label className="field">
+      <Field className="field">
         <span><Jargon text={props.label} /></span>
         <NumberInput
-          className={props.issue ? `invalid-${props.issue.severity}` : undefined}
+          className={missingMortgage ? 'invalid-error' : props.issue ? `invalid-${props.issue.severity}` : undefined}
+          invalid={missingMortgage || props.issue?.severity === 'error'}
+          describedBy={[...(missingMortgage ? [`${descriptionId}-mortgage`] : []), ...(props.issue ? [`${descriptionId}-issue`] : [])].join(' ') || undefined}
           value={props.value}
           draft={draft}
           preserveInvalidDraft={!!props.field}
@@ -82,13 +86,13 @@ function Num(props: {
             props.onChange(v ?? 0)
           }}
         />
-        {missingMortgage && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
+        {missingMortgage && <em id={`${descriptionId}-mortgage`} className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
         {props.issue && (
-          <em className={`field-issue ${props.issue.severity}`}>
+          <em id={`${descriptionId}-issue`} className={`field-issue ${props.issue.severity}`}>
             {t(props.issue.key, props.issue.params)}
           </em>
         )}
-      </label>
+      </Field>
       {meta && <small className="answer-status">{t(`guided.meta.${meta.origin === 'legacy' ? 'legacy' : meta.status}`)}</small>}
       {content && professionalContentApplies(content, inputs) && <ProfessionalFieldHelp content={content} />}
     </>
@@ -102,21 +106,24 @@ function OptionalAge(props: {
   issue?: ValidationIssue
 }) {
   const { t } = useTranslation()
+  const descriptionId = useId()
   return (
-    <label className="field">
+    <Field className="field">
       <span><Jargon text={props.label} /></span>
       <NumberInput
         className={props.issue ? `invalid-${props.issue.severity}` : undefined}
+        invalid={props.issue?.severity === 'error'}
+        describedBy={props.issue ? descriptionId : undefined}
         value={props.value}
         placeholder="—"
         onChange={props.onChange}
       />
       {props.issue && (
-        <em className={`field-issue ${props.issue.severity}`}>
+        <em id={descriptionId} className={`field-issue ${props.issue.severity}`}>
           {t(props.issue.key, props.issue.params)}
         </em>
       )}
-    </label>
+    </Field>
   )
 }
 
@@ -169,7 +176,7 @@ export function InputForm() {
         <Num field="currentAge" label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num field="fireAge" label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
         <Num field="lifeExpectancy" label={t('lifeExpectancy')} value={inputs.lifeExpectancy} issue={issueFor('lifeExpectancy')} onChange={(v) => set({ lifeExpectancy: v })} />
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('province')} /></span>
           <select
             value={inputs.province}
@@ -182,7 +189,7 @@ export function InputForm() {
               <option key={p} value={p}>{p} — {t(`prov_${p}`)}</option>
             ))}
           </select>
-        </label>
+        </Field>
         <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
         <BudgetMethodPanel />
         <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
@@ -194,18 +201,18 @@ export function InputForm() {
           ))}
           <div className="ws-total">
             <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
-            <button type="button" disabled={worksheetTotal <= 0}
+            <Button type="button" disabled={worksheetTotal <= 0}
               onClick={() => {
                 set({ retirementSpending: worksheetTotal })
                 track('worksheet_apply')
               }}>
               {t('wsApply')}
-            </button>
+            </Button>
           </div>
         </details>
         <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
           onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('goal')} /></span>
           <select
             value={inputs.goal ?? 'legacy'}
@@ -217,13 +224,13 @@ export function InputForm() {
             <option value="legacy">{t('goal_legacy')}</option>
             <option value="dieWithZero">{t('goal_dieWithZero')}</option>
           </select>
-        </label>
+        </Field>
         {(inputs.goal ?? 'legacy') === 'dieWithZero' && (
           <p className="hint"><Jargon text={t('dwzGoalNote')} /></p>
         )}
         {/* FE-46: any guided inflation rate is shown and editable here, not
             snapped to the nearest preset label. */}
-        <label className="field">
+        <Field className="field">
           <span>{t('inflationLabel')}</span>
           <select
             value={INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021)) && !customInflation ? String(inputs.inflation ?? 0.021) : 'custom'}
@@ -239,24 +246,21 @@ export function InputForm() {
             <option value="0.03">{t('infl_high')}</option>
             <option value="custom">{t('infl_custom', { value: Number(((inputs.inflation ?? 0.021) * 100).toFixed(2)) })}</option>
           </select>
-        </label>
-        {(customInflation || !INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021))) && <label className="field">
+        </Field>
+        {(customInflation || !INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021))) && <Field className="field">
           <span>{t('infl_customLabel')}</span>
           <NumberInput value={Number(((inputs.inflation ?? 0.021) * 100).toFixed(4))} step={0.1}
             onChange={(v) => { if (v !== null && v >= 0 && v <= 15) set({ inflation: v / 100 }) }} />
-        </label>}
-        <label className="field">
-          <span>{t('displayModeLabel')}</span>
-          <select
-            value={displayMode}
-            onChange={(e) => setDisplayMode(e.target.value as 'real' | 'nominal')}
-          >
-            <option value="real">{t('display_real')}</option>
-            <option value="nominal">{t('display_nominal')}</option>
-          </select>
-        </label>
+        </Field>}
+        <Field as="div" className="field">
+          <span id="display-mode-label">{t('displayModeLabel')}</span>
+          <Segmented aria-labelledby="display-mode-label">
+            <Button aria-pressed={displayMode === 'real'} onClick={() => setDisplayMode('real')}>{t('display_real')}</Button>
+            <Button aria-pressed={displayMode === 'nominal'} onClick={() => setDisplayMode('nominal')}>{t('display_nominal')}</Button>
+          </Segmented>
+        </Field>
         <p className="hint"><Jargon text={t('displayModeNote')} /></p>
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('household')} /></span>
           <select
             value={inputs.partner ? 'couple' : 'single'}
@@ -268,7 +272,7 @@ export function InputForm() {
             <option value="single">{t('single')}</option>
             <option value="couple">{t('couple')}</option>
           </select>
-        </label>
+        </Field>
         {inputs.partner && (
           <>
             <Num label={t('partnerAge')} value={inputs.partner.currentAge} issue={issueFor('partner.currentAge')}
@@ -276,7 +280,7 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('coupleNote')} /></p>
           </>
         )}
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('extraIncomeToggle')} /></span>
           <input
             type="checkbox"
@@ -290,13 +294,13 @@ export function InputForm() {
               track('barista_fire_toggle', { enabled: e.target.checked })
             }}
           />
-        </label>
+        </Field>
         {inputs.extraIncome && (
           <>
             <Num label={t('extraIncomeAnnual')} value={inputs.extraIncome.annual} step={1000}
               issue={issueFor('extraIncome.annual')}
               onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, annual: v } })} />
-            <label className="field">
+            <Field className="field">
               <span>{t('sideIncomeKind')}</span>
               <select data-testid="side-income-kind" value={inputs.extraIncome.kind ?? 'employment'}
                 onChange={(e) => set({ extraIncome: { ...inputs.extraIncome!, kind: e.target.value as 'employment' | 'selfEmployment' | 'other' } })}>
@@ -304,7 +308,7 @@ export function InputForm() {
                 <option value="selfEmployment">{t('sideIncomeSelf')}</option>
                 <option value="other">{t('sideIncomeOther')}</option>
               </select>
-            </label>
+            </Field>
             <Num label={t('extraIncomeFrom')} value={inputs.extraIncome.fromAge}
               issue={issueFor('extraIncome.fromAge')}
               onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, fromAge: v } })} />
@@ -314,7 +318,7 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
           </>
         )}
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('childrenToggle')} /></span>
           <input
             type="checkbox"
@@ -324,14 +328,14 @@ export function InputForm() {
               track('children_toggle', { enabled: e.target.checked })
             }}
           />
-        </label>
+        </Field>
         {inputs.children && (
           <>
             {inputs.children.map((c, i) => (
               <div className="property-card" key={i}>
                 <p className="subhead property-head">
                   {t('childCard', { n: i + 1 })}
-                  <button
+                  <Button
                     type="button"
                     className="remove-item"
                     onClick={() => {
@@ -340,7 +344,7 @@ export function InputForm() {
                     }}
                   >
                     {t('removeItem')}
-                  </button>
+                  </Button>
                 </p>
                 <Num label={t('childAge')} value={c.age}
                   issue={issueFor(`children.${i}.age`)}
@@ -351,7 +355,7 @@ export function InputForm() {
                   }} />
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="add-item"
               onClick={() => {
@@ -360,7 +364,7 @@ export function InputForm() {
               }}
             >
               {t('addChild')}
-            </button>
+            </Button>
             <p className="hint"><Jargon text={t('childrenNote')} /></p>
           </>
         )}
@@ -380,7 +384,7 @@ export function InputForm() {
             onChange={(v) => set({ balances: { ...inputs.balances, [a]: v } })}
           />
         ))}
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('lockedRetirementToggle')} /></span>
           <input
             type="checkbox"
@@ -390,7 +394,7 @@ export function InputForm() {
               track('locked_retirement_toggle', { enabled: e.target.checked })
             }}
           />
-        </label>
+        </Field>
         {inputs.lockedRetirement && (
           <>
             <Num label={t('lockedRetirementBalance')} value={inputs.lockedRetirement.balance} step={5000}
@@ -405,22 +409,22 @@ export function InputForm() {
             <Num label={t('lockedRetirementAge')} value={inputs.lockedRetirement.accessibleAge}
               issue={issueFor('lockedRetirement.accessibleAge')}
               onChange={(v) => set({ lockedRetirement: { ...inputs.lockedRetirement!, accessibleAge: v } })} />
-            <label className="field">
+            <Field className="field">
               <span>{t('lockedRetirementJurisdiction')}</span>
               <select value={inputs.lockedRetirement.jurisdiction}
                 onChange={(e) => set({ lockedRetirement: { ...inputs.lockedRetirement!, jurisdiction: e.target.value as Province | 'federal' } })}>
                 <option value="federal">{t('lockedJur_federal')}</option>
                 {PROVINCES.map((p) => <option key={p} value={p}>{p} — {t(`prov_${p}`)}</option>)}
               </select>
-            </label>
-            {inputs.partner && <label className="field">
+            </Field>
+            {inputs.partner && <Field className="field">
               <span>{t('lockedRetirementOwner')}</span>
               <select value={inputs.lockedRetirement.owner}
                 onChange={(e) => set({ lockedRetirement: { ...inputs.lockedRetirement!, owner: e.target.value as 'self' | 'partner' } })}>
                 <option value="self">{t('benefitsSelf')}</option>
                 <option value="partner">{t('partnerSection')}</option>
               </select>
-            </label>}
+            </Field>}
             <p className="hint"><Jargon text={t('lockedRetirementNote')} /></p>
           </>
         )}
@@ -440,7 +444,7 @@ export function InputForm() {
           <summary>{t('mixLabel')}</summary>
           <p className="hint"><Jargon text={t('mixNote')} /></p>
           {ACCOUNTS.map((a) => (
-            <label className="field" key={a}>
+            <Field className="field" key={a}>
               <span><Jargon text={t(a)} /></span>
               <select
                 value={mixPresets[a]}
@@ -450,7 +454,7 @@ export function InputForm() {
                   <option key={p} value={p}>{t(`mix_${p}`)}</option>
                 ))}
               </select>
-            </label>
+            </Field>
           ))}
           <p className="hint">
             {ACCOUNTS.map((a) => `${t(a)}: ${(inputs.returns[a] * 100).toFixed(1)}%`).join(' · ')}
@@ -477,7 +481,7 @@ export function InputForm() {
 
       <fieldset>
         <legend><Jargon text={t('fhsaSection')} /></legend>
-        <label className="field">
+        <Field className="field">
           <span>{t('fhsaToggle')}</span>
           <input
             type="checkbox"
@@ -487,7 +491,7 @@ export function InputForm() {
               track('fhsa_toggle', { enabled: e.target.checked })
             }}
           />
-        </label>
+        </Field>
         {inputs.fhsa && (
           <>
             <p className="hint"><Jargon text={t('fhsaNote')} /></p>
@@ -522,7 +526,7 @@ export function InputForm() {
           <div className="property-card">
             <p className="subhead property-head">
               🏠 <Jargon text={t('principalResidence')} />
-              <button
+              <Button
                 type="button"
                 className="remove-item"
                 onClick={() => {
@@ -531,11 +535,11 @@ export function InputForm() {
                 }}
               >
                 {t('removeItem')}
-              </button>
+              </Button>
             </p>
             <p className="hint"><Jargon text={t('prCardNote')} /></p>
             <div className="mode-toggle">
-              <label>
+              <Field>
                 <input type="radio" name="prMode" checked={pr.mode !== 'planned'}
                   onChange={() => {
                     set({
@@ -544,8 +548,8 @@ export function InputForm() {
                     track('pr_mode_change', { mode: 'owned' })
                   }} />
                 {t('prModeOwned')}
-              </label>
-              <label>
+              </Field>
+              <Field>
                 <input type="radio" name="prMode" checked={pr.mode === 'planned'}
                   onChange={() => {
                     set({
@@ -564,7 +568,7 @@ export function InputForm() {
                     track('pr_mode_change', { mode: 'planned' })
                   }} />
                 {t('prModePlanned')}
-              </label>
+              </Field>
             </div>
 
             {pr.mode === 'planned' ? (
@@ -579,11 +583,11 @@ export function InputForm() {
                   issue={issueFor('principalResidence.downPayment')}
                   onChange={(v) => set({ principalResidence: { ...pr, downPayment: v } })} />
                 <p className="hint"><Jargon text={t('prFundingOrderHint')} /></p>
-                <label className="field checkbox-field">
+                <Field className="field checkbox-field">
                   <input type="checkbox" data-testid="hbp-use" checked={pr.hbp !== false}
                     onChange={(e) => set({ principalResidence: { ...pr, hbp: e.target.checked } })} />
                   <span>{t('hbpUse')}</span>
-                </label>
+                </Field>
                 <Num label={t('propAppreciation')} value={pr.appreciation * 100} step={0.5}
                   onChange={(v) => set({ principalResidence: { ...pr, appreciation: v / 100 } })} />
                 <Num field="principalResidence.annualMortgagePayment" label={t('debtPaymentLabel')} value={pr.annualMortgagePayment ?? 0} step={1000}
@@ -612,7 +616,7 @@ export function InputForm() {
                 {pr.sellAtAge !== null && pr.sellAtAge < inputs.fireAge && pr.mortgage &&
                   <p className="hint">{t('saleSavingsHint')}</p>}
                 <p className="hint"><Jargon text={t('prNote')} /></p>
-                <label className="field">
+                <Field className="field">
                   <span>{t('hasMortgage')}</span>
                   <input
                     type="checkbox"
@@ -629,7 +633,7 @@ export function InputForm() {
                       track('pr_mortgage_toggle', { enabled: e.target.checked })
                     }}
                   />
-                </label>
+                </Field>
                 {pr.mortgage && (
                   <>
                     <Num label={t('debtBalance')} value={pr.mortgage.balance} step={10000}
@@ -664,7 +668,7 @@ export function InputForm() {
             <div className="property-card" key={ip.id ?? i}>
               <p className="subhead property-head">
                 🏢 <Jargon text={t('investmentProperty')} /> #{i + 1}
-                <button
+                <Button
                   type="button"
                   className="remove-item"
                   onClick={() => {
@@ -677,7 +681,7 @@ export function InputForm() {
                   }}
                 >
                   {t('removeItem')}
-                </button>
+                </Button>
               </p>
               <p className="hint"><Jargon text={t('ipCardNote')} /></p>
               <Num label={t('propValue')} value={ip.value} step={25000}
@@ -700,7 +704,7 @@ export function InputForm() {
                 onChange={(v) => patch({ sellAtAge: v })} />
               {ip.sellAtAge !== null && ip.sellAtAge < inputs.fireAge && ip.mortgage &&
                 <p className="hint">{t('saleSavingsHint')}</p>}
-              <label className="field">
+              <Field className="field">
                 <span>{t('hasMortgage')}</span>
                 <input
                   type="checkbox"
@@ -714,7 +718,7 @@ export function InputForm() {
                     track('ip_mortgage_toggle', { enabled: e.target.checked })
                   }}
                 />
-              </label>
+              </Field>
               {ip.mortgage && (
                 <>
                   <Num label={t('debtBalance')} value={ip.mortgage.balance} step={10000}
@@ -734,7 +738,7 @@ export function InputForm() {
         })}
         <div className="add-buttons">
           {!inputs.principalResidence && (
-            <button
+            <Button
               type="button"
               className="add-item"
               onClick={() => {
@@ -745,9 +749,9 @@ export function InputForm() {
               }}
             >
               {t('addPrincipalResidence')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             className="add-item"
             onClick={() => {
@@ -761,7 +765,7 @@ export function InputForm() {
             }}
           >
             {t('addProperty')}
-          </button>
+          </Button>
         </div>
         {(inputs.investmentProperties?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('ipNote')} /></p>
@@ -780,7 +784,7 @@ export function InputForm() {
             <div className="property-card" key={d.id ?? i}>
               <p className="subhead property-head">
                 {t(`debt_${d.kind}`)} #{i + 1}
-                <button
+                <Button
                   type="button"
                   className="remove-item"
                   onClick={() => {
@@ -789,9 +793,9 @@ export function InputForm() {
                   }}
                 >
                   {t('removeItem')}
-                </button>
+                </Button>
               </p>
-              <label className="field">
+              <Field className="field">
                 <span>{t('debtKind')}</span>
                 <select value={d.kind} onChange={(e) => {
                   patch({ kind: e.target.value as DebtKind })
@@ -801,7 +805,7 @@ export function InputForm() {
                     <option key={k} value={k}>{t(`debt_${k}`)}</option>
                   ))}
                 </select>
-              </label>
+              </Field>
               <Num label={t('debtBalance')} value={d.balance} step={10000}
                 issue={issueFor(`debts.${i}.balance`)}
                 onChange={(v) => patch({ balance: v })} />
@@ -814,7 +818,7 @@ export function InputForm() {
             </div>
           )
         })}
-        <button
+        <Button
           type="button"
           className="add-item"
           onClick={() => {
@@ -828,7 +832,7 @@ export function InputForm() {
           }}
         >
           {t('addDebt')}
-        </button>
+        </Button>
         {(inputs.debts?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('debtNote')} /></p>
         )}
@@ -858,7 +862,7 @@ export function InputForm() {
           }} />
         <OasEstimator retireAge={inputs.fireAge} onApply={(v, oasAmountSource) => set({ oasAnnualAt65: v, oasAmountSource })} />
 
-        <label className="field">
+        <Field className="field">
           <span><Jargon text={t('pensionToggle')} /></span>
           <input
             type="checkbox"
@@ -868,7 +872,7 @@ export function InputForm() {
               track('pension_toggle', { enabled: e.target.checked, who: 'self' })
             }}
           />
-        </label>
+        </Field>
         {inputs.pension && (
           <>
             <Num label={t('pensionAnnual')} value={inputs.pension.annualAmount} step={1000}
@@ -921,7 +925,7 @@ export function InputForm() {
               retireAge={partnerRetireAge}
               onApply={(v, oasAmountSource) => set({ partner: { ...inputs.partner!, oasAnnualAt65: v, oasAmountSource } })}
             />
-            <label className="field">
+            <Field className="field">
               <span><Jargon text={t('pensionToggle')} /></span>
               <input
                 type="checkbox"
@@ -936,7 +940,7 @@ export function InputForm() {
                   track('pension_toggle', { enabled: e.target.checked, who: 'partner' })
                 }}
               />
-            </label>
+            </Field>
             {inputs.partner.pension && (
               <>
                 <Num label={t('pensionAnnual')} value={inputs.partner.pension.annualAmount} step={1000}

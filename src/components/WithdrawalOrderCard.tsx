@@ -1,3 +1,4 @@
+import { Field } from '../ui'
 import { useTranslation } from 'react-i18next'
 import {
   MELTDOWN_CAPS,
@@ -22,7 +23,7 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
 
   return (
     <div className="chart-card withdrawal-order-card">
-      <label className="field">
+      <Field className="field">
         <span><Jargon text={t('withdrawalOrder')} /></span>
         <select
           value={inputs.strategy}
@@ -35,13 +36,13 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
             <option key={s} value={s}>{t(`strat_${s}`)}</option>
           ))}
         </select>
-      </label>
+      </Field>
       {selected.status !== 'feasible' && <p className="hint">{t('manualFailureExploration')}{' '}
         {selected.gap !== null && t('manualFailureGap', { amount: cad(selected.gap) })}</p>}
       {inputs.strategy === 'meltdownPaced' && (
         <>
           <p className="hint"><Jargon text={t('meltdownNote')} /></p>
-          <label className="field">
+          <Field className="field">
             <span><Jargon text={t('meltdownCapLabel')} /></span>
             <select
               value={inputs.meltdownBracketCap ?? 'bracket1'}
@@ -54,7 +55,7 @@ export function WithdrawalOrderCard(props: { inputs: Inputs }) {
                 <option key={c} value={c}>{t(`meltdownCap_${c}`)}</option>
               ))}
             </select>
-          </label>
+          </Field>
         </>
       )}
     </div>

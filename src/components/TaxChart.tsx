@@ -1,3 +1,4 @@
+import { useChartColors } from '../chartColors'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -14,15 +15,6 @@ import { marginalRate, type Inputs, type ProjectionResult } from '../engine'
 import { useCad, useCadCompact } from '../format'
 import { Jargon } from './Jargon'
 
-const COLORS = {
-  rrsp: '#1565c0',
-  nonReg: '#ef6c00',
-  cpp: '#6a1b9a',
-  oas: '#ad1457',
-  property: '#5d4037',
-  extraIncome: '#7cb342',
-  pension: '#f9a825',
-}
 
 const SOURCE_KEYS = ['rrsp', 'nonReg', 'cpp', 'oas', 'property', 'extraIncome', 'pension'] as const
 type SourceKey = (typeof SOURCE_KEYS)[number]
@@ -74,6 +66,7 @@ export function TaxChart(props: {
   scale?: (age: number) => number
 }) {
   const { t } = useTranslation()
+  const COLORS = useChartColors()
   const id = useId()
   const cad = useCad()
   const cadTick = useCadCompact()
@@ -142,20 +135,17 @@ export function TaxChart(props: {
     const d = tprops.payload?.[0]?.payload
     if (!tprops.active || !d) return null
     return (
-      <div style={{
-        margin: 0, padding: 10, background: '#fff',
-        border: '1px solid #ccc', whiteSpace: 'nowrap', fontSize: 13,
-      }}>
-        <p style={{ margin: 0, paddingBottom: 4 }}>{tprops.label}</p>
-        <p style={{ margin: 0, paddingBottom: 4 }}>{t('total')}：{cad(d.total)}</p>
+      <div className="chart-tooltip">
+        <p>{tprops.label}</p>
+        <p>{t('total')}：{cad(d.total)}</p>
         {visibleSources.map((key) => (
-          <p key={key} style={{ margin: 0, paddingBottom: 4, color: COLORS[key] }}>
+          <p key={key} className="chart-tooltip-source" style={{ '--series-color': COLORS[key] } as React.CSSProperties}>
             {sourceLabels[key]}：{t('taxTaxablePrefix')} {cad(d[TAXABLE_KEY[key]])} → {t('taxLabel')} {cad(d[key])}
           </p>
         ))}
-        <p style={{ margin: 0, paddingBottom: 4 }}>{t('taxTotalTaxable')}：{cad(d.totalTaxable)}</p>
-        <p style={{ margin: 0, paddingBottom: 4 }}>{t('taxAvgRate')}：{(d.avgRate * 100).toFixed(1)}%</p>
-        <p style={{ margin: 0 }}>{t('colMarginal')}：{(d.marginalRate * 100).toFixed(1)}%</p>
+        <p>{t('taxTotalTaxable')}：{cad(d.totalTaxable)}</p>
+        <p>{t('taxAvgRate')}：{(d.avgRate * 100).toFixed(1)}%</p>
+        <p>{t('colMarginal')}：{(d.marginalRate * 100).toFixed(1)}%</p>
       </div>
     )
   }
@@ -168,13 +158,13 @@ export function TaxChart(props: {
       <div role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-summary`}>
       <ResponsiveContainer width="100%" height={260}>
         <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
-          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
-          <XAxis dataKey="age" type="number" allowDecimals={false}
+          <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" strokeOpacity={0.4} />
+          <XAxis stroke={COLORS.axis} dataKey="age" type="number" allowDecimals={false}
             domain={[data[0].age, data[data.length - 1].age]}
             tickCount={12} />
-          <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
+          <YAxis stroke={COLORS.axis} tickFormatter={(v: number) => cadTick(v)} width={64} />
           <Tooltip content={ChartTooltip} />
-          <Legend />
+          <Legend formatter={value => <span className="chart-legend-label">{value}</span>} />
           <Area dataKey="rrsp" stackId="1" name={t('rrsp')} stroke={COLORS.rrsp} fill={COLORS.rrsp} fillOpacity={0.55} />
           <Area dataKey="nonReg" stackId="1" name={t('taxSrcNonReg')} stroke={COLORS.nonReg} fill={COLORS.nonReg} fillOpacity={0.55} />
           <Area dataKey="cpp" stackId="1" name={t('cppLabel')} stroke={COLORS.cpp} fill={COLORS.cpp} fillOpacity={0.55} />

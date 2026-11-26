@@ -1,3 +1,4 @@
+import { ChoiceCard, Field, Callout } from '../ui'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
 import { useCad } from '../format'
@@ -37,11 +38,11 @@ function TraceAnswer(props: {
     <p className="budget-fact-title">{props.legend}</p>
     <p className="hint">{props.detail}</p>
     <div className="choice-group" role="radiogroup" aria-label={props.legend}>
-      {([true, false] as const).map((value) => <label key={String(value)} className={props.value === value ? 'selected' : ''}>
+      {([true, false] as const).map((value) => <ChoiceCard key={String(value)} className={props.value === value ? 'selected' : ''}>
         <input type="radio" name={props.name} checked={props.value === value} data-testid={`${props.testId}-${value ? 'yes' : 'no'}`}
           onChange={() => props.onChange(value)} />
         <span><strong>{t(value ? 'budget.yes' : 'budget.no')}</strong></span>
-      </label>)}
+      </ChoiceCard>)}
     </div>
   </div>
 }
@@ -80,16 +81,16 @@ export function BudgetMethodPanel() {
 
     <div className="budget-mode" role="radiogroup" aria-label={t('budget.title')}>
       <div className="choice-group">
-        <label className={budget.kind === 'savingsBudget' ? 'selected' : ''}>
+        <ChoiceCard className={budget.kind === 'savingsBudget' ? 'selected' : ''}>
           <input type="radio" name="budget-mode" checked={budget.kind === 'savingsBudget'} data-testid="budget-mode-savings"
             onChange={() => setBudgetChoice({ kind: 'mode', mode: 'savingsBudget' })} />
           <span><strong>{t('budget.modeSavings')}</strong><small>{t('budget.modeSavingsDetail')}</small></span>
-        </label>
-        <label className={budget.kind === 'incomeBudget' ? 'selected' : ''}>
+        </ChoiceCard>
+        <ChoiceCard className={budget.kind === 'incomeBudget' ? 'selected' : ''}>
           <input type="radio" name="budget-mode" checked={budget.kind === 'incomeBudget'} data-testid="budget-mode-income"
             onChange={() => setBudgetChoice({ kind: 'mode', mode: 'incomeBudget' })} />
           <span><strong>{t('budget.modeIncome')}</strong><small>{t('budget.modeIncomeDetail')}</small></span>
-        </label>
+        </ChoiceCard>
       </div>
     </div>
 
@@ -102,30 +103,30 @@ export function BudgetMethodPanel() {
       value={savings.taxBenefitIncluded.status === 'known' ? savings.taxBenefitIncluded.value : undefined}
       testId="budget-tax" onChange={(value) => setBudgetChoice({ kind: 'taxBenefitIncluded', value })} />}
 
-    {budget.kind === 'incomeBudget' && <label className="field" data-testid="budget-working-spending">
+    {budget.kind === 'incomeBudget' && <Field className="field" data-testid="budget-working-spending">
       <span>{t('budget.workingSpending')}</span>
       <NumberInput value={budget.workingSpending} step={1000}
         onChange={(value) => set({ budgetWorkingSpending: value == null ? null : value })} />
       <small className="hint">{t('budget.workingSpendingHint')}</small>
-    </label>}
+    </Field>}
 
     {savings && migrated && !bothRecordedAsNew && (
-      <div className="budget-reconciliation" data-testid="budget-reconciliation" role="group" aria-label={t('budget.legacyReview')}>
+      <Callout variant="warn" className="budget-reconciliation" data-testid="budget-reconciliation" role="group" aria-label={t('budget.legacyReview')}>
         <p className="budget-fact-title">{t('budget.legacyReview')}</p>
         <p className="hint">{t('budget.legacyBaseline', { annualDebt: cad(debtBaseline) })}</p>
         <div className="choice-group" role="radiogroup" aria-label={t('budget.legacyReview')}>
-          <label>
+          <ChoiceCard>
             <input type="radio" name="budget-basis" data-testid="budget-basis-legacy"
               onChange={() => setBudgetChoice({ kind: 'migratedBasis', basis: 'legacy' })} />
             <span><strong>{t('budget.legacyKeep')}</strong><small>{t('budget.legacyKeepDetail')}</small></span>
-          </label>
-          <label>
+          </ChoiceCard>
+          <ChoiceCard>
             <input type="radio" name="budget-basis" data-testid="budget-basis-adopt"
               onChange={() => setBudgetChoice({ kind: 'migratedBasis', basis: 'newDefinition' })} />
             <span><strong>{t('budget.legacyAdopt')}</strong><small>{t('budget.legacyAdoptDetail')}</small></span>
-          </label>
+          </ChoiceCard>
         </div>
-      </div>
+      </Callout>
     )}
 
     <p className="budget-state" data-testid="budget-state" role="status" aria-live="polite">

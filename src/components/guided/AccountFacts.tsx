@@ -1,3 +1,4 @@
+import { Field, Button } from '../../ui'
 import { useTranslation } from 'react-i18next'
 import type { Account, InputsV2 } from '../../engine/model'
 import { derivedAccountId } from '../../engine/migration'
@@ -29,7 +30,7 @@ export function EarnedIncomeQuestion({ plan }: { plan: InputsV2 }) {
     <p className="question-intro">{t('questionnaire.earned.intro')}</p>
     <div className="question-pair">{plan.people.map(person => {
       const known = person.earnedIncome.status === 'known'
-      return <div className="question-answer" key={person.id}>
+      return <Field as="div" className="question-answer" key={person.id}>
         <label htmlFor={`earned-${person.role}`}>{t('questionnaire.earned.label', { person: label(person) })}</label>
         <NumberInput id={`earned-${person.role}`} testId={`earned-${person.role}`} className="question-number"
           value={person.earnedIncome.status === 'known' ? person.earnedIncome.value : null}
@@ -40,9 +41,9 @@ export function EarnedIncomeQuestion({ plan }: { plan: InputsV2 }) {
           }} />
         <div className="answer-actions">
           <small>{t(known ? 'questionnaire.earned.recorded' : 'questionnaire.earned.optional')}</small>
-          {known && <button type="button" onClick={() => record(person.id, null)}>{t('questionnaire.earned.clear')}</button>}
+          {known && <Button type="button" onClick={() => record(person.id, null)}>{t('questionnaire.earned.clear')}</Button>}
         </div>
-      </div>
+      </Field>
     })}</div>
   </div>
 }
@@ -96,7 +97,7 @@ export function RrifDetailsQuestion({ plan }: { plan: InputsV2 }) {
           <strong>{t(`questionnaire.accountNames.${account.id === LOCKED_ACCOUNT_ID ? 'locked' : accountNameKey(account.kind)}`)}</strong>
           <span>{cad(rowTotal(plan, account))}</span>
         </div>
-        <div className="question-answer">
+        <Field as="div" className="question-answer">
           <label htmlFor={`rrif-opened-${account.id}`}>{t('questionnaire.rrif.openedYear')}</label>
           <NumberInput id={`rrif-opened-${account.id}`} testId={`guided-rrif-opened-${account.id}`} className="question-number"
             value={opened} grouping={false}
@@ -107,7 +108,7 @@ export function RrifDetailsQuestion({ plan }: { plan: InputsV2 }) {
               commitRegisteredRowEdit(account.id, item => { item.openedYear = year === null
                 ? { status: 'unknown', reason: 'RRIF opening year not supplied' } : { status: 'known', value: year } })
             }} />
-        </div>
+        </Field>
         <p className="question-subhead">{t('questionnaire.rrif.category')}</p>
         <CardChoices name={`rrif-category-${account.id}`} testId={`guided-rrif-category-${account.id}`} value={category}
           options={[

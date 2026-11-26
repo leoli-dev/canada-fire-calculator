@@ -1,0 +1,145 @@
+/*
+ * Canada FIRE Calculator design tokens (FE-54), design kit ui-unify-2026-11.
+ * Target location in the app: src/styles/tokens.css, imported first by src/styles.css.
+ * Component rules reference these tokens only. No literal colors outside this file.
+ *
+ * Migration from the current tokens in src/styles.css:1-16
+ *   --card        -> --surface
+ *   --ink-soft    -> --ink-2
+ *   --ink-faint   -> --ink-3          (2.81:1 -> 5.13:1 on --bg)
+ *   --blue        -> --accent         (#1565c0 retired; #174ea6 is the only accent)
+ *   --navy        -> --ink            (active segmented now uses --surface on --surface-2)
+ *   --green       -> --positive
+ *   --amber       -> --caution
+ *   --red         -> --critical
+ *   --radius      -> --r-panel
+ *   --shadow      -> --shadow-float   (static panels drop the shadow, keep 1px border)
+ */
+
+:root {
+  /* surfaces and lines */
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #e9edf2;          /* segmented track, table head, side rails */
+  --line: #dfe4ea;
+  --line-strong: #c5ced8;         /* control borders */
+
+  /* text (contrast measured on --bg / --surface / --surface-2) */
+  --ink: #18222e;                 /* 14.7 / 16.1 / 13.7 */
+  --ink-2: #475769;               /*  6.8 /  7.4 /  6.3 */
+  --ink-3: #5b697a;               /*  5.1 /  5.6 /  4.8 */
+
+  /* single accent: primary actions, current selection, focus, links */
+  --accent: #174ea6;              /* 7.2 on --bg, white on accent 7.9 */
+  --accent-hover: #123f87;
+  --accent-tint: #e8effa;
+  --on-accent: #ffffff;
+  --focus-ring: 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-tint);
+
+  /* semantic state (not accent) */
+  --positive: #1e7a34;  --positive-tint: #e5f3e8;
+  --caution: #8a4b08;   --caution-tint: #fdf0dc;
+  --critical: #b42318;  --critical-tint: #fbe9e7;
+
+  /* chart series, fixed across every chart. One map in src/chartColors.ts reads these;
+   * replaces the three COLORS constants in ProjectionChart.tsx:19, IncomeChart.tsx:18, TaxChart.tsx:17
+   * and the literals in MonteCarloCard.tsx:158-171. Old CCB #c2185b was nearly identical to OAS. */
+  --c-tfsa: #3f8f4f;
+  --c-rrsp: #3b74c4;
+  --c-nonreg: #cf6a1a;
+  --c-fhsa: #2a9d8f;
+  --c-locked: #5e5aa8;            /* LIRA / locked DC */
+  --c-property: #8d6e63;
+  --c-cpp: #7b4bb7;
+  --c-oas: #c23f7a;
+  --c-gis: #198a8a;
+  --c-ccb: #8a7a1f;
+  --c-rent: #6d4c41;
+  --c-extra-income: #6f9e2f;
+  --c-pension: #a87b0c;
+  --c-need: var(--critical);      /* "needed" dotted line */
+  --c-tax: #18222e;               /* tax dashed line */
+  --c-shortfall: var(--critical); /* hatched pattern on --critical-tint, never a flat pink fill */
+  --c-mc-band: #3b74c4;           /* drawn at 0.25 opacity */
+  --c-mc-median: var(--accent);
+  --c-mc-worst: var(--critical);
+  --c-marker-fire: #475769;       /* neutral: retiring is not a warning */
+  --c-marker-pension: var(--c-cpp);
+  --c-marker-sale: var(--c-property);
+  --c-bridge: #e9edf2;            /* FIRE-to-pension bridge band */
+  --c-grid: #dfe4ea;
+  --c-axis: #475769;
+
+  /* type: one family, fixed rem scale */
+  --font: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --fs-display: 1.75rem;          /* 28 question heading, desktop */
+  --fs-display-sm: 1.5rem;        /* 24 question heading, phone */
+  --fs-title: 1.375rem;           /* 22 verdict line, page titles */
+  --fs-heading: 1.125rem;         /* 18 card and section titles */
+  --fs-body: 1rem;                /* 16 phone body and every phone input */
+  --fs-ui: 0.875rem;              /* 14 desktop body, buttons, labels */
+  --fs-meta: 0.8125rem;           /* 13 help text, legends, tables */
+  --fs-caption: 0.75rem;          /* 12 chips, axes */
+  --fs-micro: 0.6875rem;          /* 11 only for the status sub-line inside table cells */
+  --lh-tight: 1.2;
+  --lh-body: 1.55;
+
+  /* space, radius, elevation */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --r-control: 6px;
+  --r-panel: 10px;
+  --r-sheet: 16px;
+  --r-pill: 999px;
+  --shadow-float: 0 8px 28px rgb(24 34 46 / 0.16);
+
+  /* sizes */
+  --h-control: 40px;              /* desktop inputs and md buttons */
+  --h-control-sm: 32px;
+  --h-touch: 44px;                /* phone minimum hit target */
+  --h-touch-primary: 48px;        /* phone primary buttons and inputs */
+  --appbar-h: 56px;
+  --appbar-h-sm: 52px;
+  --pro-input-w: 400px;
+
+  /* layers */
+  --z-sticky: 10;
+  --z-tabbar: 20;
+  --z-scrim: 30;
+  --z-sheet: 40;
+  --z-fullscreen: 50;
+  --z-toast: 60;
+
+  /* motion: state changes only */
+  --dur-fast: 150ms;
+  --dur: 220ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Breakpoints (use these three only):
+ *   phone    max-width: 640px
+ *   tablet   641px - 1099px   single column, desktop components
+ *   desktop  min-width: 1100px side by side; min-width: 1280px adds the guided help rail
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur: 0ms; }
+}
+
+/* Dark values are defined for later use. Not wired to prefers-color-scheme in this round;
+ * enabling dark mode is a separate item after charts are themed (see design report). */
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #161d25; --surface-2: #1d2631;
+  --line: #263241; --line-strong: #364452;
+  --ink: #e6ebf1; --ink-2: #b4bfcb; --ink-3: #8e9bab;
+  --accent: #80aaf2; --accent-hover: #9dbdf6; --accent-tint: #1b2a42; --on-accent: #0f141a;
+  --positive: #63c27f; --positive-tint: #15291c;
+  --caution: #e3a952; --caution-tint: #2e2312;
+  --critical: #f2867a; --critical-tint: #33191a;
+  --c-tfsa: #5fb26f; --c-rrsp: #6c9be0; --c-nonreg: #ee9a55; --c-fhsa: #4fc0b2; --c-locked: #8f8be0; --c-property: #b39488;
+  --c-cpp: #a07ad6; --c-oas: #e070a2; --c-gis: #3fb4b4; --c-ccb: #c8b64a; --c-rent: #a78275; --c-extra-income: #9cc95a; --c-pension: #e3b748;
+  --c-tax: #e6ebf1; --c-mc-band: #6c9be0; --c-marker-fire: #b4bfcb; --c-bridge: #1d2631; --c-grid: #263241; --c-axis: #b4bfcb;
+  --shadow-float: 0 8px 28px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+:root { --scrim: rgb(24 34 46 / 0.35); }

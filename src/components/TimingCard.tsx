@@ -1,3 +1,4 @@
+import { Disclosure, StatusChip, Button } from '../ui'
 import { useTranslation } from 'react-i18next'
 import { inputsCppAnnual, inputsOasAnnual, type Inputs, type RankedCandidate } from '../engine'
 import { useAnalysis, useCardOpen } from '../analysis/useAnalysis'
@@ -15,14 +16,14 @@ export function TimingCard({ inputs }: { inputs: Inputs }) {
   // FE-47: the scan runs off the main thread, and only while the card is open.
   const [open, setOpen] = useCardOpen('timing')
   const analysis = useAnalysis('timing', inputs, open)
-  return <details className="chart-card collapsible" open={open}
+  return <Disclosure className="chart-card collapsible" open={open}
     onToggle={(event) => {
       setOpen(event.currentTarget.open)
       if (event.currentTarget.open && !open) track('panel_open', { panel: 'timing_comparison' })
     }}>
     <summary><h3>{t('timingTitle')}</h3></summary>
     {open && <AnalysisBody analysis={analysis}>{(ranking, stale) => <TimingBody inputs={inputs} ranking={ranking} stale={stale} />}</AnalysisBody>}
-  </details>
+  </Disclosure>
 }
 
 function TimingBody({ inputs, ranking, stale }: { inputs: Inputs; ranking: AnalysisResult<'timing'>; stale: boolean }) {
@@ -58,8 +59,8 @@ function TimingBody({ inputs, ranking, stale }: { inputs: Inputs; ranking: Analy
         const isCurrent = age === currentAge
         const delta = row.metric !== null && current?.metric !== null && current?.metric !== undefined ? row.metric - current.metric : null
         return <tr key={age} className={isCurrent ? 'current-row' : ''}>
-          <td>{age}{isCurrent && <span className="tag">{t('current')}</span>}
-            {row.status === 'feasible' && row.metric === bestScore && <span className="tag best">{t('best')}</span>}</td>
+          <td>{age}{isCurrent && <StatusChip className="tag">{t('current')}</StatusChip>}
+            {row.status === 'feasible' && row.metric === bestScore && <StatusChip className="tag best">{t('best')}</StatusChip>}</td>
           <td className="num">{Number.isFinite(annual) ? cad(annual) : '—'}</td>
           <td>{row.status === 'feasible' ? t('stratOk') : <>{failure(row)}{' '}
             {row.gap !== null && t('candidateGap', { amount: cad(row.gap) })}</>}</td>
@@ -67,9 +68,9 @@ function TimingBody({ inputs, ranking, stale }: { inputs: Inputs; ranking: Analy
           <td className={`num ${delta !== null && delta > 0 ? 'good' : delta !== null && delta < 0 ? 'poor' : ''}`}>
             {isCurrent || delta === null ? '—' : `${delta >= 0 ? '+' : '−'}${cad(Math.abs(delta))}`}</td>
           <td className="num">{!isCurrent && row.status === 'feasible' &&
-            <button type="button" className="use-strategy" disabled={stale} onClick={() => {
+            <Button type="button" className="use-strategy" disabled={stale} onClick={() => {
               set({ [which === 'cpp' ? 'cppStartAge' : 'oasStartAge']: age }); track('timing_apply', { which })
-            }}>{t('useStrategy')}</button>}</td>
+            }}>{t('useStrategy')}</Button>}</td>
         </tr>
       })}</tbody>
     </table></div>
@@ -95,9 +96,9 @@ function TimingBody({ inputs, ranking, stale }: { inputs: Inputs; ranking: Analy
           {best?.metric !== null && current?.metric !== null && current?.metric !== undefined && best!.metric! > current.metric &&
             <strong className="good">+{cad(best!.metric! - current.metric)}</strong>}
         </>}</p>
-      {!bestIsCurrent && best && <button type="button" className="use-strategy" disabled={stale} onClick={() => {
+      {!bestIsCurrent && best && <Button type="button" className="use-strategy" disabled={stale} onClick={() => {
         set({ cppStartAge: best.value.cppStartAge, oasStartAge: best.value.oasStartAge }); track('timing_apply', { which: 'combo' })
-      }}>{t('useStrategy')}</button>}
+      }}>{t('useStrategy')}</Button>}
     </div>
     <p className="hint"><Jargon text={t('timingNote')} /></p>
   </>

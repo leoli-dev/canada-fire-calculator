@@ -1,3 +1,4 @@
+import { useChartColors } from '../chartColors'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -15,18 +16,6 @@ import type { ProjectionResult } from '../engine'
 import { useCad, useCadCompact } from '../format'
 import { Jargon } from './Jargon'
 
-const COLORS = {
-  tfsa: '#2e7d32',
-  rrsp: '#1565c0',
-  nonReg: '#ef6c00',
-  cpp: '#6a1b9a',
-  oas: '#ad1457',
-  gis: '#00838f',
-  ccb: '#c2185b',
-  rent: '#5d4037',
-  extraIncome: '#7cb342',
-  pension: '#f9a825',
-}
 
 export function IncomeChart(props: {
   result: ProjectionResult
@@ -34,6 +23,7 @@ export function IncomeChart(props: {
   scale?: (age: number) => number
 }) {
   const { t } = useTranslation()
+  const COLORS = useChartColors()
   const id = useId()
   const cad = useCad()
   const cadTick = useCadCompact()
@@ -86,13 +76,13 @@ export function IncomeChart(props: {
       <div role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-summary`}>
       <ResponsiveContainer width="100%" height={300}>
         <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
-          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
-          <XAxis dataKey="age" type="number" allowDecimals={false}
+          <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" strokeOpacity={0.4} />
+          <XAxis stroke={COLORS.axis} dataKey="age" type="number" allowDecimals={false}
             domain={[data[0].age, data[data.length - 1].age]}
             tickCount={12} />
-          <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
-          <Tooltip formatter={(v) => cad(Number(v))} />
-          <Legend />
+          <YAxis stroke={COLORS.axis} tickFormatter={(v: number) => cadTick(v)} width={64} />
+          <Tooltip itemStyle={{ color: COLORS.axis }} formatter={(v) => cad(Number(v))} />
+          <Legend formatter={value => <span className="chart-legend-label">{value}</span>} />
           <Line dataKey="total" name={t('total')} stroke="none" dot={false}
             activeDot={false} legendType="none" />
           <Area dataKey="rrsp" stackId="1" name={t('rrsp')} stroke={COLORS.rrsp} fill={COLORS.rrsp} fillOpacity={0.55} />
@@ -116,10 +106,10 @@ export function IncomeChart(props: {
             <Area dataKey="extraIncome" stackId="1" name={t('extraIncomeLabel')} stroke={COLORS.extraIncome} fill={COLORS.extraIncome} fillOpacity={0.55} />
           )}
           {hasShortfall && (
-            <Area dataKey="shortfall" stackId="1" name={t('incomeShortfall')} stroke="#c62828" fill="#c62828" fillOpacity={0.35} />
+            <Area dataKey="shortfall" stackId="1" name={t('incomeShortfall')} stroke={COLORS.shortfall} fill={COLORS.shortfall} fillOpacity={0.35} />
           )}
-          <Line dataKey="need" name={t('incomeNeed')} stroke="#c62828" strokeWidth={2} strokeDasharray="2 3" dot={false} />
-          <Line dataKey="tax" name={t('taxLabel')} stroke="#37474f" strokeWidth={2} strokeDasharray="5 3" dot={false} />
+          <Line dataKey="need" name={t('incomeNeed')} stroke={COLORS.shortfall} strokeWidth={2} strokeDasharray="2 3" dot={false} />
+          <Line dataKey="tax" name={t('taxLabel')} stroke={COLORS.tax} strokeWidth={2} strokeDasharray="5 3" dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
       </div>

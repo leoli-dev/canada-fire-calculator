@@ -1,3 +1,4 @@
+import { Button, Callout } from '../ui'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
@@ -21,10 +22,10 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
       const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
         <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <button type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></button>)}</div>
+        <div>{categoryPages.map((page) => <Button variant="ghost" type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
       </details>
     })}
-    <button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</button>
+    <Button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</Button>
   </nav>
 }
 
@@ -67,7 +68,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
     window.location.hash = `#/guided/${definition.categoryId}/${definition.id}`
   }
   return <section className="answer-review">
-    <button type="button" className="text-action" onClick={() => editPage(state.activePageId)}>{t('questionnaire.backToQuestions')}</button>
+    <Button variant="link" type="button" className="text-action" onClick={() => editPage(state.activePageId)}>{t('questionnaire.backToQuestions')}</Button>
     <h2 tabIndex={-1}>{t('questionnaire.reviewTitle')}</h2><p>{t('questionnaire.reviewIntro')}</p>
     <section className="review-assumptions" aria-labelledby="review-assumptions-title">
       <h3 id="review-assumptions-title">{t('questionnaire.reviewAssumptionsTitle')}</h3>
@@ -79,7 +80,7 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
         const statusKey = !complete ? 'reviewAssumptionPending' : containsEstimate ? 'reviewAssumptionEstimated' : 'reviewAssumptionSet'
         return <div className="review-assumption-row" key={row.id}>
           <div><strong>{row.title}</strong><p>{row.value}</p><small>{t(`questionnaire.${statusKey}`)}</small></div>
-          <button type="button" onClick={() => editPage(row.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: row.title })}>{t('guidedEdit')}</button>
+          <Button type="button" onClick={() => editPage(row.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: row.title })}>{t('guidedEdit')}</Button>
         </div>
       })}</div>
       <p className="review-assumptions-note">{t('questionnaire.reviewAssumptionsNote')}</p>
@@ -92,13 +93,13 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
         ? (state.questionAnswers['tax.intro'] === 'skip' ? t('questionnaire.taxDetails.reviewSkipped')
           : t('questionnaire.taxDetails.reviewRecorded', { answered: categoryPages.filter((page) => page.id !== 'tax.intro' && pageIsComplete(page, state)).length, total: categoryPages.filter((page) => page.id !== 'tax.intro').length }))
         : category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
-      return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</button></div><p>{value}</p></article>
+      return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><Button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</Button></div><p>{value}</p></article>
     })}</div>
-    {(incomplete.length > 0 || issues.length > 0) && <div className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
-      {incomplete.map((page) => <li key={page.id}><button type="button" onClick={() => editPage(page.id)}>{t(questionTitleKey(page, state.inputs))}</button></li>)}
-      {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</button></li> })}
-    </ul></div>}
-    <button type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</button>
+    {(incomplete.length > 0 || issues.length > 0) && <Callout variant="warn" className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
+      {incomplete.map((page) => <li key={page.id}><Button type="button" onClick={() => editPage(page.id)}>{t(questionTitleKey(page, state.inputs))}</Button></li>)}
+      {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><Button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</Button></li> })}
+    </ul></Callout>}
+    <Button variant="primary" type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</Button>
     <ResetPlan onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
   </section>
 }
@@ -151,12 +152,12 @@ export function GuidedFlow() {
 
   useEffect(() => { document.querySelector<HTMLElement>('#question-title, .answer-review h2, .results-intro h2')?.focus() }, [state.activePageId, state.guidedView])
 
-  if (state.guidedView === 'results' && state.resultRevision === state.inputRevision) return <section className="results-intro"><button type="button" className="text-action" onClick={() => { state.setGuidedView('questionnaire'); window.location.hash = `#/guided/${current.categoryId}/${current.id}` }}>{t('questionnaire.modifyAnswers')}</button><h2 tabIndex={-1}>{t('questionnaire.resultsTitle')}</h2><p>{t('questionnaire.resultsIntro')}</p></section>
+  if (state.guidedView === 'results' && state.resultRevision === state.inputRevision) return <section className="results-intro"><Button variant="link" type="button" className="text-action" onClick={() => { state.setGuidedView('questionnaire'); window.location.hash = `#/guided/${current.categoryId}/${current.id}` }}>{t('questionnaire.modifyAnswers')}</Button><h2 tabIndex={-1}>{t('questionnaire.resultsTitle')}</h2><p>{t('questionnaire.resultsIntro')}</p></section>
   if (state.guidedView === 'review') return <AnswerReview pages={pages} />
 
   return <div className="questionnaire-layout">
-    <button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</button>
-    <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</button><span data-testid="guided-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><button type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</button></div></div>
+    <Button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</Button>
+    <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><Button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</Button></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><Button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</Button><span data-testid="guided-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><Button variant="primary" type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</Button></div></div>
   </div>
 }

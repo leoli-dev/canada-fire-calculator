@@ -1,3 +1,4 @@
+import { Button, Segmented } from './ui'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { pensionStartAge, validateInputs } from './engine'
@@ -128,42 +129,42 @@ export default function App() {
               instead of two sentences saying the same thing. */}
           <p className="header-disclaimer">
             <strong>{t('disclaimer')}</strong>{' '}
-            <button type="button" className="term" onClick={() => openGlossary('simplifications')}>
+            <Button variant="link" type="button" className="term" onClick={() => openGlossary('simplifications')}>
               {t('simplificationsLink')}
-            </button>
+            </Button>
           </p>
         </div>
-        <nav className="langs">
+        <Segmented as="nav" className="langs">
           {LANGS.map((l) => (
-            <button
+            <Button
               key={l.code}
               className={i18n.language === l.code ? 'active' : ''}
               onClick={() => setLanguage(l.code)}
             >
               {l.label}
-            </button>
+            </Button>
           ))}
-        </nav>
+        </Segmented>
       </header>
 
       <AnalyticsPrompt />
       {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
-        <button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</button>
+        <Button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</Button>
       </div>}
       <MigrationReview current={canonical} scenarioA={scenarioACanonical} scenarioAExists={scenarioA !== null} />
       {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
       <main className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : undefined}>
         <aside>
-          <div className="entry-mode" aria-label={t('entryModeLabel')}>
-            <button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
+          <Segmented className="entry-mode" aria-label={t('entryModeLabel')}>
+            <Button type="button" className={entryMode === 'guided' ? 'active' : ''} onClick={() => setEntryMode('guided')}>
               {t('guidedMode')}
-            </button>
-            <button type="button" className={entryMode === 'professional' ? 'active' : ''} onClick={() => setEntryMode('professional')}>
+            </Button>
+            <Button type="button" className={entryMode === 'professional' ? 'active' : ''} onClick={() => setEntryMode('professional')}>
               {t('professionalMode')}
-            </button>
-          </div>
+            </Button>
+          </Segmented>
           {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
             estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
           {!storageIssue && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
@@ -171,7 +172,7 @@ export default function App() {
         </aside>
         {canonicalResult && <section className="results-column" id="results" tabIndex={-1}>
           <CanonicalResults result={canonicalResult} model={canonicalModel} />
-          {canonicalResult.coverage && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>
+          {canonicalResult.coverage && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>
           {annualOpen && canonicalModel && <AnnualSheetDialog key={inputRevision} open={true} model={canonicalModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {canonical && <CanonicalPlanningTool key={`${entryMode}:${inputRevision}:${i18n.language}`} inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
           {canonical && <CanonicalMonteCarloCard inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
@@ -181,7 +182,7 @@ export default function App() {
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
-          {result && <><button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
+          {result && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}

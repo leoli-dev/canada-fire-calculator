@@ -1,3 +1,4 @@
+import { Segmented, Button, Field } from '../ui'
 import { fundingGapMessageKey } from '../fundingGapMessages'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -152,9 +153,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       // FE-44: an unverified failure still reads as a failure.
       ? (ok || mode === 'target' && target <= 0 ? 'uncertain' : 'uncertain bad') : mode === 'target' && target <= 0 ? '' : ok ? 'ok' : 'bad'}`}>
       {/* FE-45: tabs with roving focus, arrow keys, and one labelled panel. */}
-      <div className="mode-tabs" role="tablist" aria-label={t('modeTabsLabel')}>
+      <Segmented mode="tab" className="mode-tabs" role="tablist" aria-label={t('modeTabsLabel')}>
         {MODES.map((m, index) => (
-          <button
+          <Button
             key={m}
             id={`mode-tab-${m}`}
             type="button"
@@ -178,9 +179,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             }}
           >
             {t(`mode_${m}`)}
-          </button>
+          </Button>
         ))}
-      </div>
+      </Segmented>
 
       <div role="tabpanel" id="mode-panel" aria-labelledby={`mode-tab-${mode}`}>
       {mode === 'last' && (
@@ -197,8 +198,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           {/* FE-44: a failing plan gets a next step, not just a final net worth. */}
           {!result.success && <div className="next-steps" data-testid="next-steps">
             <p><strong>{t('nextStepsTitle')}</strong></p>
-            <button type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</button>
-            <button type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</button>
+            <Button variant="link" type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</Button>
+            <Button variant="link" type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</Button>
             {sustainable?.status === 'solved' && sustainable.value !== null && <p data-testid="next-step-sustainable-answer">{t('nextStepSustainableAnswer', { amount: cad(sustainable.value), age: inputs.lifeExpectancy })}</p>}
             {sustainable && sustainable.status !== 'solved' && <p className="hint">{t(`solver_${sustainable.status}`)}</p>}
           </div>}
@@ -306,7 +307,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
 
       {mode === 'target' && (
         <>
-          <label className="field target-field">
+          <Field className="field target-field">
             <span><Jargon text={t('targetInputLabel')} /></span>
             <NumberInput
               step={50000}
@@ -318,7 +319,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
                 if (entryMode === 'guided') useStore.getState().generateGuidedResults()
               }}
             />
-          </label>
+          </Field>
           {!goal && <p className="hint">{t('targetUnset')}</p>}
           {goal?.status === 'unsupported' && <p className="verdict">{quickEstimateMessage}</p>}
           {goal?.status === 'supported' && (

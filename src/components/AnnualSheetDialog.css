@@ -1,54 +1,55 @@
+@layer legacy {
 .annual-sheet-dialog {
   position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none;
-  margin: 0; padding: 0; border: 0; color: var(--ink); background: var(--card); overflow: hidden;
+  margin: 0; padding: 0; border: 0; color: var(--ink); background: var(--surface); overflow: hidden;
 }
-.annual-sheet-dialog::backdrop { background: rgb(26 37 50 / 45%); }
+.annual-sheet-dialog::backdrop { background: var(--scrim); }
 .annual-sheet-layout {
   height: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
 }
 .annual-sheet-header { flex: none; margin: 0 0 8px; padding: 0 0 8px; gap: 8px; }
 .annual-sheet-header > div { min-width: 0; max-height: 18dvh; overflow: auto; overflow-wrap: anywhere; }
-.annual-sheet-header h2 { margin: 0; font-size: 1.15rem; }
-.annual-sheet-header p { margin: 4px 0 0; color: var(--ink-soft); font-size: .8rem; }
+.annual-sheet-header h2 { margin: 0; font-size: var(--fs-heading); }
+.annual-sheet-header p { margin: 4px 0 0; color: var(--ink-2); font-size: var(--fs-meta); }
 .annual-sheet-dialog button, .annual-sheet-dialog select {
-  font: inherit; font-size: .8rem; color: var(--ink); background: var(--card);
+  font: inherit; font-size: var(--fs-meta); color: var(--ink); background: var(--surface);
   border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 9px; cursor: pointer;
 }
 .annual-sheet-dialog button:focus-visible, .annual-sheet-dialog select:focus-visible,
-.annual-sheet-scroll:focus-visible, .annual-sheet-detail:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; }
+.annual-sheet-scroll:focus-visible, .annual-sheet-detail:focus-visible { outline: none; box-shadow: var(--focus-ring); outline-offset: -3px; }
 .annual-sheet-header > button { flex: none; min-height: 40px; }
 .annual-sheet-tools { flex: 0 1 auto; min-height: 0; max-height: 25dvh; overflow: auto; overscroll-behavior: contain; }
 .annual-sheet-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: none; }
-.annual-sheet-controls label { font-size: .8rem; }
+.annual-sheet-controls label { font-size: var(--fs-meta); }
 .annual-sheet-controls button:disabled { opacity: .5; cursor: default; }
-.annual-sheet-help { margin: 6px 0; font-size: .75rem; color: var(--ink-soft); }
-.annual-sheet-announcement { font-size: .8rem; }
+.annual-sheet-help { margin: 6px 0; font-size: var(--fs-caption); color: var(--ink-2); }
+.annual-sheet-announcement { font-size: var(--fs-meta); }
 .annual-sheet-scroll { min-height: 0; min-width: 0; flex: 1 1 100px; overflow: auto; scroll-padding-top: 48px; scroll-padding-left: 172px; position: relative; border: 1px solid var(--line-strong); overscroll-behavior: contain; }
-.annual-sheet-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.annual-sheet-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
 .annual-sheet-table th, .annual-sheet-table td { padding: 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); vertical-align: top; min-width: 142px; }
-.annual-sheet-table thead th { position: sticky; top: 0; z-index: 3; background: var(--navy); color: white; text-align: right; }
-.annual-sheet-table th:first-child { position: sticky; left: 0; width: 156px; min-width: 156px; max-width: 156px; background: var(--card); z-index: 2; text-align: left; overflow-wrap: anywhere; }
-.annual-sheet-table thead th:first-child { z-index: 4; background: var(--navy); }
+.annual-sheet-table thead th { position: sticky; top: 0; z-index: 3; background: var(--ink); color: var(--on-accent); text-align: right; }
+.annual-sheet-table th:first-child { position: sticky; left: 0; width: 156px; min-width: 156px; max-width: 156px; background: var(--surface); z-index: 2; text-align: left; overflow-wrap: anywhere; }
+.annual-sheet-table thead th:first-child { z-index: 4; background: var(--ink); }
 .annual-sheet-table td { text-align: right; cursor: pointer; }
 .annual-sheet-table td:hover { background: var(--bg); }
 .annual-sheet-group th:first-child, .annual-sheet-group td { background: var(--bg); font-weight: 600; }
 .annual-sheet-table th button { margin: 0 5px 3px 0; }
-.annual-sheet-table th .annual-sheet-inspect { display: block; font-size: .7rem; margin: 5px 0 0; padding: 4px; color: var(--blue); }
-.annual-sheet-status { display: block; font-size: .65rem; color: var(--ink-soft); font-weight: 400; }
-.annual-sheet-detail { flex: 0 1 auto; min-height: 0; max-height: 30dvh; overflow: auto; padding: 10px; margin: 6px 0; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg); font-size: .8rem; overscroll-behavior: contain; }
-.annual-sheet-detail h3 { margin: 6px 0; font-size: .95rem; }
+.annual-sheet-table th .annual-sheet-inspect { display: block; font-size: var(--fs-caption); margin: 5px 0 0; padding: 4px; color: var(--accent); }
+.annual-sheet-status { display: block; font-size: var(--fs-micro); color: var(--ink-2); font-weight: 400; }
+.annual-sheet-detail { flex: 0 1 auto; min-height: 0; max-height: 30dvh; overflow: auto; padding: 10px; margin: 6px 0; border: 1px solid var(--line-strong); border-radius: var(--r-panel); background: var(--bg); font-size: var(--fs-meta); overscroll-behavior: contain; }
+.annual-sheet-detail h3 { margin: 6px 0; font-size: var(--fs-body); }
 .annual-sheet-detail dl { display: grid; grid-template-columns: minmax(80px, auto) 1fr; gap: 4px 12px; }
 .annual-sheet-detail dt { font-weight: 600; }
 .annual-sheet-detail dd { margin: 0; overflow-wrap: anywhere; }
 .annual-sheet-sr { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .annual-sheet-layout { padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right)); }
   .annual-sheet-table th:first-child { width: 132px; min-width: 132px; max-width: 132px; }
   .annual-sheet-table td, .annual-sheet-table thead th:not(:first-child) { min-width: 164px; }
-  .annual-sheet-header h2 { font-size: 1rem; }
-  .annual-sheet-header p { font-size: .7rem; }
-  .annual-sheet-help { font-size: .7rem; }
+  .annual-sheet-header h2 { font-size: var(--fs-body); }
+  .annual-sheet-header p { font-size: var(--fs-caption); }
+  .annual-sheet-help { font-size: var(--fs-caption); }
 }
 /* Short windows and browser zoom need an explicit table budget: otherwise the
    wrapped jump list and focused detail panel consume all remaining flex space. */
@@ -57,4 +58,5 @@
   .annual-sheet-tools { max-height: 12dvh; }
   .annual-sheet-detail { max-height: 25dvh; padding: 6px; margin-block: 4px; }
   .annual-sheet-scroll { min-height: 40dvh; flex-shrink: 0; }
+}
 }

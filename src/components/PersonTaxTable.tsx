@@ -1,3 +1,4 @@
+import { Disclosure } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { InputsV2 } from '../engine/model'
 import type { ProjectionResult } from '../engine/types'
@@ -9,7 +10,7 @@ export function PersonTaxTable({ plan, result }: { plan: InputsV2; result: Proje
   const cad = useCad()
   const rows = result.rows.filter(row => row.phase !== 'accumulation' && row.byPersonTax)
   if (rows.length === 0) return null
-  return <details className="chart-card collapsible" data-testid="person-tax-table">
+  return <Disclosure className="chart-card collapsible" data-testid="person-tax-table">
     <summary><h3>{t('be11.personLedger')}</h3></summary>
     <p className="hint">{t('be11.ledgerLimit')}</p>
     <div className="table-scroll"><table className="compare-table">
@@ -27,5 +28,5 @@ export function PersonTaxTable({ plan, result }: { plan: InputsV2; result: Proje
         <td className="num">{cad(person.tax)}</td>
       </tr>))}</tbody>
     </table></div>
-  </details>
+  </Disclosure>
 }
