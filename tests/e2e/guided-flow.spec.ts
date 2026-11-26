@@ -1,3 +1,4 @@
+import { showAnnualTable } from './fixtures/annual-sheet'
 import { prepareProfessionalTarget } from './fixtures/professional'
 import { revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage, openLanguages, expectMode } from './fixtures/app-bar'
@@ -92,6 +93,7 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await expect(page.locator('.conclusion-estate p').filter({ hasText: 'adds remaining registered balances' })).toBeVisible()
   const annual = page.getByRole('button', { name: 'Annual financial details' })
   await (await prepareProfessionalTarget(annual)).click()
+  await showAnnualTable(page)
   const annualDialog = page.getByRole('dialog', { name: 'Household annual estimate' })
   await expect(annualDialog).toBeVisible()
   const primaryAge = annualDialog.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /Primary age/ }) })
@@ -113,6 +115,7 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await expect(page.getByRole('button', { name: 'Annual financial details', includeHidden: true })).toHaveCount(0)
   await (await prepareProfessionalTarget(generate)).click()
   await (await prepareProfessionalTarget(annual)).click()
+  await showAnnualTable(page)
   await expect(primaryAge.getByRole('cell').first()).toContainText('36')
 })
 

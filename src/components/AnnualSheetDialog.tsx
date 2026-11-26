@@ -1,5 +1,5 @@
 import { Button, Field, Segmented, Sheet, StatusChip } from '../ui'
-import { Fragment, useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useCad } from '../format'
@@ -59,6 +59,15 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
     visit(model.rows)
     return result
   })
+
+  useLayoutEffect(() => {
+    // Hidden tables have no usable offsets. Align only after the selected
+    // year's column is laid out, without changing focus or keyboard scrolling.
+    if (phone && view !== 'table') return
+    const port = scroller.current
+    const header = yearHeaders.current.get(year)
+    if (port && header) port.scrollLeft = Math.max(0, header.offsetLeft - (rowHeaders.current.values().next().value?.offsetWidth ?? 144))
+  }, [phone, view, year])
 
   useEffect(() => {
     const node = dialog.current!
@@ -176,8 +185,8 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
       {hasChildren || row.kind === "group" ? <div className="annual-year-group">
         {hasChildren ? <Button aria-expanded={expanded} onClick={() => setCollapsed(current => { const next = new Set(current); if (next.has(row.id)) next.delete(row.id); else next.add(row.id); return next })}>{expanded ? "−" : "+"} {text(row.label)}</Button> : <strong>{text(row.label)}</strong>}
       </div> : null}
-      {(row.kind !== "group" || row.cells) && <Button ref={node => { if (node) yearRows.current.set(row.id, node); else yearRows.current.delete(row.id) }} className="annual-year-row" style={{ paddingInlineStart: 12 + depth * 10 }} aria-label={`${copy.inspect}: ${text(row.label)}, ${year}`} onClick={event => inspect(row, year, event.currentTarget)}>
-        <span>{text(row.label)}</span><span className="annual-year-value">{['calculated', 'estimated'].includes(annualSheetCellStatus(row.cells?.[year], model.years[yearIndex], moneyMode)) && cellValue(row.cells?.[year], year)}<span className="annual-year-status">{copy[annualSheetCellStatus(row.cells?.[year], model.years[yearIndex], moneyMode)]}</span></span>
+      {(row.kind !== "group" || row.cells) && <Button ref={node => { if (node) yearRows.current.set(row.id, node); else yearRows.current.delete(row.id) }} className="annual-year-row" style={{ paddingInlineStart: 12 + depth * 10 }} aria-label={`${copy.inspect}: ${text(row.label)}, ${year}`} aria-describedby={`${id}-year-value-${row.id}`} onClick={event => inspect(row, year, event.currentTarget)}>
+        <span>{text(row.label)}</span><span id={`${id}-year-value-${row.id}`} className="annual-year-value">{['calculated', 'estimated'].includes(annualSheetCellStatus(row.cells?.[year], model.years[yearIndex], moneyMode)) && cellValue(row.cells?.[year], year)}<span className="annual-year-status">{copy[annualSheetCellStatus(row.cells?.[year], model.years[yearIndex], moneyMode)]}</span></span>
       </Button>}
       {hasChildren && expanded && renderYearRows(row.children!, depth + 1)}
     </Fragment>
@@ -211,7 +220,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
   return createPortal(<dialog ref={dialog} className="annual-sheet-dialog" aria-labelledby={`${id}-title`} aria-describedby={`${id}-scope`} onCancel={event => { event.preventDefault(); onClose() }}>
     <div className="annual-sheet-layout" data-view={phone ? view : "table"}>
       <header className="annual-sheet-header">
-        <div><div className="annual-sheet-title"><h2 id={`${id}-title`}>{text(model.title) || copy.title}</h2>{hasEstimates(model.rows) && <StatusChip status="est">{copy.estimated}</StatusChip>}</div><details className="annual-sheet-scope"><summary>{copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</summary><p id={`${id}-scope`}>{text(model.scope)} · {copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</p></details></div>
+        <div><div className="annual-sheet-title"><h2 id={`${id}-title`}>{text(model.title) || copy.title}</h2>{hasEstimates(model.rows) && <StatusChip status="est">{copy.estimated}</StatusChip>}</div><details className="annual-sheet-scope"><summary><span className="annual-scope-chevron" aria-hidden="true">›</span><span>{t('ui.annual.scope')}<small>{copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</small></span></summary><p id={`${id}-scope`}>{text(model.scope)} · {copy.deterministic} · {moneyMode === 'real' ? `${copy.real} (${model.baseYear})` : copy.nominal}</p></details></div>
         <Segmented className="annual-sheet-view" aria-label={t("ui.annual.view")}><Button aria-pressed={view === "year"} onClick={() => setView("year")}>{t("ui.annual.year")}</Button><Button aria-pressed={view === "table"} onClick={() => setView("table")}>{t("ui.annual.table")}</Button></Segmented>
         {!phone && controls}
         <Button ref={closeButton} type="button" onClick={onClose}>{copy.close}</Button>

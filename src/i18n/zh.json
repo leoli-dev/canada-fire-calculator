@@ -74,7 +74,8 @@
       "year": "按年",
       "table": "表格",
       "previous": "上一年",
-      "next": "下一年"
+      "next": "下一年",
+      "scope": "口径与限制"
     }
   },
   "title": "🇨🇦 加拿大 FIRE 计算器",

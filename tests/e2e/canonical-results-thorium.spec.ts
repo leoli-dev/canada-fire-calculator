@@ -49,9 +49,10 @@ async function storeState(page: Page) {
 async function openSheet(page: Page) {
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener(page))).click()
-  await showAnnualTable(page)
   const sheet = page.getByRole('dialog', { name: 'Canonical annual ledger' })
   await expect(sheet).toBeVisible()
+  await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+  await showAnnualTable(page)
   return sheet
 }
 

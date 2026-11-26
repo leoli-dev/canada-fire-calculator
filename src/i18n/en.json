@@ -74,7 +74,8 @@
       "year": "Year",
       "table": "Table",
       "previous": "Previous year",
-      "next": "Next year"
+      "next": "Next year",
+      "scope": "Scope and limitations"
     }
   },
   "title": "🇨🇦 Canada FIRE Calculator",

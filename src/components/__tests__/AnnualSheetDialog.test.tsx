@@ -28,9 +28,12 @@ it('defaults to Year, steps and jumps through the same ledger and opens precise 
   expect(screen.getByRole('button', { name: /^Year$/ }).getAttribute('aria-pressed')).toBe('true')
   expect(screen.queryByRole('table')).toBeNull()
   expect(screen.getByRole('button', { name: 'Inspect row: Cash, 2030' }).textContent).toContain('0')
+  const initialRow = screen.getByRole('button', { name: 'Inspect row: Cash, 2030' })
+  expect(document.getElementById(initialRow.getAttribute('aria-describedby')!)?.textContent).toBe('CA$0Calculated')
   expect((screen.getByRole('button', { name: 'Previous year' }) as HTMLButtonElement).disabled).toBe(true)
   await userEvent.click(screen.getByRole('button', { name: 'Next year' }))
   const row = screen.getByRole('button', { name: 'Inspect row: Cash, 2031' })
+  expect(document.getElementById(row.getAttribute('aria-describedby')!)?.textContent).toBe('≈ CA$62Estimated')
   await userEvent.click(row)
   const details = screen.getByRole('complementary', { name: 'Cell details' })
   expect(within(details).getByRole('heading').textContent).toContain('61.73')
@@ -44,6 +47,18 @@ it('defaults to Year, steps and jumps through the same ledger and opens precise 
   await userEvent.click(screen.getByRole('button', { name: /^Table$/ }))
   expect(screen.getByRole('table')).toBeTruthy()
   expect(screen.getAllByRole('button', { name: 'Inspect row: Cash, 2031' })).toHaveLength(1)
+})
+
+it('labels the scope disclosure and preserves its complete dialog description when expanded', async () => {
+  render(<AnnualSheetDialog open model={model} moneyMode="nominal" onClose={vi.fn()} />)
+  const dialog = screen.getByRole('dialog', { name: 'Ledger' })
+  const description = document.getElementById(dialog.getAttribute('aria-describedby')!)!
+  const original = description.textContent
+  expect(original).toBe('Recorded scope · Deterministic projection · Nominal CAD')
+  const summary = screen.getByText('Scope and limitations').closest('summary')!
+  await userEvent.click(summary)
+  expect(summary.parentElement!.hasAttribute('open')).toBe(true)
+  expect(description.textContent).toBe(original)
 })
 
 it('resets the year and selected details on revision changes', async () => {

@@ -55,7 +55,11 @@
 .annual-sheet-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .annual-sheet-header > .annual-sheet-controls { flex: none; max-width: 60%; }
 .annual-sheet-scope { border: 0; padding: 0; margin: 4px 0 0; background: transparent; }
-.annual-sheet-scope > summary { min-height: 0; padding: 0; font-size: var(--fs-caption); color: var(--ink-2); }
+.annual-sheet-scope > summary { display: flex; align-items: center; gap: 8px; list-style: none; min-height: 0; padding: 0; font-size: var(--fs-meta); color: var(--accent); cursor: pointer; }
+.annual-sheet-scope > summary::-webkit-details-marker { display: none; }
+.annual-scope-chevron { flex: none; font-size: var(--fs-heading); }
+.annual-sheet-scope[open] .annual-scope-chevron { transform: rotate(90deg); }
+.annual-sheet-scope summary small { display: block; font-size: var(--fs-caption); color: var(--ink-2); }
 .annual-sheet-scope p { padding: 8px 0; }
 .annual-sheet-detail-column { min-height: 0; overflow: auto; border-left: 1px solid var(--line); background: var(--bg); }
 .annual-sheet-detail-column > p { padding: 16px; font-size: var(--fs-meta); color: var(--ink-2); }
@@ -74,12 +78,12 @@
   .annual-sheet-scope > summary { min-height: 44px; display: flex; align-items: center; }
   .annual-sheet-header > button { font-size: var(--fs-caption); padding-inline: 8px; align-self: start; }
   .annual-sheet-view { display: flex; align-self: start; border-radius: var(--r-control); background: var(--surface-2); padding: 2px; flex: none; }
-  .annual-sheet-dialog .annual-sheet-view button { border: 0; background: transparent; padding-inline: 8px; font-size: var(--fs-caption); }
+  .annual-sheet-dialog .annual-sheet-view button { min-width: 44px; border: 0; background: transparent; padding-inline: 8px; font-size: var(--fs-caption); }
   .annual-sheet-dialog .annual-sheet-view button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
-  .annual-sheet-dialog button { min-height: 44px; }
+  .annual-sheet-dialog button { min-width: 44px; min-height: 44px; }
   .annual-sheet-tools { padding: 8px 12px; max-height: 30dvh; }
-  .annual-sheet-controls { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .annual-sheet-controls > * { flex: none; }
+  .annual-sheet-controls { flex-wrap: wrap; overflow: visible; padding-bottom: 4px; }
+  .annual-sheet-controls > * { flex: 0 1 auto; max-width: 100%; }
   .annual-sheet-controls .field { margin: 0; }
   .annual-sheet-controls button { font-size: var(--fs-caption); }
   .annual-sheet-dialog select { font-size: var(--fs-body); min-height: 44px; }

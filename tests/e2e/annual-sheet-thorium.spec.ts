@@ -32,9 +32,9 @@ test('professional household results open the current annual estimate and follow
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener)).focus()
   await page.keyboard.press('Enter')
-  await showAnnualTable(page)
   await expect(dialog).toHaveAccessibleDescription(/Household estimate/)
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+  await showAnnualTable(page)
   await expect(row(/Salary/).getByRole('cell').first()).toContainText(/Unknown|Not computed/)
   await expect(partner).toContainText('34')
   await expect(row(/Closing net worth/).getByRole('cell').last()).toContainText(expectedNetWorth.replace(/^[^\d−-]+/, ''))
@@ -159,7 +159,7 @@ for (const locale of [
   })
 }
 
-async function openSheet(page: Page, query = '') {
+async function openSheet(page: Page, query = '', table = true) {
   await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html${query}`)
   const opener = page.getByRole('button', { name: 'Open fixture', includeHidden: true })
   await expect(opener).toBeVisible()
@@ -170,7 +170,8 @@ async function openSheet(page: Page, query = '') {
   await page.keyboard.press('Enter')
   const dialog = page.locator('dialog.annual-sheet-dialog')
   await expect(dialog).toBeVisible()
-  await showAnnualTable(page)
+  await expect(dialog.getByRole('button', { name: /^(Close|Fermer|关闭)$/ })).toBeFocused()
+  if (table) await showAnnualTable(page)
   return { dialog, opener }
 }
 
@@ -181,9 +182,10 @@ function cell(dialog: Locator, rowName: string, year: number) {
 }
 
 test('StrictMode dialog traps focus and restores scroll and opener after either close path', async ({ page }) => {
-  const { dialog, opener } = await openSheet(page)
+  const { dialog, opener } = await openSheet(page, '', false)
   const close = dialog.getByRole('button', { name: 'Close', exact: true })
   await expect(close).toBeFocused()
+  await showAnnualTable(page)
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
   // The focus cycle may pass through browser chrome, but never the page behind the modal.
   for (const key of ['Shift+Tab', 'Tab', 'Tab']) {
@@ -416,10 +418,10 @@ test('a new revision resets dialog state and cleanup tolerates a removed opener'
   await page.evaluate(() => window.dispatchEvent(new Event('fixture:revise')))
   await expect(dialog.getByRole('complementary')).toHaveCount(0)
   await expect(year).toHaveValue('2030')
-  await showAnnualTable(page)
-  await expect(dialog.getByRole('button', { name: 'Alex TFSA', exact: true })).toHaveAttribute('aria-expanded', 'false')
   const close = dialog.getByRole('button', { name: 'Close', exact: true })
   await expect(close).toBeFocused()
+  await showAnnualTable(page)
+  await expect(dialog.getByRole('button', { name: 'Alex TFSA', exact: true })).toHaveAttribute('aria-expanded', 'false')
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
   await (await prepareProfessionalTarget(close)).click()
   await expect(opener).toBeFocused()
@@ -550,4 +552,81 @@ test('desktop details reserve 340px without reducing table height and use the sh
   await column.getByRole('button', { name: 'Hide details' }).click()
   expect((await column.boundingBox())!.width).toBe(340)
   expect((await port.boundingBox())!.height).toBe(before.height)
+})
+
+for (const locale of [
+  { language: 'EN', width: 390, scope: 'Scope and limitations', opener: 'Annual financial details', retirement: 'Retirement (2036)', next: 'Next year' },
+  { language: 'FR', width: 320, scope: 'Portée et limites', opener: 'Détails financiers annuels', retirement: 'Retraite (2036)', next: 'Année suivante' },
+  { language: '中文', width: 390, scope: '口径与限制', opener: '逐年财务明细', retirement: '退休 (2036)', next: '下一年' },
+]) {
+  test(`review fixes expose scope, wrap jumps and align the selected year in ${locale.language}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: locale.width, height: locale.width === 320 ? 740 : 844 })
+    await page.goto('/')
+    await chooseMode(page, 'professional')
+    await chooseLanguage(page, locale.language)
+    await showProfessionalResults(page)
+    const opener = page.getByRole('button', { name: locale.opener, exact: true })
+    await (await prepareProfessionalTarget(opener)).click()
+    const dialog = page.locator('dialog.annual-sheet-dialog')
+    await expect(dialog.locator('.annual-sheet-header > button')).toBeFocused()
+    const scope = dialog.locator('.annual-sheet-scope')
+    const description = await dialog.evaluate(node => document.getElementById(node.getAttribute('aria-describedby')!)!.textContent!)
+    await expect(dialog).toHaveAccessibleDescription(description)
+    await expect(scope.locator('summary')).toContainText(locale.scope)
+    await expect(scope.locator('.annual-scope-chevron')).toBeVisible()
+    await scope.locator('summary').click()
+    await expect(scope).toHaveAttribute('open', '')
+    await expect(dialog).toHaveAccessibleDescription(description)
+    await scope.locator('summary').click()
+    const controls = dialog.locator('.annual-sheet-controls')
+    expect(await controls.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+    for (const jump of await controls.getByRole('button').all()) await expect(jump).toBeInViewport({ ratio: 1 })
+    const touch = await dialog.locator('button, select, summary').evaluateAll(nodes => nodes.filter(node => node.getClientRects().length).map(node => {
+      const rect = node.getBoundingClientRect()
+      return { name: node.getAttribute('aria-label') ?? node.textContent, width: rect.width, height: rect.height }
+    }))
+    expect(touch.filter(target => target.width < 44 || target.height < 44)).toEqual([])
+    const row = dialog.locator('.annual-year-row').first()
+    await row.focus()
+    await expect(row).toHaveAccessibleDescription(/35\s*(Calculated|Calculé|已计算)/)
+    await controls.getByRole('button', { name: locale.retirement, exact: true }).click()
+    const table = dialog.locator('.annual-sheet-view button').last()
+    const year = dialog.locator('.annual-sheet-view button').first()
+    const port = dialog.locator('.annual-sheet-scroll')
+    const aligned = async (selected: string) => {
+      const geometry = await port.evaluate((node, selected) => {
+        const bounds = node.getBoundingClientRect()
+        const sticky = node.querySelector('thead th')!.getBoundingClientRect()
+        const header = [...node.querySelectorAll('thead th')].find(header => header.textContent === selected)!.getBoundingClientRect()
+        return { left: header.left, right: header.right, stickyRight: sticky.right, portRight: bounds.right, scrollLeft: node.scrollLeft }
+      }, selected)
+      expect(geometry.scrollLeft).toBeGreaterThan(0)
+      expect(geometry.left).toBeGreaterThanOrEqual(geometry.stickyRight - 1)
+      expect(geometry.right).toBeLessThanOrEqual(geometry.portRight + 1)
+      await expect(table).toBeFocused()
+      return geometry
+    }
+    await table.click()
+    const retirement = await aligned('2036')
+    await year.click()
+    await dialog.getByRole('button', { name: locale.next, exact: true }).click()
+    await table.click()
+    const stepped = await aligned('2037')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(locale.width)
+    await testInfo.attach('review geometry', { body: JSON.stringify({ locale, touch, retirement, stepped }), contentType: 'application/json' })
+  })
+}
+
+test('320px Table inspect and group controls meet both touch dimensions and focused Year exposes zero', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  const { dialog } = await openSheet(page, '', false)
+  const row = dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2030' })
+  await row.focus()
+  await expect(row).toHaveAccessibleName('Inspect row: Alex pension, 2030')
+  await expect(row).toHaveAccessibleDescription(/CA\$0\s*Calculated/)
+  await showAnnualTable(page)
+  const controls = dialog.locator('th button')
+  expect(await controls.count()).toBeGreaterThan(10)
+  const sizes = await controls.evaluateAll(nodes => nodes.map(node => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })))
+  expect(sizes.filter(size => size.width < 44 || size.height < 44)).toEqual([])
 })
