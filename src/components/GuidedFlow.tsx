@@ -12,6 +12,20 @@ import { QuestionPage, QuestionHelpRail } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
 import { ResetPlan } from './ResetPlan'
 
+/** Native focus scrolling does not account for the phone's two fixed bars. */
+function revealPhoneQuestionFocus(target: HTMLElement) {
+  const viewport = window.visualViewport
+  const viewportTop = viewport?.offsetTop ?? 0
+  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+  const top = Math.max(viewportTop, ...['.app-bar', '.mobile-question-progress'].map(selector => document.querySelector(selector)?.getBoundingClientRect().bottom ?? viewportTop))
+  const bottom = Math.min(viewportBottom, document.querySelector('.question-pager')?.getBoundingClientRect().top ?? viewportBottom)
+  const choice = target.closest<HTMLElement>('.ui-choice, .owner-choices label')
+  const area = choice && choice.getBoundingClientRect().height <= bottom - top ? choice : target
+  const rect = area.getBoundingClientRect()
+  const delta = rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0
+  if (delta) window.scrollBy({ top: delta < 0 ? Math.floor(delta) : Math.ceil(delta), behavior: 'instant' })
+}
+
 function CategoryNavigation({ pages, onNavigate, onReview }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void; onReview?: () => void }) {
   const { t } = useTranslation()
   const state = useStore()
@@ -136,6 +150,18 @@ export function GuidedFlow() {
     }
   }, [directoryOpen])
   const directoryNavigate = (id: string) => { pendingDestination.current = id; setDirectoryOpen(false) }
+  useEffect(() => {
+    if (!phone || state.guidedView !== 'questionnaire') return
+    const reveal = (event: FocusEvent) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement) || !target.closest('.question-page') || target.closest('[role="dialog"]')) return
+      // Correct the native focus scroll immediately, without a delayed scroll that
+      // could override the user's subsequent scrolling or disclosure interaction.
+      revealPhoneQuestionFocus(target)
+    }
+    document.addEventListener('focusin', reveal)
+    return () => document.removeEventListener('focusin', reveal)
+  }, [phone, state.guidedView])
   const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers, state.canonical), [state.inputs, state.questionAnswers, state.canonical])
   const current = pages.find((page) => page.id === state.activePageId) ?? pages[0]
   const index = Math.max(0, pages.findIndex((page) => page.id === current.id))
@@ -182,7 +208,10 @@ export function GuidedFlow() {
     const target = document.querySelector<HTMLElement>('#question-title, .answer-review h2, .results-intro h2')
     if (!target) return
     target.dataset.programmaticFocus = 'true'
-    target.focus()
+    if (phone && target.closest('.question-page')) {
+      target.focus({ preventScroll: true })
+      revealPhoneQuestionFocus(target)
+    } else target.focus()
     const clear = () => { delete target.dataset.programmaticFocus }
     target.addEventListener('blur', clear, { once: true })
     return () => { target.removeEventListener('blur', clear); clear() }

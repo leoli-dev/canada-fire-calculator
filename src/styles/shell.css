@@ -123,7 +123,8 @@ main.guided-only { grid-template-columns: minmax(0, 1fr); }
   .question-pager .pager-mobile-button-label { display: none; }
   .question-page :is(input:not([type=radio]):not([type=checkbox]), select, textarea) { min-height: 48px; font-size: 16px; min-width: 0; max-width: 100%; }
   .app:has(.questionnaire-layout) footer :is(button, a[href]) { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
-  .question-page :is(button, a[href], summary) { min-height: 44px; min-width: 44px; }
+  .question-page :is(button, a[href], summary) { min-width: 44px; }
+  .question-page :is(button, a[href], summary):not(.ui-choice) { min-height: 44px; }
   .question-page :is(.ui-button-link, a[href]) { display: inline-flex; align-items: center; max-width: 100%; overflow-wrap: normal; word-break: normal; hyphens: manual; }
   .question-page .ui-choice, .question-page .owner-choices label { min-height: 56px; align-items: center; padding-top: 6px; padding-bottom: 6px; }
   /* Preserve a small visual mark inside a real 44px native input hit area. */
