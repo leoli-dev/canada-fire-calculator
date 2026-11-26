@@ -175,6 +175,7 @@ export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; r
               )}
             </ComposedChart>
           </ResponsiveContainer></div>
+          <p className="chart-currency">{t('ui.results.currency')}</p>
           <p className="hint"><Jargon text={t('mcNote')} /></p>
         </>
       )}

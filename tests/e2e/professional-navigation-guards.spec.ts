@@ -37,7 +37,7 @@ test('negative precise Results guard rejects a legitimate precise tab while Inpu
   await expect(actualGuard).toHaveCount(1)
   const rejection = await expect(actualGuard).toHaveCount(0, { timeout: 100 }).then(() => null, error => error)
   expect(rejection, 'The exact negative migration guard must fail for an erroneously present hidden precise tab').not.toBeNull()
-  const annualGuard = page.getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })
+  const annualGuard = page.locator('#results-overview').getByRole('button', { name: 'Annual financial details', exact: true, includeHidden: true })
   await expect(annualGuard).toHaveCount(1)
   const annualRejection = await expect(annualGuard).toHaveCount(0, { timeout: 100 }).then(() => null, error => error)
   expect(annualRejection, 'The annual capability guard must also reject an existing hidden control').not.toBeNull()

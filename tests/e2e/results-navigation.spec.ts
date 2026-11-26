@@ -36,9 +36,10 @@ for (const mode of ['guided', 'professional'] as const) {
     // Scroll without clicking navigation, requiring the IntersectionObserver to update state.
     await page.locator('#results-benefits').evaluate(element => {
       const pane = document.getElementById('results')!
-      const margin = parseFloat(getComputedStyle(element).scrollMarginTop)
-      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, element.getBoundingClientRect().top - pane.getBoundingClientRect().top - margin)
-      else window.scrollBy(0, element.getBoundingClientRect().top - margin)
+      const nav = document.querySelector('.results-navigation')!
+      const line = getComputedStyle(nav).flexDirection === 'column' ? 24 : nav.getBoundingClientRect().bottom + 4
+      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, element.getBoundingClientRect().top - line)
+      else window.scrollBy(0, element.getBoundingClientRect().top - line)
     })
     await expect(nav.getByRole('link', { name: 'Benefits', exact: true })).toHaveAttribute('aria-current', 'true')
     if (mode === 'professional') {
@@ -143,9 +144,10 @@ test('resizing rebinds active-section observation between pane and document scro
     await expect(balances).toHaveAttribute('aria-current', 'true')
     await page.locator('#results-income').evaluate(element => {
       const pane = document.getElementById('results')!
-      const margin = parseFloat(getComputedStyle(element).scrollMarginTop)
-      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, element.getBoundingClientRect().top - pane.getBoundingClientRect().top - margin)
-      else window.scrollBy(0, element.getBoundingClientRect().top - margin)
+      const nav = document.querySelector('.results-navigation')!
+      const line = getComputedStyle(nav).flexDirection === 'column' ? 24 : nav.getBoundingClientRect().bottom + 4
+      if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, element.getBoundingClientRect().top - line)
+      else window.scrollBy(0, element.getBoundingClientRect().top - line)
     })
     await expect(nav.getByRole('link', { name: 'Income', exact: true })).toHaveAttribute('aria-current', 'true')
     expect(await page.locator('#results').evaluate(element => element.scrollTop > 0)).toBe(width !== 1099)
@@ -176,3 +178,77 @@ for (const language of ['en', 'fr', 'zh']) {
     }
   })
 }
+
+test('reading-line crossings track short Benefits and Tax sections in both scrollports', async ({ page }) => {
+  for (const mode of ['guided', 'professional'] as const) {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await seed(page, mode)
+    const nav = page.locator('.results-navigation')
+    await nav.locator('[href="#results-income"]').click()
+    for (const id of ['benefits', 'tax']) {
+      // Place the new heading four pixels below the sticky strip, as in the review probe.
+      await page.locator(`#results-${id}`).evaluate(element => {
+        const pane = document.getElementById('results')!
+        const top = document.querySelector('.results-navigation')!.getBoundingClientRect().bottom + 4
+        const amount = element.getBoundingClientRect().top - top
+        if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, amount)
+        else window.scrollBy(0, amount)
+      })
+      await expect(nav.locator(`[href="#results-${id}"]`)).toHaveAttribute('aria-current', 'true')
+    }
+  }
+})
+
+test('clamped anchor jumps retain the focused destination until actual scrolling resumes', async ({ page }) => {
+  for (const [mode, width] of [['guided', 1440], ['professional', 1440], ['professional', 1099], ['guided', 390], ['professional', 390]] as const) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await seed(page, mode)
+    const nav = page.locator('.results-navigation')
+    for (const id of ['strategies', 'risk', 'scenarios']) {
+      await nav.locator(`[href="#results-${id}"]`).click()
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await expect(page.locator(`#results-${id}`)).toBeFocused()
+      await expect(nav.locator(`[href="#results-${id}"]`)).toHaveAttribute('aria-current', 'true')
+    }
+    await page.locator('#results-balances').evaluate(element => {
+      const pane = document.getElementById('results')!
+      const nav = document.querySelector('.results-navigation')!
+      const paneScrolls = getComputedStyle(pane).overflowY === 'auto'
+      const readingTop = getComputedStyle(nav).flexDirection === 'column' ? 24 : nav.getBoundingClientRect().bottom + 4
+      const amount = element.getBoundingClientRect().top - readingTop
+      if (paneScrolls) pane.scrollBy(0, amount)
+      else window.scrollBy(0, amount)
+    })
+    await expect(nav.locator('[href="#results-balances"]')).toHaveAttribute('aria-current', 'true')
+  }
+})
+
+test('Guided phone legend tab stops clear both sticky UI edges including safe-area sized insets', async ({ page }) => {
+  for (const inset of [false, true]) {
+    await page.setViewportSize({ width: inset ? 320 : 390, height: inset ? 740 : 844 })
+    await seed(page, 'guided')
+    if (inset) await page.addStyleTag({ content: '.app:has(.guided-results) > .app-bar { height:72px; padding-top:20px } .guided-results .results-navigation { top:72px } .app .phone-result-tabs { min-height:98px; padding-bottom:32px }' })
+    await page.locator('.results-navigation a[href="#results-balances"]').focus()
+    await page.keyboard.press('Enter')
+    const seen = new Set<string>()
+    for (let index = 0; index < 60 && seen.size < 4; index++) {
+      await page.keyboard.press('Tab')
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const measurement = await page.evaluate(() => {
+        const control = document.activeElement as HTMLElement
+        if (!control.matches('.chart-legend button')) return null
+        const box = control.getBoundingClientRect()
+        const top = Math.max(document.querySelector('.app-bar')!.getBoundingClientRect().bottom, document.querySelector('.results-navigation')!.getBoundingClientRect().bottom)
+        const bottom = document.querySelector('.phone-result-tabs')!.getBoundingClientRect().top
+        const peer = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+        return { top: box.top, bottom: box.bottom, clearTop: top, clearBottom: bottom, hit: !!peer && control.contains(peer), taxSeries: control.closest('#results-tax') ? control.dataset.series : null }
+      })
+      if (!measurement) continue
+      expect(measurement.top).toBeGreaterThanOrEqual(measurement.clearTop)
+      expect(measurement.bottom).toBeLessThanOrEqual(measurement.clearBottom)
+      expect(measurement.hit).toBe(true)
+      if (measurement.taxSeries) seen.add(measurement.taxSeries)
+    }
+    expect([...seen]).toEqual(['rrsp', 'nonReg', 'cpp', 'oas'])
+  }
+})

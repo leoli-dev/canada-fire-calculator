@@ -30,40 +30,78 @@ export function ResultsNavigation({ sections, annualAction }: { sections: Result
   const { t } = useTranslation()
   const nav = useRef<HTMLElement>(null)
   const [active, setActive] = useState<ResultSectionId>('overview')
+  const destination = useRef<{ id: ResultSectionId; root: HTMLElement | null; offset: number } | null>(null)
   const signature = sections.join(',')
   useEffect(() => {
     const element = nav.current
     if (!element) return
     const scope = element.closest('#results')!
-    let observer: IntersectionObserver | undefined
+    let dispose = () => {}
     const setup = () => {
-      observer?.disconnect()
+      dispose()
       const root = resultScrollport(element)
       const currentSections = signature.split(',') as ResultSectionId[]
       const targets = currentSections.map(id => scope.querySelector<HTMLElement>(`#${resultSectionAnchor(id)}`)).filter((node): node is HTMLElement => !!node)
-      const visible = new Set<Element>()
-      observer = new IntersectionObserver(entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visible.add(entry.target)
-          else visible.delete(entry.target)
-        }
-        // A tall section remains current until the next section enters the reading band.
+      let frame = 0
+      let observer: IntersectionObserver | undefined
+      let observedLine = -1
+      let observedHeight = -1
+      const scrollElement = root ?? document.documentElement
+      const scrollTarget = root ?? window
+      const sample = () => {
+        frame = 0
+        const rootTop = root?.getBoundingClientRect().top ?? 0
+        const height = root?.clientHeight ?? window.innerHeight
         const horizontal = getComputedStyle(element).flexDirection !== 'column'
-        // Scroll offsets round to pixels while section bounds can retain fractional font metrics.
-        const top = (root?.getBoundingClientRect().top ?? (horizontal ? element.getBoundingClientRect().top : 0)) + (horizontal ? element.offsetHeight : 0) + 33
-        const candidates = targets.filter(target => visible.has(target))
-        const scrollElement = root ?? document.documentElement
-        const atEnd = scrollElement.scrollTop > 0 && scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight <= 2
-        const current = atEnd ? targets.at(-1) : candidates.filter(target => target.getBoundingClientRect().top <= top).at(-1) ?? candidates[0]
+        const line = horizontal ? Math.max(rootTop, element.getBoundingClientRect().bottom) + 8 : rootTop + 24
+        // Observe the same one-pixel reading line used to choose the current section.
+        const inset = Math.max(0, Math.min(height - 1, line - rootTop))
+        if (!observer || Math.abs(inset - observedLine) > 1 || height !== observedHeight) {
+          observedLine = inset
+          observedHeight = height
+          observer?.disconnect()
+          observer = new IntersectionObserver(schedule, { root, rootMargin: `-${inset}px 0px -${Math.max(0, height - inset - 1)}px 0px`, threshold: 0 })
+          targets.forEach(target => observer!.observe(target))
+        }
+        const pinned = destination.current
+        if (pinned && pinned.root === root && pinned.offset === scrollElement.scrollTop && currentSections.includes(pinned.id)) {
+          setActive(pinned.id)
+          return
+        }
+        destination.current = null
+        const current = targets.filter(target => target.getBoundingClientRect().top <= line + 1).at(-1) ?? targets[0]
         if (current) setActive(current.dataset.resultSection as ResultSectionId)
-      }, { root, rootMargin: '0px 0px -55% 0px', threshold: 0 })
-      targets.forEach(target => observer!.observe(target))
+      }
+      function schedule() { if (!frame) frame = requestAnimationFrame(sample) }
+      // Scroll sampling also handles section gaps and fast jumps that cross the reading line in one frame.
+      scrollTarget.addEventListener('scroll', schedule, { passive: true })
+      sample()
+      dispose = () => { observer?.disconnect(); cancelAnimationFrame(frame); scrollTarget.removeEventListener('scroll', schedule) }
     }
     setup()
     window.addEventListener('resize', setup)
-    return () => { observer?.disconnect(); window.removeEventListener('resize', setup) }
+    return () => { dispose(); window.removeEventListener('resize', setup) }
   // The signature represents the gated section list, independent of array identity.
   }, [signature])
+  useEffect(() => {
+    const scope = nav.current?.closest<HTMLElement>('#results')
+    if (!scope) return
+    let frame = 0
+    const reveal = (event: FocusEvent) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement) || !target.closest('.chart-legend') || !scope.closest('.guided-results') || !window.matchMedia('(max-width: 640px)').matches) return
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const top = Math.max(nav.current?.getBoundingClientRect().bottom ?? 0, document.querySelector('.app-bar')?.getBoundingClientRect().bottom ?? 0) + 8
+        const bottom = (document.querySelector('.phone-result-tabs')?.getBoundingClientRect().top ?? window.innerHeight) - 8
+        const bounds = target.getBoundingClientRect()
+        if (bounds.top < top) window.scrollBy(0, bounds.top - top)
+        else if (bounds.bottom > bottom) window.scrollBy(0, bounds.bottom - bottom)
+      })
+    }
+    scope.addEventListener('focusin', reveal)
+    return () => { cancelAnimationFrame(frame); scope.removeEventListener('focusin', reveal) }
+  }, [])
   useEffect(() => {
     const link = nav.current?.querySelector<HTMLElement>('[aria-current="true"]')
     // Scroll only the chip strip. scrollIntoView would move the results pane as well.
@@ -75,7 +113,11 @@ export function ResultsNavigation({ sections, annualAction }: { sections: Result
     {sections.map(id => <a key={id} href={`#${resultSectionAnchor(id)}`} aria-current={active === id ? 'true' : undefined} onClick={event => {
       event.preventDefault()
       const target = document.getElementById(resultSectionAnchor(id))
-      if (target) focusResultTarget(target)
+      if (target) {
+        focusResultTarget(target)
+        const root = resultScrollport(target)
+        destination.current = { id, root, offset: (root ?? document.documentElement).scrollTop }
+      }
       setActive(id)
     }}>{t(`ui.results.${id}`)}</a>)}
     {annualAction && <Button size="sm" className="results-nav-annual" onClick={annualAction}>{t('ui.results.annual')}</Button>}

@@ -31,6 +31,8 @@
   .professional-layout .results-navigation { top: -20px; }
 }
 @media (max-width: 640px) {
+  html:has(.guided-results) { scroll-padding-top: calc(120px + env(safe-area-inset-top)); scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .guided-results .chart-legend button { scroll-margin-block: 8px; }
   .app:has(.guided-results) > .app-bar { position: sticky; top: 0; z-index: var(--z-tabbar); }
   .results-navigation { top: calc(52px + env(safe-area-inset-top)); padding: 8px 0; }
   .professional-layout .results-navigation { top: -16px; }

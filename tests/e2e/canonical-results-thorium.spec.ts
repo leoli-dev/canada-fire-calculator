@@ -26,9 +26,9 @@ async function seed(page: Page, variant: AppPlanVariant = 'settled') {
   await showProfessionalResults(page)
 }
 
-const results = (page: Page) => page.getByTestId('canonical-results')
-const overview = (page: Page) => page.getByTestId('canonical-coverage-table')
-const opener = (page: Page) => page.getByRole('button', { name: 'Annual financial details', exact: true })
+const results = (page: Page) => page.locator('#results-overview').getByTestId('canonical-results')
+const overview = (page: Page) => results(page).getByTestId('canonical-coverage-table')
+const opener = (page: Page) => page.locator('#results-overview').getByRole('button', { name: 'Annual financial details', exact: true })
 const yearPicker = (sheet: Locator) => sheet.getByRole('combobox', { name: 'Jump to year' })
 const evidence = (page: Page) => page.getByTestId('canonical-evidence')
 const working = (page: Page) => page.getByTestId('canonical-working-spending')

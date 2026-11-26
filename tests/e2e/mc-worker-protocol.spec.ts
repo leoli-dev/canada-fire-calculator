@@ -345,6 +345,10 @@ test('real worker completes a seeded request and re-enables Run', async ({ page 
   await showProfessionalResults(page)
   await expect(page.getByRole('button', { name: 'Run 1,000 simulations' })).toBeEnabled()
   await expect(page.getByRole('alert')).toHaveCount(0)
+  for (const [language, caption] of [['en', 'Amounts in Canadian dollars (CAD).'], ['fr', 'Montants en dollars canadiens (CAD).'], ['zh', '金额以加元 (CAD) 表示。']]) {
+    await page.evaluate(async language => { const { setLanguage } = await import('/src/i18n/index.ts'); await setLanguage(language) }, language)
+    await expect(page.locator('.chart-card').filter({ has: page.locator('.mc-rate') }).locator('.chart-currency')).toHaveText(caption)
+  }
 })
 
 test('locked quick-answer boundary is localized in French and Chinese', async ({ page }) => {

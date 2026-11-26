@@ -25,7 +25,7 @@ test('professional household results open the current annual estimate and follow
   const scenario = page.locator('details:not(.professional-group)').filter({ hasText: 'Scenario comparison' })
   await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
   await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }), scenario.getByRole('button', { name: 'Save current as A', includeHidden: true }))).click()
-  const opener = results.getByRole('button', { name: 'Annual financial details' })
+  const opener = results.locator('#results-overview').getByRole('button', { name: 'Annual financial details' })
   const dialog = page.getByRole('dialog', { name: 'Household annual estimate' })
   const row = (name: RegExp) => dialog.getByRole('row').filter({ has: page.getByRole('rowheader', { name }) })
   const partner = row(/Partner age/).getByRole('cell').first()
@@ -109,7 +109,7 @@ test('French underwater-sale details show the event label without its technical 
   })
   await page.reload()
   await chooseLanguage(page, 'FR')
-  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Détails financiers annuels', exact: true }), page.getByRole('button', { name: 'Détails financiers annuels', exact: true, includeHidden: true }))).click()
+  await (await prepareProfessionalTarget(page.locator('#results-overview').getByRole('button', { name: 'Détails financiers annuels', exact: true }), page.locator('#results-overview').getByRole('button', { name: 'Détails financiers annuels', exact: true, includeHidden: true }))).click()
   await showAnnualTable(page)
   const dialog = page.getByRole('dialog', { name: 'Estimation annuelle du ménage' })
   const technicalId = 'sale:60:principalResidence.sellAtAge'
