@@ -62,12 +62,12 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
   })
 
   useLayoutEffect(() => {
-    // Only revealing phone Table needs deferred alignment. Explicit jumps
+    // Tab and responsive layout can both reveal a hidden Table. Explicit jumps
     // align themselves; inspecting another visible year must preserve scroll.
     const hidden = phone && view !== 'table'
     const revealing = tableWasHidden.current && !hidden
     tableWasHidden.current = hidden
-    if (!phone || !revealing) return
+    if (!revealing) return
     const port = scroller.current
     const header = yearHeaders.current.get(year)
     if (port && header) port.scrollLeft = Math.max(0, header.offsetLeft - (rowHeaders.current.values().next().value?.offsetWidth ?? 144))

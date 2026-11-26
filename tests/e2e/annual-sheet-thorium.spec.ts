@@ -676,3 +676,56 @@ for (const width of [1440, 390]) {
     await testInfo.attach('inspection scroll', { body: JSON.stringify({ width, year, before, opened, closed, jumped }), contentType: 'application/json' })
   })
 }
+
+test('repeated tab and responsive Table reveals align the year at the CSS phone breakpoint', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { dialog } = await openSheet(page, '?pressure=76', false)
+  const port = dialog.locator('.annual-sheet-scroll')
+  const picker = dialog.getByRole('combobox', { name: 'Jump to year' })
+  const close = dialog.getByRole('button', { name: 'Close', exact: true })
+  const measurements = []
+  const aligned = async (year: string) => {
+    const position = await port.evaluate((node, year) => {
+      const sticky = node.querySelector('thead th')!.getBoundingClientRect()
+      const selected = [...node.querySelectorAll('thead th')].find(header => header.textContent === year)!.getBoundingClientRect()
+      return { scrollLeft: node.scrollLeft, labelRight: sticky.right, selectedLeft: selected.left }
+    }, year)
+    expect(position.scrollLeft).toBeGreaterThan(0)
+    expect(Math.abs(position.selectedLeft - position.labelRight)).toBeLessThanOrEqual(1)
+    return position
+  }
+  for (const [width, year] of [[844, '2036'], [1440, '2037'], [641, '2038']] as const) {
+    await expect(dialog.locator('.annual-year-list')).toBeVisible()
+    await expect(port).toBeHidden()
+    await picker.selectOption(year)
+    await close.focus()
+    await page.setViewportSize({ width, height: width === 844 ? 390 : 900 })
+    await expect(port).toBeVisible()
+    await expect(dialog.locator('.annual-sheet-layout')).toHaveAttribute('data-view', 'table')
+    await expect(dialog.locator('.annual-sheet-view')).toBeHidden()
+    await expect(picker).toHaveValue(year)
+    measurements.push({ width, year, ...await aligned(year) })
+    await expect(close).toBeFocused()
+    await page.setViewportSize({ width: 640, height: 844 })
+    await expect(port).toBeHidden()
+    await expect(dialog.locator('.annual-year-list')).toBeVisible()
+    await expect(dialog.locator('.annual-sheet-view')).toBeVisible()
+  }
+  // The ordinary tab uses the same hidden-to-visible transition.
+  await picker.selectOption('2039')
+  const table = dialog.getByRole('button', { name: 'Table', exact: true })
+  await table.click()
+  await expect(port).toBeVisible()
+  measurements.push({ width: 640, year: '2039', ...await aligned('2039') })
+  await expect(table).toBeFocused()
+  // Crossing the breakpoint while Table remains visible must not realign it.
+  await port.evaluate(node => { node.scrollLeft = 275 })
+  await close.focus()
+  for (const width of [641, 844, 640, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(port).toBeVisible()
+    await expect.poll(() => port.evaluate(node => node.scrollLeft)).toBe(275)
+    await expect(close).toBeFocused()
+  }
+  await testInfo.attach('responsive reveal alignment', { body: JSON.stringify(measurements), contentType: 'application/json' })
+})
