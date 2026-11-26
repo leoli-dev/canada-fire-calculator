@@ -746,6 +746,12 @@ h3 .term:hover, h4 .term:hover, legend .term:hover {
 /* FE-46: the category progress label wraps instead of widening the pager. */
 .question-pager { grid-template-columns: auto minmax(0, 1fr) auto; }
 .question-pager > span { min-width: 0; text-align: center; overflow-wrap: anywhere; font-size: var(--fs-ui); }
+@media (max-width: 640px) {
+  .question-pager { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .question-pager > span { grid-column: 1 / -1; grid-row: 1; overflow-wrap: normal; word-break: normal; }
+  .question-pager > button { grid-row: 2; max-width: 100%; }
+  .question-pager > button:last-child { grid-column: 2; }
+}
 /* FE-21: reset confirmation. */
 .reset-plan { margin: 12px 0; }
 .reset-confirm { max-width: 520px; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--critical, var(--critical)); border-radius: var(--r-panel); background: var(--critical-tint); }
