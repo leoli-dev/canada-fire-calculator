@@ -729,3 +729,69 @@ test('repeated tab and responsive Table reveals align the year at the CSS phone 
   }
   await testInfo.attach('responsive reveal alignment', { body: JSON.stringify(measurements), contentType: 'application/json' })
 })
+
+for (const safeArea of [
+  { width: 844, height: 390, left: 0, right: 0, bottom: 0 },
+  { width: 844, height: 390, left: 47, right: 47, bottom: 21 },
+  { width: 390, height: 844, left: 0, right: 0, bottom: 0 },
+  { width: 390, height: 844, left: 0, right: 0, bottom: 34 },
+]) {
+  test(`annual safe area ${safeArea.width}x${safeArea.height} sides ${safeArea.left} bottom ${safeArea.bottom}`, async ({ page }, testInfo) => {
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, left: safeArea.left, right: safeArea.right, bottom: safeArea.bottom } })
+    await page.setViewportSize({ width: 390, height: 844 })
+    const { dialog, opener } = await openSheet(page, '?pressure=76', false)
+    const picker = dialog.getByRole('combobox', { name: 'Jump to year' })
+    await picker.selectOption('2036')
+    const close = dialog.getByRole('button', { name: 'Close', exact: true })
+    await close.focus()
+    await page.setViewportSize({ width: safeArea.width, height: safeArea.height })
+    if (safeArea.width <= 640) await showAnnualTable(page)
+    else await expect(close).toBeFocused()
+    const port = dialog.locator('.annual-sheet-scroll')
+    await expect(port).toBeVisible()
+    const geometry = await dialog.evaluate(node => {
+      const bounds = (selector: string) => node.querySelector(selector)!.getBoundingClientRect().toJSON()
+      const style = getComputedStyle(node.querySelector('.annual-sheet-layout')!)
+      return {
+        padding: { left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight), bottom: parseFloat(style.paddingBottom) },
+        title: bounds('.annual-sheet-title h2'), close: bounds('.annual-sheet-header > button'),
+        item: bounds('thead th:first-child'), table: bounds('.annual-sheet-scroll'),
+        body: bounds('.annual-sheet-body'), overflow: { x: node.scrollWidth - node.clientWidth, y: node.scrollHeight - node.clientHeight },
+      }
+    })
+    expect(geometry.padding).toEqual({ left: safeArea.left, right: safeArea.right, bottom: safeArea.bottom })
+    for (const bounds of [geometry.title, geometry.close, geometry.item, geometry.table, geometry.body]) {
+      expect(bounds.left).toBeGreaterThanOrEqual(safeArea.left)
+      expect(bounds.right).toBeLessThanOrEqual(safeArea.width - safeArea.right)
+      expect(bounds.bottom).toBeLessThanOrEqual(safeArea.height - safeArea.bottom)
+    }
+    expect(geometry.overflow).toEqual({ x: 0, y: 0 })
+    await expect(close).toBeInViewport({ ratio: 1 })
+    await expect(port).toBeInViewport({ ratio: 1 })
+    await expect(dialog.getByRole('columnheader', { name: '2036', exact: true })).toBeInViewport({ ratio: 1 })
+    const before = await port.evaluate(node => ({ left: node.scrollLeft, height: node.clientHeight }))
+    const target = cell(dialog, 'Pressure row 1', 2036)
+    await expect(target).toBeInViewport({ ratio: 1 })
+    await target.click()
+    const detail = dialog.getByRole('complementary', { name: 'Cell details' })
+    await expect(detail).toBeFocused()
+    if (safeArea.width <= 640) {
+      await expect(dialog.locator('.ui-sheet')).toBeVisible()
+      const bodyBottom = await dialog.locator('.ui-sheet-body').evaluate(node => node.getBoundingClientRect().bottom)
+      expect(bodyBottom).toBeLessThanOrEqual(safeArea.height - safeArea.bottom)
+      await page.keyboard.press('Escape')
+    } else await detail.getByRole('button', { name: 'Hide details', exact: true }).click()
+    await expect(detail).toBeHidden()
+    await expect(dialog.getByRole('button', { name: 'Inspect row: Pressure row 1, 2036', exact: true })).toBeFocused()
+    expect(await port.evaluate(node => ({ left: node.scrollLeft, height: node.clientHeight }))).toEqual(before)
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
+    await page.screenshot({ path: testInfo.outputPath('safe-area.png'), animations: 'disabled' })
+    await testInfo.attach('safe-area geometry', { body: JSON.stringify({ safeArea, geometry, node: process.version, browser: page.context().browser()!.version(), executablePath }), contentType: 'application/json' })
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('')
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(760)
+  })
+}
