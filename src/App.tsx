@@ -111,7 +111,8 @@ export default function App() {
   return (
     <div className="app">
       <AppBar showResults={!!canonicalResult || (!!result && !hasBlockingIssues)} />
-      <AnalyticsPrompt />
+      {/* Match GuidedFlow's question branch, including a stale-result transition. */}
+      {!(entryMode === 'guided' && !storageIssue && guidedView !== 'review' && (guidedView !== 'results' || resultRevision !== inputRevision)) && <AnalyticsPrompt />}
 
       {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">

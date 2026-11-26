@@ -15,6 +15,7 @@ import type { QuestionDefinition } from '../../guided/schema'
 import { guidanceForPage } from '../../guided/pageGuidance'
 import { asksCoupleTotal, questionTitleKey } from '../../guided/questionCatalog'
 import { useGlossary } from '../../glossary'
+import { AnalyticsPrompt } from '../AnalyticsConsent'
 import { NumberInput } from '../NumberInput'
 import { isSharedField, parseField } from '../../forms/fieldRegistry'
 import { CppEstimator, OasEstimator } from '../BenefitEstimators'
@@ -756,6 +757,7 @@ export function QuestionPage({ definition, categoryProgress }: { definition: Que
   return <article className="question-page" data-page-id={definition.id}>
     <p className="question-location">{t(`questionnaire.categories.${definition.categoryId}`)}{categoryProgress && <span> {categoryProgress}</span>}</p>
     <h2 id="question-title" tabIndex={-1}>{t(questionTitleKey(definition, inputs))}</h2>
+    <AnalyticsPrompt />
     {control}
     <QuestionHelp guidanceKey={definition.guidanceKey} />
     {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <Callout as="p" variant="warn" className="pending-note">{t('questionnaire.pendingSaved')}</Callout>}

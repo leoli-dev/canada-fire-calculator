@@ -91,3 +91,5 @@ main.guided-only { grid-template-columns: minmax(0, 1fr); }
   .app-menu-content a[href] { display: inline-flex; align-items: center; }
   .app-menu-content .term, .app-menu-content .text-action { display: inline-flex; align-items: center; justify-content: center; }
 }
+
+.question-page > .analytics-prompt { margin-top: 16px; }

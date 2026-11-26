@@ -1,5 +1,5 @@
 import { Button } from '../ui'
-import { useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAnalyticsConsent, privacySignal, setAnalyticsConsent, subscribeAnalyticsConsent, type AnalyticsConsent } from '../analytics'
 
@@ -34,4 +34,20 @@ export function AnalyticsFooter({ testId = 'analytics-footer', hideGrant = false
       {t('analyticsOff')}{' '}{!hideGrant && <Button variant="link" type="button" className="text-action" onClick={() => choose('granted')}>{t('analyticsTurnOn')}</Button>}
     </>}
   </p>
+}
+
+/** Keep the privacy destination mounted while its consent actions change. */
+export function AnalyticsMenuSettings() {
+  const { t } = useTranslation()
+  const [consent] = useConsent()
+  const heading = useRef<HTMLHeadingElement>(null)
+  const focusedAction = useRef<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (focusedAction.current && !focusedAction.current.isConnected) heading.current?.focus()
+  }, [consent])
+  return <section aria-label={t('ui.privacy')} onFocusCapture={event => { focusedAction.current = event.target as HTMLElement }}>
+    <h3 ref={heading} tabIndex={-1}>{t('ui.privacy')}</h3>
+    <AnalyticsPrompt testId="analytics-menu-prompt" includeDenied />
+    <AnalyticsFooter testId="analytics-menu-footer" hideGrant />
+  </section>
 }

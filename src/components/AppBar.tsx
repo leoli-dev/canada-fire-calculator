@@ -4,7 +4,7 @@ import { setLanguage } from '../i18n'
 import { useGlossary } from '../glossary'
 import { useStore } from '../store'
 import { Button, Segmented, Sheet } from '../ui'
-import { AnalyticsFooter, AnalyticsPrompt } from './AnalyticsConsent'
+import { AnalyticsMenuSettings } from './AnalyticsConsent'
 
 const LANGS = [{ code: 'en', label: 'EN' }, { code: 'fr', label: 'FR' }, { code: 'zh', label: '中文' }]
 const github = 'https://github.com/leoli-dev/canada-fire-calculator'
@@ -59,7 +59,7 @@ export function AppBar({ showResults }: { showResults: boolean }) {
     </header>
     <div className="desktop-disclaimer">{disclaimer}</div>
     <Sheet open={panel !== null} onClose={() => setPanel(null)} title={t(panel === 'language' ? 'ui.language' : 'ui.menu')} closeLabel={t('ui.close')}>
-      {panel === 'language' ? languages : <div className="app-menu-content">{modes}<Button onClick={() => handoff('fire')}>{t('ui.terms')}</Button><a href={github} target="_blank" rel="noopener noreferrer">{t('githubSource')}</a><section aria-label={t('ui.privacy')}><h3>{t('ui.privacy')}</h3><AnalyticsPrompt testId="analytics-menu-prompt" includeDenied /><AnalyticsFooter testId="analytics-menu-footer" hideGrant /></section><CompactDisclaimer onOpen={() => handoff('simplifications')} /></div>}
+      {panel === 'language' ? languages : <div className="app-menu-content">{modes}<Button onClick={() => handoff('fire')}>{t('ui.terms')}</Button><a href={github} target="_blank" rel="noopener noreferrer">{t('githubSource')}</a><AnalyticsMenuSettings /><CompactDisclaimer onOpen={() => handoff('simplifications')} /></div>}
     </Sheet>
   </>
 }
