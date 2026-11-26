@@ -16,7 +16,33 @@
     "categoryProgress": "{{current}} sur {{total}}",
     "nextQuestion": "Suite : {{label}}",
     "real": "Réel",
-    "nominal": "Nominal"
+    "nominal": "Nominal",
+    "conclusion": {
+      "ok": "Viable",
+      "bad": "Manque de fonds",
+      "uncertain": "À vérifier",
+      "notComputed": "Non calculé",
+      "fundsUntil": "Fonds disponibles jusqu’à cet âge",
+      "earliestAge": "Premier âge de retraite possible",
+      "assetsAtRetirement": "Actif à la retraite",
+      "fireNumber": "Montant FIRE",
+      "projectedAssets": "Actif projeté à la retraite",
+      "difference": "Excédent ou manque",
+      "target": "Objectif d’actif",
+      "targetAge": "Âge où l’objectif est atteint",
+      "estateExplanation": "Comment la valeur successorale est calculée",
+      "yourPlan": "Votre plan",
+      "ready": "Prêt à générer",
+      "confirmed": "Réponses confirmées",
+      "estimated": "Estimations utilisées",
+      "blockers": "Éléments bloquant la génération",
+      "reviewSummary": "{{confirmed}} confirmées, {{estimated}} estimées, {{blockers}} bloquantes.",
+      "generateBlocked": "Réglez les {{count}} éléments bloquants avant de générer.",
+      "dangerZone": "Réinitialiser votre plan",
+      "targetReached": "Objectif atteint",
+      "optional": "Facultatif",
+      "reviewRuleDate": "Règles fiscales {{jurisdiction}} {{year}}, prestations pour {{quarter}}."
+    }
   },
   "title": "🇨🇦 Calculateur FIRE Canada",
   "budget": {
@@ -1946,28 +1972,5 @@
       "budget": "Budget de temps atteint. Essais restants non calculés; aucun taux global affiché."
     },
     "run": "Lancer {{count}} essais canoniques"
-  },
-  "conclusion": {
-    "ok": "Viable",
-    "bad": "Manque de fonds",
-    "uncertain": "À vérifier",
-    "notComputed": "Non calculé",
-    "fundsUntil": "Fonds disponibles jusqu’à cet âge",
-    "earliestAge": "Premier âge de retraite possible",
-    "assetsAtRetirement": "Actif à la retraite",
-    "fireNumber": "Montant FIRE",
-    "projectedAssets": "Actif projeté à la retraite",
-    "difference": "Excédent ou manque",
-    "target": "Objectif d’actif",
-    "targetAge": "Âge où l’objectif est atteint",
-    "estateExplanation": "Comment la valeur successorale est calculée",
-    "yourPlan": "Votre plan",
-    "ready": "Prêt à générer",
-    "confirmed": "Réponses confirmées",
-    "estimated": "Estimations utilisées",
-    "blockers": "Éléments bloquant la génération",
-    "reviewSummary": "{{confirmed}} confirmées, {{estimated}} estimées, {{blockers}} bloquantes.",
-    "generateBlocked": "Réglez les {{count}} éléments bloquants avant de générer.",
-    "dangerZone": "Réinitialiser votre plan"
   }
 }

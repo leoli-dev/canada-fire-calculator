@@ -121,7 +121,10 @@ test('PR-4 review controls, focus clearance and localized conclusions in both mo
   for (const view of [
     { width: 1440, height: 1000, language: 'EN' },
     { width: 390, height: 844, language: 'EN' },
+    { width: 320, height: 740, language: 'EN' },
     { width: 320, height: 740, language: 'FR' },
+    { width: 390, height: 844, language: 'FR' },
+    { width: 320, height: 740, language: '中文' },
     { width: 390, height: 844, language: '中文' },
   ]) {
     await page.setViewportSize({ width: view.width, height: view.height })
@@ -134,9 +137,26 @@ test('PR-4 review controls, focus clearance and localized conclusions in both mo
     await expect(generate).toBeInViewport({ ratio: 1 })
     evidence.push({ view, review: await page.locator('.generate-results').evaluate(button => ({ rect: button.getBoundingClientRect().toJSON(), disabled: (button as HTMLButtonElement).disabled, viewport: { width: innerWidth, height: innerHeight }, documentWidth: document.documentElement.scrollWidth })) })
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(view.width)
+    const ledger = page.getByTestId('canonical-evidence')
+    const ledgerTitle = { EN: 'Canonical annual ledger', FR: 'Registre annuel canonique', 中文: '标准年度账本' }[view.language]!
+    await expect(ledger.locator('summary')).toHaveAccessibleName(ledgerTitle)
+    await expect(ledger.locator('.canonical-optional')).toHaveText({ EN: 'Optional', FR: 'Facultatif', 中文: '可选' }[view.language]!)
+    await expect(ledger.locator('.canonical-optional')).toBeVisible()
+    await expect(ledger).not.toHaveAttribute('open')
+    // The side date is a factual caption; the full source instruction remains in the rules disclosure.
+    const date = await page.locator('.review-rule-date').innerText()
+    expect(date).not.toMatch(/Open|Ouvrez|展开/)
+    await expect(page.getByTestId('rule-assumptions-details').locator('summary')).toContainText({ EN: 'Open for the sources', FR: 'Ouvrez pour les sources', 中文: '展开查看来源' }[view.language]!)
     if (view.width <= 640) {
       expect((await generate.boundingBox())!.height).toBe(48)
       await expect(page.locator('.review-phone-summary')).toBeVisible()
+      const edits = await page.locator('.review-category-list button, .review-assumption-row button').evaluateAll(buttons => buttons.map(button => {
+        const rect = button.getBoundingClientRect(), row = button.parentElement!.getBoundingClientRect()
+        const siblings = [...button.parentElement!.children].filter(el => el !== button).map(el => el.getBoundingClientRect())
+        return { width: rect.width, height: rect.height, insideRow: rect.left >= row.left && rect.right <= row.right, overlaps: siblings.some(other => Math.min(rect.right, other.right) > Math.max(rect.left, other.left) && Math.min(rect.bottom, other.bottom) > Math.max(rect.top, other.top)) }
+      }))
+      for (const edit of edits) { expect(edit.width).toBeGreaterThanOrEqual(44); expect(edit.height).toBeGreaterThanOrEqual(44); expect(edit.insideRow).toBe(true); expect(edit.overlaps).toBe(false) }
+      evidence.push({ view, edits })
       // Native focus must scroll the page-end Reset above the fixed action bar.
       await page.getByTestId('reset-plan').focus()
       const reset = (await page.getByTestId('reset-plan').boundingBox())!
@@ -156,6 +176,10 @@ test('PR-4 review controls, focus clearance and localized conclusions in both mo
     await expect(page.locator('.results-intro h2')).toBeFocused()
     for (const mode of ['guided', 'professional'] as const) {
       if (mode === 'professional') await chooseMode(page, mode)
+      if (mode === 'professional') {
+        await expect(page.getByTestId('canonical-evidence').locator('.canonical-optional')).toHaveCount(0)
+        await expect(page.getByTestId('canonical-evidence').locator('summary')).toHaveText(ledgerTitle)
+      }
       const summary = page.locator('.summary')
       await summary.scrollIntoViewIfNeeded()
       await expect(summary.locator('[role="tab"]')).toHaveCount(4)

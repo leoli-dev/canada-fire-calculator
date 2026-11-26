@@ -23,14 +23,14 @@ import type { ReactNode } from 'react'
 type Mode = 'last' | 'when' | 'number' | 'target'
 const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
 
-function ConclusionVerdict({ children, tone, testId }: { children: ReactNode; tone: 'ok' | 'bad' | 'uncertain'; testId?: string }) {
+function ConclusionVerdict({ children, tone, testId, statusLabel, statusTone = tone }: { children: ReactNode; tone: 'ok' | 'bad' | 'uncertain'; testId?: string; statusLabel?: string; statusTone?: 'ok' | 'bad' | 'uncertain' }) {
   const { t } = useTranslation()
-  return <div className="conclusion-heading"><StatusChip status={tone === 'uncertain' ? 'est' : tone}>{t(`conclusion.${tone}`)}</StatusChip><p className={`verdict${tone === 'bad' ? ' verdict-bad' : ''}`} data-testid={testId}>{children}</p></div>
+  return <div className="conclusion-heading"><StatusChip status={statusTone === 'uncertain' ? 'est' : statusTone}>{statusLabel ?? t(`ui.conclusion.${statusTone}`)}</StatusChip><p className={`verdict${tone === 'bad' ? ' verdict-bad' : ''}`} data-testid={testId}>{children}</p></div>
 }
 
 function ConclusionMetrics({ items }: { items: readonly (readonly [string, ReactNode])[] }) {
   const { t } = useTranslation()
-  return <dl className="conclusion-metrics">{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? t('conclusion.notComputed')}</dd></div>)}</dl>
+  return <dl className="conclusion-metrics">{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? t('ui.conclusion.notComputed')}</dd></div>)}</dl>
 }
 
 /**
@@ -213,7 +213,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             {result.terminalTaxStatus === 'unsupported' && <li>{t('checkClosingTax')}</li>}
           </ul></Callout>}
           <ConclusionMetrics items={[
-            [t('conclusion.fundsUntil'), result.success ? inputs.lifeExpectancy : result.depletedAge],
+            [t('ui.conclusion.fundsUntil'), result.success ? inputs.lifeExpectancy : result.depletedAge],
             [t('finalNetWorth'), cad(result.finalNetWorth)],
             [t('estateValue'), result.terminalTaxStatus === 'estimated' ? cad(result.estateValue) : null],
           ]} />
@@ -231,7 +231,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}
           </ul>}
-          <Disclosure className="conclusion-estate"><summary>{t('conclusion.estateExplanation')}</summary>
+          <Disclosure className="conclusion-estate"><summary>{t('ui.conclusion.estateExplanation')}</summary>
           <p>
             {t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong>
             {result.terminalTaxStatus === 'estimated' && <>
@@ -278,8 +278,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
                   : t(`solver_${earliest?.status ?? 'unsupported'}`)}
           </ConclusionVerdict>
           <ConclusionMetrics items={[
-            [t('conclusion.earliestAge'), earliest?.status === 'solved' ? earliest.value : null],
-            [t('conclusion.assetsAtRetirement'), earliest?.status === 'solved' && earliestAssets !== null ? cad(earliestAssets) : null],
+            [t('ui.conclusion.earliestAge'), earliest?.status === 'solved' ? earliest.value : null],
+            [t('ui.conclusion.assetsAtRetirement'), earliest?.status === 'solved' && earliestAssets !== null ? cad(earliestAssets) : null],
             [t('retirementSpending'), cad(inputs.retirementSpending)],
           ]} />
           {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&
@@ -307,7 +307,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
         <>
           {quickEstimateUnsupported ? <>
             <ConclusionVerdict tone="uncertain">{quickEstimateMessage}</ConclusionVerdict>
-            <ConclusionMetrics items={[[t('conclusion.fireNumber'), null], [t('conclusion.projectedAssets'), null], [t('conclusion.difference'), null]]} />
+            <ConclusionMetrics items={[[t('ui.conclusion.fireNumber'), null], [t('ui.conclusion.projectedAssets'), null], [t('ui.conclusion.difference'), null]]} />
             {fireNumber?.status === 'searchLimit' && fireNumber.lastVerifiedBound !== null &&
               <p className="hint">{t('solverCheckedAssets', { amount: cad(fireNumber.lastVerifiedBound), iterations: fireNumber.iterations })}</p>}
           </> : <>
@@ -315,9 +315,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber!.value!) })}
           </ConclusionVerdict>
           <ConclusionMetrics items={[
-            [t('conclusion.fireNumber'), fireNumber?.value != null ? cad(fireNumber.value) : null],
-            [t('conclusion.projectedAssets'), Number.isFinite(projectedAtFire) ? cad(projectedAtFire!) : null],
-            [t('conclusion.difference'), Number.isFinite(projectedAtFire) && fireNumber?.value != null ? cad(projectedAtFire! >= fireNumber.value ? projectedAtFire! - fireNumber.value : fireNumber.value - projectedAtFire!) : null],
+            [t('ui.conclusion.fireNumber'), fireNumber?.value != null ? cad(fireNumber.value) : null],
+            [t('ui.conclusion.projectedAssets'), Number.isFinite(projectedAtFire) ? cad(projectedAtFire!) : null],
+            [t('ui.conclusion.difference'), Number.isFinite(projectedAtFire) && fireNumber?.value != null ? cad(projectedAtFire! >= fireNumber.value ? projectedAtFire! - fireNumber.value : fireNumber.value - projectedAtFire!) : null],
           ]} />
           {Number.isFinite(projectedAtFire) && fireNumber?.value !== null && fireNumber?.value !== undefined && (
             <p>
@@ -355,10 +355,11 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               }}
             />
           </Field>
-          {!goal && <><StatusChip status="est">{t('conclusion.uncertain')}</StatusChip><p className="hint">{t('targetUnset')}</p></>}
+          {!goal && <><StatusChip status="est">{t('ui.conclusion.uncertain')}</StatusChip><p className="hint">{t('targetUnset')}</p></>}
           {goal?.status === 'unsupported' && <ConclusionVerdict tone="uncertain">{quickEstimateMessage}</ConclusionVerdict>}
           {goal?.status === 'supported' && (
-            <ConclusionVerdict tone={!ok ? 'bad' : targetResultUnverified ? 'uncertain' : 'ok'}>
+            <ConclusionVerdict tone={!ok ? 'bad' : resultUnverified ? 'uncertain' : 'ok'} statusTone={resultUnverified ? 'uncertain' : undefined}
+              statusLabel={!resultUnverified && ok ? t('ui.conclusion.targetReached') : undefined}>
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge
                 ? t('targetReachedEarly', {
                     fireAge: inputs.fireAge,
@@ -383,9 +384,9 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
             </ConclusionVerdict>
           )}
           <ConclusionMetrics items={[
-            [t('conclusion.target'), goal?.status === 'supported' ? cad(target) : null],
-            [t('conclusion.projectedAssets'), goal?.status === 'supported' && goal.reachedAge !== null ? cad(goal.assetsAtFire) : null],
-            [t('conclusion.targetAge'), goal?.status === 'supported' ? goal.reachedAge : null],
+            [t('ui.conclusion.target'), goal?.status === 'supported' ? cad(target) : null],
+            [t('ui.conclusion.projectedAssets'), goal?.status === 'supported' && goal.reachedAge !== null ? cad(goal.assetsAtFire) : null],
+            [t('ui.conclusion.targetAge'), goal?.status === 'supported' ? goal.reachedAge : null],
           ]} />
           {targetResultUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
           <p className="hint"><Jargon text={t('targetHint')} /></p>

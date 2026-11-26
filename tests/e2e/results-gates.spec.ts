@@ -68,3 +68,22 @@ test('a sustainable-spending answer is retired when the plan changes', async ({ 
   await expect(answer).toBeVisible()
   expect(await answer.innerText()).not.toBe(first)
 })
+
+test('the default CA$750,000 accumulation target keeps the existing tax uncertainty in its status', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs: { ...DEFAULT_INPUTS, fireTargetAssets: 750000 }, entryMode: 'professional', inputRevision: 0, resultRevision: null,
+    } }))
+  })
+  await page.reload()
+  await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+  const card = page.locator('.summary')
+  await expect(card).toHaveClass(/uncertain/)
+  await expect(card.locator('.conclusion-heading .ui-status')).toHaveText('Needs checks')
+  await expect(card.locator('.verdict')).toContainText('On track: the CA$750,000 target')
+  await expect(card.locator('.conclusion-metrics dd').first()).toHaveText('CA$750,000')
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+})

@@ -19,6 +19,7 @@
 .review-generate-bar > p { font-size: var(--fs-meta); margin: 0 0 8px; }
 .review-ready [data-testid='canonical-evidence'] { margin: 16px 0 0; padding: 0 12px; }
 .review-ready [data-testid='canonical-evidence'] > summary { gap: 8px; }
+.review-ready .canonical-optional { color: var(--ink-2); font-size: var(--fs-meta); font-weight: 400; }
 .review-ready [data-testid='canonical-evidence'] .ui-field { display: grid; gap: 8px; margin: 12px 0; }
 .review-ready [data-testid='canonical-evidence'] .ui-field:has(input[type='checkbox']) { grid-template-columns: auto 1fr; align-items: start; }
 .review-ready [data-testid='canonical-evidence'] :is(input:not([type='checkbox']), select) { width: 100%; min-width: 0; }
@@ -64,7 +65,7 @@
   .review-category-list h3, .review-assumption-row strong { grid-column: 1; grid-row: 1; }
   .review-category-list p, .review-assumption-row p { grid-column: 1; grid-row: 2; font-size: var(--fs-body); }
   .review-category-list .ui-status, .review-assumption-row .ui-status { grid-column: 1; justify-self: start; max-width: none; }
-  .review-category-list button, .review-assumption-row button { grid-column: 2; grid-row: 1 / 4; min-height: 44px; }
+  .review-category-list button, .review-assumption-row button { grid-column: 2; grid-row: 1 / 4; min-width: 44px; min-height: 44px; }
   .review-main > .text-action { min-height: 44px; }
   .review-generate-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: var(--z-sticky); border-top: 1px solid var(--line); background: var(--surface); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-float); }
   .review-generate-bar .generate-results { height: 48px; min-height: 48px; }

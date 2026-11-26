@@ -20,7 +20,7 @@ vi.mock('../../engine', async importOriginal => ({
 }))
 const inputs = { ...DEFAULT_INPUTS, fireTargetAssets: 750000 }
 const result = runProjection(inputs)
-beforeEach(() => { useStore.setState({ canonical: null }); solvers.earliest.status = 'solved'; solvers.number.status = 'solved' })
+beforeEach(() => { useStore.setState({ canonical: null }); solvers.earliest.status = 'solved'; solvers.number.status = 'solved'; solvers.target.status = 'supported'; solvers.target.reachedAge = 55 })
 afterEach(cleanup)
 const values = () => Array.from(document.querySelectorAll('.conclusion-metrics dd')).map(node => node.textContent)
 
@@ -84,4 +84,24 @@ it('keeps needs-checks between verdict and metrics and preserves the warning ite
   expect(checks.closest('.ui-callout-warn')).not.toBeNull()
   expect(checks.textContent).toContain('tax')
   expect(checks.compareDocumentPosition(document.querySelector('.conclusion-metrics')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it.each([true, false])('keeps a reached accumulation target distinct from sustainability with tax uncertainty %s', async taxWarning => {
+  solvers.target.reachedAge = 40
+  render(<ResultsPanel inputs={inputs} result={result} taxWarning={taxWarning} />)
+  await userEvent.click(screen.getByRole('tab', { name: 'Will I hit my target?' }))
+  expect(document.querySelector('.conclusion-heading .ui-status')?.textContent).toBe(taxWarning ? 'Needs checks' : 'Target reached')
+  expect(document.querySelector('.verdict')?.textContent).toContain('On track: the CA$750,000 target is first reached at age 40')
+  expect(values()).toEqual(['CA$750,000', 'CA$650,000', '40'])
+})
+
+it('keeps an uncertain late target and an unsupported target labelled Needs checks without changing their facts', async () => {
+  const view = render(<ResultsPanel inputs={inputs} result={result} taxWarning />)
+  await userEvent.click(screen.getByRole('tab', { name: 'Will I hit my target?' }))
+  expect(document.querySelector('.conclusion-heading .ui-status')?.textContent).toBe('Needs checks')
+  expect(values()).toEqual(['CA$750,000', 'CA$650,000', '55'])
+  solvers.target.status = 'unsupported'
+  view.rerender(<ResultsPanel inputs={{ ...inputs }} result={result} taxWarning />)
+  expect(document.querySelector('.conclusion-heading .ui-status')?.textContent).toBe('Needs checks')
+  expect(values()).toEqual(['Not computed', 'Not computed', 'Not computed'])
 })

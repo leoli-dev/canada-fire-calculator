@@ -16,7 +16,33 @@
     "categoryProgress": "{{current}} / {{total}}",
     "nextQuestion": "下一题：{{label}}",
     "real": "实际",
-    "nominal": "名义"
+    "nominal": "名义",
+    "conclusion": {
+      "ok": "可持续",
+      "bad": "资金不足",
+      "uncertain": "需要核实",
+      "notComputed": "未计算",
+      "fundsUntil": "资金可维持至几岁",
+      "earliestAge": "最早退休年龄",
+      "assetsAtRetirement": "退休时资产",
+      "fireNumber": "FIRE 所需资产",
+      "projectedAssets": "退休时预计资产",
+      "difference": "盈余或缺口",
+      "target": "资产目标",
+      "targetAge": "达到目标时的年龄",
+      "estateExplanation": "遗产价值如何计算",
+      "yourPlan": "你的计划",
+      "ready": "准备生成结果",
+      "confirmed": "已确认的回答",
+      "estimated": "使用估算的回答",
+      "blockers": "阻止生成的项目",
+      "reviewSummary": "已确认 {{confirmed}} 项，估算 {{estimated}} 项，待处理 {{blockers}} 项。",
+      "generateBlocked": "请先处理 {{count}} 项阻止生成的问题。",
+      "dangerZone": "重置你的计划",
+      "targetReached": "已达到目标",
+      "optional": "可选",
+      "reviewRuleDate": "{{jurisdiction}} {{year}} 年税务规则，{{quarter}} 福利标准。"
+    }
   },
   "title": "🇨🇦 加拿大 FIRE 计算器",
   "budget": {
@@ -1946,28 +1972,5 @@
       "budget": "已达时间预算。其余试验未计算，不显示整体比例。"
     },
     "run": "运行 {{count}} 次标准试验"
-  },
-  "conclusion": {
-    "ok": "可持续",
-    "bad": "资金不足",
-    "uncertain": "需要核实",
-    "notComputed": "未计算",
-    "fundsUntil": "资金可维持至几岁",
-    "earliestAge": "最早退休年龄",
-    "assetsAtRetirement": "退休时资产",
-    "fireNumber": "FIRE 所需资产",
-    "projectedAssets": "退休时预计资产",
-    "difference": "盈余或缺口",
-    "target": "资产目标",
-    "targetAge": "达到目标时的年龄",
-    "estateExplanation": "遗产价值如何计算",
-    "yourPlan": "你的计划",
-    "ready": "准备生成结果",
-    "confirmed": "已确认的回答",
-    "estimated": "使用估算的回答",
-    "blockers": "阻止生成的项目",
-    "reviewSummary": "已确认 {{confirmed}} 项，估算 {{estimated}} 项，待处理 {{blockers}} 项。",
-    "generateBlocked": "请先处理 {{count}} 项阻止生成的问题。",
-    "dangerZone": "重置你的计划"
   }
 }

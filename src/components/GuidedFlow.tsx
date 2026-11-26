@@ -113,9 +113,9 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
     <div className="review-main">
     <Button variant="link" type="button" className="text-action" onClick={() => editPage(state.activePageId)}>{t('questionnaire.backToQuestions')}</Button>
     <h2 tabIndex={-1}>{t('questionnaire.reviewTitle')}</h2><p>{t('questionnaire.reviewIntro')}</p>
-    <Callout className="review-phone-summary" role="status">{t('conclusion.reviewSummary', { confirmed, estimated, blockers })}</Callout>
+    <Callout className="review-phone-summary" role="status">{t('ui.conclusion.reviewSummary', { confirmed, estimated, blockers })}</Callout>
     <section className="review-plan" aria-labelledby="review-plan-title">
-    <h3 id="review-plan-title">{t('conclusion.yourPlan')}</h3>
+    <h3 id="review-plan-title">{t('ui.conclusion.yourPlan')}</h3>
     <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
       const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
       const categoryPages = pages.filter((page) => page.categoryId === category.id)
@@ -150,24 +150,24 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
     </section>
     </div>
     <aside className="review-ready" aria-labelledby="review-ready-title">
-    <h3 id="review-ready-title">{t('conclusion.ready')}</h3>
+    <h3 id="review-ready-title">{t('ui.conclusion.ready')}</h3>
     <dl className="review-counts">
-      <div><dt>{t('conclusion.confirmed')}</dt><dd><StatusChip status="ok">{confirmed}</StatusChip></dd></div>
-      <div><dt>{t('conclusion.estimated')}</dt><dd><StatusChip status="est">{estimated}</StatusChip></dd></div>
-      <div><dt>{t('conclusion.blockers')}</dt><dd><StatusChip status={blockers ? 'bad' : 'info'}>{blockers}</StatusChip></dd></div>
+      <div><dt>{t('ui.conclusion.confirmed')}</dt><dd><StatusChip status="ok">{confirmed}</StatusChip></dd></div>
+      <div><dt>{t('ui.conclusion.estimated')}</dt><dd><StatusChip status="est">{estimated}</StatusChip></dd></div>
+      <div><dt>{t('ui.conclusion.blockers')}</dt><dd><StatusChip status={blockers ? 'bad' : 'info'}>{blockers}</StatusChip></dd></div>
     </dl>
     <div className="review-generate-bar">
-      {!canGenerate && <p id="review-generate-blocked">{t('conclusion.generateBlocked', { count: blockers })}</p>}
+      {!canGenerate && <p id="review-generate-blocked">{t('ui.conclusion.generateBlocked', { count: blockers })}</p>}
       <Button variant="primary" type="button" className="generate-results" disabled={!canGenerate} aria-describedby={!canGenerate ? 'review-generate-blocked' : undefined} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</Button>
     </div>
     {(incomplete.length > 0 || issues.length > 0) && <Callout variant="warn" className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
       {incomplete.map((page) => <li key={page.id}><Button type="button" onClick={() => editPage(page.id)}>{t(questionTitleKey(page, state.inputs))}</Button></li>)}
       {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><Button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</Button></li> })}
     </ul></Callout>}
-    <CanonicalEvidenceControl key={`${state.inputRevision}:${i18n.language}`} />
-    <p className="hint review-rule-date">{t('ruleAssumptionsSummary', { jurisdiction: state.inputs.province, year: PLAN_TAX_YEAR, quarter: selectGisRules().paymentPeriod })}</p>
+    <CanonicalEvidenceControl showOptional key={`${state.inputRevision}:${i18n.language}`} />
+    <p className="hint review-rule-date">{t('ui.conclusion.reviewRuleDate', { jurisdiction: state.inputs.province, year: PLAN_TAX_YEAR, quarter: selectGisRules().paymentPeriod })}</p>
     </aside>
-    <section className="review-danger" aria-labelledby="review-danger-title"><h3 id="review-danger-title">{t('conclusion.dangerZone')}</h3>
+    <section className="review-danger" aria-labelledby="review-danger-title"><h3 id="review-danger-title">{t('ui.conclusion.dangerZone')}</h3>
       <ResetPlan danger onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
     </section>
   </section>
