@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
@@ -30,7 +31,7 @@ for (const mode of ['guided', 'professional'] as const) {
     await combined.click()
     const applied = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.inputs)
     expect([applied.cppStartAge, applied.oasStartAge]).toEqual([Number(combo[1]), Number(combo[2])])
-    if (mode === 'guided') await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    if (mode === 'guided') await chooseMode(page, 'professional')
     await expect(timing.locator('.combo')).toContainText('already optimal')
   })
 
@@ -53,7 +54,7 @@ async function openFundedUnranked(page: import('@playwright/test').Page,
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(({ mode, kind }) => {
     const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
     saved.state.inputs.goal = 'dieWithZero'
@@ -93,11 +94,11 @@ for (const mode of ['guided', 'professional'] as const) {
 
 test('unranked funded explanation is localized in French and Chinese', async ({ page }) => {
   await openFundedUnranked(page, 'professional', 'searchLimit')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   const frenchTiming = page.locator('details').filter({ hasText: 'Suggestion de calendrier RPC/SV' })
   await frenchTiming.locator('summary').click()
   await expect(frenchTiming.locator('.combo')).toContainText('Au moins une option finance les dépenses prévues')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   const chineseTiming = page.locator('details').filter({ hasText: 'CPP/OAS 开领时机建议' })
   await expect(chineseTiming.locator('.combo')).toContainText('至少有一个候选能支付计划支出')
 })

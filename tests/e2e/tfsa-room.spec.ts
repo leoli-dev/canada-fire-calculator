@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** BE-27 A: TFSA room belongs to the person, so the CRA room figure and the
@@ -59,7 +60,7 @@ test('professional mode prices the stated room, clips the plan and retains the r
   await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // The same recorded fact prices identically in guided mode.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 C: guided asks TFSA room on its own optional page.
   await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
   await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
@@ -100,7 +101,7 @@ test('guided mode records the room and a withdrawal, and both survive a mode swi
   // A recorded withdrawal opens the advanced detail by itself.
   await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
   await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   expect(await inViewport(page)).toBe(true)
@@ -127,9 +128,9 @@ test('the TFSA room block explains itself in EN, FR and ZH', async ({ page }) =>
   await seed(page)
   const panel = page.getByTestId('tfsa-statement-self')
   await expect(panel).toContainText('Available TFSA contribution room')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(panel).toContainText('Droits de cotisation CELI disponibles')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(panel).toContainText('可用 TFSA 供款空间')
   expect(await inViewport(page)).toBe(true)
 })

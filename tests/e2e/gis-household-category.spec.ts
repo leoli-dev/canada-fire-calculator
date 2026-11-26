@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /**
@@ -91,7 +92,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   // mode leaves the questionnaire; viewing its results is the flow's explicit
   // confirmation step, so record that confirmation and open the results in a
   // fresh page load of the same persisted plan.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.locator('.questionnaire-layout, .answer-review').first()).toBeVisible()
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
@@ -109,7 +110,7 @@ test('professional mode states the allowance-category row for a 65/60 zero-incom
   await expect(guidedPage.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   await guidedPage.close()
   // A mode switch changes navigation only: the same plan, the same row.
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
 })
 
@@ -120,7 +121,7 @@ test('guided mode agrees with professional and the panel stays inside a 320px vi
   await page.getByTestId('benefit-category-panel').locator('summary').click()
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   expect(await inViewport(page)).toBe(true)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('benefit-total-65')).toHaveText('CA$25,603')
   expect(await inViewport(page)).toBe(true)
 })

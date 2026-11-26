@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage, expectSelectedLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 async function checkContract(page: Page) {
@@ -42,13 +43,12 @@ for (const language of ['EN', 'FR', '中文']) {
     await page.goto('/')
     await page.evaluate(() => localStorage.clear())
     await page.reload()
-    await page.locator('.langs').getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await expect(page.locator('html')).toHaveAttribute('lang', language === 'FR' ? 'fr' : language === '中文' ? 'zh-Hans' : 'en')
-    await expect(page.locator('.langs').getByRole('button', { name: language, exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.locator('.langs').getByRole('button', { name: language, exact: true })).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expectSelectedLanguage(page, language)
     await expect(page.locator('.question-page')).toBeVisible()
     await checkContract(page)
-    await page.locator('.entry-mode button').nth(1).click()
+    await chooseMode(page, 'professional')
     await expect(page.locator('.input-form')).toBeVisible()
     await page.evaluate(() => document.querySelectorAll('details').forEach(details => { details.open = true }))
     await checkContract(page)

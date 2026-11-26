@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -7,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('professional clearing keeps unknown draft across modes and reload instead of writing zero', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const savings = page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input')
   await savings.fill('24000')
   await savings.fill('')
@@ -17,10 +18,10 @@ test('professional clearing keeps unknown draft across modes and reload instead 
   expect(persisted.inputs.annualSavings).toBe(24000)
   expect(persisted.draftByField.annualSavings).toBe('')
   expect(persisted.answerMeta.annualSavings.status).toBe('unknown')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/saving/saving.amount')
   await expect(page.locator('[data-field="annualSavings"] input')).toHaveValue('')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(savings).toHaveValue('')
   await page.reload()
   await expect(savings).toHaveValue('')
@@ -33,11 +34,11 @@ test('annual and monthly savings share one canonical amount across edits, modes,
   const guidedSavings = page.locator('[data-field="annualSavings"] input')
   await guidedSavings.fill('2000')
   await expect(guidedSavings).toHaveValue('2,000')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const professionalSavings = page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input')
   await expect(professionalSavings).toHaveValue('24,000')
   await professionalSavings.fill('24000')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(guidedSavings).toHaveValue('2,000')
   await page.reload()
   await expect(guidedSavings).toHaveValue('2,000')
@@ -47,7 +48,7 @@ test('annual and monthly savings share one canonical amount across edits, modes,
 })
 
 test('invalid age and minus remain drafts; professional goal changes intent and revision once', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const age = page.locator('label.field').filter({ hasText: 'Current age' }).locator('input')
   await age.fill('250')
   await age.blur()
@@ -76,7 +77,7 @@ test('invalid age and minus remain drafts; professional goal changes intent and 
 })
 
 test('switching modes never confirms an estimated amount just by viewing it', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.state.answerMeta.annualSavings = { status: 'estimated', origin: 'default', updatedAt: new Date().toISOString(), assumptionValue: 40000 }
@@ -85,8 +86,8 @@ test('switching modes never confirms an estimated amount just by viewing it', as
   await page.reload()
   const savings = page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('xpath=following-sibling::small[1]')
   await expect(savings).toContainText('estimate')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'guided')
+  await chooseMode(page, 'professional')
   await expect(savings).toContainText('estimate')
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(persisted.answerMeta.annualSavings.status).toBe('estimated')
@@ -94,7 +95,7 @@ test('switching modes never confirms an estimated amount just by viewing it', as
 
 test('no-edit professional blur preserves estimate and revision; actual edits commit once', async ({ page }) => {
   test.setTimeout(60_000)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('fire-inputs')!)
     stored.state.answerMeta.annualSavings = { status: 'estimated', origin: 'default', updatedAt: new Date().toISOString(), assumptionValue: 40000 }
@@ -150,26 +151,26 @@ test('guided monthly no-edit blur preserves exact annual amount and estimate', a
   expect(after.inputRevision).toBe(before.inputRevision + 1)
   await page.reload()
   expect((await read()).inputs.annualSavings).toBe(39999.96)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'professional')
+  await chooseMode(page, 'guided')
   expect((await read()).inputs.annualSavings).toBe(39999.96)
 })
 
 test('reset after professional goal edit resets guided intent to the default goal', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
   await page.getByTestId('reset-plan').click()
   await page.getByTestId('reset-confirm').click()
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(saved.inputs.goal).toBe('legacy')
   expect(saved.planningIntent.spendingPreference).toBe('undecided')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/preferences/intent.spending')
   await expect(page.locator('input[name="intent.spending"][value="undecided"]')).toBeChecked()
 })
 
 test('clearing non-registry CPP and OAS preserves their legacy zero semantics', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   const cpp = page.locator('label.field').filter({ hasText: 'Estimated CPP/QPP per year at 65' }).locator('input').first()
   const before = await read()
@@ -189,7 +190,7 @@ test('clearing non-registry CPP and OAS preserves their legacy zero semantics', 
 })
 
 test('clearing non-registry FIRE asset target removes the canonical target', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const target = page.locator('label.field').filter({ hasText: 'Target investable assets at FIRE' }).locator('input')
   await target.fill('1000000')
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
@@ -203,7 +204,7 @@ test('clearing non-registry FIRE asset target removes the canonical target', asy
 })
 
 test('worksheet application resolves an unknown shared retirement spending draft in one transaction', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const spending = page.locator('label.field').filter({ hasText: 'Desired after-tax annual spending in retirement' }).locator('input')
   await spending.fill('')
   await spending.blur()
@@ -223,13 +224,13 @@ test('worksheet application resolves an unknown shared retirement spending draft
 })
 
 test('unchecking each guided account resolves its shared unknown balance draft', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   for (const account of ['tfsa', 'rrsp', 'nonReg'] as const) {
     const label = account === 'tfsa' ? 'TFSA' : account === 'rrsp' ? 'RRSP / RRIF' : 'Non-registered account'
     const professionalLabel = account === 'nonReg' ? 'Non-registered' : label
     const professional = page.locator('label.field').filter({ hasText: new RegExp(`^${professionalLabel.replace('/', '\/')}$`) }).locator('input').first()
     await professional.fill('0')
-    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await chooseMode(page, 'guided')
     await page.goto('/#/guided/assets/assets.identify')
     const choice = page.getByRole('checkbox', { name: label })
     await choice.check()
@@ -245,22 +246,22 @@ test('unchecking each guided account resolves its shared unknown balance draft',
     expect(Object.hasOwn(after.draftByField, `balances.${account}`)).toBe(false)
     expect(after.answerMeta[`balances.${account}`].status).toBe('notApplicable')
     expect(after.inputRevision).toBe(before + 1)
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     await expect(professional).toHaveValue('0')
     await expect(page.locator('.results-column')).toBeVisible()
   }
 })
 
 test('professional nonzero balance reactivates a guided account in the same transaction', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const tfsa = page.locator('label.field').filter({ hasText: /^TFSA$/ }).locator('input').first()
   await tfsa.fill('0')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/assets.identify')
   const choice = page.getByRole('checkbox', { name: 'TFSA' })
   await choice.check()
   await choice.uncheck()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.inputRevision)
   await tfsa.fill('100000')
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
@@ -269,7 +270,7 @@ test('professional nonzero balance reactivates a guided account in the same tran
   expect(after.canonical.accounts.find((account: { kind: string }) => account.kind === 'tfsa').balance).toBe(100000)
   expect(after.answerMeta['balances.tfsa'].status).toBe('confirmed')
   expect(after.questionAnswers['assets.identify']).toContain('tfsa')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/assets.identify')
   await expect(choice).toBeChecked()
   await page.goto('/#/guided/assets/account.tfsa.balance')
@@ -285,7 +286,7 @@ test('rent to planned-home round trip restores a usable cash-purchase payment st
   await page.goto('/#/guided/housing/purchase.price')
   await page.locator('[data-field="principalResidence.price"] input').fill('100000')
   await page.locator('[data-field="principalResidence.downPayment"] input').fill('100000')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(saved.inputs.principalResidence.annualMortgagePayment).toBe(0)
   expect(saved.answerMeta['principalResidence.annualMortgagePayment'].status).toBe('estimated')
@@ -295,7 +296,7 @@ test('rent to planned-home round trip restores a usable cash-purchase payment st
 
 for (const account of ['tfsa', 'rrsp', 'nonReg'] as const) {
   test(`selecting guided ${account} preserves an unresolved professional balance until an explicit amount edit`, async ({ page }) => {
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     const professionalLabel = account === 'tfsa' ? /^TFSA$/ : account === 'rrsp' ? /^RRSP \/ RRIF$/ : /^Non-registered$/
     const professional = page.locator('label.field').filter({ hasText: professionalLabel }).locator('input').first()
     await professional.fill('')
@@ -303,7 +304,7 @@ for (const account of ['tfsa', 'rrsp', 'nonReg'] as const) {
     const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
     expect(Object.hasOwn(before.draftByField, `balances.${account}`)).toBe(true)
     await expect(page.locator('.results-column')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await chooseMode(page, 'guided')
     await page.goto('/#/guided/assets/assets.identify')
     const choiceName = account === 'tfsa' ? 'TFSA' : account === 'rrsp' ? 'RRSP / RRIF' : 'Non-registered account'
     await page.getByRole('checkbox', { name: choiceName }).check()
@@ -312,13 +313,13 @@ for (const account of ['tfsa', 'rrsp', 'nonReg'] as const) {
     expect(selected.inputs.balances[account]).toBe(before.inputs.balances[account])
     expect(selected.draftByField[`balances.${account}`]).toBe('')
     expect(selected.answerMeta[`balances.${account}`].status).toBe('unknown')
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     await expect(professional).toHaveValue('')
     await expect(page.locator('.results-column')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await chooseMode(page, 'guided')
     await page.goto(`/#/guided/assets/account.${account}.balance`)
     await page.locator(`[data-field="balances.${account}"] input`).fill('100000')
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     await expect(professional).toHaveValue('100,000')
     await expect(page.locator('.results-column')).toBeVisible()
   })

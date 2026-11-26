@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** FE-36 A: the QC coverage block is annual-first — one whole-year status per
@@ -82,7 +83,7 @@ test('guided mode records a genuine mid-year change that survives reload and mod
   await expect(page.getByTestId('qc-coverage-self-6')).toHaveValue('private')
   // Professional shows the same recorded facts; the public month stays a
   // labelled estimate and the 320px layout stays inside the viewport.
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('person-tax-limit')).toBeVisible()
   await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
   await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
@@ -96,13 +97,13 @@ test('the QC coverage block explains its purpose in EN, FR and ZH', async ({ pag
   const panel = page.getByTestId('qc-drug-coverage')
   await expect(panel).toContainText('TP-1 line 447')
   await expect(panel).toContainText('Coverage for the whole year')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(panel).toContainText('ligne 447')
   await expect(panel).toContainText('Couverture pour toute l’année')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(panel).toContainText('第447行')
   await expect(panel).toContainText('全年保险状态')
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
   await page.getByTestId('qc-coverage-changed-self').check()
   await expect(panel).toContainText('Only needed when coverage changed mid-year')
 })

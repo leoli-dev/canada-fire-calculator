@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 function field(page: import('@playwright/test').Page, label: string | RegExp) {
@@ -13,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 test('professional mode completes a representative household plan and scenario round trip', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.input-form fieldset')).toHaveCount(6)
   await expect(page.locator('.results-column')).toBeVisible()
   await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
@@ -48,11 +49,11 @@ test('professional mode completes a representative household plan and scenario r
 })
 
 test('scenario final-net-worth heading aligns with its amounts', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const scenario = page.locator('details').filter({ hasText: 'Scenario comparison' })
   await scenario.locator('summary').click()
   await scenario.getByRole('button', { name: 'Save current as A' }).click()
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
 
   const localizedScenario = page.locator('details').filter({ hasText: '场景对比' })
   const heading = localizedScenario.getByRole('columnheader', { name: '最终净资产' })
@@ -68,7 +69,7 @@ test('scenario final-net-worth heading aligns with its amounts', async ({ page }
 test('timing comparison preserves unsupported spending-solver status for a funded planned home', async ({ page }) => {
   // Real spending-solver run (~18s locally for TFSA 5M + dieWithZero on a planned purchase); CI runners are slower than the 30s default.
   test.setTimeout(90_000)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await field(page, 'TFSA').first().fill('5000000')
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
   await page.getByRole('button', { name: '+ Principal residence' }).click()
@@ -83,10 +84,10 @@ test('timing comparison preserves unsupported spending-solver status for a funde
 })
 
 test('French solver boundary keeps the checked age and reports the FIRE-number search limit', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await field(page, 'Life expectancy').first().fill('61')
   await field(page, 'Desired after-tax annual spending in retirement').first().fill('20000000')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }).click()
   await expect(page.locator('.summary')).toContainText("jusqu'à 60 ans")
   await page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }).click()
@@ -97,7 +98,7 @@ test('French solver boundary keeps the checked age and reports the FIRE-number s
 })
 
 test('timing comparison keeps search-limit status in rows and combined result', async ({ page }) => {
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await field(page, 'TFSA').first().fill('10000000000')
   await page.locator('label.field').filter({ hasText: 'Goal' }).locator('select').selectOption('dieWithZero')
   const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })

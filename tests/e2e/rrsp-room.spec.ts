@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** BE-12 A: the CRA statement facts and the recomputed RRSP room row are
@@ -66,7 +67,7 @@ test('professional mode prices a stated 20k/5k statement and retains the clipped
   await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
   // The same recorded facts show in guided mode; guided keeps explicit generate.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 C: guided asks RRSP room on its own optional page; the recorded
   // statement lines open the advanced detail by themselves.
   await page.goto('/#/guided/taxDetails/tax.rrspRoom')
@@ -95,7 +96,7 @@ test('guided mode records the statement and keeps it through reload and a mode s
   await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15,000')
   await expect(page.getByTestId('rrsp-planned-self')).toHaveValue('16,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('rrsp-available-room-self')).toHaveValue('15,000')
   await expect(page.getByTestId('rrsp-ledger-self')).toContainText('15,000')
   await expect(page.getByTestId('rrsp-retained-self')).toContainText('13,000')
@@ -165,10 +166,10 @@ test('the RRSP room block explains itself in EN, FR and ZH', async ({ page }) =>
   const panel = page.getByTestId('rrsp-statement-self')
   await expect(panel).toContainText('RRSP deduction limit (CRA statement)')
   await expect(panel).toContainText('not a CRA rule')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(panel).toContainText('Maximum déductible au titre des REER')
   await expect(panel).toContainText('Droits de cotisation disponibles')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(panel).toContainText('RRSP 扣除上限')
   await expect(panel).toContainText('可用供款空间')
   expect(await inViewport(page)).toBe(true)

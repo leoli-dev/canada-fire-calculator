@@ -1,0 +1,87 @@
+/* FE-56/57: shell and desktop question geometry. Phone progress/pager stays with PR-3. */
+.app { max-width: 1316px; padding: 0 24px 48px; }
+.app-bar { height: 56px; margin: 0 -24px; padding: 0 24px; align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.app-bar h1 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-ui); white-space: nowrap; }
+.brand-mark { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; background: var(--critical); color: var(--surface); font-size: var(--fs-caption); }
+.app-bar .entry-mode, .app-bar .langs { margin: 0; }
+.langs { margin-right: 0; }
+.app-bar .ui-segmented { flex-shrink: 0; }
+.app-bar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.app-bar .app-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; min-width: 40px; height: 40px; padding: 0; color: var(--ink-2); border-radius: var(--r-control); }
+.app-icon:hover { background: var(--surface-2); }
+.app-icon:focus-visible { outline: 2px solid var(--accent); box-shadow: var(--focus-ring); }
+.app-bar-mobile, .brand-mobile, .mobile-results-disclaimer { display: none; }
+.desktop-disclaimer { min-height: 31px; margin: 0 -24px; padding: 4px 24px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.header-disclaimer { margin: 0; font-size: var(--fs-caption); }
+.header-disclaimer strong { font-weight: 400; }
+.header-disclaimer .term { min-height: 0; padding: 0; }
+.app main { margin-top: 24px; }
+/* Later PRs own results and Professional geometry. Preserve their existing content width. */
+.app main:not(.guided-only) { max-width: 1192px; margin-left: auto; margin-right: auto; }
+main.guided-only { grid-template-columns: minmax(0, 1fr); }
+.app main.guided-only:has(.answer-review) { max-width: 1040px; margin-left: auto; margin-right: auto; }
+.questionnaire-layout { grid-template-columns: 248px minmax(0, 640px); gap: 40px; margin: 0; justify-content: center; }
+.directory-progress { margin-bottom: 8px; font-size: var(--fs-meta); color: var(--ink-2); }
+.directory-progress > div { display: flex; justify-content: space-between; gap: 8px; }
+.directory-progress progress { display: block; appearance: none; width: 100%; height: 4px; margin-top: 8px; border: 0; border-radius: 2px; overflow: hidden; background: var(--surface-2); accent-color: var(--accent); }
+.directory-progress progress::-webkit-progress-bar { background: var(--surface-2); }
+.directory-progress progress::-webkit-progress-value { background: var(--accent); }
+.category-navigation { gap: 4px; }
+.category-navigation details { border: 0; padding: 0; margin: 0; }
+.category-navigation summary { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0; }
+.category-navigation summary::after { display: none; }
+.category-status { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 11px; font-style: normal; }
+.category-status.done { background: var(--positive); border-color: var(--positive); color: var(--surface); }
+.category-status.now { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--bg); background: var(--accent); }
+.category-navigation details > div { padding: 2px 0 4px; }
+.category-navigation details button { grid-template-columns: 8px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 32px; font-weight: 400; }
+.category-navigation details button[aria-current='page'] { font-weight: 600; }
+.category-navigation details button span { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: normal; word-break: normal; }
+.page-status { width: 8px; height: 8px; background: var(--line-strong); border-radius: 50%; }
+.page-status.done { background: var(--positive); }
+.category-navigation details button[aria-current='page'] { border-color: transparent; }
+.category-navigation .review-link { margin-top: 12px; }
+.question-location { font-size: var(--fs-meta); }
+.question-help-rail { display: none; }
+.question-pager { max-width: none; }
+.pager-category-progress { display: none; }
+.pager-next-label { display: inline; }
+.pager-mobile-button-label { display: none; }
+.question-pager button span { color: inherit; }
+[data-programmatic-focus='true']:focus, [data-programmatic-focus='true']:focus-visible { outline: none !important; box-shadow: none !important; }
+.app-menu-content { display: grid; gap: 16px; }
+.app-menu-content .entry-mode { margin: 0; }
+
+@media (min-width: 1280px) {
+  .questionnaire-layout { grid-template-columns: 248px minmax(0, 640px) 300px; }
+  .question-help-rail { display: block; position: sticky; top: 24px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); }
+  .question-help-rail h3 { margin: 0 0 10px; font-size: var(--fs-ui); }
+  .question-help-rail p { margin: 0 0 16px; color: var(--ink-2); font-size: var(--fs-meta); }
+}
+@media (min-width: 641px) and (max-width: 1099px) {
+  .questionnaire-layout { display: block; max-width: 640px; margin: 0 auto; }
+  .directory-shell { display: none; position: static; margin: 16px 0; }
+  .directory-shell.open { display: block; }
+  .mobile-directory-trigger, .directory-close { display: block; }
+  .question-page { min-height: 0; margin-top: 16px; }
+  .app-bar { gap: 12px; height: auto; min-height: 56px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+}
+@media (max-width: 640px) {
+  .app { padding: 0 16px 32px; }
+  .app-bar { height: 52px; flex-direction: row; align-items: center; gap: 8px; margin: 0 -16px; padding: 0 16px; }
+  .app-bar h1 { font-size: var(--fs-ui); }
+  .app-bar-desktop, .brand-desktop, .desktop-disclaimer { display: none; }
+  .brand-mobile { display: inline; }
+  .app-bar-mobile { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  .app-bar-mobile button { min-width: 44px; min-height: 44px; padding: 0 8px; }
+  .mobile-results-disclaimer { display: block; margin: 16px 0; }
+  .app main { margin-top: 16px; }
+  .questionnaire-layout { display: block; margin-top: 0; }
+  .question-page { padding-top: 16px; }
+  .question-location { margin-bottom: 8px; }
+  .category-navigation details button { min-height: var(--h-touch); }
+  .pager-category-progress { display: inline; }
+  .pager-next-label { display: none; }
+  .pager-desktop-button-label { display: none; }
+  .pager-mobile-button-label { display: inline; }
+}

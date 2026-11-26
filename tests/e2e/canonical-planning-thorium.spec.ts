@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { canonicalSheetId } from '../../src/canonicalAnnualSheet'
@@ -153,7 +154,7 @@ test('partial candidate retains blocked and uncomputed years in the replay and a
 test('Guide uses generated current results and clears candidate state on mode and revision changes', async ({ page }) => {
   await seed(page)
   await replay(page).click()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/results')
   await expect(planning(page)).toHaveCount(0)
   await page.getByRole('button', { name: 'Generate my results' }).click()
@@ -174,7 +175,7 @@ test('Guide uses generated current results and clears candidate state on mode an
   await page.goto('/#/guided/results')
   await expect(planning(page)).toHaveCount(0)
   expect((await snapshot(page)).resultRevision).toBeNull()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(planning(page)).toBeVisible()
   await expect(outcomes(page)).toHaveCount(0)
 })
@@ -248,7 +249,7 @@ test('FR and ZH round-trip a tiny prefill using the keyboard at 320px', async ({
     { button: 'FR', replay: 'Rejouer le scénario', amount: tiny.replace('.', ','), facts: /Budget courant du ménage/, scope: /120 ans maximum/ },
     { button: '中文', replay: '重放候选方案', amount: tiny, facts: /家庭退休生活预算/, scope: /最多 120 年/ },
   ]) {
-    await page.getByRole('button', { name: locale.button, exact: true }).click()
+    await chooseLanguage(page, locale.button)
     await expect(replay(page)).toHaveAccessibleName(locale.replay)
     await expect(planning(page)).toContainText(locale.scope)
     await expect(outcomes(page)).toHaveCount(0)

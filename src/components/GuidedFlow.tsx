@@ -4,25 +4,30 @@ import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
 import { accountSummary } from '../guidedReview'
 import { pageIsComplete } from '../guided/pageState'
-import { pageById, QUESTION_CATEGORIES, questionForField, questionTitleKey, visibleQuestionPages } from '../guided/questionCatalog'
+import { pageById, QUESTION_CATEGORIES, questionForField, questionShortKey, questionTitleKey, visibleQuestionPages } from '../guided/questionCatalog'
 import type { QuestionDefinition } from '../guided/schema'
 import { useStore } from '../store'
 import { useCad } from '../format'
-import { QuestionPage } from './guided/QuestionPage'
+import { QuestionPage, QuestionHelpRail } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
 import { ResetPlan } from './ResetPlan'
 
 function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
   const { t } = useTranslation()
   const state = useStore()
+  const completed = pages.filter(page => pageIsComplete(page, state)).length
+  const percent = Math.round(completed / pages.length * 100)
   return <nav className="category-navigation" aria-label={t('questionnaire.directory')}>
+    <div className="directory-progress"><div><span>{t('ui.questionCount', { current: Math.max(0, pages.findIndex(page => page.id === state.activePageId)) + 1, total: pages.length })}</span><span>{percent}%</span></div><progress aria-label={t('ui.overallProgress')} value={completed} max={pages.length} /></div>
     {QUESTION_CATEGORIES.map((category) => {
       const categoryPages = pages.filter((page) => page.categoryId === category.id)
       // An unanswered optional page is not outstanding work.
       const answered = categoryPages.filter((page) => page.optional || pageIsComplete(page, state)).length
+      const active = categoryPages.some(page => page.id === state.activePageId)
+      const status = active ? 'now' : answered === categoryPages.length ? 'done' : 'todo'
       return <details key={category.id} open={categoryPages.some((page) => page.id === state.activePageId)}>
-        <summary><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
-        <div>{categoryPages.map((page) => <Button variant="ghost" type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><span>{t(questionTitleKey(page, state.inputs))}</span><small>{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
+        <summary><i className={`category-status ${status}`} aria-hidden="true">{status === 'done' ? '✓' : ''}</i><span>{t(`questionnaire.categories.${category.contentKey}`)}</span><small>{answered}/{categoryPages.length}</small></summary>
+        <div>{categoryPages.map((page) => <Button variant="ghost" type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><i className={`page-status ${pageIsComplete(page, state) ? 'done' : 'todo'}`} aria-hidden="true" /><span>{t(questionShortKey(page, state.inputs))}</span><small className="sr-only">{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
       </details>
     })}
     <Button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</Button>
@@ -150,7 +155,15 @@ export function GuidedFlow() {
     }
   }, [state.guidedView, state.inputRevision, state.resultRevision])
 
-  useEffect(() => { document.querySelector<HTMLElement>('#question-title, .answer-review h2, .results-intro h2')?.focus() }, [state.activePageId, state.guidedView])
+  useEffect(() => {
+    const target = document.querySelector<HTMLElement>('#question-title, .answer-review h2, .results-intro h2')
+    if (!target) return
+    target.dataset.programmaticFocus = 'true'
+    target.focus()
+    const clear = () => { delete target.dataset.programmaticFocus }
+    target.addEventListener('blur', clear, { once: true })
+    return () => { target.removeEventListener('blur', clear); clear() }
+  }, [state.activePageId, state.guidedView])
 
   if (state.guidedView === 'results' && state.resultRevision === state.inputRevision) return <section className="results-intro"><Button variant="link" type="button" className="text-action" onClick={() => { state.setGuidedView('questionnaire'); window.location.hash = `#/guided/${current.categoryId}/${current.id}` }}>{t('questionnaire.modifyAnswers')}</Button><h2 tabIndex={-1}>{t('questionnaire.resultsTitle')}</h2><p>{t('questionnaire.resultsIntro')}</p></section>
   if (state.guidedView === 'review') return <AnswerReview pages={pages} />
@@ -158,6 +171,7 @@ export function GuidedFlow() {
   return <div className="questionnaire-layout">
     <Button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</Button>
     <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><Button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</Button></div>
-    <div className="questionnaire-main"><QuestionPage definition={current} /><div className="question-pager"><Button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</Button><span data-testid="guided-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><Button variant="primary" type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</Button></div></div>
+    <div className="questionnaire-main"><QuestionPage definition={current} categoryProgress={t('ui.categoryProgress', { current: categoryPages.findIndex(page => page.id === current.id) + 1, total: categoryPages.length })} /><div className="question-pager"><Button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</Button><span data-testid="guided-progress"><span className="pager-category-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><span className="pager-next-label">{index < pages.length - 1 ? t('ui.nextQuestion', { label: t(questionShortKey(pages[index + 1], state.inputs)) }) : t('questionnaire.reviewAnswers')}</span></span><Button variant="primary" type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : <><span className="pager-desktop-button-label">{t('guidedNext')}</span><span className="pager-mobile-button-label">{pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</span></>}</Button></div></div>
+    <QuestionHelpRail guidanceKey={current.guidanceKey} />
   </div>
 }

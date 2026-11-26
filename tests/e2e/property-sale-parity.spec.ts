@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
@@ -24,7 +25,7 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
   await page.locator('[data-field="principalResidence.mortgage.yearsRemaining"] input').fill('10')
   await expect(page.locator('.question-page')).toContainText('Annual savings is after existing mortgage payments')
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.locator('.input-form')).toContainText('Annual savings is after existing mortgage payments')
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input').last()
   await expect(field('Current value')).toHaveValue('500,000')
@@ -50,7 +51,7 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
   for (const index of [0, 1, 2]) await accounts.locator(':scope > label.field').nth(index).locator('input').fill('0')
   await expect(page.locator('.input-form')).toContainText('100000')
   await expect(page.locator('.input-form')).toContainText('remains a debt')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/housing/home.value')
   await expect(guidedSale).toHaveValue('35')
   await expect(page.locator('[data-field="principalResidence.sellAtAge"]')).toContainText('100000')
@@ -59,7 +60,7 @@ test('owned-home sale and mortgage survive both mode edits, with localized short
     ['中文', '仍计为债务', '年储蓄已扣除'],
     ['EN', 'remains a debt', 'Annual savings is after'],
   ]) {
-    await page.locator('.langs').getByRole('button', { name: language }).click()
+    await chooseLanguage(page, language)
     await expect(page.locator('[data-field="principalResidence.sellAtAge"]')).toContainText(phrase)
     await expect(page.locator('.question-page')).toContainText(savingsHint)
   }

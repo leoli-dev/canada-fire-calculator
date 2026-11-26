@@ -1,3 +1,4 @@
+import { chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator } from '@playwright/test'
 import { canonicalAppPlan } from './fixtures/canonical-app-plan'
@@ -17,7 +18,7 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
       }, canonicalAppPlan())
       await page.reload()
       expect(await page.evaluate(() => navigator.language)).toBe(browserLocale)
-      await page.getByRole('button', { name: 'FR', exact: true }).click()
+      await chooseLanguage(page, 'FR')
       await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
       const evidence = page.getByTestId('canonical-evidence')
       const working = page.getByTestId('canonical-working-spending')
@@ -76,7 +77,7 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
 
       await open()
       await working.pressSequentially('11,298')
-      await page.getByRole('button', { name: 'EN', exact: true }).click()
+      await chooseLanguage(page, 'EN')
       await expect(page.locator('html')).toHaveAttribute('lang', 'en')
       await expect(summary).toHaveText('Canonical annual ledger')
       await open()

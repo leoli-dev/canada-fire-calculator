@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 async function seed(page: import('@playwright/test').Page, options: { couple?: boolean; province?: 'ON' | 'QC'; pension?: boolean; guided?: boolean }) {
@@ -32,7 +33,7 @@ async function seed(page: import('@playwright/test').Page, options: { couple?: b
 test('shared tax ownership survives Guided/Professional switch and refresh without stale guided results', async ({ page }) => {
   await seed(page, { couple: true, guided: true })
   await expect(page.locator('.results-column')).toBeVisible()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const panel = page.getByTestId('person-tax-facts')
   await expect(panel).toBeVisible()
   await page.getByTestId('owner-legacy:account:tfsa').selectOption('legacy:person:self')
@@ -45,7 +46,7 @@ test('shared tax ownership survives Guided/Professional switch and refresh witho
   expect(shares['legacy:person:self']).toBeCloseTo(.8, 12)
   expect(shares['legacy:person:partner']).toBeCloseTo(.2, 12)
   expect(saved.resultRevision).toBeNull()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 A: guided asks ownership on its own checklist page.
   await page.goto('/#/guided/assets/assets.ownership')
   await expect(page.getByTestId('guided-ownership-row-legacy:account:nonReg')).toBeVisible()
@@ -69,7 +70,7 @@ test('explicit DB pension election changes the normal person tax ledger in both 
   await table.locator('summary').click()
   await expect(table.locator('tbody tr').first()).toContainText('20,000')
   await expect(table.locator('tbody tr').nth(1)).toContainText('20,000')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 C: the election is on the optional pension-split page.
   await page.goto('/#/guided/taxDetails/tax.pensionSplit')
   await expect(page.getByTestId('guided-pension-split-choice-yes')).toBeChecked()
@@ -83,23 +84,23 @@ test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private
   for (const [language, fragment] of [
     ['EN', 'Schedule K'], ['FR', 'annexe K'], ['中文', '附表K'],
   ] as const) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await expect(page.getByTestId('person-tax-limit')).toContainText(fragment)
     await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
   }
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
   await page.getByTestId('qc-coverage-all-self').selectOption('private')
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
   await expect(page.getByTestId('person-tax-table')).toBeVisible()
   await page.getByTestId('person-tax-table').locator('summary').click()
   await expect(page.getByTestId('person-tax-table')).toContainText('FSS contribution')
   await expect(page.getByTestId('person-tax-table')).toContainText('RAMQ premium')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(page.getByTestId('person-tax-table')).toContainText('Cotisation FSS')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.getByTestId('person-tax-table')).toContainText('FSS缴费')
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseLanguage(page, 'EN')
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/family/family.qcDrug')
   await expect(page.getByTestId('qc-coverage-all-self-private')).toBeChecked()
   // A mid-year change first reveals the month detail, then edits one month.
@@ -111,7 +112,7 @@ test('QC unknown/public coverage stays visibly limited in EN, FR and ZH; private
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(saved.canonical.taxProfile.qcDrugCoverage['legacy:person:self'][6]).toBe('public')
   expect(saved.resultRevision).toBeNull()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('person-tax-limit')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
@@ -126,7 +127,7 @@ test('QC spouse coverage is independent and the Quebec election is separate from
   await page.getByTestId('split-amount').fill('10000')
   await page.getByTestId('split-amount').blur()
   await expect(page.getByTestId('qc-split-transferor')).toHaveValue('')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/family/family.qcDrug')
   await expect(page.getByTestId('qc-coverage-all-partner-waived')).toBeChecked()
   await page.goto('/#/guided/taxDetails/tax.pensionSplit')
@@ -231,11 +232,11 @@ test('couple terminal tax cannot masquerade as final net worth in Scenario A com
   await expect(scenario).toContainText('After-tax estate comparison is unavailable')
   await expect(scenario.locator('tbody td.num')).toHaveText(['—', '—'])
   await expect(scenario).not.toContainText(Math.round(values.estate).toLocaleString('en-CA'))
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(scenario).toContainText('La comparaison des successions après impôt est indisponible')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(scenario).toContainText('税后遗产比较不可用')
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
   await page.evaluate(async () => {
     const { refreshCanonicalFromLegacy } = await import('/src/engine/migration.ts')
     const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
@@ -278,17 +279,17 @@ test('RRIF age-71 category is explicit and shared across Professional and Guided
   await expect(panel).toContainText('Opening year alone does not prove qualification')
   await expect(panel.getByRole('link', { name: 'CRA prescribed-factor chart' }))
     .toHaveAttribute('href', /canada\.ca\/.*chart-prescribed-factors/)
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await expect(panel).toContainText('L’année d’ouverture ne prouve pas la catégorie')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(panel).toContainText('仅凭开户年份不能确认资格')
-  await page.getByRole('button', { name: 'EN', exact: true }).click()
+  await chooseLanguage(page, 'EN')
   const category = page.getByTestId('rrif-factor-category-legacy:account:rrsp')
   await category.selectOption('qualifying')
   await expect(page.getByTestId('person-tax-table')).toBeVisible()
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
   // FE-43 B: guided asks the RRIF facts on their own page, as choice cards.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/account.rrif.details')
   const guidedCategory = page.getByTestId('guided-rrif-category-legacy:account:rrsp-qualifying')
   await expect(guidedCategory).toBeChecked()
@@ -366,7 +367,7 @@ test('each spouse records their own registered balance; the household total is c
   await expect(page.getByTestId('account-self-amount-legacy:account:nonReg')).toHaveValue('150,000')
   await expect(page.getByTestId('account-partner-amount-legacy:account:nonReg')).toHaveValue('50,000')
   // guided mode shows the same recorded facts on its ownership checklist
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/assets.ownership')
   await expect(page.getByTestId('owner-choice-legacy:account:rrsp-split')).toBeChecked()
   await expect(page.getByTestId('account-self-amount-legacy:account:rrsp')).toHaveValue('300,000')
@@ -484,7 +485,7 @@ test('the registered-type control is present in every ownership state in both en
     .map((account: { kind: string }) => account.kind))
   expect(kinds.sort()).toEqual(['spousalRrsp', 'spousalRrsp'])
   // Guided mode shows the same types in every state, on the account-type page.
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/account.rrsp.type')
   await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toBeChecked()
   await expect(page.getByTestId('registered-type-legacy:account:locked-lif')).toBeChecked()
@@ -521,7 +522,7 @@ test('an investment property split records both amounts, conserves the value and
   await page.reload()
   await expect(page.getByTestId('property-self-amount-legacy:property:investment:0')).toHaveValue('250,000')
   await expect(page.getByTestId('property-partner-amount-legacy:property:investment:0')).toHaveValue('150,000')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   // FE-43 A: guided records a jointly held property as one share.
   await page.goto('/#/guided/housing/housing.ownership')
   await expect(page.getByTestId('owner-choice-legacy:property:investment:0-split')).toBeChecked()

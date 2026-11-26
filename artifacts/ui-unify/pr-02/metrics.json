@@ -1,0 +1,901 @@
+{
+  "executablePath": "/Applications/Thorium.app/Contents/MacOS/Thorium",
+  "browserVersion": "156.0.8078.28",
+  "screens": [
+    {
+      "id": "desktop",
+      "language": "EN",
+      "width": 1440,
+      "documentWidth": 1440,
+      "header": {
+        "x": 62,
+        "y": 0,
+        "width": 1316,
+        "height": 56,
+        "top": 0,
+        "right": 1378,
+        "bottom": 56,
+        "left": 62
+      },
+      "title": {
+        "x": 374,
+        "y": 148.5,
+        "width": 415.234375,
+        "height": 68.3125,
+        "top": 148.5,
+        "right": 789.234375,
+        "bottom": 216.8125,
+        "left": 374
+      },
+      "directory": {
+        "x": 86,
+        "y": 111,
+        "width": 248,
+        "height": 636.5,
+        "top": 111,
+        "right": 334,
+        "bottom": 747.5,
+        "left": 86
+      },
+      "main": {
+        "x": 374,
+        "y": 111,
+        "width": 640,
+        "height": 609,
+        "top": 111,
+        "right": 1014,
+        "bottom": 720,
+        "left": 374
+      },
+      "help": {
+        "x": 1054,
+        "y": 111,
+        "width": 300,
+        "height": 246.5,
+        "top": 111,
+        "right": 1354,
+        "bottom": 357.5,
+        "left": 1054
+      },
+      "pager": {
+        "x": 374,
+        "y": 651,
+        "width": 640,
+        "height": 69,
+        "top": 651,
+        "right": 1014,
+        "bottom": 720,
+        "left": 374
+      },
+      "focusedTitle": false,
+      "titleShadow": "none",
+      "firstScreenTargetsUnder44": [
+        {
+          "text": "Guided",
+          "width": 116.03125,
+          "height": 40
+        },
+        {
+          "text": "Professional",
+          "width": 116.03125,
+          "height": 40
+        },
+        {
+          "text": "EN",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "FR",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "中文",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "▣",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "text": "",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "text": "See what's simplified",
+          "width": 146.421875,
+          "height": 18.796875
+        },
+        {
+          "text": "Family and timing0/6",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Householdto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Agesto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Childrento do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Provinceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Retirement age and targetto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Planning horizonto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Everyday saving1/4",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Savings amountto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Budget methodto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Employment incomeoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Side incometo do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Money you already have0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Accountsto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Savings allocationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Housing and loans0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Housing situationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Rentals and debtsto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Retirement life0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Spending methodto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Total spendingto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Other retirement income0/3",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Your CPP or QPPto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Your OASto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Your pensionto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Legacy preferenceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Spending preferenceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Investment mixto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Fees and inflationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Investment taxto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Withdrawal strategyto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "✓Tax details (optional)3/3",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Tax detailsoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "TFSA roomoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "RRSP roomoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Review answers",
+          "width": 248,
+          "height": 40
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "Back",
+          "width": 112,
+          "height": 40
+        },
+        {
+          "text": "NextNext",
+          "width": 112,
+          "height": 40
+        },
+        {
+          "text": "Open glossary",
+          "width": 100.265625,
+          "height": 18.796875
+        },
+        {
+          "text": "Leo Li",
+          "width": 34.046875,
+          "height": 15
+        }
+      ]
+    },
+    {
+      "id": "desktop-1280",
+      "language": "EN",
+      "width": 1280,
+      "documentWidth": 1280,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 56,
+        "top": 0,
+        "right": 1280,
+        "bottom": 56,
+        "left": 0
+      },
+      "title": {
+        "x": 312,
+        "y": 148.5,
+        "width": 415.234375,
+        "height": 68.3125,
+        "top": 148.5,
+        "right": 727.234375,
+        "bottom": 216.8125,
+        "left": 312
+      },
+      "directory": {
+        "x": 24,
+        "y": 111,
+        "width": 248,
+        "height": 636.5,
+        "top": 111,
+        "right": 272,
+        "bottom": 747.5,
+        "left": 24
+      },
+      "main": {
+        "x": 312,
+        "y": 111,
+        "width": 604,
+        "height": 609,
+        "top": 111,
+        "right": 916,
+        "bottom": 720,
+        "left": 312
+      },
+      "help": {
+        "x": 956,
+        "y": 111,
+        "width": 300,
+        "height": 246.5,
+        "top": 111,
+        "right": 1256,
+        "bottom": 357.5,
+        "left": 956
+      },
+      "pager": {
+        "x": 312,
+        "y": 651,
+        "width": 604,
+        "height": 69,
+        "top": 651,
+        "right": 916,
+        "bottom": 720,
+        "left": 312
+      },
+      "focusedTitle": false,
+      "titleShadow": "none",
+      "firstScreenTargetsUnder44": [
+        {
+          "text": "Guided",
+          "width": 116.03125,
+          "height": 40
+        },
+        {
+          "text": "Professional",
+          "width": 116.03125,
+          "height": 40
+        },
+        {
+          "text": "EN",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "FR",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "中文",
+          "width": 60,
+          "height": 40
+        },
+        {
+          "text": "▣",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "text": "",
+          "width": 40,
+          "height": 40
+        },
+        {
+          "text": "See what's simplified",
+          "width": 146.421875,
+          "height": 18.796875
+        },
+        {
+          "text": "Family and timing0/6",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Householdto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Agesto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Childrento do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Provinceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Retirement age and targetto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Planning horizonto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Everyday saving1/4",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Savings amountto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Budget methodto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Employment incomeoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Side incometo do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Money you already have0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Accountsto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Savings allocationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Housing and loans0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Housing situationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Rentals and debtsto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Retirement life0/2",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Spending methodto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Total spendingto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Other retirement income0/3",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Your CPP or QPPto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Your OASto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Your pensionto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Legacy preferenceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Spending preferenceto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Investment mixto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Fees and inflationto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Investment taxto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Withdrawal strategyto do",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "✓Tax details (optional)3/3",
+          "width": 248,
+          "height": 35
+        },
+        {
+          "text": "Tax detailsoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "TFSA roomoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "RRSP roomoptional",
+          "width": 248,
+          "height": 32
+        },
+        {
+          "text": "Review answers",
+          "width": 248,
+          "height": 40
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "Back",
+          "width": 112,
+          "height": 40
+        },
+        {
+          "text": "NextNext",
+          "width": 112,
+          "height": 40
+        },
+        {
+          "text": "Open glossary",
+          "width": 100.265625,
+          "height": 18.796875
+        },
+        {
+          "text": "Leo Li",
+          "width": 34.046875,
+          "height": 15
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "language": "EN",
+      "width": 390,
+      "documentWidth": 390,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 52,
+        "top": 0,
+        "right": 390,
+        "bottom": 52,
+        "left": 0
+      },
+      "title": {
+        "x": 16,
+        "y": 155.5,
+        "width": 355.921875,
+        "height": 58.53125,
+        "top": 155.5,
+        "right": 371.921875,
+        "bottom": 214.03125,
+        "left": 16
+      },
+      "directory": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "main": {
+        "x": 16,
+        "y": 112,
+        "width": 358,
+        "height": 501.65625,
+        "top": 112,
+        "right": 374,
+        "bottom": 613.65625,
+        "left": 16
+      },
+      "help": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "pager": {
+        "x": 16,
+        "y": 503.65625,
+        "width": 358,
+        "height": 110,
+        "top": 503.65625,
+        "right": 374,
+        "bottom": 613.65625,
+        "left": 16
+      },
+      "focusedTitle": false,
+      "titleShadow": "none",
+      "firstScreenTargetsUnder44": [
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "Leo Li",
+          "width": 34.046875,
+          "height": 15
+        }
+      ]
+    },
+    {
+      "id": "fr320",
+      "language": "FR",
+      "width": 320,
+      "documentWidth": 320,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 52,
+        "top": 0,
+        "right": 320,
+        "bottom": 52,
+        "left": 0
+      },
+      "title": {
+        "x": 16,
+        "y": 163.09375,
+        "width": 288,
+        "height": 58.53125,
+        "top": 163.09375,
+        "right": 304,
+        "bottom": 221.625,
+        "left": 16
+      },
+      "directory": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "main": {
+        "x": 16,
+        "y": 119.59375,
+        "width": 288,
+        "height": 501.65625,
+        "top": 119.59375,
+        "right": 304,
+        "bottom": 621.25,
+        "left": 16
+      },
+      "help": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "pager": {
+        "x": 16,
+        "y": 511.25,
+        "width": 288,
+        "height": 110,
+        "top": 511.25,
+        "right": 304,
+        "bottom": 621.25,
+        "left": 16
+      },
+      "focusedTitle": false,
+      "titleShadow": "none",
+      "firstScreenTargetsUnder44": [
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "Leo Li",
+          "width": 34.046875,
+          "height": 15
+        }
+      ]
+    },
+    {
+      "id": "zh390",
+      "language": "中文",
+      "width": 390,
+      "documentWidth": 390,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 52,
+        "top": 0,
+        "right": 390,
+        "bottom": 52,
+        "left": 0
+      },
+      "title": {
+        "x": 16,
+        "y": 155.5,
+        "width": 355.921875,
+        "height": 58.53125,
+        "top": 155.5,
+        "right": 371.921875,
+        "bottom": 214.03125,
+        "left": 16
+      },
+      "directory": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "main": {
+        "x": 16,
+        "y": 112,
+        "width": 358,
+        "height": 501.65625,
+        "top": 112,
+        "right": 374,
+        "bottom": 613.65625,
+        "left": 16
+      },
+      "help": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "pager": {
+        "x": 16,
+        "y": 503.65625,
+        "width": 358,
+        "height": 110,
+        "top": 503.65625,
+        "right": 374,
+        "bottom": 613.65625,
+        "left": 16
+      },
+      "focusedTitle": false,
+      "titleShadow": "none",
+      "firstScreenTargetsUnder44": [
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "",
+          "width": 13,
+          "height": 13
+        },
+        {
+          "text": "Leo Li",
+          "width": 34.046875,
+          "height": 15
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /** FE-43 A: the household tax facts that used to sit on one long guided page
@@ -61,7 +62,7 @@ test('a couple clears the ownership gate with one choice per row, shared with pr
 
   // Professional mode reads the very same facts.
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('person-tax-facts')).toBeVisible()
   await expect(page.getByTestId('owner-legacy:account:rrsp')).toHaveValue('legacy:person:partner')
   await expect(page.getByTestId('account-self-share-legacy:account:nonReg')).toHaveValue('50')
@@ -88,10 +89,10 @@ test('spouse support is one question with an explicit "not sure", recorded for b
   await expect(question).toBeVisible()
   await question.getByRole('radio', { name: /Yes/ }).check()
   expect((await saved(page)).canonical.taxProfile.spouseSupported).toEqual({ status: 'known', value: true })
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('spouse-support')).toHaveValue('true')
   await page.getByTestId('spouse-support').selectOption('unknown')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/family/family.spouseSupport')
   await expect(page.getByTestId('guided-spouse-support').getByRole('radio', { name: /Yes/ })).not.toBeChecked()
   await page.getByTestId('guided-spouse-support').getByRole('radio', { name: /come back/i }).check()
@@ -122,7 +123,7 @@ test('the new pages are translated in EN, FR and ZH', async ({ page }) => {
   await seed(page, { province: 'QC' })
   const titles: Record<string, string[]> = {}
   for (const language of ['EN', 'FR', '中文']) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     titles[language] = []
     for (const path of ['family/family.spouseSupport', 'family/family.qcDrug', 'assets/assets.ownership', 'housing/housing.ownership']) {
       await page.goto(`/#/guided/${path}`)

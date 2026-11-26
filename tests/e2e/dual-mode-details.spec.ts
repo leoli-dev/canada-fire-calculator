@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** FE-46: dual-mode consistency and guided dead ends. */
@@ -10,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 test('a guided inflation rate is shown and editable in professional mode', async ({ page }) => {
   await page.goto('/#/guided/preferences/invest.fees')
   await page.locator('[data-field="inflation"] input').fill('2.5')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const select = page.getByLabel('Inflation assumption (avg/yr)')
   await expect(select).toHaveValue('custom')
   await expect(select.locator('option[value="custom"]')).toHaveText('Custom (2.5%)')
@@ -60,7 +61,7 @@ test('BE-46: how side income is paid is one fact in both modes', async ({ page }
   await page.goto('/#/guided/saving/work.amount')
   await page.getByRole('radio', { name: /Self-employed/ }).check()
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).inputs.extraIncome.kind).toBe('selfEmployment')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('side-income-kind')).toHaveValue('selfEmployment')
 })
 
@@ -72,13 +73,13 @@ test("BE-47: the Home Buyers' Plan is on for a planned first home and can be tur
   await expect(guided).toBeChecked()
   await guided.uncheck()
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).inputs.principalResidence.hbp).toBe(false)
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('hbp-use')).not.toBeChecked()
 })
 
 test('FE-41: the rule sources are one collapsed line, so the form starts near the top', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('rule-assumptions-details')).not.toHaveAttribute('open', '')
   const box = await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').first().boundingBox()
   expect(box!.y).toBeLessThan(1_200)

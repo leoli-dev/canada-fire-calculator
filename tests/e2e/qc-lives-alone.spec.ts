@@ -1,3 +1,4 @@
+import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
 /** BE-44: the Québec living-alone fact is asked in guided and editable in professional. */
@@ -18,6 +19,6 @@ test('a single Québec user records living alone in guided and sees it in profes
   await page.getByTestId('guided-lives-alone-choice-yes').check()
   const fact = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.taxProfile.livesAlone)
   expect(fact).toEqual({ status: 'known', value: true })
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('lives-alone')).toHaveValue('true')
 })

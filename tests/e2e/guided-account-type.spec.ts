@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 /** FE-43 B: employment income and the registered-account type get their own
@@ -47,13 +48,13 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   expect(rrsp).toMatchObject({ kind: 'rrif', openedYear: { status: 'known', value: 2024 }, rrifFactorCategory: { status: 'known', value: 'allOther' } })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toHaveValue('rrif')
   await expect(page.getByTestId('rrif-opened-year')).toHaveValue('2024')
   await expect(page.getByTestId('rrif-factor-category-legacy:account:rrsp')).toHaveValue('allOther')
   // Back to a plain RRSP in professional mode removes the guided RRIF page.
   await page.getByTestId('registered-type-legacy:account:rrsp').selectOption('rrsp')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/assets/account.rrsp.type')
   await expect.poll(() => pageCount(page)).toBe(before)
 })
@@ -82,9 +83,9 @@ test('employment income is optional, per person, and clearable', async ({ page }
   expect(people.map((person: { earnedIncome: unknown }) => person.earnedIncome)).toEqual([
     { status: 'known', value: 92_000 }, { status: 'known', value: 55_000 },
   ])
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/saving/saving.earned')
   await page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first().click()
   people = (await canonical(page)).people
@@ -98,7 +99,7 @@ test('the new pages are translated in EN, FR and ZH', async ({ page }) => {
   await page.getByTestId('registered-type-legacy:account:rrsp-rrif').check()
   const titles: Record<string, string[]> = {}
   for (const language of ['EN', 'FR', '中文']) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     titles[language] = []
     for (const path of ['saving/saving.earned', 'assets/account.rrsp.type', 'assets/account.rrif.details']) {
       await page.goto(`/#/guided/${path}`)

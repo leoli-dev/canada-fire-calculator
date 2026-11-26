@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { canonicalSheetId } from '../../src/canonicalAnnualSheet'
@@ -198,10 +199,8 @@ test('Guide regenerates the persisted household ledger after revision and restor
     mode: 'canonical', spending: { transitionSpending: { status: 'known', value: 350 } },
   })
 
-  const guide = page.getByRole('button', { name: 'Guided', exact: true })
-  const pro = page.getByRole('button', { name: 'Professional', exact: true })
   const generate = page.getByRole('button', { name: 'Generate my results' })
-  await guide.click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await expect(results(page)).toHaveCount(0)
   await expect(generate, 'recorded Guide answers make this household ready for review').toBeEnabled()
@@ -222,14 +221,14 @@ test('Guide regenerates the persisted household ledger after revision and restor
   // A legacy-facing edit to the restored household asks the user to review
   // ownership rather than silently reassigning the persisted owner IDs.
   await expect(generate).toBeDisabled()
-  await pro.click()
+  await chooseMode(page, 'professional')
   await expect(page.getByTestId('canonical-blocked-year')).toBeVisible()
   await expect(results(page)).not.toContainText(summaryCad(158_070))
   await expectNoLegacyResults(page)
   if (!(await scenario.locator('summary').evaluate(summary => (summary.parentElement as HTMLDetailsElement).open))) await scenario.locator('summary').click()
   await scenario.getByRole('button', { name: 'Restore A as current inputs' }).click()
   await expect(results(page)).toContainText(summaryCad(158_070))
-  await guide.click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/results')
   await expect(opener(page)).toHaveCount(0)
   await generate.click()
@@ -285,7 +284,7 @@ test('Pro authors a 28-year Ontario ledger with ordinary inputs and explicitly r
   test.setTimeout(60_000)
   await page.clock.setFixedTime(new Date('2026-11-25T12:00:00Z'))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fields = page.locator('label.field')
   const edits = [
     [ /^Current age/, '58' ], [ /^Target FIRE age/, '59' ], [ /^Life expectancy/, '85' ],
@@ -366,7 +365,7 @@ for (const locale of [
   test(`canonical results and the actual dialog share ${locale.language} at 320px and restore keyboard focus`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 })
     await seed(page)
-    await page.getByRole('button', { name: locale.switcher, exact: true }).click()
+    await chooseLanguage(page, locale.switcher)
     await expect(results(page)).toContainText(cad(158_070, locale.language, 2))
     const trigger = page.getByRole('button', { name: locale.opener, exact: true })
     await trigger.focus()
@@ -405,7 +404,7 @@ test('S1 uses its pinned stored-plan values and known annual limitations with no
 test('a pre-v11 default plan migrates without opt-in and keeps the same S1 summary and sheet', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-25T12:00:00Z'))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const summary = page.locator('.results-column .summary').first()
   await expect(summary).toContainText('Final net worth: CA$601,940')
   await page.evaluate(() => {

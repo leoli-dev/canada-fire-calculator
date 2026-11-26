@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
 async function installWorkerGate(page: Page) {
@@ -34,7 +35,7 @@ async function openProfessional(page: Page) {
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(page.getByRole('button', { name: 'Run 1,000 simulations' })).toBeVisible()
 }
 
@@ -93,7 +94,7 @@ test('switching out of results terminates the worker and discards its response',
   await installWorkerGate(page)
   await openProfessional(page)
   await page.getByRole('button', { name: 'Run 1,000 simulations' }).click()
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await expect(page.locator('.mc-rate')).toHaveCount(0)
   await page.evaluate(() => (window as any).__mcGate.reply(0))
   await expect(page.locator('.mc-rate')).toHaveCount(0)
@@ -103,12 +104,12 @@ test('switching out of results terminates the worker and discards its response',
 test('French and Chinese show the conditional rate and recovery controls', async ({ page }) => {
   await installWorkerGate(page)
   await openProfessional(page)
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await page.getByRole('button', { name: 'Lancer 1 000 simulations' }).click()
   await expect(page.getByRole('button', { name: 'Annuler la simulation' })).toBeVisible()
   await page.evaluate(() => (window as any).__mcGate.reply(0))
   await expect(page.locator('.mc-rate')).toContainText('Taux de réussite selon ces hypothèses du modèle')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await expect(page.locator('.mc-rate')).toContainText('当前模型假设下的通过比例')
 })
 
@@ -297,14 +298,14 @@ for (const owner of ['self', 'partner'] as const) {
     expect(saved.inputs.lockedRetirement.owner).toBe(owner)
     expect(saved.answerMeta['lockedRetirement.owner']).toMatchObject({ status: 'confirmed', origin: 'user' })
     await expect(page.locator('.summary')).toHaveClass(/uncertain/)
-    await page.getByRole('button', { name: 'Professional', exact: true }).click()
+    await chooseMode(page, 'professional')
     await expect(page.locator('.results-column')).toBeVisible()
-    await page.getByRole('button', { name: 'Guided', exact: true }).click()
+    await chooseMode(page, 'guided')
     await expect(page.locator('.results-column')).toBeVisible()
     if (owner === 'partner') {
-      await page.getByRole('button', { name: 'Professional', exact: true }).click()
+      await chooseMode(page, 'professional')
       await page.getByLabel('Account owner').selectOption('self')
-      await page.getByRole('button', { name: 'Guided', exact: true }).click()
+      await chooseMode(page, 'guided')
       await expect(page.locator('.results-column')).toHaveCount(0)
       await page.goto('/#/guided/review')
       await expect(page.getByRole('button', { name: 'Generate my results' })).toBeDisabled()
@@ -342,14 +343,14 @@ test('locked quick-answer boundary is localized in French and Chinese', async ({
   await page.locator('label.field').filter({ hasText: 'Use a locked DC pension' }).locator('input[type=checkbox]').check()
   await page.getByLabel('Current locked balance').fill('500000')
   await page.getByLabel('Current locked balance').press('Tab')
-  await page.getByRole('button', { name: 'FR', exact: true }).click()
+  await chooseLanguage(page, 'FR')
   await page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }).click()
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
   await expect(page.locator('.summary')).toContainText('Les limites de retrait des comptes immobilisés restent à vérifier')
   await page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }).click()
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
   await expect(page.locator('.summary')).toContainText('Les limites de retrait des comptes immobilisés restent à vérifier')
-  await page.getByRole('button', { name: '中文' }).click()
+  await chooseLanguage(page, '中文')
   await page.getByRole('tab', { name: '我几岁能退休？' }).click()
   await expect(page.locator('.summary')).toHaveClass(/uncertain/)
   await expect(page.locator('.summary')).toContainText('锁定账户提款限制尚未核验')

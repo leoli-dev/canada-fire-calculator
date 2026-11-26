@@ -1,3 +1,4 @@
+import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { heldHomeEstateIds as ids } from '../../src/engine/__tests__/fixtures/annualIntegratedHeldHomeEstate'
@@ -117,7 +118,7 @@ test('the actual Guide runs the selected household while the partial control ret
   await persistedApp(page, 'partial')
   await expect(page.getByTestId('canonical-blocked-year')).toContainText('2028')
   await expect(page.getByTestId('canonical-uncomputed')).toContainText(/2029.*2030/)
-  await page.getByRole('button', { name: 'Guided', exact: true }).click()
+  await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
   await expect(card(page)).toHaveCount(0)
   await page.getByRole('button', { name: 'Generate my results' }).click()
@@ -194,7 +195,7 @@ test('fixed #78 bands use closing CPI in real display and remain localized in Fr
     ['FR', 'Monte Carlo canonique', /Simulation terminée|Échantillonnage terminé/, /centile/i],
     ['中文', '标准蒙特卡洛模拟', /抽样完成/, /百分位/],
   ] as const) {
-    await page.getByRole('button', { name: language, exact: true }).click()
+    await chooseLanguage(page, language)
     await expect(card(page).getByRole('heading', { name: title, exact: true })).toBeVisible()
     await recordExplicitVolatility(page, '0')
     await chooseSeedAndTrials(page)
@@ -211,7 +212,7 @@ test('Pro authors a long Ontario solo plan and can interact with the App while t
   test.setTimeout(60_000)
   await page.clock.setFixedTime(new Date('2026-11-25T12:00:00Z'))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   const fields = page.locator('label.field')
   for (const [label, value] of [
     [/^Current age/, '58'], [/^Target FIRE age/, '59'], [/^Life expectancy/, '85'],
@@ -273,7 +274,7 @@ test('Pro authors a long Ontario solo plan and can interact with the App while t
 
 test('ordinary Pro results keep the legacy mode and actual legacy worker output', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Professional', exact: true }).click()
+  await chooseMode(page, 'professional')
   await expect(card(page)).toHaveCount(0)
   await expect(page.locator('.summary')).toBeVisible()
   const legacyRun = page.getByRole('button', { name: 'Run 1,000 simulations' })
