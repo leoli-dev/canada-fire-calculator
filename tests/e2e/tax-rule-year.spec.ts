@@ -43,11 +43,11 @@ test('the tax rule pack and year are visible and identical in both modes', async
   await page.goto('/#/guided/review')
   const onGuided = await read()
   expect(onGuided).toEqual(alberta)
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).toContainText('GST/HST credit')
+  await expect(page.getByTestId('rule-tax-not-modelled')).toContainText('GST/HST credit')
   // Alberta charges neither the Ontario nor the Quebec premiums, so neither is
   // declared for it; the shared federal gaps still are.
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).not.toContainText('Ontario surtax')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).not.toContainText('RAMQ premium')
+  await expect(page.getByTestId('rule-tax-not-modelled')).not.toContainText('Ontario surtax')
+  await expect(page.getByTestId('rule-tax-not-modelled')).not.toContainText('RAMQ premium')
 
   // Switching modes back and forth leaves the selection untouched.
   await chooseMode(page, 'professional')
@@ -59,8 +59,8 @@ test('the tax rule pack and year are visible and identical in both modes', async
   // Ontario's own premiums and levies are declared only for Ontario.
   await chooseMode(page, 'professional')
   await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('ON')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).toContainText('Ontario surtax')
+  await expect(page.getByTestId('rule-tax-not-modelled')).toContainText('Ontario surtax')
   await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('SK')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).not.toContainText('Ontario surtax')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-not-modelled')))).toContainText('GST/HST credit')
+  await expect(page.getByTestId('rule-tax-not-modelled')).not.toContainText('Ontario surtax')
+  await expect(page.getByTestId('rule-tax-not-modelled')).toContainText('GST/HST credit')
 })

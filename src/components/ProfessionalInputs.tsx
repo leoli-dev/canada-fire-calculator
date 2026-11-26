@@ -37,7 +37,7 @@ export function ProfessionalInputs({ children }: { children: ReactNode }) {
 }
 
 /** Keep editors mounted when a group closes or a search hides it, including uncommitted drafts. */
-export function ProfessionalGroup({ name, title, summary, fields = [], children }: { name: string; title: string; summary?: string; fields?: readonly string[]; children: ReactNode }) {
+export function ProfessionalGroup({ name, title, summary, fields = [], needsReview = false, children }: { name: string; title: string; summary?: string; fields?: readonly string[]; needsReview?: boolean; children: ReactNode }) {
   const { t } = useTranslation()
   const answerMeta = useStore(state => state.answerMeta)
   const [nestedFields, setNestedFields] = useState<string[]>([])
@@ -91,7 +91,7 @@ export function ProfessionalGroup({ name, title, summary, fields = [], children 
     if (query && found) group.open = true
   }, [query, title, children])
   return <details ref={root} className="ui-disclosure professional-group" data-group={name} hidden={!matches} open={undefined}>
-    <summary><span>{title}</span><small>{summary ?? <>{status}{estimated > 0 && <> · <StatusChip status="est">{t('ui.professional.estimates', { count: estimated })}</StatusChip></>}</>}</small></summary>
+    <summary><span>{title}</span><small>{summary ?? <>{status}{needsReview && status !== t('ui.professional.needsReview') && <> · {t('ui.professional.needsReview')}</>}{estimated > 0 && <> · <StatusChip status="est">{t('ui.professional.estimates', { count: estimated })}</StatusChip></>}</>}</small></summary>
     <div role="group" aria-label={title} className="professional-group-body">{children}</div>
   </details>
 }

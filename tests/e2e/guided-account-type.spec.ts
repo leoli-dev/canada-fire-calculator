@@ -28,7 +28,7 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   await seed(page)
   await page.goto('/#/guided/assets/account.rrsp.type')
   const type = page.getByTestId('registered-type-legacy:account:rrsp')
-  await expect((await prepareProfessionalTarget(type))).toBeVisible()
+  await expect(type).toBeVisible()
   // The plain-RRSP default is an example, not an answer, and a single person has no spousal plan.
   await expect(type.locator('input:checked')).toHaveCount(0)
   await expect(page.getByTestId('registered-type-legacy:account:rrsp-spousalRrsp')).toHaveCount(0)
@@ -36,12 +36,12 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-rrif'))).check()
   await expect.poll(() => pageCount(page)).toBe(before + 1)
   await (await prepareProfessionalTarget(page.locator('.question-pager button').last())).click()
-  await expect((await prepareProfessionalTarget(page.locator('.question-page')))).toHaveAttribute('data-page-id', 'account.rrif.details')
+  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'account.rrif.details')
   const opened = page.getByTestId('guided-rrif-opened-legacy:account:rrsp')
   await (await prepareProfessionalTarget(opened)).fill('2024')
   await (await prepareProfessionalTarget(opened)).blur()
   // A calendar year is never shown with a thousands separator.
-  await expect((await prepareProfessionalTarget(opened))).toHaveValue('2024')
+  await expect(opened).toHaveValue('2024')
   await (await prepareProfessionalTarget(page.getByTestId('guided-rrif-category-legacy:account:rrsp-allOther'))).check()
   // A single person has no age election to make.
   await expect(page.getByTestId('guided-rrif-election-legacy:account:rrsp')).toHaveCount(0)
@@ -50,9 +50,9 @@ test('choosing RRIF adds its own page; the facts are shared with professional mo
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp')))).toHaveValue('rrif')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rrif-opened-year')))).toHaveValue('2024')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rrif-factor-category-legacy:account:rrsp')))).toHaveValue('allOther')
+  await expect(page.getByTestId('registered-type-legacy:account:rrsp')).toHaveValue('rrif')
+  await expect(page.getByTestId('rrif-opened-year')).toHaveValue('2024')
+  await expect(page.getByTestId('rrif-factor-category-legacy:account:rrsp')).toHaveValue('allOther')
   // Back to a plain RRSP in professional mode removes the guided RRIF page.
   await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp'))).selectOption('rrsp')
   await chooseMode(page, 'guided')
@@ -75,23 +75,23 @@ test('a couple can record a spousal RRSP and a RRIF age election', async ({ page
 test('employment income is optional, per person, and clearable', async ({ page }) => {
   await seed(page, { couple: true })
   await page.goto('/#/guided/saving/saving.earned')
-  await expect((await prepareProfessionalTarget(page.getByTestId('guided-earned-income')))).toBeVisible()
+  await expect(page.getByTestId('guided-earned-income')).toBeVisible()
   await (await prepareProfessionalTarget(page.getByTestId('earned-self'))).fill('92000')
   await (await prepareProfessionalTarget(page.getByTestId('earned-partner'))).fill('55000')
   await (await prepareProfessionalTarget(page.getByTestId('earned-partner'))).blur()
-  await expect((await prepareProfessionalTarget(page.getByTestId('earned-self')))).toHaveValue('92,000')
+  await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
   let people = (await canonical(page)).people
   expect(people.map((person: { earnedIncome: unknown }) => person.earnedIncome)).toEqual([
     { status: 'known', value: 92_000 }, { status: 'known', value: 55_000 },
   ])
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.getByTestId('earned-self')))).toHaveValue('92,000')
+  await expect(page.getByTestId('earned-self')).toHaveValue('92,000')
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/saving/saving.earned')
-  await (await prepareProfessionalTarget(page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first())).click()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear' }).first(), page.getByTestId('guided-earned-income').getByRole('button', { name: 'Clear', includeHidden: true }).first())).click()
   people = (await canonical(page)).people
   expect(people[0].earnedIncome.status).toBe('unknown')
-  await expect((await prepareProfessionalTarget(page.getByTestId('earned-self')))).toHaveValue('')
+  await expect(page.getByTestId('earned-self')).toHaveValue('')
 })
 
 test('the new pages are translated in EN, FR and ZH', async ({ page }) => {
@@ -107,7 +107,7 @@ test('the new pages are translated in EN, FR and ZH', async ({ page }) => {
       const title = (await page.locator('.question-page h2').first().textContent())?.trim() ?? ''
       expect(title.length, `${language} ${path}`).toBeGreaterThan(5)
       expect(title, `${language} ${path}`).not.toContain('questionnaire.')
-      expect(await (await prepareProfessionalTarget(page.locator('.question-page'))).innerText(), `${language} ${path}`).not.toMatch(/questionnaire\.|be11\./)
+      expect(await page.locator('.question-page').innerText(), `${language} ${path}`).not.toMatch(/questionnaire\.|be11\./)
       titles[language].push(title)
     }
   }

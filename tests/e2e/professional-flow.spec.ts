@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { prepareProfessionalTarget } from './fixtures/professional'
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -17,7 +17,7 @@ test('professional mode completes a representative household plan and scenario r
   test.skip(testInfo.project.name !== 'desktop')
 
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.locator('.input-form .professional-group')))).toHaveCount(7)
+  await expect(page.locator('.input-form .professional-group')).toHaveCount(7)
   expect(await page.locator('.input-form .professional-group').evaluateAll(groups => groups.map(group => (group as HTMLElement).dataset.group))).toEqual(['profile', 'saving', 'accounts', 'housing', 'benefits', 'tax', 'advanced'])
   // Preserve the parent revision's complete initial control multiset, including hidden optional editors.
   const expectedControls = JSON.parse(readFileSync(new URL('./fixtures/professional-controls.json', import.meta.url), 'utf8'))
@@ -34,8 +34,9 @@ test('professional mode completes a representative household plan and scenario r
     remaining.splice(index, 1)
   }
 
-  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
-  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toContainText('adds remaining registered balances')
+  await showProfessionalResults(page)
+  await expect(page.locator('.results-column')).toBeVisible()
+  await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
 
   await (await prepareProfessionalTarget(field(page, 'Current age'))).fill('36')
   await (await prepareProfessionalTarget(field(page, 'Target FIRE age'))).fill('46')
@@ -48,29 +49,30 @@ test('professional mode completes a representative household plan and scenario r
   await (await prepareProfessionalTarget(field(page, 'Use an FHSA (First Home Savings Account)'))).check()
   await (await prepareProfessionalTarget(field(page, 'Current balance (combined)'))).fill('20000')
 
-  await (await prepareProfessionalTarget(page.getByRole('button', { name: '+ Principal residence' }))).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: '+ Principal residence' }), page.getByRole('button', { name: '+ Principal residence', includeHidden: true }))).click()
   await (await prepareProfessionalTarget(field(page, 'Current value'))).fill('900000')
 
   await (await prepareProfessionalTarget(field(page, /CPP.*start age/).nth(1))).fill('66')
   await (await prepareProfessionalTarget(field(page, /OAS.*start age/).nth(1))).fill('67')
   await expect(page.locator('.validation-banner')).toHaveCount(0)
-  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
+  await showProfessionalResults(page)
+  await expect(page.locator('.results-column')).toBeVisible()
 
   const scenario = page.locator('details:not(.professional-group)').filter({ hasText: 'Scenario comparison' })
   await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
-  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }))).click()
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }), scenario.getByRole('button', { name: 'Save current as A', includeHidden: true }))).click()
   await (await prepareProfessionalTarget(field(page, 'Desired after-tax annual spending in retirement'))).fill('54000')
-  await expect((await prepareProfessionalTarget(scenario.getByRole('cell', { name: 'Scenario A' })))).toBeVisible()
-  await expect((await prepareProfessionalTarget(scenario.getByRole('cell', { name: 'Current', exact: true })))).toBeVisible()
-  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Restore A as current inputs' }))).click()
-  await expect((await prepareProfessionalTarget(field(page, 'Desired after-tax annual spending in retirement')))).toHaveValue('50,000')
+  await expect(scenario.getByRole('cell', { name: 'Scenario A' })).toBeVisible()
+  await expect(scenario.getByRole('cell', { name: 'Current', exact: true })).toBeVisible()
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Restore A as current inputs' }), scenario.getByRole('button', { name: 'Restore A as current inputs', includeHidden: true }))).click()
+  await expect(field(page, 'Desired after-tax annual spending in retirement')).toHaveValue('50,000')
 })
 
 test('scenario final-net-worth heading aligns with its amounts', async ({ page }) => {
   await chooseMode(page, 'professional')
   const scenario = page.locator('details:not(.professional-group)').filter({ hasText: 'Scenario comparison' })
   await (await prepareProfessionalTarget(scenario.locator('summary'))).press('Enter')
-  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }))).click()
+  await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Save current as A' }), scenario.getByRole('button', { name: 'Save current as A', includeHidden: true }))).click()
   await chooseLanguage(page, '中文')
 
   const localizedScenario = page.locator('details:not(.professional-group)').filter({ hasText: '场景对比' })
@@ -90,15 +92,16 @@ test('timing comparison preserves unsupported spending-solver status for a funde
   await chooseMode(page, 'professional')
   await (await prepareProfessionalTarget(field(page, 'TFSA').first())).fill('5000000')
   await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Goal' }).locator('select'))).selectOption('dieWithZero')
-  await (await prepareProfessionalTarget(page.getByRole('button', { name: '+ Principal residence' }))).click()
-  await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Planned purchase' }))).check()
-  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: '+ Principal residence' }), page.getByRole('button', { name: '+ Principal residence', includeHidden: true }))).click()
+  await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Planned purchase' }), page.getByRole('radio', { name: 'Planned purchase', includeHidden: true }))).check()
+  await showProfessionalResults(page)
+  await expect(page.locator('.results-column')).toBeVisible()
   const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
   await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
-  await expect((await prepareProfessionalTarget(timing))).toContainText('A future home purchase is not supported')
-  await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('funds the planned spending')
-  await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('A future home purchase is not supported')
-  await expect((await prepareProfessionalTarget(timing.locator('.combo')))).not.toContainText('shortfall')
+  await expect(timing).toContainText('A future home purchase is not supported')
+  await expect(timing.locator('.combo')).toContainText('funds the planned spending')
+  await expect(timing.locator('.combo')).toContainText('A future home purchase is not supported')
+  await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })
 
 test('French solver boundary keeps the checked age and reports the FIRE-number search limit', async ({ page }) => {
@@ -106,13 +109,13 @@ test('French solver boundary keeps the checked age and reports the FIRE-number s
   await (await prepareProfessionalTarget(field(page, 'Life expectancy').first())).fill('61')
   await (await prepareProfessionalTarget(field(page, 'Desired after-tax annual spending in retirement').first())).fill('20000000')
   await chooseLanguage(page, 'FR')
-  await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }))).click()
-  await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText("jusqu'à 60 ans")
-  await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }))).click()
+  await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Quand puis-je me retirer ?' }), page.getByRole('tab', { name: 'Quand puis-je me retirer ?', includeHidden: true }))).click()
+  await expect(page.locator('.summary')).toContainText("jusqu'à 60 ans")
+  await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Mon chiffre FIRE ?' }), page.getByRole('tab', { name: 'Mon chiffre FIRE ?', includeHidden: true }))).click()
   // BE-42: the working plan is now priced from its projected basis; at 20M a
   // year the search runs out, and the French copy says no amount is shown.
-  await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText('La limite de recherche a été atteinte')
-  await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText("Aucun montant FIRE n'est affiché")
+  await expect(page.locator('.summary')).toContainText('La limite de recherche a été atteinte')
+  await expect(page.locator('.summary')).toContainText("Aucun montant FIRE n'est affiché")
 })
 
 test('timing comparison keeps search-limit status in rows and combined result', async ({ page }) => {
@@ -121,7 +124,7 @@ test('timing comparison keeps search-limit status in rows and combined result', 
   await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Goal' }).locator('select'))).selectOption('dieWithZero')
   const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
   await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
-  await expect((await prepareProfessionalTarget(timing.locator('tbody tr').first()))).toContainText('search limit was reached')
-  await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('funds the planned spending')
-  await expect((await prepareProfessionalTarget(timing.locator('.combo')))).not.toContainText('shortfall')
+  await expect(timing.locator('tbody tr').first()).toContainText('search limit was reached')
+  await expect(timing.locator('.combo')).toContainText('funds the planned spending')
+  await expect(timing.locator('.combo')).not.toContainText('shortfall')
 })

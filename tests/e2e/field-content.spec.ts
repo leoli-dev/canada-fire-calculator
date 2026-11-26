@@ -15,12 +15,12 @@ async function compareGuidedAndProfessionalHelp(page: Page, fieldId: string) {
   const professional = page.getByTestId(`professional-help-${fieldId}`)
   await revealProfessionalEditor(page, professional)
   await (await prepareProfessionalTarget(professional.locator('.ui-field-help'))).click()
-  await expect((await prepareProfessionalTarget(professional.getByRole('dialog')))).toHaveAttribute('aria-modal', 'true')
+  await expect(professional.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
   await page.keyboard.press('Shift+Tab')
   await expect(professional.getByRole('dialog').getByRole('button')).toBeFocused()
-  await expect((await prepareProfessionalTarget(professional.locator('p').first()))).toHaveText(why)
-  await expect((await prepareProfessionalTarget(professional.locator('p').nth(1)))).toHaveText(find)
-  await expect((await prepareProfessionalTarget(professional.locator(`[data-content-field="${fieldId}"]`)))).toHaveText(facts)
+  await expect(professional.locator('p').first()).toHaveText(why)
+  await expect(professional.locator('p').nth(1)).toHaveText(find)
+  await expect(professional.locator(`[data-content-field="${fieldId}"]`)).toHaveText(facts)
   await page.keyboard.press('Escape')
   await expect(professional.getByRole('dialog')).toHaveCount(0)
   await expect(professional.locator('.ui-field-help')).toBeFocused()
@@ -46,7 +46,7 @@ test('savings question and Professional field share source, unit and unknown mea
 
 test('planned mortgage content appears only when applicable and stays shared in EN/FR/ZH', async ({ page }) => {
   await page.goto('/#/guided/housing/home.situation')
-  await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Planned purchase' }))).check()
+  await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Planned purchase' }), page.getByRole('radio', { name: 'Planned purchase', includeHidden: true }))).check()
   for (const language of languages) {
     await chooseLanguage(page, language)
     await page.goto('/#/guided/housing/purchase.loan')

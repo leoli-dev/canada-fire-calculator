@@ -37,7 +37,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
   await (await prepareProfessionalTarget(page.getByLabel('Province'))).selectOption('AB')
   const alberta = await read()
   expect(alberta).toEqual(onProfessional)
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-tax-pack')))).toHaveAttribute('data-rule-pack-id', 'CA-AB-tax-2026-legacy-v1')
+  await expect(page.getByTestId('rule-tax-pack')).toHaveAttribute('data-rule-pack-id', 'CA-AB-tax-2026-legacy-v1')
 
   // Guided mode shows the very same pack and period — not a second copy.
   await chooseMode(page, 'guided')
@@ -45,9 +45,9 @@ test('the CCB rule pack and payment period are visible and identical in both mod
   const onGuided = await read()
   expect(onGuided).toEqual(alberta)
   // The gaps the pack refuses to model travel with it.
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-ccb-not-modelled')))).toContainText('prior-year adjusted family net income')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-ccb-not-modelled')))).toContainText('Child Disability Benefit')
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-ccb-not-modelled')))).toContainText('provincial child benefits')
+  await expect(page.getByTestId('rule-ccb-not-modelled')).toContainText('prior-year adjusted family net income')
+  await expect(page.getByTestId('rule-ccb-not-modelled')).toContainText('Child Disability Benefit')
+  await expect(page.getByTestId('rule-ccb-not-modelled')).toContainText('provincial child benefits')
 
   // Switching modes back and forth leaves the selection untouched.
   await chooseMode(page, 'professional')
@@ -58,7 +58,7 @@ test('the CCB rule pack and payment period are visible and identical in both mod
 
   // The version line names the pack and its period in both modes, and the
   // statutory rate source is linked so the rates are traceable too.
-  await expect((await prepareProfessionalTarget(page.getByTestId('rule-assumptions')))).toContainText('CA-CCB-2026-07-v1 (2026-07/2027-06)')
+  await expect(page.getByTestId('rule-assumptions')).toContainText('CA-CCB-2026-07-v1 (2026-07/2027-06)')
   const links = await page.getByTestId('rule-assumptions').locator('a')
     .evaluateAll(anchors => anchors.map(a => a.getAttribute('href')))
   expect(links.some(href => href?.includes('laws-lois.justice.gc.ca'))).toBe(true)

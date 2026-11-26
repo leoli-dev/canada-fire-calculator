@@ -12,7 +12,7 @@ test('single, couple, single settles in one step without resetting the plan', as
   await (await prepareProfessionalTarget(household)).selectOption('couple')
   await (await prepareProfessionalTarget(household)).selectOption('single')
   const gate = page.getByTestId('migration-gate')
-  await expect((await prepareProfessionalTarget(gate))).toBeVisible()
+  await expect(gate).toBeVisible()
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.inputs.balances)
   await (await prepareProfessionalTarget(page.getByTestId('migration-settle-single'))).click()
   await expect(gate).toHaveCount(0)

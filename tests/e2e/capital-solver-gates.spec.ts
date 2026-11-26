@@ -1,4 +1,4 @@
-import { prepareProfessionalTarget } from './fixtures/professional'
+import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -25,7 +25,8 @@ async function seed(page: Page, kind: 'nonReg' | 'property', mode: 'guided' | 'p
     } }))
   }, { kind, mode })
   await page.reload()
-  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
+  await showProfessionalResults(page)
+  await expect(page.locator('.results-column')).toBeVisible()
 }
 
 for (const mode of ['guided', 'professional'] as const) {
@@ -41,8 +42,8 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Your FIRE number:')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
+    await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
     await page.evaluate(() => {
       const saved = JSON.parse(localStorage.getItem('fire-inputs')!)
       saved.state.inputs.nonRegBook = 700_000
@@ -51,8 +52,8 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Your FIRE number:')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
+    await expect(page.locator('.summary')).not.toContainText('Your FIRE number:')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
 
@@ -73,11 +74,11 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Estate value (after tax):')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText('required income or capital-gain tax facts')
+    await expect(page.locator('.summary')).not.toContainText('Estate value (after tax):')
+    await expect(page.locator('.summary')).toContainText('required income or capital-gain tax facts')
     for (const [language, phrase] of [['FR', 'gains en capital'], ['中文', '资本利得税务事实']] as const) {
       await chooseLanguage(page, language)
-      await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText(phrase)
+      await expect(page.locator('.summary')).toContainText(phrase)
     }
     await chooseLanguage(page, 'EN')
     await page.evaluate(() => {
@@ -89,46 +90,46 @@ for (const mode of ['guided', 'professional'] as const) {
     await page.reload()
     const comparison = page.getByTestId('scenario-comparison')
     await (await prepareProfessionalTarget(comparison.locator('summary'))).press('Enter')
-    await expect((await prepareProfessionalTarget(comparison))).toContainText('Comparison unavailable')
-    await expect((await prepareProfessionalTarget(comparison.getByRole('row', { name: /Scenario A/ })))).toContainText('—')
+    await expect(comparison).toContainText('Comparison unavailable')
+    await expect(comparison.getByRole('row', { name: /Scenario A/ })).toContainText('—')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
   test(`${mode} FIRE-number tab prices P06 from its projected basis, with no false sufficiency, at desktop and 320px`, async ({ page }) => {
     // BE-42: the 500,000 the plan holds falls 16,018 short once the eroded
     // cost base is taxed, so the number is labelled an estimate and shows a gap.
     await seed(page, 'nonReg', mode)
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText('FIRE number')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).toHaveClass(/uncertain/)
-    await expect((await prepareProfessionalTarget(page.getByTestId('fire-number-projected')))).toContainText('cost base your plan projects for age 60')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText('a shortfall of')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: "What's my FIRE number?" }), page.getByRole('tab', { name: "What's my FIRE number?", includeHidden: true }))).click()
+    await expect(page.locator('.summary .verdict')).toContainText('FIRE number')
+    await expect(page.locator('.summary')).toHaveClass(/uncertain/)
+    await expect(page.getByTestId('fire-number-projected')).toContainText('cost base your plan projects for age 60')
+    await expect(page.locator('.summary')).toContainText('a shortfall of')
     for (const [language, phrase] of [['FR', 'prix de base non enregistré'], ['中文', '非注册成本基础']] as const) {
       await chooseLanguage(page, language)
-      await expect((await prepareProfessionalTarget(page.getByTestId('fire-number-projected')))).toContainText(phrase)
+      await expect(page.getByTestId('fire-number-projected')).toContainText(phrase)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
 
   test(`${mode} target tab withholds investment-property sale verdict and amount`, async ({ page }) => {
     await seed(page, 'property', mode)
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Will I hit my target?' }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText('needs verified nominal cost, selling expenses')
-    await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).not.toContainText('475,000')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'Will I hit my target?' }), page.getByRole('tab', { name: 'Will I hit my target?', includeHidden: true }))).click()
+    await expect(page.locator('.summary .verdict')).toContainText('needs verified nominal cost, selling expenses')
+    await expect(page.locator('.summary .verdict')).not.toContainText('475,000')
     for (const [language, phrase] of [['FR', 'frais de vente'], ['中文', '出售费用']] as const) {
       await chooseLanguage(page, language)
-      await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText(phrase)
+      await expect(page.locator('.summary .verdict')).toContainText(phrase)
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
 
   test(`${mode} retirement age and spending ceiling withhold an untaxed property sale`, async ({ page }) => {
     await seed(page, 'property', mode)
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText('investment-property sale')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Earliest successful FIRE age:')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }), page.getByRole('tab', { name: 'When can I retire?', includeHidden: true }))).click()
+    await expect(page.locator('.summary .verdict')).toContainText('investment-property sale')
+    await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
     for (const [language, phrase] of [['FR', 'immeuble de placement'], ['中文', '投资房出售']] as const) {
       await chooseLanguage(page, language)
-      await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText(phrase)
+      await expect(page.locator('.summary .verdict')).toContainText(phrase)
     }
     await chooseLanguage(page, 'EN')
     await page.evaluate(() => {
@@ -137,8 +138,8 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).toContainText('investment-property sale')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Max sustainable after-tax spending')
+    await expect(page.locator('.summary')).toContainText('investment-property sale')
+    await expect(page.locator('.summary')).not.toContainText('Max sustainable after-tax spending')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   })
 
@@ -161,8 +162,8 @@ for (const mode of ['guided', 'professional'] as const) {
       localStorage.setItem('fire-inputs', JSON.stringify(saved))
     })
     await page.reload()
-    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }))).click()
-    await expect((await prepareProfessionalTarget(page.locator('.summary .verdict')))).toContainText('confirmed non-registered cost base')
-    await expect((await prepareProfessionalTarget(page.locator('.summary')))).not.toContainText('Earliest successful FIRE age:')
+    await (await prepareProfessionalTarget(page.getByRole('tab', { name: 'When can I retire?' }), page.getByRole('tab', { name: 'When can I retire?', includeHidden: true }))).click()
+    await expect(page.locator('.summary .verdict')).toContainText('confirmed non-registered cost base')
+    await expect(page.locator('.summary')).not.toContainText('Earliest successful FIRE age:')
   })
 }

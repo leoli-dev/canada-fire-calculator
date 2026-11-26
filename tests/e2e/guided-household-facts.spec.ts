@@ -1,4 +1,4 @@
-import { prepareProfessionalTarget } from './fixtures/professional'
+import { prepareProfessionalTarget, revealProfessionalEditor } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -28,7 +28,7 @@ const saved = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getIte
 test('a couple clears the ownership gate with one choice per row, shared with professional mode', async ({ page }) => {
   await seed(page)
   await page.goto('/#/guided/assets/assets.ownership')
-  for (const kind of ['tfsa', 'rrsp', 'nonReg']) await expect((await prepareProfessionalTarget(page.getByTestId(`guided-ownership-row-legacy:account:${kind}`)))).toBeVisible()
+  for (const kind of ['tfsa', 'rrsp', 'nonReg']) await expect(page.getByTestId(`guided-ownership-row-legacy:account:${kind}`)).toBeVisible()
   // Nothing asks for amounts until a row is held by both people.
   await expect(page.getByTestId('account-self-amount-legacy:account:tfsa')).toHaveCount(0)
   await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:tfsa-split'))).check()
@@ -53,7 +53,7 @@ test('a couple clears the ownership gate with one choice per row, shared with pr
   expect(state.canonical.migration.ownershipNeedsConfirmation).toBe(true)
 
   await page.goto('/#/guided/housing/housing.ownership')
-  await expect((await prepareProfessionalTarget(page.getByTestId('guided-ownership-row-legacy:property:principal')))).toBeVisible()
+  await expect(page.getByTestId('guided-ownership-row-legacy:property:principal')).toBeVisible()
   await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:property:principal-split'))).check()
   await (await prepareProfessionalTarget(page.getByTestId('property-self-share-legacy:property:principal'))).fill('50')
   await (await prepareProfessionalTarget(page.getByTestId('property-self-share-legacy:property:principal'))).blur()
@@ -64,18 +64,19 @@ test('a couple clears the ownership gate with one choice per row, shared with pr
   // Professional mode reads the very same facts.
   await page.reload()
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.getByTestId('person-tax-facts')))).toBeVisible()
-  await expect((await prepareProfessionalTarget(page.getByTestId('owner-legacy:account:rrsp')))).toHaveValue('legacy:person:partner')
-  await expect((await prepareProfessionalTarget(page.getByTestId('account-self-share-legacy:account:nonReg')))).toHaveValue('50')
-  await expect((await prepareProfessionalTarget(page.getByTestId('property-self-amount-legacy:property:principal')))).toHaveValue('400,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('property-owner-legacy:property:investment:0')))).toHaveValue('legacy:person:self')
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
+  await expect(page.getByTestId('person-tax-facts')).toBeVisible()
+  await expect(page.getByTestId('owner-legacy:account:rrsp')).toHaveValue('legacy:person:partner')
+  await expect(page.getByTestId('account-self-share-legacy:account:nonReg')).toHaveValue('50')
+  await expect(page.getByTestId('property-self-amount-legacy:property:principal')).toHaveValue('400,000')
+  await expect(page.getByTestId('property-owner-legacy:property:investment:0')).toHaveValue('legacy:person:self')
 })
 
 test('a zero-balance registered account is answered by naming its owner', async ({ page }) => {
   await seed(page, { fhsa: true })
   await page.goto('/#/guided/assets/assets.ownership')
   const fhsa = page.getByTestId('guided-ownership-row-legacy:account:fhsa')
-  await expect((await prepareProfessionalTarget(fhsa))).toBeVisible()
+  await expect(fhsa).toBeVisible()
   // An empty account has no amounts to split, so "each has one" is not offered.
   await expect(page.getByTestId('owner-choice-legacy:account:fhsa-split')).toHaveCount(0)
   await (await prepareProfessionalTarget(page.getByTestId('owner-choice-legacy:account:fhsa-partner'))).check()
@@ -87,16 +88,16 @@ test('spouse support is one question with an explicit "not sure", recorded for b
   await seed(page)
   await page.goto('/#/guided/family/family.spouseSupport')
   const question = page.getByTestId('guided-spouse-support')
-  await expect((await prepareProfessionalTarget(question))).toBeVisible()
-  await (await prepareProfessionalTarget(question.getByRole('radio', { name: /Yes/ }))).check()
+  await expect(question).toBeVisible()
+  await (await prepareProfessionalTarget(question.getByRole('radio', { name: /Yes/ }), question.getByRole('radio', { name: /Yes/, includeHidden: true }))).check()
   expect((await saved(page)).canonical.taxProfile.spouseSupported).toEqual({ status: 'known', value: true })
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.getByTestId('spouse-support')))).toHaveValue('true')
+  await expect(page.getByTestId('spouse-support')).toHaveValue('true')
   await (await prepareProfessionalTarget(page.getByTestId('spouse-support'))).selectOption('unknown')
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/family/family.spouseSupport')
-  await expect((await prepareProfessionalTarget(page.getByTestId('guided-spouse-support').getByRole('radio', { name: /Yes/ })))).not.toBeChecked()
-  await (await prepareProfessionalTarget(page.getByTestId('guided-spouse-support').getByRole('radio', { name: /come back/i }))).check()
+  await expect(page.getByTestId('guided-spouse-support').getByRole('radio', { name: /Yes/ })).not.toBeChecked()
+  await (await prepareProfessionalTarget(page.getByTestId('guided-spouse-support').getByRole('radio', { name: /come back/i }), page.getByTestId('guided-spouse-support').getByRole('radio', { name: /come back/i, includeHidden: true }))).check()
   const state = await saved(page)
   expect(state.canonical.taxProfile.spouseSupported.status).toBe('unknown')
   expect(state.questionAnswers['family.spouseSupport']).toBe('unknown')
@@ -106,13 +107,13 @@ test('Quebec drug coverage is asked right after the province, one whole-year ans
   await seed(page, { province: 'QC' })
   await page.goto('/#/guided/family/family.province')
   await page.goto('/#/guided/family/family.qcDrug')
-  await expect((await prepareProfessionalTarget(page.getByTestId('guided-qc-drug')))).toBeVisible()
+  await expect(page.getByTestId('guided-qc-drug')).toBeVisible()
   await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self-private'))).check()
   await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner-public'))).check()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // Picking a whole-year status again after opening the month detail closes it.
   await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self'))).check()
-  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-1')))).toBeVisible()
+  await expect(page.getByTestId('qc-coverage-self-1')).toBeVisible()
   await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self-private'))).check()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   const coverage = (await saved(page)).canonical.taxProfile.qcDrugCoverage

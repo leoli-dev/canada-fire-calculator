@@ -1,4 +1,4 @@
-import { prepareProfessionalTarget } from './fixtures/professional'
+import { prepareProfessionalTarget, revealProfessionalEditor } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -27,6 +27,7 @@ async function seed(page: import('@playwright/test').Page, options: { guided?: b
     } }))
   }, options)
   await page.reload()
+  await revealProfessionalEditor(page, page.locator('[data-group="tax"]'))
 }
 
 const inViewport = (page: import('@playwright/test').Page) =>
@@ -39,36 +40,36 @@ const storedPlan = (page: import('@playwright/test').Page) =>
 test('professional mode prices the stated room, clips the plan and retains the remainder', async ({ page }) => {
   await seed(page)
   const panel = page.getByTestId('tfsa-statement-self')
-  await expect((await prepareProfessionalTarget(panel))).toBeVisible()
+  await expect(panel).toBeVisible()
   // Unknown room is a visible state: it is never unlimited room and never zero.
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-room-unknown-self')))).toBeVisible()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('Not confirmed')
+  await expect(page.getByTestId('tfsa-room-unknown-self')).toBeVisible()
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('Not confirmed')
   // 5,000 of room against the plan's 8,000: 5,000 executes, 3,000 is retained.
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).fill('5000')
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).blur()
   await expect(page.getByTestId('tfsa-room-unknown-self')).toHaveCount(0)
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-savings-share-self')))).toContainText('8,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('3,000')
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('5,000')
+  await expect(page.getByTestId('tfsa-savings-share-self')).toContainText('8,000')
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // FE-43 D: the panel no longer claims the excess moves to the non-registered
   // account; the projection does not apply the room check yet, and it says so.
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('does not apply this room check yet')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).not.toContainText('non-registered')
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('does not apply this room check yet')
+  await expect(page.getByTestId('tfsa-retained-self')).not.toContainText('non-registered')
   const person = (await storedPlan(page)).people.find((item: { role: string }) => item.role === 'self')
   expect(person.tfsaAvailableRoom).toEqual({ status: 'known', value: 5000 })
   // Reload keeps the recorded room and the priced row.
   await page.reload()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self')))).toHaveValue('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('3,000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // The same recorded fact prices identically in guided mode.
   await chooseMode(page, 'guided')
   // FE-43 C: guided asks TFSA room on its own optional page.
   await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self')))).toHaveValue('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('guided-tfsa-feedback-self')))).toContainText('3,000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
+  await expect(page.getByTestId('guided-tfsa-feedback-self')).toContainText('3,000')
   await (await prepareProfessionalTarget(page.getByTestId('guided-tfsa-more-self'))).click()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('3,000')
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('5,000')
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -78,19 +79,19 @@ test('guided mode records the room and a withdrawal, and both survive a mode swi
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).fill('5000')
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).blur()
   await (await prepareProfessionalTarget(page.getByTestId('guided-tfsa-more-self'))).click()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-statement-self')))).toBeVisible()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('3,000')
+  await expect(page.getByTestId('tfsa-statement-self')).toBeVisible()
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('3,000')
   // A withdrawal made this year does not restore room this year: the row says
   // when it will, so the rule is visible rather than implied.
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-withdrawal-add-self'))).click()
   const baseYear = (await storedPlan(page)).baseYear
   const amount = page.locator('[data-testid^="tfsa-withdrawal-amount-"]')
-  await expect((await prepareProfessionalTarget(amount))).toHaveCount(1)
+  await expect(amount).toHaveCount(1)
   await (await prepareProfessionalTarget(amount)).fill('10000')
   await (await prepareProfessionalTarget(amount)).blur()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('closing room 0 CAD')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-restored-next-self')))).toContainText('10,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-restored-next-self')))).toContainText(`not in ${baseYear}`)
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('closing room 0 CAD')
+  await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
+  await expect(page.getByTestId('tfsa-restored-next-self')).toContainText(`not in ${baseYear}`)
   // Guided does not auto-run: recording facts leaves results stale.
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   const saved = await storedPlan(page)
@@ -100,38 +101,38 @@ test('guided mode records the room and a withdrawal, and both survive a mode swi
   expect(saved.tfsaStatement[person.id].withdrawals[0]).toMatchObject({ calendarYear: saved.baseYear, amount: 10000 })
   await page.reload()
   // A recorded withdrawal opens the advanced detail by itself.
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self')))).toHaveValue('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-restored-next-self')))).toContainText('10,000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
+  await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   await chooseMode(page, 'professional')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self')))).toHaveValue('5,000')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-restored-next-self')))).toContainText('10,000')
+  await expect(page.getByTestId('tfsa-available-room-self')).toHaveValue('5,000')
+  await expect(page.getByTestId('tfsa-restored-next-self')).toContainText('10,000')
   expect(await inViewport(page)).toBe(true)
 })
 
 test('a known zero room is a real zero, and an unknown is not treated as one', async ({ page }) => {
   await seed(page)
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-room-unknown-self')))).toBeVisible()
+  await expect(page.getByTestId('tfsa-room-unknown-self')).toBeVisible()
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).fill('0')
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).blur()
   // Zero is priceable: nothing executes and the whole plan is retained.
   await expect(page.getByTestId('tfsa-room-unknown-self')).toHaveCount(0)
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('Opening room 0')
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-retained-self')))).toContainText('8,000')
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('Opening room 0')
+  await expect(page.getByTestId('tfsa-retained-self')).toContainText('8,000')
   // Clearing it returns an explicit unknown, not a zero.
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).fill('')
   await (await prepareProfessionalTarget(page.getByTestId('tfsa-available-room-self'))).blur()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-room-unknown-self')))).toBeVisible()
-  await expect((await prepareProfessionalTarget(page.getByTestId('tfsa-ledger-self')))).toContainText('Not confirmed')
+  await expect(page.getByTestId('tfsa-room-unknown-self')).toBeVisible()
+  await expect(page.getByTestId('tfsa-ledger-self')).toContainText('Not confirmed')
   expect(await inViewport(page)).toBe(true)
 })
 
 test('the TFSA room block explains itself in EN, FR and ZH', async ({ page }) => {
   await seed(page)
   const panel = page.getByTestId('tfsa-statement-self')
-  await expect((await prepareProfessionalTarget(panel))).toContainText('Available TFSA contribution room')
+  await expect(panel).toContainText('Available TFSA contribution room')
   await chooseLanguage(page, 'FR')
-  await expect((await prepareProfessionalTarget(panel))).toContainText('Droits de cotisation CELI disponibles')
+  await expect(panel).toContainText('Droits de cotisation CELI disponibles')
   await chooseLanguage(page, '中文')
-  await expect((await prepareProfessionalTarget(panel))).toContainText('可用 TFSA 供款空间')
+  await expect(panel).toContainText('可用 TFSA 供款空间')
   expect(await inViewport(page)).toBe(true)
 })

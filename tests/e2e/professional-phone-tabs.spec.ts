@@ -16,7 +16,7 @@ test('phone Professional tab keys and sequential focus reach the labelled select
   await (await prepareProfessionalTarget(inputs)).focus()
   await page.keyboard.press('ArrowRight')
   await expect(results).toBeFocused()
-  await expect((await prepareProfessionalTarget(results))).toHaveAttribute('aria-selected', 'true')
+  await expect(results).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Tab')
   await expect(resultPanel).toBeFocused()
   await resultPanel.evaluate(element => { element.scrollTop = 400 })
