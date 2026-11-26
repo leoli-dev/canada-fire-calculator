@@ -39,6 +39,7 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
   const rowHeaders = useRef(new Map<string, HTMLTableCellElement>())
   const yearList = useRef<HTMLDivElement>(null)
   const yearRows = useRef(new Map<string, HTMLElement>())
+  const tableWasHidden = useRef(false)
   const [phone, setPhone] = useState(() => window.matchMedia("(max-width: 640px)").matches)
   const [view, setView] = useState<"year" | "table">("year")
   useEffect(() => {
@@ -61,9 +62,12 @@ function AnnualSheetSession({ model, moneyMode, onClose }: AnnualSheetDialogProp
   })
 
   useLayoutEffect(() => {
-    // Hidden tables have no usable offsets. Align only after the selected
-    // year's column is laid out, without changing focus or keyboard scrolling.
-    if (phone && view !== 'table') return
+    // Only revealing phone Table needs deferred alignment. Explicit jumps
+    // align themselves; inspecting another visible year must preserve scroll.
+    const hidden = phone && view !== 'table'
+    const revealing = tableWasHidden.current && !hidden
+    tableWasHidden.current = hidden
+    if (!phone || !revealing) return
     const port = scroller.current
     const header = yearHeaders.current.get(year)
     if (port && header) port.scrollLeft = Math.max(0, header.offsetLeft - (rowHeaders.current.values().next().value?.offsetWidth ?? 144))
