@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -15,10 +16,10 @@ test('a single Québec user records living alone in guided and sees it in profes
   })
   await page.reload()
   await page.goto('/#/guided/family/family.livesAlone')
-  await expect(page.getByTestId('guided-lives-alone')).toContainText('2,172')
-  await page.getByTestId('guided-lives-alone-choice-yes').check()
+  await expect((await prepareProfessionalTarget(page.getByTestId('guided-lives-alone')))).toContainText('2,172')
+  await (await prepareProfessionalTarget(page.getByTestId('guided-lives-alone-choice-yes'))).check()
   const fact = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.taxProfile.livesAlone)
   expect(fact).toEqual({ status: 'known', value: true })
   await chooseMode(page, 'professional')
-  await expect(page.getByTestId('lives-alone')).toHaveValue('true')
+  await expect((await prepareProfessionalTarget(page.getByTestId('lives-alone')))).toHaveValue('true')
 })

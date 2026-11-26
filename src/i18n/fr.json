@@ -62,7 +62,12 @@
       "fields_other": "{{count}} champs",
       "options": "Tous les choix",
       "lasts": "Solde jusqu’à {{age}} ans",
-      "depleted": "Épuisé à {{age}} ans"
+      "depleted": "Épuisé à {{age}} ans",
+      "confirmed": "{{count}} sur {{total}} réponses suivies confirmées",
+      "estimates_one": "{{count}} estimation",
+      "estimates_other": "{{count}} estimations",
+      "needsReview": "À vérifier",
+      "none": "Aucun"
     }
   },
   "title": "🇨🇦 Calculateur FIRE Canada",

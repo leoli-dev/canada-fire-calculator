@@ -58,7 +58,7 @@ test('search, collapse, named groups, source help and phone field dimensions', a
   await expect(page.locator('.professional-group[open]')).toHaveCount(0)
   await expect(page.locator('.professional-group')).toHaveCount(7)
   for (const group of await page.locator('.professional-group').all()) {
-    await group.locator(':scope > summary').click()
+    await group.locator(':scope > summary').press('Enter')
     if (info.project.name === 'mobile-320') {
       await expect(page.locator('.professional-group[open]')).toHaveCount(1)
       const issues = await group.locator('input:visible, select:visible, textarea:visible').evaluateAll(fields => fields.filter(field => parseFloat(getComputedStyle(field).fontSize) < 16 || field.getBoundingClientRect().height < 48).map(field => field.outerHTML))
@@ -66,7 +66,7 @@ test('search, collapse, named groups, source help and phone field dimensions', a
     }
   }
   const profile = page.locator('[data-group="profile"]')
-  if (!(await profile.evaluate(element => (element as HTMLDetailsElement).open))) await profile.locator(':scope > summary').click()
+  if (!(await profile.evaluate(element => (element as HTMLDetailsElement).open))) await profile.locator(':scope > summary').press('Enter')
   const choices = profile.getByRole('button', { name: 'All choices', exact: true }).first()
   await choices.click()
   await page.getByRole('dialog').getByRole('button', { name: /NL.*Newfoundland/ }).click()
@@ -104,7 +104,7 @@ test('phone Guided Answers returns to review and Results reuses the current plan
   const before = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('fire-inputs')!).state; return { inputs: s.inputs, canonical: s.canonical, inputRevision: s.inputRevision, resultRevision: s.resultRevision } })
   await page.getByRole('tab', { name: 'Answers', exact: true }).click()
   await expect(page.locator('.answer-review')).toBeVisible()
-  await expect(page.locator('.answer-review h2')).toBeFocused()
+  await expect(page.getByRole('tab', { name: 'Answers', exact: true })).toBeFocused()
   await page.getByRole('tab', { name: 'Results', exact: true }).click()
   await expect(page.getByTestId('canonical-results')).toBeVisible()
   const after = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('fire-inputs')!).state; return { inputs: s.inputs, canonical: s.canonical, inputRevision: s.inputRevision, resultRevision: s.resultRevision } })

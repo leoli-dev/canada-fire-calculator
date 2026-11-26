@@ -173,7 +173,7 @@ export function InputForm() {
       {errorCount > 0 && (
         <p className="validation-banner">{t('valBanner', { count: errorCount })}</p>
       )}
-      <ProfessionalGroup name="profile" title={t('profile')}>
+      <ProfessionalGroup name="profile" title={t('profile')} fields={['currentAge', 'fireAge', 'lifeExpectancy', 'province', 'household', 'children', ...(inputs.partner ? ['partner.currentAge'] : [])]}>
         <RuleAssumptions province={inputs.province} inflation={inputs.inflation ?? 0.021} />
         <Num field="currentAge" label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num field="fireAge" label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
@@ -264,7 +264,7 @@ export function InputForm() {
         )}
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="saving" title={t('ui.professional.saving')}>
+      <ProfessionalGroup name="saving" title={t('ui.professional.saving')} fields={['fireTargetAssets', 'goal', 'inflation', 'annualSavings', 'retirementSpending', 'budget.method', ...(canonical?.budget.kind !== 'incomeBudget' ? ['budget.debtIncluded', 'budget.taxBenefitIncluded'] : [])]}>
         <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
           onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
         <Field className="field">
@@ -318,7 +318,7 @@ export function InputForm() {
         <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
         <BudgetMethodPanel />
         <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
-        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
+        <details data-status-fields={WORKSHEET_KEYS.map(key => `worksheet.${key}`).join(' ')} onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
           <summary>{t('worksheetTitle')}</summary>
           {WORKSHEET_KEYS.map((k) => (
             <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
@@ -337,7 +337,7 @@ export function InputForm() {
         </details>
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="accounts" title={t('accounts')}>
+      <ProfessionalGroup name="accounts" title={t('accounts')} fields={['balances.tfsa', 'balances.rrsp', 'balances.nonReg', ...(inputs.balances.nonReg > 0 ? ['nonRegBook'] : []), 'fhsa', 'lockedRetirement', ...(inputs.fhsa ? ['fhsa.balance', 'fhsa.annualContribution', 'fhsa.openedYearsAgo'] : []), ...(inputs.lockedRetirement ? ['lockedRetirement.balance', 'lockedRetirement.employeeContribution', 'lockedRetirement.employerContribution', 'lockedRetirement.accessibleAge', ...(inputs.partner ? ['lockedRetirement.owner'] : [])] : [])]}>
         <p className="hint">{t('accountsHint')}</p>
         {ACCOUNTS.map((a) => (
           <Num
@@ -397,7 +397,7 @@ export function InputForm() {
         <Num field="nonRegBook" label={t('nonRegBook')} value={inputs.nonRegBook} step={5000} issue={issueFor('nonRegBook')} onChange={(v) => set({ nonRegBook: v })} />
         <p className="hint"><Jargon text={t('nonRegBookHint')} /></p>
 
-        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'tax_drag' })}>
+        <details data-status-fields="nonRegDistributionYield accumulationMarginalRate" onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'tax_drag' })}>
           <summary><Jargon text={t('nonRegTaxTitle')} /></summary>
           <p className="hint"><Jargon text={t('nonRegYieldHint')} /></p>
           <Num label={t('nonRegYieldLabel')} value={(inputs.nonRegDistributionYield ?? 0) * 100} step={0.5}
@@ -406,7 +406,7 @@ export function InputForm() {
             onChange={(v) => set({ accumulationMarginalRate: Math.max(0, Math.min(60, v)) / 100 })} />
         </details>
 
-        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'asset_mix' })}>
+        <details data-status-fields="returns volatilities fees" onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'asset_mix' })}>
           <summary>{t('mixLabel')}</summary>
           <p className="hint"><Jargon text={t('mixNote')} /></p>
           {ACCOUNTS.map((a) => (
@@ -431,7 +431,7 @@ export function InputForm() {
           <p className="hint"><Jargon text={t('feesHint')} /></p>
         </details>
 
-        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'savings_split' })}>
+        <details data-status-fields="savingsSplit.tfsa savingsSplit.rrsp savingsSplit.nonReg" onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'savings_split' })}>
           <summary>{t('savingsSplit')}</summary>
           {ACCOUNTS.map((a) => (
             <Num key={a} label={t(a)} value={Math.round(inputs.savingsSplit[a] * 100)}
@@ -482,7 +482,7 @@ export function InputForm() {
         )}
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="housing" title={t('ui.professional.housing')}>
+      <ProfessionalGroup name="housing" title={t('ui.professional.housing')} fields={[...(pr ? ['housingMode'] : []), ...(pr?.mode === 'planned' ? ['principalResidence.buyAtAge', 'principalResidence.price', 'principalResidence.downPayment', 'principalResidence.annualMortgagePayment', 'principalResidence.mortgageYears'] : pr ? ['principalResidence.value', 'principalResidence.sellAtAge', 'principalResidence.mortgage', ...(pr.mortgage ? ['principalResidence.mortgage.balance', 'principalResidence.mortgage.annualPayment', 'principalResidence.mortgage.yearsRemaining'] : [])] : []), ...(inputs.investmentProperties?.length ? ['investmentProperties.0.value', 'investmentProperties.0.acb', 'investmentProperties.0.annualRent', 'investmentProperties.0.sellAtAge', 'investmentProperties.0.saleExpenses', 'investmentProperties.0.mortgage', ...(inputs.investmentProperties[0].mortgage ? ['investmentProperties.0.mortgage.balance', 'investmentProperties.0.mortgage.annualPayment', 'investmentProperties.0.mortgage.yearsRemaining'] : [])] : []), ...(inputs.debts?.length ? ['debts.0.kind', 'debts.0.balance', 'debts.0.annualPayment', 'debts.0.yearsRemaining'] : [])]} summary={!pr && !inputs.investmentProperties?.length && !inputs.debts?.length ? t('ui.professional.none') : undefined}>
         <h3>{t('propertySection')}</h3>
 
         {pr && (
@@ -798,7 +798,7 @@ export function InputForm() {
         )}
       </ProfessionalGroup>
 
-      <ProfessionalGroup name="benefits" title={t('ui.professional.benefits')}>
+      <ProfessionalGroup name="benefits" title={t('ui.professional.benefits')} fields={['cppStartAge', 'cppAnnualAt65', 'oasStartAge', 'oasAnnualAt65', 'extraIncome', 'pension', ...(inputs.extraIncome ? ['extraIncome.annual', 'extraIncome.fromAge', 'extraIncome.toAge'] : []), ...(inputs.pension ? ['pension.annualAmount', 'pension.startAge', 'pension.indexation', 'pension.bridgeAnnual'] : []), ...(inputs.partner ? ['partner.cppStartAge', 'partner.cppAnnualAt65', 'partner.oasStartAge', 'partner.oasAnnualAt65', 'partner.pension', ...(inputs.partner.pension ? ['partner.pension.annualAmount', 'partner.pension.startAge', 'partner.pension.indexation', 'partner.pension.bridgeAnnual'] : [])] : [])]}>
         <Field className="field">
           <span><Jargon text={t('extraIncomeToggle')} /></span>
           <input

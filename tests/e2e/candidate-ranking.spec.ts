@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
@@ -21,30 +22,30 @@ async function openPlan(page: import('@playwright/test').Page, mode: 'guided' | 
 for (const mode of ['guided', 'professional'] as const) {
   test(`${mode} timing recommends a funded P17 preview and applies the same ages`, async ({ page }) => {
     await openPlan(page, mode)
-    const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
-    await timing.locator('summary').click()
-    await expect(timing.locator('.combo')).toContainText('Best combination')
-    await expect(timing.locator('.combo')).not.toContainText('70 + OAS at 70')
+    const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
+    await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
+    await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('Best combination')
+    await expect((await prepareProfessionalTarget(timing.locator('.combo')))).not.toContainText('70 + OAS at 70')
     const combined = timing.locator('.card-head .use-strategy')
-    await expect(combined).toBeVisible()
-    const combo = (await timing.locator('.combo').innerText()).match(/CPP at (\d+) \+ OAS at (\d+)/)!
-    await combined.click()
+    await expect((await prepareProfessionalTarget(combined))).toBeVisible()
+    const combo = (await (await prepareProfessionalTarget(timing.locator('.combo'))).innerText()).match(/CPP at (\d+) \+ OAS at (\d+)/)!
+    await (await prepareProfessionalTarget(combined)).click()
     const applied = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.inputs)
     expect([applied.cppStartAge, applied.oasStartAge]).toEqual([Number(combo[1]), Number(combo[2])])
     if (mode === 'guided') await chooseMode(page, 'professional')
-    await expect(timing.locator('.combo')).toContainText('already optimal')
+    await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('already optimal')
   })
 
   test(`${mode} all-fail state offers no recommended application`, async ({ page }) => {
     await openPlan(page, mode, true)
-    const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
-    const strategy = page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })
-    await timing.locator('summary').click()
-    await strategy.locator('summary').click()
-    await expect(timing.locator('.combo')).toContainText('No valid, funded candidate')
-    await expect(timing.locator('.combo')).toContainText('shortfall')
+    const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
+    const strategy = page.locator('details:not(.professional-group)').filter({ hasText: 'Withdrawal-order comparison' })
+    await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
+    await (await prepareProfessionalTarget(strategy.locator('summary'))).press('Enter')
+    await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('No valid, funded candidate')
+    await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('shortfall')
     await expect(timing.locator('.use-strategy')).toHaveCount(0)
-    await expect(strategy).toContainText('No valid, funded candidate')
+    await expect((await prepareProfessionalTarget(strategy))).toContainText('No valid, funded candidate')
     await expect(strategy.locator('.use-strategy')).toHaveCount(0)
   })
 }
@@ -75,19 +76,19 @@ for (const mode of ['guided', 'professional'] as const) {
   for (const kind of ['searchLimit', 'unsupported'] as const) {
     test(`${mode} funded ${kind} objective stays unranked without a failure claim`, async ({ page }) => {
       await openFundedUnranked(page, mode, kind)
-      const timing = page.locator('details').filter({ hasText: 'CPP/OAS timing suggestion' })
-      const strategy = page.locator('details').filter({ hasText: 'Withdrawal-order comparison' })
-      await timing.locator('summary').click()
-      await strategy.locator('summary').click()
-      await expect(timing.locator('.combo')).toContainText('funds the planned spending')
-      await expect(strategy).toContainText('funds the planned spending')
-      await expect(timing.locator('.combo')).not.toContainText('shortfall')
-      await expect(timing.locator('.combo')).not.toContainText('failed plan')
+      const timing = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS timing suggestion' })
+      const strategy = page.locator('details:not(.professional-group)').filter({ hasText: 'Withdrawal-order comparison' })
+      await (await prepareProfessionalTarget(timing.locator('summary'))).press('Enter')
+      await (await prepareProfessionalTarget(strategy.locator('summary'))).press('Enter')
+      await expect((await prepareProfessionalTarget(timing.locator('.combo')))).toContainText('funds the planned spending')
+      await expect((await prepareProfessionalTarget(strategy))).toContainText('funds the planned spending')
+      await expect((await prepareProfessionalTarget(timing.locator('.combo')))).not.toContainText('shortfall')
+      await expect((await prepareProfessionalTarget(timing.locator('.combo')))).not.toContainText('failed plan')
       await expect(timing.locator('.use-strategy')).toHaveCount(0)
       await expect(strategy.locator('.use-strategy')).toHaveCount(0)
       await expect(timing.locator('.tag.best')).toHaveCount(0)
       await expect(strategy.locator('.tag.best')).toHaveCount(0)
-      await expect(page.locator('.withdrawal-order-card')).not.toContainText('failed scenario')
+      await expect((await prepareProfessionalTarget(page.locator('.withdrawal-order-card')))).not.toContainText('failed scenario')
     })
   }
 }
@@ -95,10 +96,10 @@ for (const mode of ['guided', 'professional'] as const) {
 test('unranked funded explanation is localized in French and Chinese', async ({ page }) => {
   await openFundedUnranked(page, 'professional', 'searchLimit')
   await chooseLanguage(page, 'FR')
-  const frenchTiming = page.locator('details').filter({ hasText: 'Suggestion de calendrier RPC/SV' })
-  await frenchTiming.locator('summary').click()
-  await expect(frenchTiming.locator('.combo')).toContainText('Au moins une option finance les dépenses prévues')
+  const frenchTiming = page.locator('details:not(.professional-group)').filter({ hasText: 'Suggestion de calendrier RPC/SV' })
+  await (await prepareProfessionalTarget(frenchTiming.locator('summary'))).press('Enter')
+  await expect((await prepareProfessionalTarget(frenchTiming.locator('.combo')))).toContainText('Au moins une option finance les dépenses prévues')
   await chooseLanguage(page, '中文')
-  const chineseTiming = page.locator('details').filter({ hasText: 'CPP/OAS 开领时机建议' })
-  await expect(chineseTiming.locator('.combo')).toContainText('至少有一个候选能支付计划支出')
+  const chineseTiming = page.locator('details:not(.professional-group)').filter({ hasText: 'CPP/OAS 开领时机建议' })
+  await expect((await prepareProfessionalTarget(chineseTiming.locator('.combo')))).toContainText('至少有一个候选能支付计划支出')
 })

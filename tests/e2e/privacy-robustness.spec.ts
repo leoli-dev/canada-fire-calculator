@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { showProfessionalResults } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
@@ -17,23 +18,23 @@ test('usage statistics stay off until allowed, and the answer can be changed', a
   await fresh(page)
   const prompt = page.getByTestId('analytics-prompt')
   const footer = page.getByTestId('analytics-footer')
-  await expect(prompt).toBeVisible()
-  await expect(footer).toContainText('Anonymous usage statistics are off.')
+  await expect((await prepareProfessionalTarget(prompt))).toBeVisible()
+  await expect((await prepareProfessionalTarget(footer))).toContainText('Anonymous usage statistics are off.')
   expect(await page.evaluate(() => typeof window.gtag)).toBe('undefined')
-  await prompt.getByRole('button', { name: 'No thanks' }).click()
+  await (await prepareProfessionalTarget(prompt.getByRole('button', { name: 'No thanks' }))).click()
   await expect(prompt).toHaveCount(0)
   await page.reload()
   await expect(prompt).toHaveCount(0)
-  await footer.getByRole('button', { name: 'Allow them' }).click()
-  await expect(footer).toContainText('Anonymous usage statistics are on.')
-  await footer.getByRole('button', { name: 'Turn them off' }).click()
-  await expect(footer).toContainText('Anonymous usage statistics are off.')
+  await (await prepareProfessionalTarget(footer.getByRole('button', { name: 'Allow them' }))).click()
+  await expect((await prepareProfessionalTarget(footer))).toContainText('Anonymous usage statistics are on.')
+  await (await prepareProfessionalTarget(footer.getByRole('button', { name: 'Turn them off' }))).click()
+  await expect((await prepareProfessionalTarget(footer))).toContainText('Anonymous usage statistics are off.')
 })
 
 test('a Global Privacy Control signal is a refusal that is never asked about', async ({ page }) => {
   await fresh(page, true)
   await expect(page.getByTestId('analytics-prompt')).toHaveCount(0)
-  await expect(page.getByTestId('analytics-footer')).toContainText('usage statistics stay off')
+  await expect((await prepareProfessionalTarget(page.getByTestId('analytics-footer')))).toContainText('usage statistics stay off')
 })
 
 test('blocked site storage still starts the calculator and says the plan is not saved', async ({ page }) => {
@@ -43,22 +44,22 @@ test('blocked site storage still starts the calculator and says the plan is not 
     Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Access is denied', 'SecurityError') } })
   })
   await page.goto('/')
-  await expect(page.getByTestId('storage-unavailable')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('storage-unavailable')))).toBeVisible()
   await chooseMode(page, 'professional')
-  await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('40')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Current age' }).locator('input'))).fill('40')
   await showProfessionalResults(page)
-  await expect(page.locator('.results-column')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
   // The consent answer holds for the session even though it cannot be stored.
-  await page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks' }).click()
+  await (await prepareProfessionalTarget(page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks' }))).click()
   await expect(page.getByTestId('analytics-prompt')).toHaveCount(0)
 })
 
 test('the page carries a description and share preview', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /FIRE/)
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Canada FIRE Calculator')
-  await expect(page.locator('meta[property="og:description"]')).toHaveAttribute('content', /TFSA/)
-  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary')
+  await expect((await prepareProfessionalTarget(page.locator('meta[name="description"]')))).toHaveAttribute('content', /FIRE/)
+  await expect((await prepareProfessionalTarget(page.locator('meta[property="og:title"]')))).toHaveAttribute('content', 'Canada FIRE Calculator')
+  await expect((await prepareProfessionalTarget(page.locator('meta[property="og:description"]')))).toHaveAttribute('content', /TFSA/)
+  await expect((await prepareProfessionalTarget(page.locator('meta[name="twitter:card"]')))).toHaveAttribute('content', 'summary')
 })
 
 test('on a phone the headline sits above the form and every result question fits', async ({ page }, testInfo) => {
@@ -66,13 +67,13 @@ test('on a phone the headline sits above the form and every result question fits
   await fresh(page)
   await chooseMode(page, 'professional')
   const peek = page.getByTestId('result-peek')
-  await expect(peek).toBeInViewport()
-  const verdict = (await page.locator('.summary .verdict').first().innerText()).trim()
-  await expect(peek).toContainText(verdict)
-  await peek.getByRole('button', { name: 'See the full results' }).click()
+  await expect((await prepareProfessionalTarget(peek))).toBeInViewport()
+  const verdict = (await (await prepareProfessionalTarget(page.locator('.summary .verdict').first())).innerText()).trim()
+  await expect((await prepareProfessionalTarget(peek))).toContainText(verdict)
+  await (await prepareProfessionalTarget(peek.getByRole('button', { name: 'See the full results' }))).click()
   await expect(page.locator('#results')).toBeFocused()
   const tabs = page.locator('.summary').getByRole('tab')
-  await expect(tabs).toHaveCount(4)
+  await expect((await prepareProfessionalTarget(tabs))).toHaveCount(4)
   const width = page.viewportSize()!.width
   for (const box of await tabs.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON())))
     expect(box.right).toBeLessThanOrEqual(width)
@@ -82,6 +83,6 @@ test('the peek is hidden where results sit beside the form', async ({ page }, te
   test.skip(testInfo.project.name !== 'desktop')
   await fresh(page)
   await chooseMode(page, 'professional')
-  await expect(page.locator('.results-column')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.locator('.results-column')))).toBeVisible()
   await expect(page.getByTestId('result-peek')).toBeHidden()
 })

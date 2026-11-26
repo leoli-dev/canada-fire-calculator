@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n'
 import { ProfessionalGroup, ProfessionalInputs } from '../ProfessionalInputs'
 import { Field } from '../../ui'
+import { useStore } from '../../store'
+import { setLanguage } from '../../i18n'
 
 beforeEach(() => vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -14,6 +16,28 @@ const editor = () => render(<ProfessionalInputs>
 </ProfessionalInputs>)
 
 describe('Professional input groups', () => {
+  it('reports only existing applicable tracked metadata and never confirms legacy or hidden editor values', async () => {
+    const before = useStore.getState().answerMeta
+    const meta = (status: 'confirmed' | 'estimated' | 'notApplicable', origin: 'user' | 'legacy' = 'user') => ({ status, origin, updatedAt: '2026-01-01' })
+    const answers = { currentAge: meta('confirmed'), fireAge: meta('estimated', 'legacy'), lifeExpectancy: meta('confirmed', 'legacy'), nonRegBook: meta('notApplicable'), hiddenWorksheet: meta('confirmed') }
+    useStore.setState({ answerMeta: answers })
+    try {
+      for (const [language, expected] of [['en', '1 of 3 tracked answers confirmed'], ['fr', '1 sur 3 réponses suivies confirmées'], ['zh', '已确认 1 / 3 项有记录答案']]) {
+        await setLanguage(language)
+        const view = render(<ProfessionalGroup name="profile" title={'Profile'} fields={['currentAge', 'fireAge', 'lifeExpectancy', 'nonRegBook']}><details data-status-fields="hiddenWorksheet"><summary>Worksheet</summary><input /></details></ProfessionalGroup>)
+        expect(view.container.querySelector('summary small')?.textContent).toContain(expected)
+        expect(view.container.querySelector('summary small')?.textContent).toContain(language === 'zh' ? '1 项估算' : language === 'fr' ? '1 estimation' : '1 estimate')
+        await userEvent.click(screen.getByText('Worksheet'))
+        await waitFor(() => expect(view.container.querySelector('summary small')?.textContent).toContain(language === 'zh' ? '2 / 4' : language === 'fr' ? '2 sur 4' : '2 of 4'))
+        view.rerender(<ProfessionalGroup name="profile" title={'Profile'} fields={['currentAge']}><input /></ProfessionalGroup>)
+        expect(view.container.querySelector('summary small')?.textContent).toContain(language === 'zh' ? '1 / 1' : language === 'fr' ? '1 sur 1' : '1 of 1')
+        view.rerender(<ProfessionalGroup name="profile" title={'Profile'} fields={['untracked']}><input /></ProfessionalGroup>)
+        expect(view.container.querySelector('summary small')?.textContent).toBe(language === 'zh' ? '待核对' : language === 'fr' ? 'À vérifier' : 'Needs review')
+        view.unmount()
+      }
+      expect(useStore.getState().answerMeta).toEqual(answers)
+    } finally { useStore.setState({ answerMeta: before }); await setLanguage('en') }
+  })
   it('searches field labels, expands nested disclosures and preserves uncommitted values', async () => {
     editor()
     const age = screen.getByLabelText('Age')

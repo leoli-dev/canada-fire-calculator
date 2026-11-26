@@ -62,7 +62,12 @@
       "fields_other": "{{count}} fields",
       "options": "All choices",
       "lasts": "Balance lasts to {{age}}",
-      "depleted": "Runs out at {{age}}"
+      "depleted": "Runs out at {{age}}",
+      "confirmed": "{{count}} of {{total}} tracked answers confirmed",
+      "estimates_one": "{{count}} estimate",
+      "estimates_other": "{{count}} estimates",
+      "needsReview": "Needs review",
+      "none": "None"
     }
   },
   "title": "🇨🇦 Canada FIRE Calculator",

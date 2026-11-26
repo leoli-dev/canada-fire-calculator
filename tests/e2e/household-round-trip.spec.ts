@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -8,18 +9,18 @@ test('single, couple, single settles in one step without resetting the plan', as
   await page.reload()
   await chooseMode(page, 'professional')
   const household = page.locator('label.field').filter({ hasText: 'Household' }).locator('select')
-  await household.selectOption('couple')
-  await household.selectOption('single')
+  await (await prepareProfessionalTarget(household)).selectOption('couple')
+  await (await prepareProfessionalTarget(household)).selectOption('single')
   const gate = page.getByTestId('migration-gate')
-  await expect(gate).toBeVisible()
+  await expect((await prepareProfessionalTarget(gate))).toBeVisible()
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.inputs.balances)
-  await page.getByTestId('migration-settle-single').click()
+  await (await prepareProfessionalTarget(page.getByTestId('migration-settle-single'))).click()
   await expect(gate).toHaveCount(0)
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(state.inputs.balances).toEqual(before)
   expect(state.canonical.orphanedPeople ?? []).toEqual([])
   expect(state.canonical.accounts.every((account: { ownerId: string }) => account.ownerId === 'legacy:person:self')).toBe(true)
   // The next ordinary edit keeps the plan settled.
-  await page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input').fill('41000')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Annual after-tax savings' }).locator('input'))).fill('41000')
   await expect(gate).toHaveCount(0)
 })

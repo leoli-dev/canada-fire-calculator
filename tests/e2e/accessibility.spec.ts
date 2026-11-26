@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -20,42 +21,42 @@ async function unnamedControls(page: import('@playwright/test').Page) {
 
 test('every professional-mode control keeps its label when a glossary term sits inside it', async ({ page }) => {
   await chooseMode(page, 'professional')
-  await page.locator('label.field').filter({ hasText: 'Household' }).locator('select').selectOption('couple')
+  await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Household' }).locator('select'))).selectOption('couple')
   await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true }))
-  await expect(page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: 'Target FIRE age' }).locator('input')))).toBeVisible()
   expect(await unnamedControls(page)).toEqual([])
   // The label names the input, and the glossary term inside it still opens the glossary.
-  await expect(page.getByRole('textbox', { name: 'Target FIRE age' })).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByRole('textbox', { name: 'Target FIRE age' })))).toBeVisible()
   const term = page.locator('label.field').filter({ hasText: 'Target FIRE age' }).getByRole('button', { name: 'FIRE' })
-  await term.focus()
+  await (await prepareProfessionalTarget(term)).focus()
   await page.keyboard.press('Enter')
-  await expect(page.locator('.drawer-backdrop')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.locator('.drawer-backdrop')))).toBeVisible()
 })
 
 test('the page language follows the selected language', async ({ page }) => {
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'en')
   await chooseLanguage(page, 'FR')
-  await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'fr')
   await chooseLanguage(page, '中文')
-  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'zh-Hans')
   await page.reload()
-  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'zh-Hans')
 })
 
 test('result questions are tabs that control one labelled panel', async ({ page }) => {
   await chooseMode(page, 'professional')
   const tabs = page.getByRole('tablist', { name: 'Result question' })
   const first = tabs.getByRole('tab', { name: 'Will my money last?' })
-  await expect(first).toHaveAttribute('aria-selected', 'true')
-  await expect(first).toHaveAttribute('aria-controls', 'mode-panel')
-  await expect(page.getByRole('tabpanel', { name: 'Will my money last?' })).toBeVisible()
-  await first.focus()
+  await expect((await prepareProfessionalTarget(first))).toHaveAttribute('aria-selected', 'true')
+  await expect((await prepareProfessionalTarget(first))).toHaveAttribute('aria-controls', 'mode-panel')
+  await expect((await prepareProfessionalTarget(page.getByRole('tabpanel', { name: 'Will my money last?' })))).toBeVisible()
+  await (await prepareProfessionalTarget(first)).focus()
   await page.keyboard.press('ArrowRight')
   const when = tabs.getByRole('tab', { name: 'When can I retire?' })
   await expect(when).toBeFocused()
-  await expect(when).toHaveAttribute('aria-selected', 'true')
-  await expect(first).toHaveAttribute('tabindex', '-1')
-  await expect(page.getByRole('tabpanel', { name: 'When can I retire?' })).toBeVisible()
+  await expect((await prepareProfessionalTarget(when))).toHaveAttribute('aria-selected', 'true')
+  await expect((await prepareProfessionalTarget(first))).toHaveAttribute('tabindex', '-1')
+  await expect((await prepareProfessionalTarget(page.getByRole('tabpanel', { name: 'When can I retire?' })))).toBeVisible()
   await page.keyboard.press('End')
   await expect(tabs.getByRole('tab', { name: "Will I hit my target?" })).toBeFocused()
 })
@@ -63,10 +64,10 @@ test('result questions are tabs that control one labelled panel', async ({ page 
 test('charts are described in words', async ({ page }) => {
   await chooseMode(page, 'professional')
   const chart = page.getByRole('img', { name: 'Account balances by age' })
-  await expect(chart).toHaveCount(1)
+  await expect((await prepareProfessionalTarget(chart))).toHaveCount(1)
   const summaryId = await chart.getAttribute('aria-describedby')
-  await expect(page.locator(`[id="${summaryId}"]`)).toContainText(/Net worth is .* at FIRE age/)
-  await expect(page.getByRole('img', { name: 'Retirement income by source' }).first()).toHaveAttribute('aria-describedby', /.+/)
+  await expect((await prepareProfessionalTarget(page.locator(`[id="${summaryId}"]`)))).toContainText(/Net worth is .* at FIRE age/)
+  await expect((await prepareProfessionalTarget(page.getByRole('img', { name: 'Retirement income by source' }).first()))).toHaveAttribute('aria-describedby', /.+/)
 })
 
 test('a guided answer is described by its sample or confirmed status', async ({ page }) => {

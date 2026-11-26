@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -36,22 +37,22 @@ const baseYear = (page: Page) =>
 
 /** Turn the seeded household RRSP into a spousal plan owned by `self`. */
 async function makeSpousal(page: Page) {
-  await page.getByTestId(`owner-${ACCOUNT}`).selectOption(SELF)
-  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
-  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toBeVisible()
+  await (await prepareProfessionalTarget(page.getByTestId(`owner-${ACCOUNT}`))).selectOption(SELF)
+  await (await prepareProfessionalTarget(page.getByTestId(`registered-type-${ACCOUNT}`))).selectOption('spousalRrsp')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-attribution-${ACCOUNT}`)))).toBeVisible()
 }
 
 async function addPremium(page: Page, rowId: string, values: { year: number; contributor: string; amount: number }) {
-  await page.getByTestId(`spousal-add-${ACCOUNT}`).click()
-  await page.getByTestId(`spousal-year-${rowId}`).fill(String(values.year))
-  await page.getByTestId(`spousal-year-${rowId}`).blur()
-  await page.getByTestId(`spousal-contributor-${rowId}`).selectOption(values.contributor)
-  await page.getByTestId(`spousal-amount-${rowId}`).fill(String(values.amount))
-  await page.getByTestId(`spousal-amount-${rowId}`).blur()
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-add-${ACCOUNT}`))).click()
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-year-${rowId}`))).fill(String(values.year))
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-year-${rowId}`))).blur()
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-contributor-${rowId}`))).selectOption(values.contributor)
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${rowId}`))).fill(String(values.amount))
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${rowId}`))).blur()
 }
 
 async function previewPayment(page: Page, amount: number) {
-  await page.getByTestId(`spousal-payment-${ACCOUNT}`).fill(String(amount))
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-payment-${ACCOUNT}`))).fill(String(amount))
 }
 
 const inViewport = (page: Page) =>
@@ -62,29 +63,29 @@ test('professional records premiums, prices the contributor room and previews th
   const year = await baseYear(page)
   await makeSpousal(page)
   // An unrecorded history is an explicit state, and no payment may be previewed.
-  await expect(page.getByTestId(`spousal-unknown-${ACCOUNT}`)).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unknown-${ACCOUNT}`)))).toBeVisible()
   await expect(page.getByTestId(`spousal-payment-${ACCOUNT}`)).toHaveCount(0)
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
   await expect(page.getByTestId(`spousal-unknown-${ACCOUNT}`)).toHaveCount(0)
   // A prior-year premium drives the attribution window; a current-year premium
   // drives the contributor's room ledger.
   await addPremium(page, ROW0, { year: year - 2, contributor: PARTNER, amount: 4_000 })
   await addPremium(page, ROW1, { year, contributor: PARTNER, amount: 6_000 })
-  await page.getByTestId('rrsp-available-room-partner').fill('15000')
-  await page.getByTestId('rrsp-available-room-partner').blur()
+  await (await prepareProfessionalTarget(page.getByTestId('rrsp-available-room-partner'))).fill('15000')
+  await (await prepareProfessionalTarget(page.getByTestId('rrsp-available-room-partner'))).blur()
   // Hand calculation: 15,000 of room less the 6,000 current-year premium leaves
   // 9,000, and only the current-year premium is priced in this year's ledger.
   const ledger = page.getByTestId('rrsp-ledger-partner')
-  await expect(ledger).toContainText('15,000')
-  await expect(ledger).toContainText('6,000')
-  await expect(ledger).toContainText('9,000')
-  await expect(page.getByTestId('rrsp-retained-partner')).toContainText('0 CAD')
+  await expect((await prepareProfessionalTarget(ledger))).toContainText('15,000')
+  await expect((await prepareProfessionalTarget(ledger))).toContainText('6,000')
+  await expect((await prepareProfessionalTarget(ledger))).toContainText('9,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId('rrsp-retained-partner')))).toContainText('0 CAD')
   // Hand calculation: a 12,000 payment is attributed up to the 10,000 of
   // premiums inside {year-2, year-1, year}; the remaining 2,000 is the
   // annuitant's.
   await previewPayment(page, 12_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('10,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('2,000')
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
   expect(saved.accounts.find((account: { id: string }) => account.id === ACCOUNT).kind).toBe('spousalRrsp')
   expect(saved.spousalHistory[ACCOUNT]).toEqual({ status: 'complete' })
@@ -93,23 +94,23 @@ test('professional records premiums, prices the contributor room and previews th
     .toEqual([[year - 2, 4_000, PARTNER], [year, 6_000, PARTNER]])
   // Reload keeps every recorded fact; the transient preview is re-entered.
   await page.reload()
-  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-year-${ROW0}`)).toHaveValue(String(year - 2))
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
-  await expect(page.getByTestId(`spousal-contributor-${ROW0}`)).toHaveValue(PARTNER)
-  await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('6,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`)))).toHaveValue('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-year-${ROW0}`)))).toHaveValue(String(year - 2))
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW1}`)))).toHaveValue('6,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-contributor-${ROW0}`)))).toHaveValue(PARTNER)
+  await expect((await prepareProfessionalTarget(page.getByTestId('rrsp-ledger-partner')))).toContainText('6,000')
   await previewPayment(page, 12_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('10,000')
   // The same recorded facts and split show in guided mode.
   await chooseMode(page, 'guided')
   // FE-43 C: the premium history is on the optional spousal-history page.
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
-  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('4,000')
-  await expect(page.getByTestId(`spousal-amount-${ROW1}`)).toHaveValue('6,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`)))).toHaveValue('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW0}`)))).toHaveValue('4,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW1}`)))).toHaveValue('6,000')
   await previewPayment(page, 12_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('10,000')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('10,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('2,000')
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   expect(await inViewport(page)).toBe(true)
 })
@@ -119,31 +120,31 @@ test('guided records the premium history and keeps it through reload and a mode 
   // FE-43 A: guided names the owner on the ownership checklist, then records
   // the plan type and its history with the other tax details.
   await page.goto('/#/guided/assets/assets.ownership')
-  await page.getByTestId(`owner-choice-${ACCOUNT}-self`).check()
+  await (await prepareProfessionalTarget(page.getByTestId(`owner-choice-${ACCOUNT}-self`))).check()
   await page.goto('/#/guided/assets/account.rrsp.type')
-  await page.getByTestId(`registered-type-${ACCOUNT}-spousalRrsp`).check()
+  await (await prepareProfessionalTarget(page.getByTestId(`registered-type-${ACCOUNT}-spousalRrsp`))).check()
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
   const year = await baseYear(page)
-  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toBeVisible()
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-attribution-${ACCOUNT}`)))).toBeVisible()
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
   await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 5_000 })
   // The contributor's room is on the RRSP room page; the premium opens its detail.
   await page.goto('/#/guided/taxDetails/tax.rrspRoom')
-  await page.getByTestId('rrsp-available-room-partner').fill('8000')
-  await page.getByTestId('rrsp-available-room-partner').blur()
-  await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('5,000')
+  await (await prepareProfessionalTarget(page.getByTestId('rrsp-available-room-partner'))).fill('8000')
+  await (await prepareProfessionalTarget(page.getByTestId('rrsp-available-room-partner'))).blur()
+  await expect((await prepareProfessionalTarget(page.getByTestId('rrsp-ledger-partner')))).toContainText('5,000')
   // Guided does not auto-run: recorded facts change but results stay stale.
   expect((await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)).resultRevision).toBeNull()
   await page.reload()
-  await expect(page.getByTestId('rrsp-ledger-partner')).toContainText('5,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId('rrsp-ledger-partner')))).toContainText('5,000')
   await page.goto('/#/guided/taxDetails/tax.spousalHistory')
-  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`)))).toHaveValue('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW0}`)))).toHaveValue('5,000')
   await chooseMode(page, 'professional')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('5,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW0}`)))).toHaveValue('5,000')
   await previewPayment(page, 7_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,000')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('2,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('5,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('2,000')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -151,19 +152,19 @@ test('an unrecorded history stays unsupported while a confirmed empty history is
   await seed(page)
   await makeSpousal(page)
   // Unknown history: no split is produced and no other person is assumed.
-  await expect(page.getByTestId(`spousal-unknown-${ACCOUNT}`)).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unknown-${ACCOUNT}`)))).toBeVisible()
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toHaveCount(0)
   await expect(page.getByTestId(`spousal-payment-${ACCOUNT}`)).toHaveCount(0)
   // Confirmed empty history: the payment is entirely the annuitant's, and that
   // zero is a real answer rather than an unconfirmed one.
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
   await previewPayment(page, 5_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('0 CAD')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('0 CAD')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('5,000')
   // A premium with no recorded contributor is refused with a reason.
   await addPremium(page, ROW0, { year: await baseYear(page), contributor: '', amount: 3_000 })
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toBeVisible()
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText('has no contributor')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)))).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)))).toContainText('has no contributor')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -171,19 +172,19 @@ test('the spousal attribution block explains itself in EN, FR and ZH', async ({ 
   await seed(page)
   await makeSpousal(page)
   const editor = page.getByTestId(`spousal-attribution-${ACCOUNT}`)
-  await expect(editor).toContainText('Spousal RRSP attribution (T2205)')
-  await expect(editor).toContainText('first-in-first-out')
+  await expect((await prepareProfessionalTarget(editor))).toContainText('Spousal RRSP attribution (T2205)')
+  await expect((await prepareProfessionalTarget(editor))).toContainText('first-in-first-out')
   // Review fix B2: the base-year attribution convention is stated in the UI
   // rather than assumed silently.
-  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('attributed at most once')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-base-year-${ACCOUNT}`)))).toContainText('attributed at most once')
   await chooseLanguage(page, 'FR')
-  await expect(editor).toContainText('Attribution REER de conjoint (T2205)')
-  await expect(editor).toContainText('premier entré, premier sorti')
-  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText("attribuée qu'une seule fois")
+  await expect((await prepareProfessionalTarget(editor))).toContainText('Attribution REER de conjoint (T2205)')
+  await expect((await prepareProfessionalTarget(editor))).toContainText('premier entré, premier sorti')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-base-year-${ACCOUNT}`)))).toContainText("attribuée qu'une seule fois")
   await chooseLanguage(page, '中文')
-  await expect(editor).toContainText('配偶 RRSP 归属（T2205）')
-  await expect(editor).toContainText('先进先出')
-  await expect(page.getByTestId(`spousal-base-year-${ACCOUNT}`)).toContainText('最多只能归属一次')
+  await expect((await prepareProfessionalTarget(editor))).toContainText('配偶 RRSP 归属（T2205）')
+  await expect((await prepareProfessionalTarget(editor))).toContainText('先进先出')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-base-year-${ACCOUNT}`)))).toContainText('最多只能归属一次')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -196,18 +197,18 @@ test('a recorded spousal history stays visible and attributed after the type swi
   await seed(page, { currentAge: 72, rrspBalance: 100_000 })
   const year = await baseYear(page)
   await makeSpousal(page)
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
   await addPremium(page, ROW0, { year: year - 1, contributor: PARTNER, amount: 40_000 })
-  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('rrif')
-  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
-  await expect(page.getByTestId(`spousal-history-${ACCOUNT}`)).toHaveValue('complete')
-  await expect(page.getByTestId(`spousal-amount-${ROW0}`)).toHaveValue('40,000')
+  await (await prepareProfessionalTarget(page.getByTestId(`registered-type-${ACCOUNT}`))).selectOption('rrif')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-attribution-${ACCOUNT}`)))).toHaveCount(1)
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`)))).toHaveValue('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-amount-${ROW0}`)))).toHaveValue('40,000')
   // The seeded account reaches age 72 during the year, i.e. January 1 age 71,
   // so the post-1986 factor category is required. `allOther` is 0.0528, and
   // 100,000 * 0.0528 = a 5,280 minimum.
-  await page.getByTestId('rrif-opened-year').fill(String(year - 1))
-  await page.getByTestId('rrif-opened-year').blur()
-  await page.getByTestId(`rrif-factor-category-${ACCOUNT}`).selectOption('allOther')
+  await (await prepareProfessionalTarget(page.getByTestId('rrif-opened-year'))).fill(String(year - 1))
+  await (await prepareProfessionalTarget(page.getByTestId('rrif-opened-year'))).blur()
+  await (await prepareProfessionalTarget(page.getByTestId(`rrif-factor-category-${ACCOUNT}`))).selectOption('allOther')
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical)
   expect(saved.accounts.find((account: { id: string }) => account.id === ACCOUNT).kind).toBe('rrif')
   expect(saved.spousalHistory[ACCOUNT]).toEqual({ status: 'complete' })
@@ -215,15 +216,15 @@ test('a recorded spousal history stays visible and attributed after the type swi
   // A 10,000 payment: 5,280 is the holder's minimum, only the 4,720 excess is
   // attributed to the contributor.
   await previewPayment(page, 10_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,720')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,280')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('4,720')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('5,280')
   // Reload keeps the recorded fact, the RRIF note and the same split.
   await page.reload()
-  await expect(page.getByTestId(`spousal-attribution-${ACCOUNT}`)).toHaveCount(1)
-  await expect(page.getByTestId(`spousal-rrif-note-${ACCOUNT}`)).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-attribution-${ACCOUNT}`)))).toHaveCount(1)
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-rrif-note-${ACCOUNT}`)))).toBeVisible()
   await previewPayment(page, 10_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,720')
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('5,280')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('4,720')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('5,280')
   expect(await inViewport(page)).toBe(true)
 })
 
@@ -232,10 +233,10 @@ test('a single-person plan explains why a spousal payment cannot be attributed',
   // produce an answer. The confirmed history now states the concrete reason.
   await seed(page, { single: true })
   // A single-person plan owns the account outright, so there is no owner picker.
-  await page.getByTestId(`registered-type-${ACCOUNT}`).selectOption('spousalRrsp')
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toBeVisible()
-  await expect(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)).toContainText('needs the annuitant’s spouse or common-law partner')
+  await (await prepareProfessionalTarget(page.getByTestId(`registered-type-${ACCOUNT}`))).selectOption('spousalRrsp')
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)))).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-unsupported-${ACCOUNT}`)))).toContainText('needs the annuitant’s spouse or common-law partner')
   await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toHaveCount(0)
   expect(await inViewport(page)).toBe(true)
 })
@@ -247,7 +248,7 @@ test('a spousal premium can be deducted in a later year than it was paid', async
   await seed(page)
   const year = await baseYear(page)
   await makeSpousal(page)
-  await page.getByTestId(`spousal-history-${ACCOUNT}`).selectOption('complete')
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-history-${ACCOUNT}`))).selectOption('complete')
   await addPremium(page, ROW0, { year, contributor: PARTNER, amount: 4_000 })
   const contribution = () => page.evaluate((rowId) =>
     JSON.parse(localStorage.getItem('fire-inputs')!).state.canonical.contributions
@@ -255,15 +256,15 @@ test('a spousal premium can be deducted in a later year than it was paid', async
   // By default the premium is deducted in the year it was paid.
   expect((await contribution()).deductionYear).toBeNull()
   expect((await contribution()).calendarYear).toBe(year)
-  await page.getByTestId(`spousal-deduct-later-${ROW0}`).check()
-  await expect(page.getByTestId(`spousal-deduction-year-${ROW0}`)).toContainText(String(year + 1))
+  await (await prepareProfessionalTarget(page.getByTestId(`spousal-deduct-later-${ROW0}`))).check()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-deduction-year-${ROW0}`)))).toContainText(String(year + 1))
   expect((await contribution()).deductionYear).toBe(year + 1)
   // The attribution window still uses the contribution year, never the deduction
   // year: a base-year payment attributes the base-year premium.
   await previewPayment(page, 4_000)
-  await expect(page.getByTestId(`spousal-split-${ACCOUNT}`)).toContainText('4,000')
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-split-${ACCOUNT}`)))).toContainText('4,000')
   await page.reload()
-  await expect(page.getByTestId(`spousal-deduct-later-${ROW0}`)).toBeChecked()
-  await expect(page.getByTestId(`spousal-deduction-year-${ROW0}`)).toContainText(String(year + 1))
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-deduct-later-${ROW0}`)))).toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId(`spousal-deduction-year-${ROW0}`)))).toContainText(String(year + 1))
   expect(await inViewport(page)).toBe(true)
 })

@@ -11,7 +11,10 @@
 .professional-group-body h3 { font-size: var(--fs-ui); }
 .professional-inputs .ui-field { display: grid; grid-template-columns: minmax(0, 1fr) 150px; align-items: center; gap: 6px 12px; margin: 12px 0; }
 .professional-inputs .ui-field :is(input:not([type='checkbox']):not([type='radio']), select, .commit-number) { width: 100%; min-width: 0; }
-.professional-inputs .ui-field:has(> input[type='checkbox']) { display: flex; align-items: center; }
+.professional-inputs .ui-field:has(> input:is([type='checkbox'], [type='radio'])) { display: flex; align-items: center; }
+.professional-inputs .ui-field > input[type='radio'] { flex: 0 0 13px; width: 13px; min-width: 13px; }
+.professional-inputs input:is([type='checkbox'], [type='radio']) { flex-shrink: 0; }
+.professional-inputs .mode-toggle { flex-wrap: wrap; }
 .professional-inputs .ui-field > input[type='checkbox'] { flex: 0 0 20px; width: 20px; min-width: 20px; }
 .professional-inputs .ui-field:has(> input[type='checkbox']) > span { flex: 1; }
 .professional-inputs .selected-value { display: block; grid-column: 2; color: var(--ink-2); font-size: var(--fs-meta); white-space: normal; overflow-wrap: anywhere; }
@@ -56,6 +59,8 @@
   .phone-result-tabs .ui-button[aria-selected='true'] { color: var(--accent); background: var(--accent-tint); }
   .has-result-tabs { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
   .has-result-tabs .review-generate-bar { bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .professional-input-pane { scroll-padding-top: var(--professional-peek-clearance, 96px); }
+  .professional-inputs :is(button, input, select, summary) { scroll-margin-top: var(--professional-peek-clearance, 96px); }
   .professional-tools { padding: 12px 16px; }
   .professional-search input { min-height: 48px; font-size: 16px; }
   .professional-inputs .ui-field, .professional-inputs .tax-facts-panel .ui-field { grid-template-columns: minmax(0, 1fr); }
@@ -63,8 +68,9 @@
   .professional-inputs :is(input, select, textarea) { font-size: 16px; min-height: 48px; }
   .app-professional .professional-inputs :is(button, summary, a[href]) { min-height: 48px; min-width: 48px; }
   .professional-inputs a[href] { display: inline-flex; align-items: center; }
-  .professional-inputs input:is([type='checkbox'], [type='radio']) { width: 48px; height: 48px; }
-  .professional-inputs .ui-field > input[type='checkbox'] { flex-basis: 48px; width: 48px; min-width: 48px; }
+  .professional-inputs input:is([type='checkbox'], [type='radio']) { width: 48px; height: 48px; min-width: 48px; }
+  .professional-inputs .mode-toggle { flex-direction: column; gap: 8px; }
+  .professional-inputs .ui-field > input:is([type='checkbox'], [type='radio']) { flex-basis: 48px; width: 48px; min-width: 48px; }
   .professional-number-field .professional-field-help { top: 0; right: 0; }
   .professional-number-field:has(.professional-field-help) .field > span:first-child { min-height: 48px; display: block; padding: 12px 56px 12px 0; }
   .professional-layout .withdrawal-order-card .field.ui-field { grid-template-columns: minmax(0, 1fr); }

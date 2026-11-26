@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { expect, test } from '@playwright/test'
 
 /**
@@ -28,15 +29,15 @@ async function seedCouple(page: import('@playwright/test').Page, debtIncluded: b
 
 test('a couple with unconfirmed ownership gets the planning tools, labelled as estimates', async ({ page }) => {
   await seedCouple(page, true)
-  await expect(page.getByTestId('estimate-charts-note')).toBeVisible()
-  await expect(page.getByTestId('couple-tools-estimate')).toBeVisible()
-  await expect(page.getByText('Monte Carlo simulation', { exact: true })).toBeVisible()
-  await expect(page.locator('.withdrawal-order-card')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('estimate-charts-note')))).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('couple-tools-estimate')))).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByText('Monte Carlo simulation', { exact: true })))).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.locator('.withdrawal-order-card')))).toBeVisible()
 })
 
 test('a couple whose savings exclude debt payments does not get the planning tools', async ({ page }) => {
   await seedCouple(page, false)
-  await expect(page.getByTestId('estimate-charts-note')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('estimate-charts-note')))).toBeVisible()
   await expect(page.getByTestId('couple-tools-estimate')).toHaveCount(0)
   await expect(page.getByText('Monte Carlo simulation', { exact: true })).toHaveCount(0)
   await expect(page.locator('.withdrawal-order-card')).toHaveCount(0)

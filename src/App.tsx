@@ -54,6 +54,14 @@ export default function App() {
   const guidedView = useStore((s) => s.guidedView)
   const inputRevision = useStore((s) => s.inputRevision)
   const resultRevision = useStore((s) => s.resultRevision)
+  const [phone, setPhone] = useState(() => window.matchMedia('(max-width: 640px)').matches)
+  const pendingPaneFocus = useRef(false)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 640px)')
+    const update = () => setPhone(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
   const [phonePane, setPhonePane] = useState<'inputs' | 'results'>('inputs')
   const inputsPane = useRef<HTMLElement>(null)
   const paneScroll = useRef({ inputs: 0, results: 0 })
@@ -63,6 +71,8 @@ export default function App() {
   const professional = entryMode === 'professional'
   const activePane = professional ? phonePane : guidedView === 'results' ? 'results' : 'inputs'
   const switchPane = (pane: 'inputs' | 'results') => {
+    if (pane === activePane) return
+    pendingPaneFocus.current = phone
     if (professional) {
       const current = activePane === 'inputs' ? inputsPane.current : document.getElementById('results')
       paneScroll.current[activePane] = current?.scrollTop ?? 0
@@ -86,24 +96,10 @@ export default function App() {
     if (professional) {
       const pane = activePane === 'inputs' ? inputsPane.current : document.getElementById('results')
       if (pane) pane.scrollTop = paneScroll.current[activePane]
-    } else if (guidedTabs) window.scrollTo(0, guidedScroll.current[guidedView === 'results' ? 'results' : 'review'])
-  }, [activePane, professional, guidedTabs])
-  useEffect(() => {
-    if (!professional) return
-    const pane = inputsPane.current
-    const reveal = (event: FocusEvent) => {
-      const target = event.target
-      if (!window.matchMedia('(max-width: 640px)').matches || !(target instanceof HTMLElement) || target.closest('[role="dialog"]') || !pane) return
-      const bounds = pane.getBoundingClientRect()
-      const peek = pane.querySelector('.result-peek, .professional-canonical-peek')?.getBoundingClientRect()
-      const top = (peek?.bottom ?? bounds.top) + 8
-      const box = target.getBoundingClientRect()
-      if (box.top < top) pane.scrollTop -= top - box.top
-      else if (box.bottom > bounds.bottom - 8) pane.scrollTop += box.bottom - bounds.bottom + 8
-    }
-    pane?.addEventListener('focusin', reveal)
-    return () => pane?.removeEventListener('focusin', reveal)
-  }, [professional])
+    } else if (guidedTabs && pendingPaneFocus.current) window.scrollTo(0, guidedScroll.current[guidedView === 'results' ? 'results' : 'review'])
+    if (pendingPaneFocus.current) document.getElementById(activePane === 'inputs' ? 'phone-inputs-tab' : 'phone-results-tab')?.focus({ preventScroll: true })
+    pendingPaneFocus.current = false
+  }, [activePane, professional, guidedTabs, phone])
   // Input editing must leave the existing conclusion available, even after the results were scrolled.
   useEffect(() => {
     if (professional && window.matchMedia('(min-width: 1100px)').matches) document.getElementById('results')?.scrollTo({ top: 0 })
@@ -151,6 +147,27 @@ export default function App() {
     () => validateInputs(inputs, { canonical: !!canonical?.deterministicProjection }).some((issue) => issue.severity === 'error'),
     [inputs, canonical],
   )
+  useEffect(() => {
+    if (!professional) return
+    const pane = inputsPane.current
+    const reveal = (event: FocusEvent) => {
+      const target = event.target
+      if (!window.matchMedia('(max-width: 640px)').matches || !(target instanceof HTMLElement) || target.closest('[role="dialog"]') || !pane || target === pane) return
+      const bounds = pane.getBoundingClientRect()
+      const peek = pane.querySelector('.result-peek, .professional-canonical-peek')?.getBoundingClientRect()
+      const top = (peek?.bottom ?? bounds.top) + 8
+      const box = target.getBoundingClientRect()
+      if (box.top < top) pane.scrollTop -= top - box.top
+      else if (box.bottom > bounds.bottom - 8) pane.scrollTop += box.bottom - bounds.bottom + 8
+    }
+    const peek = pane?.querySelector('.result-peek, .professional-canonical-peek')
+    const updateClearance = () => pane?.style.setProperty('--professional-peek-clearance', `${(peek?.getBoundingClientRect().height ?? 0) + 8}px`)
+    const observer = new ResizeObserver(updateClearance)
+    if (peek) observer.observe(peek)
+    updateClearance()
+    pane?.addEventListener('focusin', reveal)
+    return () => { observer.disconnect(); pane?.removeEventListener('focusin', reveal) }
+  }, [professional, !!result, !!canonicalResult, hasBlockingIssues])
   const pensionAge = pensionStartAge(inputs)
   const inflation = inputs.inflation ?? 0.021
   const scale = useMemo(
@@ -184,18 +201,24 @@ export default function App() {
         {t(storageIssue === 'futureVersion' ? 'storageFuture' : 'storageCorrupt')}
         <Button type="button" onClick={downloadStoredPlan}>{t('storageDownloadOriginal')}</Button>
       </div>}
-      <MigrationReview current={canonical} scenarioA={scenarioACanonical} scenarioAExists={scenarioA !== null} />
+      {!professional && <MigrationReview current={canonical} scenarioA={scenarioACanonical} scenarioAExists={scenarioA !== null} />}
       {sharedFieldsPending && <div role="status" className="hint">{t('questionnaire.pendingSaved')}</div>}
-      <main data-phone-pane={activePane} className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : 'professional-layout'}>
-        <aside ref={inputsPane} className={professional ? 'professional-input-pane' : undefined} id="inputs">
+      {(professional || guidedTabs) && <Segmented as="nav" mode="tab" className="phone-result-tabs" aria-label={t('ui.professional.panes')}>
+        <Button id="phone-inputs-tab" aria-selected={activePane === 'inputs'} aria-controls={professional ? 'inputs' : 'guided-phone-panel'} onClick={() => switchPane('inputs')}>{t(professional ? 'ui.professional.inputs' : 'ui.professional.answers')}</Button>
+        <Button id="phone-results-tab" aria-selected={activePane === 'results'} aria-controls={professional ? 'results' : 'guided-phone-panel'} onClick={() => switchPane('results')}>{t('ui.professional.results')}</Button>
+      </Segmented>}
+
+      <main id={phone && guidedTabs ? 'guided-phone-panel' : undefined} role={phone && guidedTabs ? 'tabpanel' : undefined} aria-labelledby={phone && guidedTabs ? (activePane === 'inputs' ? 'phone-inputs-tab' : 'phone-results-tab') : undefined} tabIndex={phone && guidedTabs ? 0 : undefined} data-phone-pane={activePane} className={entryMode === 'guided' ? (showGuidedResults ? 'guided-results' : 'guided-only') : 'professional-layout'}>
+        <aside role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-inputs-tab' : undefined} tabIndex={phone && professional ? 0 : undefined} ref={inputsPane} className={professional ? 'professional-input-pane' : undefined} id="inputs">
           {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
             estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} onOpen={() => switchPane('results')} />}
           {professional && canonicalResult && <div className="professional-canonical-peek" role="status"><span>{t(`canonical.status.${canonicalResult.status}`)}</span><Button variant="link" onClick={openCanonicalResults}>{t('resultPeekJump')}</Button></div>}
+          {professional && <MigrationReview current={canonical} scenarioA={scenarioACanonical} scenarioAExists={scenarioA !== null} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <ProfessionalInputs><InputForm />{planFooter}</ProfessionalInputs>)}
           {professional && storageIssue && planFooter}
         </aside>
-        {professional && !canonicalResult && !(result && !hasBlockingIssues) && <section className="professional-results-unavailable" id="results" tabIndex={-1}><p role="status">{t('ui.professional.unavailable')}</p></section>}
-        {canonicalResult && <section className="results-column" id="results" tabIndex={-1}>
+        {professional && !canonicalResult && !(result && !hasBlockingIssues) && <section className="professional-results-unavailable" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}><p role="status">{t('ui.professional.unavailable')}</p></section>}
+        {canonicalResult && <section className="results-column" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}>
           <CanonicalResults result={canonicalResult} model={canonicalModel} />
           <div className="mobile-results-disclaimer"><CompactDisclaimer /></div>
           {canonicalResult.coverage && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>
@@ -204,7 +227,7 @@ export default function App() {
           {canonical && <CanonicalMonteCarloCard inputs={inputs} plan={canonical} nonRegAbsent={nonRegAbsent} revision={inputRevision} entryMode={entryMode} />}
           <ScenarioCard />
         </section>}
-        {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>
+        {result && !hasBlockingIssues && <section className="results-column" id="results" role={phone && professional ? 'tabpanel' : undefined} aria-labelledby={phone && professional ? 'phone-results-tab' : undefined} tabIndex={phone && professional ? 0 : -1}>
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
             annualAction={<Button size="sm" type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
@@ -247,11 +270,6 @@ export default function App() {
           <ScenarioCard />
         </section>}
       </main>
-      {(professional || guidedTabs) && <Segmented as="nav" mode="tab" className="phone-result-tabs" aria-label={t('ui.professional.panes')}>
-        <Button aria-selected={activePane === 'inputs'} aria-controls="inputs" onClick={() => switchPane('inputs')}>{t(professional ? 'ui.professional.inputs' : 'ui.professional.answers')}</Button>
-        <Button aria-selected={activePane === 'results'} aria-controls="results" onClick={() => switchPane('results')}>{t('ui.professional.results')}</Button>
-      </Segmented>}
-
       {!professional && planFooter}
       <GlossaryDrawer />
     </div>

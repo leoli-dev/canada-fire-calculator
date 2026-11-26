@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -34,17 +35,17 @@ async function seed(page: import('@playwright/test').Page, options: { guided?: b
 
 test('QC couple confirms a whole-year status with no month-by-month work in professional mode', async ({ page }) => {
   await seed(page, {})
-  await expect(page.getByTestId('qc-drug-coverage')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-drug-coverage')))).toBeVisible()
   // Default: one annual status per person, no month grid, no change toggle.
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
-  await expect(page.getByTestId('qc-coverage-changed-self')).not.toBeChecked()
-  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self')))).not.toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId('person-tax-limit')))).toBeVisible()
   // Two annual picks confirm the whole year for both people.
-  await page.getByTestId('qc-coverage-all-self').selectOption('private')
-  await page.getByTestId('qc-coverage-all-partner').selectOption('waived')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self'))).selectOption('private')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner'))).selectOption('waived')
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
-  await expect(page.getByTestId('qc-coverage-changed-self')).not.toBeChecked()
-  await expect(page.getByTestId('person-tax-table')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self')))).not.toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId('person-tax-table')))).toBeVisible()
   await expect(page.getByTestId('person-tax-limit')).toHaveCount(0)
   // The whole-year status is recorded as twelve identical months per person.
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
@@ -52,8 +53,8 @@ test('QC couple confirms a whole-year status with no month-by-month work in prof
   expect(saved.canonical.taxProfile.qcDrugCoverage['legacy:person:partner']).toEqual(Array(12).fill('waived'))
   // Reload keeps the confirmation and the compact layout inside the viewport.
   await page.reload()
-  await expect(page.getByTestId('qc-coverage-all-self')).toHaveValue('private')
-  await expect(page.getByTestId('qc-coverage-all-partner')).toHaveValue('waived')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self')))).toHaveValue('private')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner')))).toHaveValue('waived')
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
@@ -61,49 +62,49 @@ test('QC couple confirms a whole-year status with no month-by-month work in prof
 test('guided mode records a genuine mid-year change that survives reload and mode switch', async ({ page }) => {
   await seed(page, { guided: true })
   await page.goto('/#/guided/family/family.qcDrug')
-  await expect(page.getByTestId('guided-qc-drug')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('guided-qc-drug')))).toBeVisible()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // Guided shows the whole-year status as choice cards, like every other page.
-  await page.getByTestId('qc-coverage-all-self-private').check()
-  await page.getByTestId('qc-coverage-all-partner-private').check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self-private'))).check()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-partner-private'))).check()
   await expect(page.getByTestId('qc-coverage-self-1')).toHaveCount(0)
   // A genuine mid-year change: reveal the month detail, then edit one month.
-  await page.getByTestId('qc-coverage-changed-self').check()
-  await expect(page.getByTestId('qc-coverage-self-7')).toBeVisible()
-  await page.getByTestId('qc-coverage-self-7').selectOption('public')
-  await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
-  await expect(page.getByTestId('qc-coverage-all-self-private')).not.toBeChecked()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self'))).check()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-7')))).toBeVisible()
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-7'))).selectOption('public')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self')))).toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-all-self-private')))).not.toBeChecked()
   // Guided never auto-regenerates results on an edit: generate stays explicit.
   const stale = await page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state)
   expect(stale.resultRevision).toBeNull()
   // Reload keeps the mixed pattern and re-reveals the month detail.
   await page.reload()
-  await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
-  await expect(page.getByTestId('qc-coverage-self-7')).toHaveValue('public')
-  await expect(page.getByTestId('qc-coverage-self-6')).toHaveValue('private')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self')))).toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-7')))).toHaveValue('public')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-6')))).toHaveValue('private')
   // Professional shows the same recorded facts; the public month stays a
   // labelled estimate and the 320px layout stays inside the viewport.
   await chooseMode(page, 'professional')
-  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+  await expect((await prepareProfessionalTarget(page.getByTestId('person-tax-limit')))).toBeVisible()
   await expect(page.getByTestId('person-tax-table')).toHaveCount(0)
-  await expect(page.getByTestId('qc-coverage-changed-self')).toBeChecked()
-  await expect(page.getByTestId('qc-coverage-self-7')).toHaveValue('public')
-  await expect(page.getByTestId('qc-coverage-self-6')).toHaveValue('private')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self')))).toBeChecked()
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-7')))).toHaveValue('public')
+  await expect((await prepareProfessionalTarget(page.getByTestId('qc-coverage-self-6')))).toHaveValue('private')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
 
 test('the QC coverage block explains its purpose in EN, FR and ZH', async ({ page }) => {
   await seed(page, {})
   const panel = page.getByTestId('qc-drug-coverage')
-  await expect(panel).toContainText('TP-1 line 447')
-  await expect(panel).toContainText('Coverage for the whole year')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('TP-1 line 447')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('Coverage for the whole year')
   await chooseLanguage(page, 'FR')
-  await expect(panel).toContainText('ligne 447')
-  await expect(panel).toContainText('Couverture pour toute l’année')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('ligne 447')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('Couverture pour toute l’année')
   await chooseLanguage(page, '中文')
-  await expect(panel).toContainText('第447行')
-  await expect(panel).toContainText('全年保险状态')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('第447行')
+  await expect((await prepareProfessionalTarget(panel))).toContainText('全年保险状态')
   await chooseLanguage(page, 'EN')
-  await page.getByTestId('qc-coverage-changed-self').check()
-  await expect(panel).toContainText('Only needed when coverage changed mid-year')
+  await (await prepareProfessionalTarget(page.getByTestId('qc-coverage-changed-self'))).check()
+  await expect((await prepareProfessionalTarget(panel))).toContainText('Only needed when coverage changed mid-year')
 })

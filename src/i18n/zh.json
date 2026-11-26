@@ -62,7 +62,12 @@
       "fields_other": "{{count}} 个字段",
       "options": "查看全部选项",
       "lasts": "余额维持至 {{age}} 岁",
-      "depleted": "{{age}} 岁耗尽"
+      "depleted": "{{age}} 岁耗尽",
+      "confirmed": "已确认 {{count}} / {{total}} 项有记录答案",
+      "estimates_one": "{{count}} 项估算",
+      "estimates_other": "{{count}} 项估算",
+      "needsReview": "待核对",
+      "none": "无"
     }
   },
   "title": "🇨🇦 加拿大 FIRE 计算器",

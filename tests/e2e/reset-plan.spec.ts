@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -26,8 +27,8 @@ const stored = (page: Page) => page.evaluate(() => ({
 test('cancelling leaves the plan, Scenario A and storage untouched', async ({ page }) => {
   await seedWithScenario(page)
   const before = await stored(page)
-  await page.getByTestId('reset-plan').click()
-  await expect(page.getByRole('alertdialog')).toContainText('Scenario A')
+  await (await prepareProfessionalTarget(page.getByTestId('reset-plan'))).click()
+  await expect((await prepareProfessionalTarget(page.getByRole('alertdialog')))).toContainText('Scenario A')
   await expect(page.getByTestId('reset-cancel')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
@@ -37,8 +38,8 @@ test('cancelling leaves the plan, Scenario A and storage untouched', async ({ pa
 
 test('confirming clears both plans and the backup, keeps preferences, and survives reload', async ({ page }) => {
   await seedWithScenario(page)
-  await page.getByTestId('reset-plan').click()
-  await page.getByTestId('reset-confirm').click()
+  await (await prepareProfessionalTarget(page.getByTestId('reset-plan'))).click()
+  await (await prepareProfessionalTarget(page.getByTestId('reset-confirm'))).click()
   let { state, backup } = await stored(page)
   expect(state.inputs.annualSavings).toBe(40_000)
   expect(state.inputs.province).toBe('ON')
@@ -60,8 +61,8 @@ test('guided review offers the same reset', async ({ page }) => {
   await seedWithScenario(page)
   await chooseMode(page, 'guided')
   await page.goto('/#/guided/review')
-  await page.getByTestId('reset-plan').click()
-  await page.getByTestId('reset-confirm').click()
-  await expect(page.locator('.question-page')).toHaveAttribute('data-page-id', 'family.people')
+  await (await prepareProfessionalTarget(page.getByTestId('reset-plan'))).click()
+  await (await prepareProfessionalTarget(page.getByTestId('reset-confirm'))).click()
+  await expect((await prepareProfessionalTarget(page.locator('.question-page')))).toHaveAttribute('data-page-id', 'family.people')
   expect((await stored(page)).state.scenarioA).toBeNull()
 })

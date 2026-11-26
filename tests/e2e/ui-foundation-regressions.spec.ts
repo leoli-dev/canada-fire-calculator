@@ -1,3 +1,4 @@
+import { prepareProfessionalTarget } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
@@ -31,32 +32,32 @@ test('directory controls and row grids preserve desktop geometry and mobile visi
     await expect(page.locator('.mobile-directory-trigger')).toBeHidden()
     await expect(page.locator('.directory-close')).toBeHidden()
     await page.evaluate(() => window.scrollTo(0, 0))
-    const layout = await page.locator('.questionnaire-layout').boundingBox()
-    await expect(page.locator('.directory-shell')).toBeVisible()
-    const directory = await page.locator('.directory-shell').boundingBox()
-    const question = await page.locator('.questionnaire-main').boundingBox()
+    const layout = await (await prepareProfessionalTarget(page.locator('.questionnaire-layout'))).boundingBox()
+    await expect((await prepareProfessionalTarget(page.locator('.directory-shell')))).toBeVisible()
+    const directory = await (await prepareProfessionalTarget(page.locator('.directory-shell'))).boundingBox()
+    const question = await (await prepareProfessionalTarget(page.locator('.questionnaire-main'))).boundingBox()
     expect(directory!.width).toBe(248)
     expect(question!.width).toBeCloseTo(Math.min(640, layout!.width - 288 - (width >= 1280 ? 340 : 0)), 0)
     expect(question!.x - directory!.x).toBe(288)
     expect(question!.y).toBe(directory!.y)
-    const title = await page.locator('#question-title').boundingBox()
+    const title = await (await prepareProfessionalTarget(page.locator('#question-title'))).boundingBox()
     // Content above the grid can grow; the question must still occupy its first row.
     expect(question!.y).toBe(layout!.y)
     const rows = page.locator('.category-navigation details[open] > div > button')
     expect(await rows.count()).toBeGreaterThan(0)
     for (const row of await rows.all()) {
-      await expect(row).toHaveCSS('display', 'grid')
-      expect((await row.boundingBox())!.width).toBeLessThanOrEqual(directory!.width)
+      await expect((await prepareProfessionalTarget(row))).toHaveCSS('display', 'grid')
+      expect((await (await prepareProfessionalTarget(row)).boundingBox())!.width).toBeLessThanOrEqual(directory!.width)
     }
     measurements.push({ width, directory, question, title })
   }
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 })
-    await expect(page.locator('.mobile-directory-trigger')).toBeVisible()
+    await expect((await prepareProfessionalTarget(page.locator('.mobile-directory-trigger')))).toBeVisible()
     await expect(page.locator('.directory-shell')).toBeHidden()
-    await page.locator('.mobile-directory-trigger').click()
-    await expect(page.locator('.directory-close')).toBeVisible()
-    await page.locator('.directory-close').click()
+    await (await prepareProfessionalTarget(page.locator('.mobile-directory-trigger'))).click()
+    await expect((await prepareProfessionalTarget(page.locator('.directory-close')))).toBeVisible()
+    await (await prepareProfessionalTarget(page.locator('.directory-close'))).click()
     await expect(page.locator('.directory-shell')).toBeHidden()
   }
   await testInfo.attach('desktop-geometry.json', { body: JSON.stringify(measurements, null, 2), contentType: 'application/json' })
@@ -65,13 +66,13 @@ test('directory controls and row grids preserve desktop geometry and mobile visi
 test('loading buttons retain their accessible name, width and caller busy state under real CSS', async ({ page }) => {
   await page.goto(harness)
   const calculate = page.getByRole('button', { name: 'Calculate', exact: true })
-  const width = (await calculate.boundingBox())!.width
-  await expect(page.getByRole('button', { name: 'Caller busy' })).toHaveAttribute('aria-busy', 'true')
-  await page.getByRole('button', { name: 'Start calculation' }).click()
-  await expect(calculate).toHaveAccessibleName('Calculate')
-  await expect(calculate).toBeDisabled()
-  await expect(calculate).toHaveAttribute('aria-busy', 'true')
-  expect((await calculate.boundingBox())!.width).toBe(width)
+  const width = (await (await prepareProfessionalTarget(calculate)).boundingBox())!.width
+  await expect((await prepareProfessionalTarget(page.getByRole('button', { name: 'Caller busy' })))).toHaveAttribute('aria-busy', 'true')
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Start calculation' }))).click()
+  await expect((await prepareProfessionalTarget(calculate))).toHaveAccessibleName('Calculate')
+  await expect((await prepareProfessionalTarget(calculate))).toBeDisabled()
+  await expect((await prepareProfessionalTarget(calculate))).toHaveAttribute('aria-busy', 'true')
+  expect((await (await prepareProfessionalTarget(calculate)).boundingBox())!.width).toBe(width)
 })
 
 test('keyboard focus paints an accent ring above its halo and survives forced colors', async ({ page }, testInfo) => {
@@ -84,7 +85,7 @@ test('keyboard focus paints an accent ring above its halo and survives forced co
     expect(shadow.startsWith(await tokenColor(control, '--accent'))).toBe(true)
     expect(shadow).toContain('0px 0px 0px 2px')
   }
-  await page.getByRole('button', { name: 'Open sheet' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Open sheet' }))).click()
   const close = page.getByRole('button', { name: 'Close sheet' })
   await page.keyboard.press('Tab')
   await page.keyboard.press('Shift+Tab')
@@ -92,20 +93,20 @@ test('keyboard focus paints an accent ring above its halo and survives forced co
   expect((await close.evaluate(element => getComputedStyle(element).boxShadow)).startsWith(await tokenColor(close, '--accent'))).toBe(true)
   await testInfo.attach('dialog-focus.png', { body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png' })
   await page.emulateMedia({ forcedColors: 'active' })
-  await expect(close).toHaveCSS('outline-style', 'solid')
-  await expect(close).toHaveCSS('outline-width', '2px')
+  await expect((await prepareProfessionalTarget(close))).toHaveCSS('outline-style', 'solid')
+  await expect((await prepareProfessionalTarget(close))).toHaveCSS('outline-width', '2px')
   await page.keyboard.press('Escape')
   for (const control of controls) {
     await tabTo(page, control)
-    await expect(control).toHaveCSS('outline-style', 'solid')
-    await expect(control).toHaveCSS('outline-width', '2px')
+    await expect((await prepareProfessionalTarget(control))).toHaveCSS('outline-style', 'solid')
+    await expect((await prepareProfessionalTarget(control))).toHaveCSS('outline-width', '2px')
   }
 })
 
 test('sheet follows effective native tab order through conditional and disclosure content', async ({ page }) => {
   await page.goto(harness)
   const trigger = page.getByRole('button', { name: 'Open sheet' })
-  await trigger.click()
+  await (await prepareProfessionalTarget(trigger)).click()
   const close = page.getByRole('button', { name: 'Close sheet' })
   await expect(close).toBeFocused()
   await expect(page.getByText('Hidden action', { exact: true })).toBeHidden()
@@ -137,7 +138,7 @@ for (const position of ['middle', 'trailing']) {
     test(`sheet traverses ${selected ? 'a selected' : 'an unchecked'} radio group in the ${position} position`, async ({ page }) => {
       await page.goto(`${harness}?radios=${position}${selected ? '&selected=one' : ''}`)
       const trigger = page.getByRole('button', { name: 'Open sheet' })
-      await trigger.click()
+      await (await prepareProfessionalTarget(trigger)).click()
       const close = page.getByRole('button', { name: 'Close sheet' })
       const first = page.getByRole('button', { name: 'First action' })
       const final = page.getByRole('button', { name: 'Final action' })
@@ -146,7 +147,7 @@ for (const position of ['middle', 'trailing']) {
       await expect(close).toBeFocused()
 
       // Enter backwards using native traversal in the middle, or the trap at the trailing boundary.
-      if (position === 'middle') await final.focus()
+      if (position === 'middle') await (await prepareProfessionalTarget(final)).focus()
       await page.keyboard.press('Shift+Tab')
       await expect(selected ? one : two).toBeFocused()
       await page.keyboard.press('Shift+Tab')
@@ -157,7 +158,7 @@ for (const position of ['middle', 'trailing']) {
       // Reopen fresh controls: Thorium can remember an unchecked group's last focused member.
       await page.keyboard.press('Escape')
       await expect(trigger).toBeFocused()
-      await trigger.click()
+      await (await prepareProfessionalTarget(trigger)).click()
       await expect(close).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(first).toBeFocused()
@@ -166,11 +167,11 @@ for (const position of ['middle', 'trailing']) {
       if (selected) {
         await page.keyboard.press('ArrowRight')
         await expect(two).toBeFocused()
-        await expect(two).toBeChecked()
-        await expect(one).not.toBeChecked()
+        await expect((await prepareProfessionalTarget(two))).toBeChecked()
+        await expect((await prepareProfessionalTarget(one))).not.toBeChecked()
       } else {
-        await expect(one).not.toBeChecked()
-        await expect(two).not.toBeChecked()
+        await expect((await prepareProfessionalTarget(one))).not.toBeChecked()
+        await expect((await prepareProfessionalTarget(two))).not.toBeChecked()
       }
       await page.keyboard.press('Tab')
       await expect(position === 'middle' ? final : close).toBeFocused()
@@ -205,29 +206,29 @@ test('sheet preserves native stops between unchecked trailing radios in both dir
     return names
   }
   await page.goto(`${harness}${query}&native=1`)
-  await page.getByRole('button', { name: 'First action' }).focus()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'First action' }))).focus()
   const nativeForward = await sequence('Tab', 3)
   expect(nativeForward).toEqual(['one', 'Between options', 'After fixture'])
   await page.goto(`${harness}${query}&native=1`)
-  await page.getByRole('button', { name: 'After fixture' }).focus()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'After fixture' }))).focus()
   const nativeReverse = await sequence('Shift+Tab', 3)
   expect(nativeReverse).toEqual(['two', 'Between options', 'First action'])
 
   await page.goto(`${harness}${query}`)
-  await page.getByRole('button', { name: 'Open sheet' }).click()
-  await page.getByRole('button', { name: 'First action' }).focus()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Open sheet' }))).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'First action' }))).focus()
   expect(await sequence('Tab', 2)).toEqual(nativeForward.slice(0, 2))
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Close sheet' })).toBeFocused()
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Open sheet' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Open sheet' }))).click()
   expect(await sequence('Shift+Tab', 3)).toEqual(nativeReverse)
 })
 
 test('sheet does not reverse-wrap past an independent stop between prefix radios', async ({ page }) => {
   const query = '?radios=trailing&interleaved=prefix'
   async function reverseEntry() {
-    await page.getByRole('radio', { name: 'Two', exact: true }).focus()
+    await (await prepareProfessionalTarget(page.getByRole('radio', { name: 'Two', exact: true }))).focus()
     await expect(page.getByRole('radio', { name: 'Two', exact: true })).toBeFocused()
     await page.keyboard.press('Shift+Tab')
     await expect(page.getByRole('button', { name: 'Between options' })).toBeFocused()
@@ -235,7 +236,7 @@ test('sheet does not reverse-wrap past an independent stop between prefix radios
   await page.goto(`${harness}${query}&native=1`)
   await reverseEntry()
   await page.goto(`${harness}${query}`)
-  await page.getByRole('button', { name: 'Open sheet' }).click()
+  await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Open sheet' }))).click()
   await reverseEntry()
   await page.keyboard.press('Shift+Tab')
   await expect(page.getByRole('button', { name: 'First action' })).toBeFocused()
@@ -255,32 +256,32 @@ test('guided sibling fields use 48px inputs and professional errors retain seman
   })
   await page.reload()
   await chooseLanguage(page, '中文')
-  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'zh-Hans')
   async function checkInput(input: Locator) {
-    await expect(input).toBeVisible()
-    await expect(input).toHaveCSS('font-size', '16px')
-    expect((await input.boundingBox())!.height).toBe(48)
+    await expect((await prepareProfessionalTarget(input))).toBeVisible()
+    await expect((await prepareProfessionalTarget(input))).toHaveCSS('font-size', '16px')
+    expect((await (await prepareProfessionalTarget(input)).boundingBox())!.height).toBe(48)
     expect(await input.evaluate(element => (element as HTMLInputElement).labels?.[0]?.textContent?.trim())).toBeTruthy()
   }
   await page.goto('/#/guided/saving/saving.earned')
   await checkInput(page.getByTestId('earned-self'))
   await page.goto('/#/guided/assets/account.rrsp.type')
-  await page.getByTestId('registered-type-legacy:account:rrsp-rrif').check()
+  await (await prepareProfessionalTarget(page.getByTestId('registered-type-legacy:account:rrsp-rrif'))).check()
   await page.goto('/#/guided/assets/account.rrif.details')
   await checkInput(page.getByTestId('guided-rrif-opened-legacy:account:rrsp'))
   await page.goto('/#/guided/taxDetails/tax.tfsaRoom')
   await checkInput(page.getByTestId('tfsa-available-room-self'))
   await chooseLanguage(page, 'EN')
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
+  await expect((await prepareProfessionalTarget(page.locator('html')))).toHaveAttribute('lang', 'en')
   await chooseMode(page, 'professional')
   const field = page.locator('label.field').filter({ hasText: 'Target FIRE age' })
   const age = field.locator('input')
-  await age.fill('21')
-  await expect(age).toHaveClass(/invalid-error/)
-  await expect(age).toHaveAttribute('aria-invalid', 'true')
-  await expect(age).toHaveCSS('border-top-color', await tokenColor(field, '--critical'))
-  await expect(age).toHaveAccessibleDescription(await field.locator('.field-issue.error').innerText())
+  await (await prepareProfessionalTarget(age)).fill('21')
+  await expect((await prepareProfessionalTarget(age))).toHaveClass(/invalid-error/)
+  await expect((await prepareProfessionalTarget(age))).toHaveAttribute('aria-invalid', 'true')
+  await expect((await prepareProfessionalTarget(age))).toHaveCSS('border-top-color', await tokenColor(field, '--critical'))
+  await expect((await prepareProfessionalTarget(age))).toHaveAccessibleDescription(await (await prepareProfessionalTarget(field.locator('.field-issue.error'))).innerText())
   await page.goto(harness)
   const warning = page.getByRole('textbox', { name: 'Warning' })
-  await expect(warning).toHaveCSS('border-top-color', await tokenColor(warning, '--caution'))
+  await expect((await prepareProfessionalTarget(warning))).toHaveCSS('border-top-color', await tokenColor(warning, '--caution'))
 })
