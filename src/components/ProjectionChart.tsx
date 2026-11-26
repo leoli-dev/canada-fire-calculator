@@ -1,3 +1,4 @@
+import { useChartColors } from '../chartColors'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -16,7 +17,6 @@ import {
 import type { ProjectionResult } from '../engine'
 import { useCad, useCadCompact } from '../format'
 
-const COLORS = { tfsa: '#2e7d32', rrsp: '#1565c0', nonReg: '#ef6c00', fhsa: '#00897b', locked: '#6a1b9a', property: '#8d6e63' }
 
 export function ProjectionChart(props: {
   result: ProjectionResult
@@ -27,6 +27,7 @@ export function ProjectionChart(props: {
   scale?: (age: number) => number
 }) {
   const { t } = useTranslation()
+  const COLORS = useChartColors()
   const id = useId()
   const cad = useCad()
   const cadTick = useCadCompact()
@@ -78,12 +79,12 @@ export function ProjectionChart(props: {
       <div role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-summary`}>
       <ResponsiveContainer width="100%" height={380}>
         <ComposedChart data={data} margin={{ top: 24, right: 16, bottom: 0, left: 24 }}>
-          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
-          <XAxis dataKey="age" type="number" domain={[data[0].age, data[data.length - 1].age]}
+          <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" strokeOpacity={0.4} />
+          <XAxis stroke={COLORS.axis} dataKey="age" type="number" domain={[data[0].age, data[data.length - 1].age]}
             allowDecimals={false} tickCount={12} />
-          <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
-          <Tooltip formatter={(v) => cad(Number(v))} />
-          <Legend />
+          <YAxis stroke={COLORS.axis} tickFormatter={(v: number) => cadTick(v)} width={64} />
+          <Tooltip itemStyle={{ color: COLORS.axis }} formatter={(v) => cad(Number(v))} />
+          <Legend formatter={value => <span className="chart-legend-label">{value}</span>} />
           {hasProperty && (
             <Line dataKey="investable" name={t('investableTotal')} stroke="none" dot={false}
               activeDot={false} legendType="none" />
@@ -93,14 +94,14 @@ export function ProjectionChart(props: {
           <ReferenceArea
             x1={props.fireAge}
             x2={props.pensionAge}
-            fill="#c62828"
-            fillOpacity={0.05}
-            label={{ value: t('phaseBridge'), fill: '#9b7676', position: 'insideTop', fontSize: 12 }}
+            fill={COLORS.bridge}
+            fillOpacity={1}
+            label={{ value: t('phaseBridge'), fill: COLORS.axis, position: 'insideTop', fontSize: 12 }}
           />
-          <ReferenceLine x={props.fireAge} stroke="#c62828" strokeDasharray="4 4"
-            label={{ value: 'FIRE', fill: '#c62828', position: 'top' }} />
-          <ReferenceLine x={props.pensionAge} stroke="#6a1b9a" strokeDasharray="4 4"
-            label={{ value: 'CPP/OAS', fill: '#6a1b9a', position: 'top' }} />
+          <ReferenceLine x={props.fireAge} stroke={COLORS.fire} strokeDasharray="4 4"
+            label={{ value: 'FIRE', fill: COLORS.fire, position: 'top' }} />
+          <ReferenceLine x={props.pensionAge} stroke={COLORS.pensionMarker} strokeDasharray="4 4"
+            label={{ value: 'CPP/OAS', fill: COLORS.pensionMarker, position: 'top' }} />
           {(props.saleAges ?? []).map((age) => (
             <ReferenceLine key={age} x={age} stroke={COLORS.property} strokeDasharray="4 4"
               label={{ value: t('saleLabel'), fill: COLORS.property, position: 'insideTopLeft', fontSize: 12 }} />
@@ -125,11 +126,11 @@ export function ProjectionChart(props: {
           )}
           {hasDebt && (
             <Line type="monotone" dataKey="debt" name={t('debtLabel')}
-              stroke="#c62828" strokeWidth={2} strokeDasharray="5 3" dot={false} />
+              stroke={COLORS.shortfall} strokeWidth={2} strokeDasharray="5 3" dot={false} />
           )}
           {hasDebt && (
             <Line type="monotone" dataKey="netWorth" name={t('netWorthLabel')}
-              stroke="#1a2532" strokeWidth={2} dot={false} />
+              stroke={COLORS.tax} strokeWidth={2} dot={false} />
           )}
         </ComposedChart>
       </ResponsiveContainer>

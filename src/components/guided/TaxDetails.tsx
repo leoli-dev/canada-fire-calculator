@@ -1,3 +1,4 @@
+import { Field, Disclosure } from '../../ui'
 import { useTranslation } from 'react-i18next'
 import type { InputsV2, Known, Person } from '../../engine/model'
 import { previewRrspRoomYear } from '../../engine/rrspRoom'
@@ -44,7 +45,7 @@ function RoomFeedback({ room, planned, retained, couple, testId }: { room: Known
 function RoomNumber({ id, testId, label, value, onChange }: { id: string; testId: string; label: string; value: Known<number>; onChange: (value: number | null) => void }) {
   const { t } = useTranslation()
   return <div className="question-answer">
-    <label htmlFor={id}>{label}</label>
+    <Field htmlFor={id}>{label}</Field>
     <NumberInput id={id} testId={testId} className="question-number" value={value.status === 'known' ? value.value : null}
       placeholder={t('be12.unknown')}
       onChange={next => {
@@ -57,10 +58,10 @@ function RoomNumber({ id, testId, label, value, onChange }: { id: string; testId
 
 /** The advanced statement detail, open by default once any of it is recorded. */
 function MoreDetail({ testId, summary, open, children }: { testId: string; summary: string; open: boolean; children: React.ReactNode }) {
-  return <details className="guided-advanced" open={open || undefined}>
+  return <Disclosure className="guided-advanced" open={open || undefined}>
     <summary data-testid={testId}>{summary}</summary>
     {children}
-  </details>
+  </Disclosure>
 }
 
 const setPersonFact = (personId: string, field: 'tfsaAvailableRoom' | 'rrspAvailableRoom', reason: string) => (value: number | null) =>
@@ -90,10 +91,10 @@ export function TfsaRoomQuestion({ plan }: { plan: InputsV2 }) {
         </MoreDetail>
       </div>
     })}
-    <details className="guided-advanced" data-testid="guided-tfsa-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
+    <Disclosure className="guided-advanced" data-testid="guided-tfsa-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
       <p className="hint">{t('be27.limit')}</p>
       <p className="hint">{t('be27.scope')}</p>
-    </details>
+    </Disclosure>
     <p className="hint"><a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/tax-free-savings-account/contributions.html"
       target="_blank" rel="noopener noreferrer">{t('be27.source')}</a></p>
   </div>
@@ -118,9 +119,9 @@ export function RrspRoomQuestion({ plan }: { plan: InputsV2 }) {
         </MoreDetail>
       </div>
     })}
-    <details className="guided-advanced" data-testid="guided-rrsp-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
+    <Disclosure className="guided-advanced" data-testid="guided-rrsp-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
       <p className="hint">{t('be12.limit')}</p>
-    </details>
+    </Disclosure>
     <p className="hint"><a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/t4040/rrsps-other-registered-plans-retirement.html"
       target="_blank" rel="noopener noreferrer">{t('be12.source')}</a></p>
   </div>
@@ -154,10 +155,10 @@ export function FhsaRoomQuestion({ plan }: { plan: InputsV2 }) {
         </MoreDetail>
       </div>
     })}
-    <details className="guided-advanced" data-testid="guided-fhsa-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
+    <Disclosure className="guided-advanced" data-testid="guided-fhsa-how"><summary>{t('questionnaire.taxDetails.howCounted')}</summary>
       <p className="hint">{t('be36.limit')}</p>
       <p className="hint">{t('be36.scope')}</p>
-    </details>
+    </Disclosure>
     <p className="hint"><a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/contributing-your-fhsa.html"
       target="_blank" rel="noopener noreferrer">{t('be36.source')}</a></p>
   </div>

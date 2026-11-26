@@ -1,3 +1,4 @@
+import { Disclosure } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { Inputs, ProjectionResult } from '../engine'
 import { useCad } from '../format'
@@ -38,7 +39,7 @@ export function BenefitCategoryPanel(props: { inputs: Inputs; result: Projection
   const total = rows.reduce((sum, row) => sum + row.gis, 0)
   const pack = OAS_GIS_ALLOWANCE_2026_Q3
 
-  return <details className="chart-card collapsible" data-testid="benefit-category-panel">
+  return <Disclosure className="chart-card collapsible" data-testid="benefit-category-panel">
     <summary><h3>{t('benefitCategoryTitle')}</h3></summary>
     <p data-testid="benefit-category-summary">
       {t('benefitCategorySummary', { ages: ageRanges(rows.map((row) => row.age)), total: cad(total) })}
@@ -70,5 +71,5 @@ export function BenefitCategoryPanel(props: { inputs: Inputs; result: Projection
       </table>
     </div>
     <p className="hint">{t('benefitCategoryLimit', { id: pack.id, period: pack.paymentPeriod })}</p>
-  </details>
+  </Disclosure>
 }

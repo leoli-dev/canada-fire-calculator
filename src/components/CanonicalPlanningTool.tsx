@@ -1,3 +1,4 @@
+import { Field, Button } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Inputs } from '../engine'
@@ -64,10 +65,10 @@ function CanonicalPlanningDraft({ inputs, plan, nonRegAbsent, revision, entryMod
     <p className="hint">{t('planning.evidence')}</p>
     <p className="hint">{t('planning.bounds', { count: CANONICAL_PLANNING_LIMIT })}</p>
     <form onSubmit={event => { event.preventDefault(); evaluate() }}>
-      <label>{t('planning.age')}<input data-testid="planning-retirement-age" type="text" inputMode="numeric" value={age} onChange={event => { setAge(event.target.value); setLimited(false) }} /></label>
-      <label>{t('planning.spending', { year: plan.baseYear })}<input data-testid="planning-retirement-spending" type="text" inputMode="decimal" value={spending} onChange={event => { setSpending(event.target.value); setLimited(false) }} /></label>
-      <button type="submit" data-testid="planning-evaluate">{t('planning.evaluate')}</button>
-      <button type="button" data-testid="planning-reset" onClick={() => { setComparison({ inputs, plan, nonRegAbsent, outcomes: [] }); setLimited(false); setSheet(null) }}>{t('planning.reset')}</button>
+      <Field>{t('planning.age')}<input data-testid="planning-retirement-age" type="text" inputMode="numeric" value={age} onChange={event => { setAge(event.target.value); setLimited(false) }} /></Field>
+      <Field>{t('planning.spending', { year: plan.baseYear })}<input data-testid="planning-retirement-spending" type="text" inputMode="decimal" value={spending} onChange={event => { setSpending(event.target.value); setLimited(false) }} /></Field>
+      <Button type="submit" data-testid="planning-evaluate">{t('planning.evaluate')}</Button>
+      <Button type="button" data-testid="planning-reset" onClick={() => { setComparison({ inputs, plan, nonRegAbsent, outcomes: [] }); setLimited(false); setSheet(null) }}>{t('planning.reset')}</Button>
     </form>
     <p>{t('planning.count', { count: outcomes.length, max: CANONICAL_PLANNING_LIMIT })}</p>
     {limited && outcomes.length >= CANONICAL_PLANNING_LIMIT && <p role="status" data-testid="planning-limit">{t('planning.status.search-limit')}</p>}
@@ -83,7 +84,7 @@ function CanonicalPlanningDraft({ inputs, plan, nonRegAbsent, revision, entryMod
         {!!outcome.livingGapYears.length && <p>{t('planning.livingGaps', { years: outcome.livingGapYears.join(', ') })}</p>}
         {!!outcome.eventGapYears.length && <p>{t('planning.eventGaps', { years: outcome.eventGapYears.join(', ') })}</p>}
         {outcome.result && <CanonicalResults result={outcome.result} model={model} />}
-        {model && <button type="button" data-testid="planning-sheet" onClick={() => { if (current()) setSheet(index) }}>{t('planning.sheet')}</button>}
+        {model && <Button type="button" data-testid="planning-sheet" onClick={() => { if (current()) setSheet(index) }}>{t('planning.sheet')}</Button>}
       </details>
     })}
     {sheetModel && <AnnualSheetDialog open={true} model={sheetModel} moneyMode={moneyMode} onClose={() => setSheet(null)} />}

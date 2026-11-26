@@ -1,3 +1,4 @@
+import { Button, Callout } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { Inputs, ProjectionResult } from '../engine'
 import { headlineVerdict } from './ResultsPanel'
@@ -10,12 +11,12 @@ import { headlineVerdict } from './ResultsPanel'
 export function ResultPeek(props: { inputs: Inputs; result: ProjectionResult; estimate: boolean; personTax: boolean; taxWarning: boolean }) {
   const { t } = useTranslation()
   const verdict = headlineVerdict(t, props.inputs, props.result, props)
-  return <div className={`result-peek ${verdict.tone}`} data-testid="result-peek">
+  return <Callout variant={verdict.tone === 'ok' ? 'info' : 'warn'} className={`result-peek ${verdict.tone}`} data-testid="result-peek">
     <p role="status">{verdict.text}</p>
-    <button type="button" className="text-action" onClick={() => {
+    <Button variant="link" type="button" className="text-action" onClick={() => {
       const results = document.getElementById('results')
       results?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       results?.focus({ preventScroll: true })
-    }}>{t('resultPeekJump')}</button>
-  </div>
+    }}>{t('resultPeekJump')}</Button>
+  </Callout>
 }

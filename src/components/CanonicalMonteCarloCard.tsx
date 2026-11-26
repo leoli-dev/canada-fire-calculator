@@ -1,3 +1,4 @@
+import { Field, Button } from '../ui'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Inputs } from '../engine'
@@ -74,11 +75,11 @@ function CanonicalMonteCarloDraft({ inputs, plan, nonRegAbsent, revision, entryM
     <p>{t('canonicalMc.scope')}</p>
     <p className="hint">{t('canonicalMc.assumptions')}</p>
     <form onSubmit={e => { e.preventDefault(); run() }}>
-      <label>{t('canonicalMc.seed')}<input data-testid="canonical-mc-seed" type="text" inputMode="numeric" value={seed} onChange={e => { edit(); setSeed(e.target.value) }} /></label>
-      <label>{t('canonicalMc.trials')}<input data-testid="canonical-mc-trials" type="text" inputMode="numeric" value={trials} onChange={e => { edit(); setTrials(e.target.value) }} /></label>
-      {accounts.map(a => <label key={a.id}>{t('canonicalMc.volatility', { account: a.id })}<input data-testid={`canonical-mc-volatility-${a.id}`} type="text" inputMode="decimal" value={vols[a.id]} onChange={e => { edit(); setVols({ ...vols, [a.id]: e.target.value }) }} /></label>)}
-      <button type="submit" data-testid="canonical-mc-run" disabled={state === 'running' || !valid}>{t('canonicalMc.run', { count: Number(trials) || 0 })}</button>
-      {state === 'running' && <button type="button" data-testid="canonical-mc-cancel" onClick={() => { stop(); setResult(null); setState('cancelled') }}>{t('mcCancel')}</button>}
+      <Field>{t('canonicalMc.seed')}<input data-testid="canonical-mc-seed" type="text" inputMode="numeric" value={seed} onChange={e => { edit(); setSeed(e.target.value) }} /></Field>
+      <Field>{t('canonicalMc.trials')}<input data-testid="canonical-mc-trials" type="text" inputMode="numeric" value={trials} onChange={e => { edit(); setTrials(e.target.value) }} /></Field>
+      {accounts.map(a => <Field key={a.id}>{t('canonicalMc.volatility', { account: a.id })}<input data-testid={`canonical-mc-volatility-${a.id}`} type="text" inputMode="decimal" value={vols[a.id]} onChange={e => { edit(); setVols({ ...vols, [a.id]: e.target.value }) }} /></Field>)}
+      <Button type="submit" data-testid="canonical-mc-run" disabled={state === 'running' || !valid}>{t('canonicalMc.run', { count: Number(trials) || 0 })}</Button>
+      {state === 'running' && <Button type="button" data-testid="canonical-mc-cancel" onClick={() => { stop(); setResult(null); setState('cancelled') }}>{t('mcCancel')}</Button>}
     </form>
     <p role={state === 'error' ? 'alert' : 'status'} data-testid="canonical-mc-status">{t(`canonicalMc.status.${state}`)}</p>
     {result && <>

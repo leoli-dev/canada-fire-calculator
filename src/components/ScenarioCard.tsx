@@ -1,3 +1,4 @@
+import { Disclosure, Button } from '../ui'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { runProjection, type ProjectionResult } from '../engine'
@@ -44,7 +45,7 @@ export function ScenarioCard() {
   const comparisonBlocked = canonicalSelected || migrationComparisonBlocked || terminalComparisonBlocked || taxComparisonBlocked && !singleLegacyPreview
 
   return (
-    <details className="chart-card collapsible" data-testid="scenario-comparison"
+    <Disclosure className="chart-card collapsible" data-testid="scenario-comparison"
       onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'scenario_comparison' })}>
       <summary><h3>{t('scenarioTitle')}</h3></summary>
       {canonicalSelected && <p className="hint">{t('canonical.comparisonUnavailable')}</p>}
@@ -52,17 +53,17 @@ export function ScenarioCard() {
       {!comparisonBlocked && taxComparisonBlocked && <p className="hint">{t('be11ComparisonEstimate')}</p>}
       <div className="card-head">
         <div>
-          <button onClick={saveScenarioA}>
+          <Button onClick={saveScenarioA}>
             {t('scenarioSave')}
-          </button>
+          </Button>
           {scenarioA && (
             <>
-              <button className="subtle" onClick={restoreScenarioA}>
+              <Button variant="ghost" className="subtle" onClick={restoreScenarioA}>
                 {t('scenarioRestore')}
-              </button>
-              <button className="subtle" onClick={clearScenarioA}>
+              </Button>
+              <Button variant="ghost" className="subtle" onClick={clearScenarioA}>
                 {t('scenarioClear')}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -92,6 +93,6 @@ export function ScenarioCard() {
       ) : (
         <p className="hint"><Jargon text={t('scenarioHint')} /></p>
       )}
-    </details>
+    </Disclosure>
   )
 }

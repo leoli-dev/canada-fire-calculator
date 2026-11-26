@@ -1,3 +1,4 @@
+import { Button } from '../ui'
 import { useTranslation } from 'react-i18next'
 import type { InputsV2 } from '../engine/model'
 import { migrationReview } from '../engine/migrationReview'
@@ -24,8 +25,8 @@ function PlanStatus({ label, plan }: { label: string; plan: InputsV2 | null }) {
           current plan is editable here; Scenario A is a saved snapshot. */}
       {label === t('scenarioCurrent') && plan.people.length === 1 && <div className="migration-settle">
         <p>{t('migrationSettleSingleHelp')}</p>
-        <button type="button" className="primary-action" data-testid="migration-settle-single"
-          onClick={() => commitCanonicalEdit(draft => { Object.assign(draft, settleSingleHousehold(draft)) })}>{t('migrationSettleSingle')}</button>
+        <Button variant="primary" type="button" className="primary-action" data-testid="migration-settle-single"
+          onClick={() => commitCanonicalEdit(draft => { Object.assign(draft, settleSingleHousehold(draft)) })}>{t('migrationSettleSingle')}</Button>
       </div>}
     </>}
   </section>

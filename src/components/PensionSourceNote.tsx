@@ -1,3 +1,4 @@
+import { Field, Callout, Button } from '../ui'
 import { useTranslation } from 'react-i18next'
 import {
   manualProvenance,
@@ -49,7 +50,7 @@ export function PensionSourceNote(props: {
   return (
     <div className="pension-source" data-pension-kind={props.kind} data-pension-source={source}>
       <div className="pension-source-controls">
-        <label className="field pension-source-field">
+        <Field className="field pension-source-field">
           <span>{t('pensionAmountSource')}</span>
           <select
             data-pension-source-select={props.kind}
@@ -64,9 +65,9 @@ export function PensionSourceNote(props: {
             <option value="manual">{t('pensionSourceManual')}</option>
             <option value="statement">{t(props.kind === 'oas' ? 'pensionSourceStatementOas' : 'pensionSourceStatement')}</option>
           </select>
-        </label>
+        </Field>
         {source === 'statement' && <>
-          <label className="field pension-source-field">
+          <Field className="field pension-source-field">
             <span>{t('pensionAmountBasis')}</span>
             <select
               data-pension-basis-select={props.kind}
@@ -76,8 +77,8 @@ export function PensionSourceNote(props: {
               <option value="annual">{t('pensionBasisAnnual')}</option>
               <option value="monthly">{t('pensionBasisMonthly')}</option>
             </select>
-          </label>
-          <label className="field pension-source-field">
+          </Field>
+          <Field className="field pension-source-field">
             <span>{t('pensionAgeBasis')}</span>
             <span data-pension-age-basis={props.kind}>
               <NumberInput
@@ -86,20 +87,20 @@ export function PensionSourceNote(props: {
                 onChange={(value) => setUnit({ ageBasis: value == null ? null : Math.round(value) })}
               />
             </span>
-          </label>
+          </Field>
         </>}
       </div>
       {warning && (
-        <p className="pension-flag" data-pension-warning={warning.kind} role="status">
+        <Callout as="p" variant="warn" className="pension-flag" data-pension-warning={warning.kind} role="status">
           {warning.kind === 'premisesNeedReview' && t('pensionStatementNeedsReview')}
           {warning.kind === 'estimatorNeedsReview' && t('pensionEstimatorNeedsReview')}
           {warning.kind === 'premisesNeedReview' || warning.kind === 'estimatorNeedsReview' ? (
-            <button type="button" className="pension-reconfirm" data-pension-reconfirm={props.kind}
+            <Button type="button" className="pension-reconfirm" data-pension-reconfirm={props.kind}
               onClick={props.onReconfirm}>
               {t('pensionReconfirm')}
-            </button>
+            </Button>
           ) : null}
-        </p>
+        </Callout>
       )}
       <p className="hint pension-source-hint">
         {source === 'unknown' && t('pensionSourceUnknownNote')}

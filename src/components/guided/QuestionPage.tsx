@@ -1,3 +1,4 @@
+import { Disclosure, Callout, Field, Button, ChoiceCard, StatusChip } from '../../ui'
 import { useTranslation } from 'react-i18next'
 import { marginalRate as engineMarginalRate, blendedReturn, pensionAmountDisplay, pensionAmountFromDisplay, reconfirmStatementAmount, typedAmountSource, validateInputs, type DebtKind, type Pension, type Province, type Strategy } from '../../engine'
 import {
@@ -32,13 +33,13 @@ function QuestionHelp({ guidanceKey }: { guidanceKey: string }) {
   const { i18n, t } = useTranslation()
   const content = contentForPage(guidanceKey)
   const guidance = content ? contentGuidance(content, i18n.resolvedLanguage ?? i18n.language) : guidanceForPage(guidanceKey, i18n.resolvedLanguage ?? i18n.language)
-  return <details className="question-help">
+  return <Disclosure className="question-help">
     <summary>{t('questionnaire.helpTitle')}</summary>
     <p>{guidance.why}</p>
     <p><strong>{t('questionnaire.findLabel')}</strong> {guidance.find}</p>
-    <p className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {guidance.example}</p>
+    <Callout as="p" variant="example" className="question-example"><strong>{t('questionnaire.exampleLabel')}</strong> {guidance.example}</Callout>
     {content && <FieldContentFacts content={content} />}
-  </details>
+  </Disclosure>
 }
 
 function FactNumber(props: { field: string; label: string; value: number; onValue: (value: number) => void; step?: number; unit?: 'canonical' | 'monthly' }) {
@@ -53,8 +54,8 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
   const issue = props.field.startsWith('principalResidence.') || props.field === 'lockedRetirement.employeeContribution' || props.field === 'fhsa.annualContribution'
     ? validateInputs(inputs, { canonical: canonicalSelected }).find((candidate) => candidate.field === props.field && candidate.severity === 'error')
     : undefined
-  return <div className="question-answer" data-field={props.field}>
-    <label htmlFor={`q-${props.field}`}>{props.label}</label>
+  return <Field as="div" className="question-answer" data-field={props.field}>
+    <Field htmlFor={`q-${props.field}`}>{props.label}</Field>
     <NumberInput id={`q-${props.field}`} value={props.value} draft={draft}
       describedBy={[`q-${props.field}-status`, ...(issue || missingMortgage ? [`q-${props.field}-issue`] : [])].join(' ')}
       invalid={!!issue || missingMortgage} preserveInvalidDraft={isSharedField(props.field)} step={props.step}
@@ -70,20 +71,20 @@ function FactNumber(props: { field: string; label: string; value: number; onValu
         markAnswers([props.field], 'confirmed')
       }} className="question-number" />
     <div className="answer-actions">
-      <small id={`q-${props.field}-status`}>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</small>
-      <button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</button>
+      <StatusChip as="small" status={meta?.status === 'confirmed' ? 'ok' : meta?.status === 'estimated' ? 'est' : meta?.status === 'unknown' ? 'unknown' : 'info'} id={`q-${props.field}-status`}>{t(`guided.meta.${meta?.origin === 'legacy' ? 'legacy' : meta?.origin === 'example' ? 'example' : (meta?.status ?? 'example')}`)}</StatusChip>
+      <Button type="button" onClick={() => isSharedField(props.field) ? editSharedField(props.field, '', props.unit) : markAnswers([props.field], 'unknown')}>{t('guidedUnknown')}</Button>
     </div>
     {issue && <em className="field-issue error" id={`q-${props.field}-issue`}>{t(issue.key, issue.params)}</em>}
     {missingMortgage && inputs.principalResidence?.mode === 'planned' && <em className="field-issue error" id={issue ? undefined : `q-${props.field}-issue`}>{t('valPurchaseMortgageRequired', { age: inputs.principalResidence.buyAtAge, amount: Math.ceil(inputs.principalResidence.price - inputs.principalResidence.downPayment) })}</em>}
-  </div>
+  </Field>
 }
 
 function ChoiceGroup(props: { id: string; value?: string; label?: string; options: Array<{ value: string; label: string; detail?: string }>; onChange: (value: string) => void }) {
   return <div className="choice-group" role="radiogroup" aria-label={props.label}>
-    {props.options.map((option) => <label key={option.value} className={props.value === option.value ? 'selected' : ''}>
+    {props.options.map((option) => <ChoiceCard key={option.value} className={props.value === option.value ? 'selected' : ''}>
       <input type="radio" name={props.id} value={option.value} checked={props.value === option.value} onChange={() => props.onChange(option.value)} />
       <span><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>
-    </label>)}
+    </ChoiceCard>)}
   </div>
 }
 
@@ -92,7 +93,7 @@ function LockedAccountNote() {
   const { t } = useTranslation()
   const setActivePage = useStore((s) => s.setActivePage)
   return <p className="answer-feedback" data-testid="guided-locked-created">{t('questionnaire.lockedCreated')}{' '}
-    <button type="button" className="text-action" onClick={() => { setActivePage('locked.balance'); window.location.hash = '#/guided/assets/locked.balance' }}>{t('questionnaire.lockedGoToBalance')}</button></p>
+    <Button variant="link" type="button" className="text-action" onClick={() => { setActivePage('locked.balance'); window.location.hash = '#/guided/assets/locked.balance' }}>{t('questionnaire.lockedGoToBalance')}</Button></p>
 }
 
 /**
@@ -302,10 +303,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       // prompt and choosing Ontario is a real change that records it.
       const provinceMeta = answerMeta.province
       const provinceConfirmed = !!provinceMeta && provinceMeta.status === 'confirmed' && provinceMeta.origin !== 'example'
-      control = <label className="question-select"><span>{t('province')}</span><select value={provinceConfirmed ? inputs.province : ''} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>
+      control = <Field className="question-select"><span>{t('province')}</span><select value={provinceConfirmed ? inputs.province : ''} onChange={(e) => { set({ province: e.target.value as Province }); markAnswers(['province'], 'confirmed') }}>
         {!provinceConfirmed && <option value="" disabled>{t('questionnaire.chooseProvince')}</option>}
         {PROVINCES.map((p) => <option key={p} value={p}>{t(`prov_${p}`)} ({p})</option>)}
-      </select></label>
+      </select></Field>
       break
     }
     case 'time.work':
@@ -374,7 +375,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       const choices = ['tfsa', 'rrsp', 'nonReg', 'fhsa', 'locked'] as const
       control = <div className="check-group">{choices.map((account) => {
         const optionId = `account-${account}`
-        return <label key={account} className={selected.includes(account) ? 'selected' : undefined}><input type="checkbox" aria-labelledby={`${optionId}-name`} aria-describedby={`${optionId}-role`} checked={selected.includes(account)} onChange={(e) => {
+        return <ChoiceCard key={account} className={selected.includes(account) ? 'selected' : undefined}><input type="checkbox" aria-labelledby={`${optionId}-name`} aria-describedby={`${optionId}-role`} checked={selected.includes(account)} onChange={(e) => {
         if (!e.target.checked) {
           const nonZero = account === 'fhsa' ? (inputs.fhsa?.balance ?? 0) > 0
             : account === 'locked' ? (inputs.lockedRetirement?.balance ?? 0) > 0
@@ -388,7 +389,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
           else set({ lockedRetirement: e.target.checked ? (inputs.lockedRetirement ?? DEFAULT_LOCKED_RETIREMENT) : null })
           markAnswers([account === 'locked' ? 'lockedRetirement' : account], e.target.checked ? 'estimated' : 'notApplicable')
         } else setAccountPresence(account, e.target.checked)
-        }} /><span><strong id={`${optionId}-name`}>{t(`questionnaire.accountNames.${account}`)}</strong><small id={`${optionId}-role`}>{t(`questionnaire.accountRoles.${account}`)}</small></span></label>
+        }} /><span><strong id={`${optionId}-name`}>{t(`questionnaire.accountNames.${account}`)}</strong><small id={`${optionId}-role`}>{t(`questionnaire.accountRoles.${account}`)}</small></span></ChoiceCard>
       })}</div>
       break
     }
@@ -408,10 +409,10 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <div className="allocation-editor">
         <p className="allocation-instruction">{t('questionnaire.allocationInstruction')}</p>
         <div className="question-pair">{accounts.map((account) => <FactNumber key={account} field={`savingsSplit.${account}`} label={`${t(account)} %`} value={Math.round(inputs.savingsSplit[account] * 100)} onValue={(value) => set({ savingsSplit: { ...inputs.savingsSplit, [account]: value / 100 } })} />)}</div>
-        <div className={`allocation-total ${isComplete ? 'complete' : 'incomplete'}`} role="status" aria-live="polite">
+        <Callout variant="warn" className={`allocation-total ${isComplete ? 'complete' : 'incomplete'}`} role="status" aria-live="polite">
           <strong>{t('questionnaire.allocationTotal', { total })}</strong>
           <span>{isComplete ? t('questionnaire.allocationComplete') : total < 100 ? t('questionnaire.allocationRemaining', { difference }) : t('questionnaire.allocationOver', { difference })}</span>
-        </div>
+        </Callout>
         <SavingsRoomHint plan={canonicalPlan} />
       </div>
       break
@@ -432,7 +433,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         <FactNumber field="lockedRetirement.accessibleAge" label={t('lockedRetirementAge')}
           value={inputs.lockedRetirement!.accessibleAge}
           onValue={(accessibleAge) => set({ lockedRetirement: { ...inputs.lockedRetirement!, accessibleAge } })} />
-        {inputs.partner && <label className="question-select">
+        {inputs.partner && <Field className="question-select">
           <span>{t('lockedRetirementOwner')}</span>
           <select value={confirmedOwner ? inputs.lockedRetirement!.owner : ''} onChange={(e) => {
             set({ lockedRetirement: { ...inputs.lockedRetirement!, owner: e.target.value as 'self' | 'partner' } })
@@ -442,7 +443,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
             <option value="self">{t('benefitsSelf')}</option>
             <option value="partner">{t('partnerSection')}</option>
           </select>
-        </label>}
+        </Field>}
       </div>
       break
     }
@@ -483,7 +484,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'purchase.time': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <FactNumber field="principalResidence.buyAtAge" label={t('prBuyAtAge')} value={home.buyAtAge} onValue={(buyAtAge) => set({ principalResidence: { ...home, buyAtAge } })} />; break }
     case 'purchase.price': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <div className="question-pair"><FactNumber field="principalResidence.price" label={t('prPrice')} value={home.price} onValue={(price) => set({ principalResidence: { ...home, price } })} /><FactNumber field="principalResidence.downPayment" label={t('prDownPayment')} value={home.downPayment} onValue={(downPayment) => set({ principalResidence: { ...home, downPayment } })} />
-      <label className="check-inline"><input type="checkbox" data-testid="guided-hbp-use" checked={home.hbp !== false} onChange={(e) => set({ principalResidence: { ...home, hbp: e.target.checked } })} /> <span>{t('hbpUse')}<small className="hint"> {t('hbpUseDetail')}</small></span></label></div>; break }
+      <Field className="check-inline"><input type="checkbox" data-testid="guided-hbp-use" checked={home.hbp !== false} onChange={(e) => set({ principalResidence: { ...home, hbp: e.target.checked } })} /> <span>{t('hbpUse')}<small className="hint"> {t('hbpUseDetail')}</small></span></Field></div>; break }
     case 'purchase.loan': { const home = inputs.principalResidence!; if (home.mode !== 'planned') break; control = <div className="question-pair"><FactNumber field="principalResidence.annualMortgagePayment" label={t('debtPaymentLabel')} value={home.annualMortgagePayment ?? 0} onValue={(annualMortgagePayment) => set({ principalResidence: { ...home, annualMortgagePayment } })} /><FactNumber field="principalResidence.mortgageYears" label={t('debtYears')} value={home.mortgageYears ?? 0} onValue={(mortgageYears) => set({ principalResidence: { ...home, mortgageYears } })} /></div>; break }
     case 'housing.other':
       control = <div className="question-pair">
@@ -534,7 +535,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     }
     case 'debt.0.type': {
       const debt = inputs.debts![0]
-      control = <label className="question-select"><span>{t('debtKind')}</span><select value={answer ?? ''} onChange={(e) => { const kind = e.target.value as DebtKind; const next = [...inputs.debts!]; next[0] = { ...debt, kind }; setQuestionAnswer(definition.id, kind); set({ debts: next }); markAnswers(['debts.0.kind'], 'confirmed') }}><option value="" disabled>{t('questionnaire.chooseOne')}</option>{(['mortgage', 'carLoan', 'other'] as DebtKind[]).map((kind) => <option key={kind} value={kind}>{t(`debt_${kind}`)}</option>)}</select></label>
+      control = <Field className="question-select"><span>{t('debtKind')}</span><select value={answer ?? ''} onChange={(e) => { const kind = e.target.value as DebtKind; const next = [...inputs.debts!]; next[0] = { ...debt, kind }; setQuestionAnswer(definition.id, kind); set({ debts: next }); markAnswers(['debts.0.kind'], 'confirmed') }}><option value="" disabled>{t('questionnaire.chooseOne')}</option>{(['mortgage', 'carLoan', 'other'] as DebtKind[]).map((kind) => <option key={kind} value={kind}>{t(`debt_${kind}`)}</option>)}</select></Field>
       break
     }
     case 'debt.0.balance': {
@@ -559,8 +560,8 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       control = <>
         {estimating && <div className="worksheet-summary" data-testid="guided-worksheet-summary">
           <p>{t('questionnaire.worksheetTotal', { total: cad(categoryTotal) })}</p>
-          {categoryTotal > 0 && !applied && <button type="button" className="primary-action" data-testid="guided-worksheet-apply"
-            onClick={() => editSharedField('retirementSpending', String(categoryTotal))}>{t('questionnaire.useWorksheetTotal', { total: cad(categoryTotal) })}</button>}
+          {categoryTotal > 0 && !applied && <Button variant="primary" type="button" className="primary-action" data-testid="guided-worksheet-apply"
+            onClick={() => editSharedField('retirementSpending', String(categoryTotal))}>{t('questionnaire.useWorksheetTotal', { total: cad(categoryTotal) })}</Button>}
           {categoryTotal > 0 && applied && <p className="answer-feedback">{t('questionnaire.worksheetApplied')}</p>}
         </div>}
         <FactNumber field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} onValue={(retirementSpending) => set({ retirementSpending })} /><p className="answer-feedback">{t('questionnaire.spendingFeedback', { monthly: cad(inputs.retirementSpending / 12), annual: cad(inputs.retirementSpending) })}</p></>
@@ -669,7 +670,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
       break
     case 'intent.spending': {
       const supported = planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'
-      control = <><ChoiceGroup id={definition.id} value={planningIntent.spendingPreference} options={[{ value: 'maintain', label: t('questionnaire.choice.maintainSpending') }, { value: 'exploreCeiling', label: t('questionnaire.choice.exploreCeiling') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); applyIntent(planningIntent.legacyPreference, value as typeof planningIntent.spendingPreference) }} />{answer && <div className="intent-recommendation" role="status"><strong>{t('questionnaire.intentRecommendationLabel')}</strong><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <p className="capability-note">{t('questionnaire.intentUnsupported')}</p>}</div>}</>
+      control = <><ChoiceGroup id={definition.id} value={planningIntent.spendingPreference} options={[{ value: 'maintain', label: t('questionnaire.choice.maintainSpending') }, { value: 'exploreCeiling', label: t('questionnaire.choice.exploreCeiling') }, { value: 'undecided', label: t('questionnaire.choice.undecided') }]} onChange={(value) => { setQuestionAnswer(definition.id, value); applyIntent(planningIntent.legacyPreference, value as typeof planningIntent.spendingPreference) }} />{answer && <Callout className="intent-recommendation" role="status"><strong>{t('questionnaire.intentRecommendationLabel')}</strong><p>{t(`questionnaire.intentSummary.${supported}`, { spending: cad(inputs.retirementSpending) })}</p>{['minimumAmount', 'lifetimeGifts'].includes(planningIntent.legacyPreference) && <Callout as="p" variant="warn" className="capability-note">{t('questionnaire.intentUnsupported')}</Callout>}</Callout>}</>
       break
     }
     case 'invest.mix': {
@@ -682,7 +683,7 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
         set({ [field]: value / 100 })
         markAnswers([field], 'estimated', 'default')
       }
-      const preset = (field: 'fees' | 'inflation', value: number, label: string) => <button key={`${field}-${value}`} type="button" className="assumption-preset" aria-pressed={Boolean(answerMeta[field]?.status === 'estimated' && answerMeta[field]?.origin === 'default' && Math.abs((inputs[field] ?? 0) * 100 - value) < 0.001)} onClick={() => choosePreset(field, value)}>{label}</button>
+      const preset = (field: 'fees' | 'inflation', value: number, label: string) => <ChoiceCard as="button" key={`${field}-${value}`} type="button" className="assumption-preset" aria-pressed={Boolean(answerMeta[field]?.status === 'estimated' && answerMeta[field]?.origin === 'default' && Math.abs((inputs[field] ?? 0) * 100 - value) < 0.001)} onClick={() => choosePreset(field, value)}>{label}</ChoiceCard>
       control = <div className="assumption-presets">
         <div className="assumption-preset-field"><FactNumber field="fees" label={t('questionnaire.feeTotalLabel')} value={(inputs.fees ?? 0) * 100} step={0.1} onValue={(value) => set({ fees: value / 100 })} /><p>{t('questionnaire.feePresetIntro')}</p><div className="assumption-preset-options" role="group" aria-label={t('questionnaire.feePresetGroup')}>
           {preset('fees', 0.2, t('questionnaire.feePreset.etf'))}{preset('fees', 0.65, t('questionnaire.feePreset.managed'))}{preset('fees', 2.1, t('questionnaire.feePreset.mutual'))}
@@ -714,12 +715,12 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
             if (earned?.status !== 'known' || earned.value <= 0) return null
             const suggested = Math.round(engineMarginalRate(earned.value, inputs.province) * 1000) / 10
             return <p className="answer-feedback" data-testid="guided-rate-suggestion">{t('questionnaire.taxRateFromIncome', { income: cad(earned.value), rate: suggested })}{' '}
-              {Math.abs(suggested - marginalRate * 100) >= 0.05 && <button type="button" className="text-action" onClick={() => { set({ accumulationMarginalRate: suggested / 100 }); markAnswers(['accumulationMarginalRate'], 'confirmed') }}>{t('questionnaire.taxRateUse', { rate: suggested })}</button>}</p>
+              {Math.abs(suggested - marginalRate * 100) >= 0.05 && <Button variant="link" type="button" className="text-action" onClick={() => { set({ accumulationMarginalRate: suggested / 100 }); markAnswers(['accumulationMarginalRate'], 'confirmed') }}>{t('questionnaire.taxRateUse', { rate: suggested })}</Button>}</p>
           })()}
           <p>{t('questionnaire.taxRateMeaning')}</p>
           <p>{t('questionnaire.taxRateFind')} <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/current-year.html" target="_blank" rel="noopener noreferrer">{t('questionnaire.taxRateSource')}</a></p>
         </div>
-        <p className="tax-worked-example" aria-live="polite">{t('questionnaire.taxWorkedExample', { balance: cad(100_000), distribution: cad(exampleDistribution), tax: cad(exampleDistribution * marginalRate) })}</p>
+        <Callout as="p" className="tax-worked-example" aria-live="polite">{t('questionnaire.taxWorkedExample', { balance: cad(100_000), distribution: cad(exampleDistribution), tax: cad(exampleDistribution * marginalRate) })}</Callout>
         <p className="tax-model-note">{t('questionnaire.taxModelNote')}</p>
       </div>
       break
@@ -744,6 +745,6 @@ export function QuestionPage({ definition }: { definition: QuestionDefinition })
     <h2 id="question-title" tabIndex={-1}>{t(questionTitleKey(definition, inputs))}</h2>
     {control}
     <QuestionHelp guidanceKey={definition.guidanceKey} />
-    {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <p className="pending-note">{t('questionnaire.pendingSaved')}</p>}
+    {definition.fieldBindings.some((field) => answerMeta[field]?.status === 'unknown') && <Callout as="p" variant="warn" className="pending-note">{t('questionnaire.pendingSaved')}</Callout>}
   </article>
 }

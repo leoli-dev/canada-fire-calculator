@@ -1,3 +1,4 @@
+import { Button } from '../ui'
 import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAnalyticsConsent, privacySignal, setAnalyticsConsent, subscribeAnalyticsConsent, type AnalyticsConsent } from '../analytics'
@@ -15,8 +16,8 @@ export function AnalyticsPrompt() {
   return <section className="analytics-prompt" aria-label={t('analyticsPromptLabel')} data-testid="analytics-prompt">
     <p>{t('analyticsPrompt')}</p>
     <div>
-      <button type="button" onClick={() => choose('granted')}>{t('analyticsAllow')}</button>
-      <button type="button" onClick={() => choose('denied')}>{t('analyticsDecline')}</button>
+      <Button variant="primary" type="button" onClick={() => choose('granted')}>{t('analyticsAllow')}</Button>
+      <Button type="button" onClick={() => choose('denied')}>{t('analyticsDecline')}</Button>
     </div>
   </section>
 }
@@ -28,9 +29,9 @@ export function AnalyticsFooter() {
   return <p className="privacy-note" data-testid="analytics-footer">
     {t('privacyNote')}{' '}
     {privacySignal() ? t('analyticsSignal') : consent === 'granted' ? <>
-      {t('analyticsOn')}{' '}<button type="button" className="text-action" onClick={() => choose('denied')}>{t('analyticsTurnOff')}</button>
+      {t('analyticsOn')}{' '}<Button variant="link" type="button" className="text-action" onClick={() => choose('denied')}>{t('analyticsTurnOff')}</Button>
     </> : <>
-      {t('analyticsOff')}{' '}<button type="button" className="text-action" onClick={() => choose('granted')}>{t('analyticsTurnOn')}</button>
+      {t('analyticsOff')}{' '}<Button variant="link" type="button" className="text-action" onClick={() => choose('granted')}>{t('analyticsTurnOn')}</Button>
     </>}
   </p>
 }

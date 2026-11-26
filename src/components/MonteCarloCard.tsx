@@ -1,3 +1,5 @@
+import { useChartColors } from '../chartColors'
+import { Button } from '../ui'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -20,6 +22,7 @@ import { matchesMcRequest, type McRequest, type McResponse } from '../mcProtocol
 
 export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; ruleVersion: string; scale?: (age: number) => number }) {
   const { t } = useTranslation()
+  const COLORS = useChartColors()
   const cad = useCad()
   const cadTick = useCadCompact()
   const workerRef = useRef<Worker | null>(null)
@@ -100,10 +103,10 @@ export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; r
     <div className="chart-card">
       <div className="card-head">
         <h3>{t('mcTitle')}</h3>
-        <button className="primary" onClick={run} disabled={running}>
+        <Button variant="primary" className="primary" onClick={run} disabled={running}>
           {running ? t('mcRunning') : t('mcRun')}
-        </button>
-        {running && <button type="button" onClick={stop}>{t('mcCancel')}</button>}
+        </Button>
+        {running && <Button type="button" onClick={stop}>{t('mcCancel')}</Button>}
       </div>
       {mc && (
         <>
@@ -143,32 +146,32 @@ export function MonteCarloCard(props: { inputs: Inputs; inputRevision: number; r
           )}
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={data} margin={{ top: 12, right: 16, bottom: 0, left: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.4} />
-              <XAxis dataKey="age" type="number" allowDecimals={false}
+              <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 3" strokeOpacity={0.4} />
+              <XAxis stroke={COLORS.axis} dataKey="age" type="number" allowDecimals={false}
                 domain={data && data.length ? [data[0].age, data[data.length - 1].age] : undefined}
                 tickCount={12} />
-              <YAxis tickFormatter={(v: number) => cadTick(v)} width={64} />
-              <Tooltip
+              <YAxis stroke={COLORS.axis} tickFormatter={(v: number) => cadTick(v)} width={64} />
+              <Tooltip itemStyle={{ color: COLORS.axis }}
                 formatter={(v, name) =>
                   name === t('mcBand')
                     ? [cad(Number(v)), t('mcBand')]
                     : [cad(Number(v)), String(name)]
                 }
               />
-              <ReferenceLine x={props.inputs.fireAge} stroke="#b3541e" strokeDasharray="4 4" />
+              <ReferenceLine x={props.inputs.fireAge} stroke={COLORS.fire} strokeDasharray="4 4" />
               {mc.failures.earliestDepletedAge != null && (
                 <ReferenceLine
                   x={mc.failures.earliestDepletedAge}
-                  stroke="#c0392b"
+                  stroke={COLORS.mcWorst}
                   strokeDasharray="2 3"
-                  label={{ value: t('mcWorstAgeLabel', { age: mc.failures.earliestDepletedAge }), position: 'insideTopRight', fill: '#c0392b', fontSize: 11 }}
+                  label={{ value: t('mcWorstAgeLabel', { age: mc.failures.earliestDepletedAge }), position: 'insideTopRight', fill: COLORS.mcWorst, fontSize: 12 }}
                 />
               )}
               <Area dataKey="p10" stackId="band" stroke="none" fill="transparent" name="p10" />
-              <Area dataKey="band" stackId="band" stroke="none" fill="#7da2c9" fillOpacity={0.35} name={t('mcBand')} />
-              <Line dataKey="p50" stroke="#1f4e79" strokeWidth={2} dot={false} name={t('mcMedian')} />
+              <Area dataKey="band" stackId="band" stroke="none" fill={COLORS.mcBand} fillOpacity={0.25} name={t('mcBand')} />
+              <Line dataKey="p50" stroke={COLORS.mcMedian} strokeWidth={2} dot={false} name={t('mcMedian')} />
               {data?.some((d) => d.worst !== undefined) && (
-                <Line dataKey="worst" stroke="#c0392b" strokeWidth={1.5} strokeDasharray="4 3" dot={false} name={t('mcWorst')} connectNulls />
+                <Line dataKey="worst" stroke={COLORS.mcWorst} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name={t('mcWorst')} connectNulls />
               )}
             </ComposedChart>
           </ResponsiveContainer>
