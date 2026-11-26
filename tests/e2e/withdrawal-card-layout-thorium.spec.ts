@@ -4,6 +4,7 @@ import { showProfessionalResults } from './fixtures/professional'
 
 const executablePath = process.env.THORIUM_EXECUTABLE_PATH ?? '/Applications/Thorium.app/Contents/MacOS/Thorium'
 test.use({ browserName: 'chromium', launchOptions: { executablePath }, headless: true })
+test.skip(!existsSync(executablePath), 'This suite requires the Thorium executable')
 
 async function seed(page: Page, mode: string, language: string) {
   await page.goto('/')
