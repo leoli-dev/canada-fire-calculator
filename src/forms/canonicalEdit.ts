@@ -2,6 +2,7 @@ import type { Account, InputsV2 } from '../engine/model'
 import { derivedAccountId, refreshCanonicalFromLegacy, settleSingleHousehold } from '../engine/migration'
 import { legacyFhsaMirror } from '../engine/fhsaPlan'
 import { useStore, type AnswerMeta } from '../store'
+import { omitUnboundPartnerAnswers } from './partnerAnswerMeta'
 
 /**
  * Whether any account or property still lacks a confirmed taxable owner. The
@@ -32,8 +33,7 @@ export function commitSingleHouseholdSettlement(): void {
     // The orphan still exists at this boundary, before settlement deliberately
     // drops it. A future replacement may reuse its ID and cannot own its answers.
     if (!before.orphanedPeople?.some(person => person.role === 'partner')) return metadata
-    return Object.fromEntries(Object.entries(metadata).filter(([field, answer]) =>
-      !(field.startsWith('partner.') && (answer.status === 'confirmed' || answer.status === 'estimated'))))
+    return omitUnboundPartnerAnswers(metadata)
   })
 }
 
