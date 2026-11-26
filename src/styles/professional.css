@@ -1,0 +1,77 @@
+/* Professional editors keep their original transactions and mounted draft controls. */
+.app .phone-result-tabs, .professional-canonical-peek, .selected-value { display: none; }
+.professional-inputs { min-width: 0; }
+.professional-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.professional-search input { width: 100%; min-width: 0; min-height: 40px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r-control); background: var(--surface); color: var(--ink); font-size: var(--fs-ui); }
+.professional-group { margin: 0; border-bottom: 1px solid var(--line); background: var(--surface); }
+.professional-group[hidden], .professional-group [data-search-hidden='true'] { display: none; }
+.professional-inputs .professional-group > summary { padding: 8px 16px; min-height: 48px; }
+.professional-group > summary small { margin-left: auto; color: var(--ink-2); font-size: var(--fs-caption); font-weight: 400; }
+.professional-group-body { padding: 0 16px; min-width: 0; }
+.professional-group-body h3 { font-size: var(--fs-ui); }
+.professional-inputs .ui-field { display: grid; grid-template-columns: minmax(0, 1fr) 150px; align-items: center; gap: 6px 12px; margin: 12px 0; }
+.professional-inputs .ui-field :is(input:not([type='checkbox']):not([type='radio']), select, .commit-number) { width: 100%; min-width: 0; }
+.professional-inputs .ui-field:has(> input[type='checkbox']) { display: flex; align-items: center; }
+.professional-inputs .ui-field > input[type='checkbox'] { flex: 0 0 20px; width: 20px; min-width: 20px; }
+.professional-inputs .ui-field:has(> input[type='checkbox']) > span { flex: 1; }
+.professional-inputs .selected-value { display: block; grid-column: 2; color: var(--ink-2); font-size: var(--fs-meta); white-space: normal; overflow-wrap: anywhere; }
+.professional-select-options { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+.professional-option-list { display: grid; gap: 8px; }
+.professional-option-list .ui-button { text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; }
+.professional-option-list .ui-button[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-tint); }
+.professional-inputs [data-search-hidden='true'] + .professional-select-options { display: none; }
+.professional-inputs .tax-facts-panel .ui-field { grid-template-columns: minmax(0, 1fr) 150px; }
+.professional-number-field { position: relative; }
+.professional-number-field:has([data-search-hidden='true']) { display: none; }
+.professional-number-field:has(.professional-field-help) .field > span:first-child { padding-right: 24px; }
+.professional-number-field .professional-field-help { position: absolute; top: 4px; right: 162px; margin: 0; }
+.professional-inputs :is(.hint, .answer-status) { font-size: var(--fs-meta); }
+.professional-inputs .answer-status { display: block; text-align: right; }
+.professional-inputs .reset-plan { margin: 24px 16px; }
+.professional-inputs .tax-facts-panel { container-type: normal; }
+.professional-layout .withdrawal-order-card .field.ui-field { grid-template-columns: minmax(0, 1fr) minmax(0, 260px); }
+.professional-layout .withdrawal-order-card .field.ui-field select { width: 100%; min-width: 0; }
+.professional-inputs [data-testid='canonical-evidence'] { margin: 0; padding: 0; border: 0; }
+.professional-inputs [data-testid='canonical-evidence'] > summary { display: none; }
+@media (min-width: 1100px) {
+  .app.app-professional { max-width: none; height: 100dvh; padding-bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .app-professional > :is(.app-bar, .desktop-disclaimer) { flex: 0 0 auto; }
+  .app-professional .professional-layout { grid-template-columns: 400px minmax(0, 1fr); gap: 0; max-width: none !important; width: calc(100% + 48px); margin: 0 -24px !important; flex: 1; min-height: 0; }
+  .professional-layout > :is(aside, .results-column, .professional-results-unavailable) { height: 100%; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .professional-input-pane { border-right: 1px solid var(--line); background: var(--surface); }
+  .professional-layout > :is(.results-column, .professional-results-unavailable) { padding: 20px 28px; }
+  .professional-layout .summary { position: sticky; top: 0; z-index: 10; background: var(--surface); }
+}
+@media (max-width: 640px) {
+  .app .app-bar { height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  .app .mobile-question-progress { top: calc(52px + env(safe-area-inset-top)); }
+  .app-professional { height: 100dvh; padding-bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .app-professional > .app-bar { flex: 0 0 auto; }
+  .app-professional .professional-layout { display: block; flex: 1; min-height: 0; margin: 0 -16px !important; padding-bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .professional-layout > :is(aside, .results-column, .professional-results-unavailable) { height: 100%; overflow: auto; overscroll-behavior: contain; }
+  .professional-layout > :is(.results-column, .professional-results-unavailable) { padding: 16px; }
+  .professional-layout[data-phone-pane='inputs'] > :is(.results-column, .professional-results-unavailable), .professional-layout[data-phone-pane='results'] > aside { display: none; }
+  .app .phone-result-tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-height: calc(74px + env(safe-area-inset-bottom)); padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+  .phone-result-tabs .ui-button { min-height: 48px; border-color: transparent; color: var(--ink-2); }
+  .phone-result-tabs .ui-button[aria-selected='true'] { color: var(--accent); background: var(--accent-tint); }
+  .has-result-tabs { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
+  .has-result-tabs .review-generate-bar { bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .professional-tools { padding: 12px 16px; }
+  .professional-search input { min-height: 48px; font-size: 16px; }
+  .professional-inputs .ui-field, .professional-inputs .tax-facts-panel .ui-field { grid-template-columns: minmax(0, 1fr); }
+  .professional-inputs .selected-value { grid-column: 1; }
+  .professional-inputs :is(input, select, textarea) { font-size: 16px; min-height: 48px; }
+  .app-professional .professional-inputs :is(button, summary, a[href]) { min-height: 48px; min-width: 48px; }
+  .professional-inputs a[href] { display: inline-flex; align-items: center; }
+  .professional-inputs input:is([type='checkbox'], [type='radio']) { width: 48px; height: 48px; }
+  .professional-inputs .ui-field > input[type='checkbox'] { flex-basis: 48px; width: 48px; min-width: 48px; }
+  .professional-number-field .professional-field-help { top: 0; right: 0; }
+  .professional-number-field:has(.professional-field-help) .field > span:first-child { min-height: 48px; display: block; padding: 12px 56px 12px 0; }
+  .professional-layout .withdrawal-order-card .field.ui-field { grid-template-columns: minmax(0, 1fr); }
+  .professional-inputs .professional-field-help .ui-field-help { width: 48px; min-width: 48px; min-height: 48px; }
+  .professional-layout .result-peek, .professional-canonical-peek { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink); }
+  .professional-layout .result-peek .ui-callout-icon { display: none; }
+  .professional-layout .result-peek p { flex: 1; font-size: var(--fs-ui); }
+  .professional-layout .result-peek p > span:not(.sr-only) { display: inline-block; margin: 2px 6px 2px 0; }
+  .professional-layout :is(.result-peek, .professional-canonical-peek) .ui-button { min-height: 48px; flex-shrink: 0; max-width: 45%; }
+}

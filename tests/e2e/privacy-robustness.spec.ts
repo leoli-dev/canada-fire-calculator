@@ -1,3 +1,4 @@
+import { showProfessionalResults } from './fixtures/professional'
 import { chooseMode } from './fixtures/app-bar'
 import { expect, test } from '@playwright/test'
 
@@ -45,6 +46,7 @@ test('blocked site storage still starts the calculator and says the plan is not 
   await expect(page.getByTestId('storage-unavailable')).toBeVisible()
   await chooseMode(page, 'professional')
   await page.locator('label.field').filter({ hasText: 'Current age' }).locator('input').fill('40')
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
   // The consent answer holds for the session even though it cannot be stored.
   await page.getByTestId('analytics-prompt').getByRole('button', { name: 'No thanks' }).click()
@@ -69,7 +71,7 @@ test('on a phone the headline sits above the form and every result question fits
   await expect(peek).toContainText(verdict)
   await peek.getByRole('button', { name: 'See the full results' }).click()
   await expect(page.locator('#results')).toBeFocused()
-  const tabs = page.getByRole('tab')
+  const tabs = page.locator('.summary').getByRole('tab')
   await expect(tabs).toHaveCount(4)
   const width = page.viewportSize()!.width
   for (const box of await tabs.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON())))

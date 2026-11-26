@@ -42,6 +42,27 @@
       "targetReached": "已达到目标",
       "optional": "可选",
       "reviewRuleDate": "{{jurisdiction}} {{year}} 年税务规则，{{quarter}} 福利标准。"
+    },
+    "professional": {
+      "search": "查找字段",
+      "collapse": "全部收起",
+      "saving": "储蓄与支出",
+      "housing": "住房与债务",
+      "benefits": "福利与养老金",
+      "tax": "税务资料",
+      "advanced": "高级：规范账本",
+      "on": "已启用",
+      "off": "未启用",
+      "panes": "计划视图",
+      "inputs": "输入",
+      "answers": "答案",
+      "results": "结果",
+      "unavailable": "结果暂不可用。请检查输入及上方提示。",
+      "fields_one": "{{count}} 个字段",
+      "fields_other": "{{count}} 个字段",
+      "options": "查看全部选项",
+      "lasts": "余额维持至 {{age}} 岁",
+      "depleted": "{{age}} 岁耗尽"
     }
   },
   "title": "🇨🇦 加拿大 FIRE 计算器",

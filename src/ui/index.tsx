@@ -1,5 +1,5 @@
-import { Children, cloneElement, createElement, forwardRef, isValidElement, useEffect, useId, useRef, useState } from 'react'
-import type { ButtonHTMLAttributes, DetailsHTMLAttributes, HTMLAttributes, LabelHTMLAttributes, ReactElement, ReactNode } from 'react'
+import { Children, cloneElement, createContext, createElement, forwardRef, isValidElement, useContext, useEffect, useId, useRef, useState } from 'react'
+import type { ButtonHTMLAttributes, DetailsHTMLAttributes, HTMLAttributes, LabelHTMLAttributes, ReactElement, ReactNode, RefObject, SelectHTMLAttributes } from 'react'
 import './ui.css'
 
 const classes = (...values: (string | undefined | false)[]) => values.filter(Boolean).join(' ')
@@ -29,8 +29,32 @@ export function Segmented({ as = 'div', className, children, mode = 'button', ..
   }))
 }
 
+export const ReadableFieldValues = createContext<{ options: string; close: string } | null>(null)
+type SelectOption = ReactElement<{ value?: string | number; children?: ReactNode; disabled?: boolean }>
+const selectOptions = (nodes: ReactNode): SelectOption[] => Children.toArray(nodes).flatMap(node => !isValidElement(node) ? [] : node.type === 'option' ? [node as SelectOption] : selectOptions((node.props as { children?: ReactNode }).children))
+
+/** Native selection stays available; the Sheet also makes every long option readable at phone widths. */
+function FieldOptions({ field, select, labels }: { field: RefObject<HTMLElement>; select: ReactElement<SelectHTMLAttributes<HTMLSelectElement>>; labels: { options: string; close: string } }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return <div className="professional-select-options"><Button size="sm" aria-expanded={open} aria-controls={id} disabled={select.props.disabled} onClick={() => setOpen(true)}>{labels.options}</Button>
+    <Sheet id={id} open={open} onClose={() => setOpen(false)} title={labels.options} closeLabel={labels.close}>
+      <div className="professional-option-list">{selectOptions(select.props.children).map((option, index) => <Button key={index} disabled={option.props.disabled} aria-pressed={String(option.props.value) === String(select.props.value)} onClick={() => {
+        const control = field.current?.querySelector('select')
+        if (!control) return
+        control.selectedIndex = index
+        control.dispatchEvent(new Event('change', { bubbles: true }))
+        setOpen(false)
+      }}>{option.props.children}</Button>)}</div>
+    </Sheet>
+  </div>
+}
 export function Field({ as = 'label', className, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { as?: 'label' | 'div' }) {
-  return createElement(as, { ...props, className: classes('ui-field', className) }, children)
+  const readable = useContext(ReadableFieldValues)
+  const field = useRef<HTMLElement>(null)
+  const select = readable ? Children.toArray(children).find(child => isValidElement(child) && child.type === 'select') as ReactElement<SelectHTMLAttributes<HTMLSelectElement>> | undefined : undefined
+  const selected = select && selectOptions(select.props.children).find(option => String(option.props.value) === String(select.props.value))
+  return <>{createElement(as, { ...props, ref: field, className: classes('ui-field', className) }, <>{children}{selected && <span className="selected-value" aria-hidden="true">{selected.props.children}</span>}</>)}{select && readable && <FieldOptions field={field} select={select} labels={readable} />}</>
 }
 export function ChoiceCard({ as = 'label', className, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { as?: 'label' | 'button'; type?: 'button'; 'aria-pressed'?: boolean }) {
   return createElement(as, { ...props, className: classes('ui-choice', className) }, children)

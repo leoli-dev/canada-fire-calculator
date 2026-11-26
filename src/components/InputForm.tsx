@@ -37,6 +37,8 @@ import { BudgetMethodPanel } from './BudgetMethodPanel'
 import { RuleAssumptions } from './RuleAssumptions'
 import { contentForField, professionalContentApplies } from '../content/fieldContent'
 import { ProfessionalFieldHelp } from './FieldContentHelp'
+import { ProfessionalGroup } from './ProfessionalInputs'
+import { CanonicalEvidenceControl } from './CanonicalEvidenceControl'
 import { TaxFactsPanel } from './TaxFactsPanel'
 
 const PROVINCES: Province[] = [
@@ -62,7 +64,7 @@ function Num(props: {
   const inputs = useStore((s) => s.inputs)
   const descriptionId = useId()
   return (
-    <>
+    <div className="professional-number-field">
       <Field className="field">
         <span><Jargon text={props.label} /></span>
         <NumberInput
@@ -95,7 +97,7 @@ function Num(props: {
       </Field>
       {meta && <small className="answer-status">{t(`guided.meta.${meta.origin === 'legacy' ? 'legacy' : meta.status}`)}</small>}
       {content && professionalContentApplies(content, inputs) && <ProfessionalFieldHelp content={content} />}
-    </>
+    </div>
   )
 }
 
@@ -130,7 +132,8 @@ function OptionalAge(props: {
 const INFLATION_PRESETS = ['0.015', '0.021', '0.03']
 
 export function InputForm() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const inputRevision = useStore(s => s.inputRevision)
   const [customInflation, setCustomInflation] = useState(false)
   const cad = useCad()
   const setGoalFromProfessional = useStore((s) => s.setGoalFromProfessional)
@@ -170,8 +173,7 @@ export function InputForm() {
       {errorCount > 0 && (
         <p className="validation-banner">{t('valBanner', { count: errorCount })}</p>
       )}
-      <fieldset>
-        <legend>{t('profile')}</legend>
+      <ProfessionalGroup name="profile" title={t('profile')}>
         <RuleAssumptions province={inputs.province} inflation={inputs.inflation ?? 0.021} />
         <Num field="currentAge" label={t('currentAge')} value={inputs.currentAge} issue={issueFor('currentAge')} onChange={(v) => set({ currentAge: v })} />
         <Num field="fireAge" label={t('fireAge')} value={inputs.fireAge} issue={issueFor('fireAge')} onChange={(v) => set({ fireAge: v })} />
@@ -190,76 +192,6 @@ export function InputForm() {
             ))}
           </select>
         </Field>
-        <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
-        <BudgetMethodPanel />
-        <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
-        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
-          <summary>{t('worksheetTitle')}</summary>
-          {WORKSHEET_KEYS.map((k) => (
-            <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
-              onChange={(v) => setWorksheet(k, Math.max(0, v))} />
-          ))}
-          <div className="ws-total">
-            <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
-            <Button type="button" disabled={worksheetTotal <= 0}
-              onClick={() => {
-                set({ retirementSpending: worksheetTotal })
-                track('worksheet_apply')
-              }}>
-              {t('wsApply')}
-            </Button>
-          </div>
-        </details>
-        <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
-          onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
-        <Field className="field">
-          <span><Jargon text={t('goal')} /></span>
-          <select
-            value={inputs.goal ?? 'legacy'}
-            onChange={(e) => {
-              setGoalFromProfessional(e.target.value as Goal)
-              track('goal_change', { goal: e.target.value })
-            }}
-          >
-            <option value="legacy">{t('goal_legacy')}</option>
-            <option value="dieWithZero">{t('goal_dieWithZero')}</option>
-          </select>
-        </Field>
-        {(inputs.goal ?? 'legacy') === 'dieWithZero' && (
-          <p className="hint"><Jargon text={t('dwzGoalNote')} /></p>
-        )}
-        {/* FE-46: any guided inflation rate is shown and editable here, not
-            snapped to the nearest preset label. */}
-        <Field className="field">
-          <span>{t('inflationLabel')}</span>
-          <select
-            value={INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021)) && !customInflation ? String(inputs.inflation ?? 0.021) : 'custom'}
-            onChange={(e) => {
-              if (e.target.value === 'custom') { setCustomInflation(true); return }
-              setCustomInflation(false)
-              set({ inflation: Number(e.target.value) })
-              track('inflation_change', { value: e.target.value })
-            }}
-          >
-            <option value="0.015">{t('infl_low')}</option>
-            <option value="0.021">{t('infl_mid')}</option>
-            <option value="0.03">{t('infl_high')}</option>
-            <option value="custom">{t('infl_custom', { value: Number(((inputs.inflation ?? 0.021) * 100).toFixed(2)) })}</option>
-          </select>
-        </Field>
-        {(customInflation || !INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021))) && <Field className="field">
-          <span>{t('infl_customLabel')}</span>
-          <NumberInput value={Number(((inputs.inflation ?? 0.021) * 100).toFixed(4))} step={0.1}
-            onChange={(v) => { if (v !== null && v >= 0 && v <= 15) set({ inflation: v / 100 }) }} />
-        </Field>}
-        <Field as="div" className="field">
-          <span id="display-mode-label">{t('displayModeLabel')}</span>
-          <Segmented aria-labelledby="display-mode-label">
-            <Button aria-pressed={displayMode === 'real'} onClick={() => setDisplayMode('real')}>{t('display_real')}</Button>
-            <Button aria-pressed={displayMode === 'nominal'} onClick={() => setDisplayMode('nominal')}>{t('display_nominal')}</Button>
-          </Segmented>
-        </Field>
-        <p className="hint"><Jargon text={t('displayModeNote')} /></p>
         <Field className="field">
           <span><Jargon text={t('household')} /></span>
           <select
@@ -278,44 +210,6 @@ export function InputForm() {
             <Num label={t('partnerAge')} value={inputs.partner.currentAge} issue={issueFor('partner.currentAge')}
               onChange={(v) => set({ partner: { ...inputs.partner!, currentAge: v } })} />
             <p className="hint"><Jargon text={t('coupleNote')} /></p>
-          </>
-        )}
-        <Field className="field">
-          <span><Jargon text={t('extraIncomeToggle')} /></span>
-          <input
-            type="checkbox"
-            checked={!!inputs.extraIncome}
-            onChange={(e) => {
-              set({
-                extraIncome: e.target.checked
-                  ? { annual: 20000, fromAge: inputs.fireAge, toAge: inputs.fireAge + 10 }
-                  : null,
-              })
-              track('barista_fire_toggle', { enabled: e.target.checked })
-            }}
-          />
-        </Field>
-        {inputs.extraIncome && (
-          <>
-            <Num label={t('extraIncomeAnnual')} value={inputs.extraIncome.annual} step={1000}
-              issue={issueFor('extraIncome.annual')}
-              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, annual: v } })} />
-            <Field className="field">
-              <span>{t('sideIncomeKind')}</span>
-              <select data-testid="side-income-kind" value={inputs.extraIncome.kind ?? 'employment'}
-                onChange={(e) => set({ extraIncome: { ...inputs.extraIncome!, kind: e.target.value as 'employment' | 'selfEmployment' | 'other' } })}>
-                <option value="employment">{t('sideIncomeEmployment')}</option>
-                <option value="selfEmployment">{t('sideIncomeSelf')}</option>
-                <option value="other">{t('sideIncomeOther')}</option>
-              </select>
-            </Field>
-            <Num label={t('extraIncomeFrom')} value={inputs.extraIncome.fromAge}
-              issue={issueFor('extraIncome.fromAge')}
-              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, fromAge: v } })} />
-            <Num label={t('extraIncomeTo')} value={inputs.extraIncome.toAge}
-              issue={issueFor('extraIncome.toAge')}
-              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, toAge: v } })} />
-            <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
           </>
         )}
         <Field className="field">
@@ -368,10 +262,82 @@ export function InputForm() {
             <p className="hint"><Jargon text={t('childrenNote')} /></p>
           </>
         )}
-      </fieldset>
+      </ProfessionalGroup>
 
-      <fieldset>
-        <legend>{t('accounts')}</legend>
+      <ProfessionalGroup name="saving" title={t('ui.professional.saving')}>
+        <Num label={t('targetInputLabel')} value={inputs.fireTargetAssets ?? 0} step={50000}
+          onChange={(v) => set({ fireTargetAssets: v > 0 ? v : null })} />
+        <Field className="field">
+          <span><Jargon text={t('goal')} /></span>
+          <select
+            value={inputs.goal ?? 'legacy'}
+            onChange={(e) => {
+              setGoalFromProfessional(e.target.value as Goal)
+              track('goal_change', { goal: e.target.value })
+            }}
+          >
+            <option value="legacy">{t('goal_legacy')}</option>
+            <option value="dieWithZero">{t('goal_dieWithZero')}</option>
+          </select>
+        </Field>
+        {(inputs.goal ?? 'legacy') === 'dieWithZero' && (
+          <p className="hint"><Jargon text={t('dwzGoalNote')} /></p>
+        )}
+        {/* FE-46: any guided inflation rate is shown and editable here, not
+            snapped to the nearest preset label. */}
+        <Field className="field">
+          <span>{t('inflationLabel')}</span>
+          <select
+            value={INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021)) && !customInflation ? String(inputs.inflation ?? 0.021) : 'custom'}
+            onChange={(e) => {
+              if (e.target.value === 'custom') { setCustomInflation(true); return }
+              setCustomInflation(false)
+              set({ inflation: Number(e.target.value) })
+              track('inflation_change', { value: e.target.value })
+            }}
+          >
+            <option value="0.015">{t('infl_low')}</option>
+            <option value="0.021">{t('infl_mid')}</option>
+            <option value="0.03">{t('infl_high')}</option>
+            <option value="custom">{t('infl_custom', { value: Number(((inputs.inflation ?? 0.021) * 100).toFixed(2)) })}</option>
+          </select>
+        </Field>
+        {(customInflation || !INFLATION_PRESETS.includes(String(inputs.inflation ?? 0.021))) && <Field className="field">
+          <span>{t('infl_customLabel')}</span>
+          <NumberInput value={Number(((inputs.inflation ?? 0.021) * 100).toFixed(4))} step={0.1}
+            onChange={(v) => { if (v !== null && v >= 0 && v <= 15) set({ inflation: v / 100 }) }} />
+        </Field>}
+        <Field as="div" className="field">
+          <span id="display-mode-label">{t('displayModeLabel')}</span>
+          <Segmented aria-labelledby="display-mode-label">
+            <Button aria-pressed={displayMode === 'real'} onClick={() => setDisplayMode('real')}>{t('display_real')}</Button>
+            <Button aria-pressed={displayMode === 'nominal'} onClick={() => setDisplayMode('nominal')}>{t('display_nominal')}</Button>
+          </Segmented>
+        </Field>
+        <p className="hint"><Jargon text={t('displayModeNote')} /></p>
+        <Num field="annualSavings" label={t('annualSavings')} value={inputs.annualSavings} step={1000} issue={issueFor('annualSavings')} onChange={(v) => set({ annualSavings: v })} />
+        <BudgetMethodPanel />
+        <Num field="retirementSpending" label={t('retirementSpending')} value={inputs.retirementSpending} step={1000} issue={issueFor('retirementSpending')} onChange={(v) => set({ retirementSpending: v })} />
+        <details onToggle={(e) => e.currentTarget.open && track('panel_open', { panel: 'worksheet' })}>
+          <summary>{t('worksheetTitle')}</summary>
+          {WORKSHEET_KEYS.map((k) => (
+            <Num key={k} label={t(k)} value={worksheet[k] || 0} step={500}
+              onChange={(v) => setWorksheet(k, Math.max(0, v))} />
+          ))}
+          <div className="ws-total">
+            <span>{t('wsTotal')}: <strong>{cad(worksheetTotal)}</strong></span>
+            <Button type="button" disabled={worksheetTotal <= 0}
+              onClick={() => {
+                set({ retirementSpending: worksheetTotal })
+                track('worksheet_apply')
+              }}>
+              {t('wsApply')}
+            </Button>
+          </div>
+        </details>
+      </ProfessionalGroup>
+
+      <ProfessionalGroup name="accounts" title={t('accounts')}>
         <p className="hint">{t('accountsHint')}</p>
         {ACCOUNTS.map((a) => (
           <Num
@@ -477,10 +443,7 @@ export function InputForm() {
             </em>
           )}
         </details>
-      </fieldset>
-
-      <fieldset>
-        <legend><Jargon text={t('fhsaSection')} /></legend>
+        <h3>{t('fhsaSection')}</h3>
         <Field className="field">
           <span>{t('fhsaToggle')}</span>
           <input
@@ -517,10 +480,10 @@ export function InputForm() {
             </p>
           </>
         )}
-      </fieldset>
+      </ProfessionalGroup>
 
-      <fieldset>
-        <legend>{t('propertySection')}</legend>
+      <ProfessionalGroup name="housing" title={t('ui.professional.housing')}>
+        <h3>{t('propertySection')}</h3>
 
         {pr && (
           <div className="property-card">
@@ -770,10 +733,7 @@ export function InputForm() {
         {(inputs.investmentProperties?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('ipNote')} /></p>
         )}
-      </fieldset>
-
-      <fieldset>
-        <legend><Jargon text={t('debtsSection')} /></legend>
+        <h3>{t('debtsSection')}</h3>
         {(inputs.debts ?? []).map((d, i) => {
           const patch = (part: Partial<typeof d>) => {
             const next = [...(inputs.debts ?? [])]
@@ -836,10 +796,48 @@ export function InputForm() {
         {(inputs.debts?.length ?? 0) > 0 && (
           <p className="hint"><Jargon text={t('debtNote')} /></p>
         )}
-      </fieldset>
+      </ProfessionalGroup>
 
-      <fieldset>
-        <legend>{t('benefits')}</legend>
+      <ProfessionalGroup name="benefits" title={t('ui.professional.benefits')}>
+        <Field className="field">
+          <span><Jargon text={t('extraIncomeToggle')} /></span>
+          <input
+            type="checkbox"
+            checked={!!inputs.extraIncome}
+            onChange={(e) => {
+              set({
+                extraIncome: e.target.checked
+                  ? { annual: 20000, fromAge: inputs.fireAge, toAge: inputs.fireAge + 10 }
+                  : null,
+              })
+              track('barista_fire_toggle', { enabled: e.target.checked })
+            }}
+          />
+        </Field>
+        {inputs.extraIncome && (
+          <>
+            <Num label={t('extraIncomeAnnual')} value={inputs.extraIncome.annual} step={1000}
+              issue={issueFor('extraIncome.annual')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, annual: v } })} />
+            <Field className="field">
+              <span>{t('sideIncomeKind')}</span>
+              <select data-testid="side-income-kind" value={inputs.extraIncome.kind ?? 'employment'}
+                onChange={(e) => set({ extraIncome: { ...inputs.extraIncome!, kind: e.target.value as 'employment' | 'selfEmployment' | 'other' } })}>
+                <option value="employment">{t('sideIncomeEmployment')}</option>
+                <option value="selfEmployment">{t('sideIncomeSelf')}</option>
+                <option value="other">{t('sideIncomeOther')}</option>
+              </select>
+            </Field>
+            <Num label={t('extraIncomeFrom')} value={inputs.extraIncome.fromAge}
+              issue={issueFor('extraIncome.fromAge')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, fromAge: v } })} />
+            <Num label={t('extraIncomeTo')} value={inputs.extraIncome.toAge}
+              issue={issueFor('extraIncome.toAge')}
+              onChange={(v) => set({ extraIncome: { ...inputs.extraIncome!, toAge: v } })} />
+            <p className="hint"><Jargon text={t('extraIncomeNote')} /></p>
+          </>
+        )}
+
         {inputs.partner && <p className="subhead">{t('benefitsSelf')}</p>}
         <Num label={t('cppStartAge')} value={inputs.cppStartAge} onChange={(v) => set({ cppStartAge: v })} />
         <Num label={t('cppAnnualAt65')} value={cppSelfDisplay} step={500}
@@ -961,8 +959,9 @@ export function InputForm() {
           </>
         )}
 
-      </fieldset>
-      <TaxFactsPanel />
+      </ProfessionalGroup>
+      <ProfessionalGroup name="tax" title={t('ui.professional.tax')} summary={t('ui.conclusion.optional')}><TaxFactsPanel /></ProfessionalGroup>
+      <ProfessionalGroup name="advanced" title={t('ui.professional.advanced')} summary={t(canonical?.deterministicProjection ? 'ui.professional.on' : 'ui.professional.off')}><CanonicalEvidenceControl embedded key={`${inputRevision}:${i18n.language}`} /></ProfessionalGroup>
 
       <ResetPlan />
     </form>

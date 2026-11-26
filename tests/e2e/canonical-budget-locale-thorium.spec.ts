@@ -1,3 +1,4 @@
+import { revealProfessionalEditor } from './fixtures/professional'
 import { chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
 import { expect, test, type Locator } from '@playwright/test'
@@ -29,6 +30,7 @@ for (const browserLocale of ['en-US', 'fr-CA']) {
       const summary = evidence.locator('summary')
       await expect(summary).toHaveText('Registre annuel canonique')
       const open = async () => {
+        await revealProfessionalEditor(page, evidence)
         if (!await evidence.evaluate(element => (element as HTMLDetailsElement).open)) await summary.click()
       }
       const persistedSpending = () => page.evaluate(() =>

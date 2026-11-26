@@ -6,7 +6,7 @@ import { recordCanonicalBudgets, disableCanonicalProjection, setCanonicalEstimat
 import { parseBudgetAmount } from '../forms/localeBudgetAmount'
 
 /** Deliberate current-plan evidence entry, shared by Guide and Pro. */
-export function CanonicalEvidenceControl({ showOptional = false }: { showOptional?: boolean }) {
+export function CanonicalEvidenceControl({ showOptional = false, embedded = false }: { showOptional?: boolean; embedded?: boolean }) {
   const { t, i18n } = useTranslation()
   const state = useStore()
   const [working, setWorking] = useState('')
@@ -42,7 +42,7 @@ export function CanonicalEvidenceControl({ showOptional = false }: { showOptiona
     current.commitPlan(transaction)
     if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
   }
-  return <Disclosure className="chart-card" data-testid="canonical-evidence">
+  return <Disclosure className="chart-card" data-testid="canonical-evidence" open={embedded || undefined}>
     <summary aria-label={showOptional ? t('canonical.title') : undefined}>{t('canonical.title')}{showOptional && <span className="canonical-optional" aria-hidden="true">{t('ui.conclusion.optional')}</span>}</summary>
     <p>{t('canonical.entryScope')}</p>
     <p>{t(state.canonical?.deterministicProjection ? 'canonical.selected' : 'canonical.optional')}</p>

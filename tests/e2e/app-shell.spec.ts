@@ -1,3 +1,4 @@
+import { revealProfessionalEditor } from './fixtures/professional'
 import { expect, test } from '@playwright/test'
 import { chooseLanguage, chooseMode } from './fixtures/app-bar'
 
@@ -37,6 +38,7 @@ test('mobile shell menu closes with Escape and returns focus, while mode and pri
   await expect(menu).toBeFocused()
   await chooseMode(page, 'professional')
   await expect(page.locator('.input-form')).toBeVisible()
+  await revealProfessionalEditor(page, page.getByTestId('canonical-evidence'))
   await expect(page.getByTestId('canonical-evidence')).toBeVisible()
   await chooseMode(page, 'guided')
   await expect(page.getByTestId('canonical-evidence')).toHaveCount(0)

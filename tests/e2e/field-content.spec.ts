@@ -1,3 +1,4 @@
+import { revealProfessionalEditor } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -11,6 +12,7 @@ async function compareGuidedAndProfessionalHelp(page: Page, fieldId: string) {
   const facts = await guided.locator(`[data-content-field="${fieldId}"]`).innerText()
   await chooseMode(page, 'professional')
   const professional = page.getByTestId(`professional-help-${fieldId}`)
+  await revealProfessionalEditor(page, professional)
   await professional.locator('.ui-field-help').click()
   await expect(professional.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
   await page.keyboard.press('Shift+Tab')

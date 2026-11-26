@@ -1,3 +1,4 @@
+import { revealProfessionalEditor, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage, openLanguages, expectMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
@@ -180,6 +181,7 @@ test('PR-4 review controls, focus clearance and localized conclusions in both mo
         await expect(page.getByTestId('canonical-evidence').locator('.canonical-optional')).toHaveCount(0)
         await expect(page.getByTestId('canonical-evidence').locator('summary')).toHaveText(ledgerTitle)
       }
+      if (mode === 'professional') await showProfessionalResults(page)
       const summary = page.locator('.summary')
       await summary.scrollIntoViewIfNeeded()
       await expect(summary.locator('[role="tab"]')).toHaveCount(4)
@@ -299,6 +301,7 @@ test('a working plan with non-registered money gets a labelled FIRE-number estim
   if (await summary.getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
 
   await chooseMode(page, 'professional')
+  await showProfessionalResults(page)
   await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
   await expect(page.locator('.summary')).not.toHaveClass(/\bok\b/)
   if (await page.locator('.summary').getByText('Your FIRE number:').count()) await expect(page.getByTestId('fire-number-projected')).toBeVisible()
@@ -653,11 +656,13 @@ test('final review replaces the redundant assumption page without overwriting co
 
 test('professional mode runs its full immediate-results UI flow', async ({ page }) => {
   await chooseMode(page, 'professional')
-  await expect(page.locator('.input-form fieldset')).toHaveCount(6)
+  await expect(page.locator('.input-form .professional-group')).toHaveCount(7)
   const field = (label: string) => page.locator('label.field').filter({ hasText: label }).locator('input, select').first()
   await field('Current age').fill('40')
   await field('Target FIRE age').fill('55')
+  await revealProfessionalEditor(page, field('Desired after-tax annual spending in retirement'))
   await field('Desired after-tax annual spending in retirement').fill('60000')
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
   await expect(page.locator('.results-column .summary')).toBeVisible()
   await expect(page.locator('.recharts-responsive-container').first()).toBeVisible()
@@ -677,6 +682,7 @@ test('legacy v6 stores retain professional mode', async ({ page }) => {
   })
   await page.reload()
   await expectMode(page, 'professional')
+  await showProfessionalResults(page)
   await expect(page.locator('.results-column')).toBeVisible()
 })
 
