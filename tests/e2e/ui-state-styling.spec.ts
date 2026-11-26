@@ -41,7 +41,8 @@ test('complete allocation is info, incomplete allocation warns, and unknown answ
   await expect(unknown).toHaveCSS('padding', '0px')
   await expect(unknown).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
   await expect(unknown).toHaveCSS('text-decoration-line', 'underline')
-  expect((await unknown.boundingBox())!.height).toBeLessThan(40)
+  if (page.viewportSize()!.width <= 640) expect((await unknown.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  else expect((await unknown.boundingBox())!.height).toBeLessThan(40)
   const link = await appearance(unknown)
   await unknown.click()
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fire-inputs')!).state.answerMeta['savingsSplit.nonReg'].status)).toBe('unknown')
@@ -62,7 +63,7 @@ test('directory rows are unboxed and current-page styling follows keyboard navig
   for (const row of [first, second]) {
     await expect(row).toHaveCSS('display', 'grid')
     await expect(row).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
-    expect((await row.boundingBox())!.width).toBeLessThanOrEqual((await page.locator('.directory-shell').boundingBox())!.width)
+    expect((await row.boundingBox())!.width).toBeLessThanOrEqual((await page.locator('.category-navigation').boundingBox())!.width)
   }
   const initial = { current: await appearance(first), other: await appearance(second) }
   await second.focus()
@@ -76,7 +77,7 @@ test('directory rows are unboxed and current-page styling follows keyboard navig
   await testInfo.attach('directory-states.json', { body: JSON.stringify({ initial, next: await appearance(second) }, null, 2), contentType: 'application/json' })
 })
 
-test('mobile inline text links retain line height while normal buttons retain touch targets', async ({ page }, testInfo) => {
+test('mobile disclaimer keeps inline text while questionnaire footer and pager meet touch targets', async ({ page }, testInfo) => {
   // Show the existing footer link in this test context; application privacy handling is unchanged.
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'globalPrivacyControl', { configurable: true, get: () => false })
@@ -89,7 +90,7 @@ test('mobile inline text links retain line height while normal buttons retain to
     await page.setViewportSize({ width, height: 844 })
     const header = page.locator('.header-disclaimer .term')
     const footer = page.getByTestId('analytics-footer').getByRole('button')
-    for (const link of [header, footer]) {
+    for (const link of [header]) {
       await expect(link).toHaveClass(/\bui-button-link\b/)
       await expect(link).toHaveCSS('min-height', '0px')
       const size = await appearance(link)
@@ -97,6 +98,9 @@ test('mobile inline text links retain line height while normal buttons retain to
       expect(size.height).toBeLessThan(44)
       expect(size.height).toBeLessThanOrEqual(lineHeight + 2)
     }
+    await expect(footer).toHaveClass(/\bui-button-link\b/)
+    expect((await footer.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect((await footer.boundingBox())!.width).toBeGreaterThanOrEqual(44)
     const back = page.locator('.question-pager button').first(), next = page.locator('.question-pager button').last()
     expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect((await next.boundingBox())!.height).toBeGreaterThanOrEqual(48)

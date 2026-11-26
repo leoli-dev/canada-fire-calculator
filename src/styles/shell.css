@@ -1,4 +1,4 @@
-/* FE-56/57: shell and desktop question geometry. Phone progress/pager stays with PR-3. */
+/* FE-56/57: shell and desktop question geometry. FE-58 phone rules follow below. */
 .app { max-width: 1316px; padding: 0 24px 48px; }
 .app-bar { height: 56px; margin: 0 -24px; padding: 0 24px; align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .app-bar h1 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-ui); white-space: nowrap; }
@@ -93,3 +93,54 @@ main.guided-only { grid-template-columns: minmax(0, 1fr); }
 }
 
 .question-page > .analytics-prompt { margin-top: 16px; }
+
+/* FE-58: phone questionnaire, shared Contents Sheet, and safe-area navigation. */
+.mobile-question-progress { display: none; }
+@media (min-width: 641px) and (max-width: 1099px) {
+  .mobile-question-progress { display: block; }
+  .mobile-question-progress > div > span, .mobile-question-progress > progress { display: none; }
+}
+@media (max-width: 640px) {
+  .app:has(.questionnaire-layout) { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .app:has(.questionnaire-layout) .app-bar { position: sticky; top: 0; z-index: var(--z-sticky); }
+  .app main:has(.questionnaire-layout) { margin-top: 0; }
+  .questionnaire-layout { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .mobile-question-progress { display: block; position: sticky; top: 52px; z-index: var(--z-sticky); margin: 0 -16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .mobile-question-progress > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 54px; padding: 4px 16px; }
+  .mobile-question-progress > div > span { min-width: 0; font-size: var(--fs-meta); font-weight: 600; }
+  .mobile-question-progress .mobile-directory-trigger { width: auto; flex-shrink: 0; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--accent); }
+  .mobile-question-progress progress { display: block; appearance: none; width: 100%; height: 3px; border: 0; background: var(--surface-2); accent-color: var(--accent); }
+  .mobile-question-progress progress::-webkit-progress-bar { background: var(--surface-2); }
+  .mobile-question-progress progress::-webkit-progress-value { background: var(--accent); }
+  .question-page .question-location { display: none; }
+  .question-page { padding-top: 20px; }
+  .question-page h2 { max-width: none; font-size: var(--fs-display-sm); overflow-wrap: normal; word-break: normal; hyphens: manual; text-wrap: balance; }
+  .question-pager { position: fixed; inset: auto 0 0; z-index: var(--z-tabbar); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); }
+  .question-pager > span { display: none; }
+  .question-pager > button { grid-row: 1; justify-self: stretch; width: 100%; min-width: 0; min-height: 48px; border-radius: var(--r-control); }
+  .question-pager > button:last-child { justify-self: stretch; }
+  .question-pager .pager-desktop-button-label { display: inline; }
+  .question-pager .pager-mobile-button-label { display: none; }
+  .question-page :is(input:not([type=radio]):not([type=checkbox]), select, textarea) { min-height: 48px; font-size: 16px; min-width: 0; max-width: 100%; }
+  .app:has(.questionnaire-layout) footer :is(button, a[href]) { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  .question-page :is(button, a[href], summary) { min-width: 44px; }
+  .question-page :is(button, a[href], summary):not(.ui-choice) { min-height: 44px; }
+  .question-page :is(.ui-button-link, a[href]) { display: inline-flex; align-items: center; max-width: 100%; overflow-wrap: normal; word-break: normal; hyphens: manual; }
+  .question-page .ui-choice, .question-page .owner-choices label { min-height: 56px; align-items: center; padding-top: 6px; padding-bottom: 6px; }
+  /* Preserve a small visual mark inside a real 44px native input hit area. */
+  .question-page input:is([type=radio], [type=checkbox]) { appearance: none; display: inline-grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; min-width: 44px; margin: 0; padding: 0; border: 0; background: transparent; vertical-align: middle; cursor: pointer; }
+  .question-page input:is([type=radio], [type=checkbox])::before { content: ''; display: block; width: 18px; height: 18px; border: 1px solid var(--ink-3); background: var(--surface); border-radius: 3px; }
+  .question-page input[type=radio]::before { border-radius: 50%; }
+  .question-page input:checked::before { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 4px var(--surface); }
+  .question-page input[type=checkbox]:checked::before { content: '✓'; display: grid; place-items: center; color: var(--on-accent); font-size: 14px; font-weight: 700; box-shadow: none; }
+  .question-page input:disabled { opacity: .45; cursor: default; }
+  .question-help { margin-top: 24px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); }
+  .question-help > summary { min-height: 48px; }
+  #question-directory .directory-close { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-height: 44px; margin: 0; padding: 0; }
+  #question-directory .category-navigation summary { min-height: 48px; }
+  #question-directory .category-navigation button { min-height: 44px; }
+  #question-directory .ui-sheet-body { min-height: 0; }
+}
+@media (forced-colors: active) {
+  .question-page input:is([type=radio], [type=checkbox]) { appearance: auto; }
+}

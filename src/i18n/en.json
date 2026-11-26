@@ -1,5 +1,7 @@
 {
   "ui": {
+    "mobileCategoryProgress": "{{category}} · {{current}}/{{total}}",
+    "contents": "Contents",
     "close": "Close",
     "brand": "Canada FIRE Calculator",
     "mobileBrand": "FIRE Calculator",

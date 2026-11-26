@@ -1,5 +1,7 @@
 {
   "ui": {
+    "mobileCategoryProgress": "{{category}} · {{current}}/{{total}}",
+    "contents": "Sommaire",
     "close": "Fermer",
     "brand": "Calculateur FIRE Canada",
     "mobileBrand": "Calculateur FIRE",

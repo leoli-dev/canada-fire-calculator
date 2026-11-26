@@ -1,5 +1,7 @@
 {
   "ui": {
+    "mobileCategoryProgress": "{{category}} · {{current}}/{{total}}",
+    "contents": "目录",
     "close": "关闭",
     "brand": "加拿大 FIRE 计算器",
     "mobileBrand": "FIRE 计算器",

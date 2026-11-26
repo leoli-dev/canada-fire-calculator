@@ -32,6 +32,7 @@ test('directory controls and row grids preserve desktop geometry and mobile visi
     await expect(page.locator('.directory-close')).toBeHidden()
     await page.evaluate(() => window.scrollTo(0, 0))
     const layout = await page.locator('.questionnaire-layout').boundingBox()
+    await expect(page.locator('.directory-shell')).toBeVisible()
     const directory = await page.locator('.directory-shell').boundingBox()
     const question = await page.locator('.questionnaire-main').boundingBox()
     expect(directory!.width).toBe(248)
