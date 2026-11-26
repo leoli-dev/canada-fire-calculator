@@ -85,3 +85,9 @@ main.guided-only { grid-template-columns: minmax(0, 1fr); }
   .pager-desktop-button-label { display: none; }
   .pager-mobile-button-label { display: inline; }
 }
+
+@media (max-width: 640px) {
+  .ui-sheet-header > button, .app-menu-content :is(button, a[href]), .langs button { min-width: 44px; min-height: 44px; }
+  .app-menu-content a[href] { display: inline-flex; align-items: center; }
+  .app-menu-content .term, .app-menu-content .text-action { display: inline-flex; align-items: center; justify-content: center; }
+}

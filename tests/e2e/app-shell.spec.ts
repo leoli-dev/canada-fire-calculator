@@ -26,7 +26,7 @@ test('mobile shell menu closes with Escape and returns focus, while mode and pri
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog', { name: 'Menu' })
   await expect(dialog.getByText('Privacy settings')).toBeVisible()
-  await expect(dialog.getByTestId('analytics-footer')).toBeVisible()
+  await expect(dialog.getByTestId('analytics-menu-footer')).toBeVisible()
   await expect(dialog.getByRole('link', { name: /GitHub/ })).toBeVisible()
   await expect(dialog.getByRole('button', { name: "See what's simplified" })).toBeVisible()
   await page.keyboard.press('Shift+Tab')

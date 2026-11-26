@@ -110,7 +110,8 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppBar showResults={!!selected} />
+      <AppBar showResults={!!canonicalResult || (!!result && !hasBlockingIssues)} />
+      <AnalyticsPrompt />
 
       {isStorageUnavailable() && <div role="status" className="hint" data-testid="storage-unavailable">{t('storageUnavailable')}</div>}
       {storageIssue && <div role="alert" className="hint">
@@ -179,7 +180,6 @@ export default function App() {
       </main>
 
       <footer>
-        <AnalyticsPrompt />
         <p className="credit">
           {t('createdBy')}{' '}
           <a href="https://xiaojieli.com" target="_blank" rel="noopener noreferrer">
