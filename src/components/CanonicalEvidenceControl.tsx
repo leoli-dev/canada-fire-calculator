@@ -1,4 +1,4 @@
-import { Field, Button, Segmented } from '../ui'
+import { Field, Button, Segmented, Disclosure } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
@@ -6,7 +6,7 @@ import { recordCanonicalBudgets, disableCanonicalProjection, setCanonicalEstimat
 import { parseBudgetAmount } from '../forms/localeBudgetAmount'
 
 /** Deliberate current-plan evidence entry, shared by Guide and Pro. */
-export function CanonicalEvidenceControl() {
+export function CanonicalEvidenceControl({ showOptional = false }: { showOptional?: boolean }) {
   const { t, i18n } = useTranslation()
   const state = useStore()
   const [working, setWorking] = useState('')
@@ -42,8 +42,8 @@ export function CanonicalEvidenceControl() {
     current.commitPlan(transaction)
     if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
   }
-  return <details className="chart-card" data-testid="canonical-evidence">
-    <summary>{t('canonical.title')}</summary>
+  return <Disclosure className="chart-card" data-testid="canonical-evidence">
+    <summary aria-label={showOptional ? t('canonical.title') : undefined}>{t('canonical.title')}{showOptional && <span className="canonical-optional" aria-hidden="true">{t('ui.conclusion.optional')}</span>}</summary>
     <p>{t('canonical.entryScope')}</p>
     <p>{t(state.canonical?.deterministicProjection ? 'canonical.selected' : 'canonical.optional')}</p>
     {state.canonical?.deterministicProjection && !state.canonical.deterministicProjection.estimateBudgetMode && <p className="hint">{t('canonical.priorModeUnavailable')}</p>}
@@ -66,5 +66,5 @@ export function CanonicalEvidenceControl() {
       <option value="nonRegFirst">{t('strat_nonRegFirst')}</option><option value="meltdownPaced">{t('strat_meltdownPaced')}</option><option value="rrspFirst">{t('strat_rrspFirst')}</option><option value="tfsaFirst">{t('strat_tfsaFirst')}</option>
     </select></Field>
     {state.inputs.balances.nonReg === 0 && <Button type="button" data-testid="canonical-no-nonreg" onClick={() => state.setAccountPresence('nonReg', false)}>{t('canonical.noNonReg')}</Button>}
-  </details>
+  </Disclosure>
 }

@@ -1,4 +1,4 @@
-import { Button, Callout, Sheet } from '../ui'
+import { Button, Callout, Sheet, StatusChip } from '../ui'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
@@ -11,6 +11,9 @@ import { useCad } from '../format'
 import { QuestionPage, QuestionHelpRail } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
 import { ResetPlan } from './ResetPlan'
+import { CanonicalEvidenceControl } from './CanonicalEvidenceControl'
+import { PLAN_TAX_YEAR } from '../engine/tax'
+import { selectGisRules } from '../engine/rules'
 
 /** Native focus scrolling does not account for the phone's two fixed bars. */
 function revealPhoneQuestionFocus(target: HTMLElement) {
@@ -56,6 +59,26 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
   const incomplete = pages.filter((page) => !page.optional && !pageIsComplete(page, state))
   const accounts = accountSummary(state.inputs)
   const canGenerate = issues.length === 0 && incomplete.length === 0
+  // Count required question pages, rather than hidden/example field defaults.
+  const required = pages.filter(page => !page.optional)
+  const estimated = required.filter(page => pageIsComplete(page, state) && page.fieldBindings.some(field => state.answerMeta[field]?.status === 'estimated')).length
+  const confirmed = required.filter(page => pageIsComplete(page, state)).length - estimated
+  const blockers = incomplete.length + issues.length
+  useEffect(() => {
+    const reveal = (event: FocusEvent) => {
+      if (!window.matchMedia('(max-width: 640px)').matches || !(event.target instanceof HTMLElement) || !event.target.closest('.answer-review') || event.target.closest('.review-generate-bar')) return
+      const viewport = window.visualViewport
+      const viewportTop = viewport?.offsetTop ?? 0
+      const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+      const top = Math.max(viewportTop, document.querySelector('.app-bar')?.getBoundingClientRect().bottom ?? viewportTop)
+      const bottom = Math.min(viewportBottom, document.querySelector('.review-generate-bar')?.getBoundingClientRect().top ?? viewportBottom)
+      const rect = event.target.getBoundingClientRect()
+      const delta = rect.top < top + 8 ? rect.top - top - 8 : rect.bottom > bottom - 8 ? rect.bottom - bottom + 8 : 0
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' })
+    }
+    document.addEventListener('focusin', reveal)
+    return () => document.removeEventListener('focusin', reveal)
+  }, [])
   const formatNumber = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { maximumFractionDigits: 2 })
   const percent = (value: number) => `${formatNumber.format(value * 100)}%`
   const chosenMix = state.questionAnswers['invest.mix']
@@ -87,8 +110,28 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
     window.location.hash = `#/guided/${definition.categoryId}/${definition.id}`
   }
   return <section className="answer-review">
+    <div className="review-main">
     <Button variant="link" type="button" className="text-action" onClick={() => editPage(state.activePageId)}>{t('questionnaire.backToQuestions')}</Button>
     <h2 tabIndex={-1}>{t('questionnaire.reviewTitle')}</h2><p>{t('questionnaire.reviewIntro')}</p>
+    <Callout className="review-phone-summary" role="status">{t('ui.conclusion.reviewSummary', { confirmed, estimated, blockers })}</Callout>
+    <section className="review-plan" aria-labelledby="review-plan-title">
+    <h3 id="review-plan-title">{t('ui.conclusion.yourPlan')}</h3>
+    <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
+      const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
+      const categoryPages = pages.filter((page) => page.categoryId === category.id)
+      const complete = categoryPages.every(page => page.optional || pageIsComplete(page, state))
+      const containsEstimate = categoryPages.some(page => page.fieldBindings.some(field => state.answerMeta[field]?.status === 'estimated'))
+      const optional = categoryPages.every(page => page.optional) && !categoryPages.some(page => pageIsComplete(page, state))
+      const value = category.id === 'taxDetails'
+        ? (state.questionAnswers['tax.intro'] === 'skip' ? t('questionnaire.taxDetails.reviewSkipped')
+          : t('questionnaire.taxDetails.reviewRecorded', { answered: categoryPages.filter((page) => page.id !== 'tax.intro' && pageIsComplete(page, state)).length, total: categoryPages.filter((page) => page.id !== 'tax.intro').length }))
+        : category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
+      return <article key={category.id}>
+        <h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><p>{value}</p>
+        <StatusChip status={optional ? 'info' : !complete ? 'unknown' : containsEstimate ? 'est' : 'ok'}>{optional ? t('questionnaire.status.optional') : t(`questionnaire.${!complete ? 'reviewAssumptionPending' : containsEstimate ? 'reviewAssumptionEstimated' : 'reviewAssumptionSet'}`)}</StatusChip>
+        <Button variant="link" type="button" onClick={() => editPage(first.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: t(`questionnaire.categories.${category.contentKey}`) })}>{t('guidedEdit')}</Button>
+      </article>
+    })}</div></section>
     <section className="review-assumptions" aria-labelledby="review-assumptions-title">
       <h3 id="review-assumptions-title">{t('questionnaire.reviewAssumptionsTitle')}</h3>
       <p>{t('questionnaire.reviewAssumptionsIntro')}</p>
@@ -98,28 +141,35 @@ function AnswerReview({ pages }: { pages: QuestionDefinition[] }) {
         const containsEstimate = definition?.fieldBindings.some((field) => state.answerMeta[field]?.status === 'estimated') ?? false
         const statusKey = !complete ? 'reviewAssumptionPending' : containsEstimate ? 'reviewAssumptionEstimated' : 'reviewAssumptionSet'
         return <div className="review-assumption-row" key={row.id}>
-          <div><strong>{row.title}</strong><p>{row.value}</p><small>{t(`questionnaire.${statusKey}`)}</small></div>
-          <Button type="button" onClick={() => editPage(row.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: row.title })}>{t('guidedEdit')}</Button>
+          <strong>{row.title}</strong><p>{row.value}</p><StatusChip status={!complete ? 'unknown' : containsEstimate ? 'est' : 'ok'}>{t(`questionnaire.${statusKey}`)}</StatusChip>
+          <Button variant="link" type="button" onClick={() => editPage(row.id)} aria-label={t('questionnaire.reviewEditAssumption', { topic: row.title })}>{t('guidedEdit')}</Button>
         </div>
       })}</div>
       <p className="review-assumptions-note">{t('questionnaire.reviewAssumptionsNote')}</p>
       <RuleAssumptions province={state.inputs.province} inflation={state.inputs.inflation ?? 0.021} />
     </section>
-    <div className="review-category-list">{QUESTION_CATEGORIES.map((category) => {
-      const first = pages.find((page) => page.categoryId === category.id); if (!first) return null
-      const categoryPages = pages.filter((page) => page.categoryId === category.id)
-      const value = category.id === 'taxDetails'
-        ? (state.questionAnswers['tax.intro'] === 'skip' ? t('questionnaire.taxDetails.reviewSkipped')
-          : t('questionnaire.taxDetails.reviewRecorded', { answered: categoryPages.filter((page) => page.id !== 'tax.intro' && pageIsComplete(page, state)).length, total: categoryPages.filter((page) => page.id !== 'tax.intro').length }))
-        : category.id === 'family' ? `${state.inputs.province} · ${state.inputs.partner ? t('couple') : t('single')}` : category.id === 'saving' ? cad(state.inputs.annualSavings) : category.id === 'assets' ? cad(accounts.totalAccounts) : category.id === 'housing' ? (state.inputs.principalResidence ? t('questionnaire.hasHome') : t('guidedRent')) : category.id === 'spending' ? cad(state.inputs.retirementSpending) : category.id === 'income' ? `${t('cppStartAge')} ${state.inputs.cppStartAge}` : t(`questionnaire.intentSummary.${state.planningIntent.spendingPreference === 'exploreCeiling' ? 'spending' : state.planningIntent.legacyPreference === 'maxRemaining' ? 'legacy' : 'sustainability'}`, { spending: cad(state.inputs.retirementSpending) })
-      return <article key={category.id}><div><h3>{t(`questionnaire.categories.${category.contentKey}`)}</h3><Button type="button" onClick={() => editPage(first.id)}>{t('guidedEdit')}</Button></div><p>{value}</p></article>
-    })}</div>
+    </div>
+    <aside className="review-ready" aria-labelledby="review-ready-title">
+    <h3 id="review-ready-title">{t('ui.conclusion.ready')}</h3>
+    <dl className="review-counts">
+      <div><dt>{t('ui.conclusion.confirmed')}</dt><dd><StatusChip status="ok">{confirmed}</StatusChip></dd></div>
+      <div><dt>{t('ui.conclusion.estimated')}</dt><dd><StatusChip status="est">{estimated}</StatusChip></dd></div>
+      <div><dt>{t('ui.conclusion.blockers')}</dt><dd><StatusChip status={blockers ? 'bad' : 'info'}>{blockers}</StatusChip></dd></div>
+    </dl>
+    <div className="review-generate-bar">
+      {!canGenerate && <p id="review-generate-blocked">{t('ui.conclusion.generateBlocked', { count: blockers })}</p>}
+      <Button variant="primary" type="button" className="generate-results" disabled={!canGenerate} aria-describedby={!canGenerate ? 'review-generate-blocked' : undefined} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</Button>
+    </div>
     {(incomplete.length > 0 || issues.length > 0) && <Callout variant="warn" className="review-blockers" role="status"><h3>{t('questionnaire.needsAttention')}</h3><ul>
       {incomplete.map((page) => <li key={page.id}><Button type="button" onClick={() => editPage(page.id)}>{t(questionTitleKey(page, state.inputs))}</Button></li>)}
       {issues.map((issue) => { const page = questionForField(issue.field); return <li key={`${issue.field}-${issue.key}`}><Button type="button" onClick={() => editPage(page?.id ?? 'family.people')}>{t(issue.key, issue.params)}</Button></li> })}
     </ul></Callout>}
-    <Button variant="primary" type="button" className="generate-results" disabled={!canGenerate} onClick={() => { state.generateGuidedResults(); window.location.hash = '#/guided/results' }}>{t('questionnaire.generateResults')}</Button>
-    <ResetPlan onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
+    <CanonicalEvidenceControl showOptional key={`${state.inputRevision}:${i18n.language}`} />
+    <p className="hint review-rule-date">{t('ui.conclusion.reviewRuleDate', { jurisdiction: state.inputs.province, year: PLAN_TAX_YEAR, quarter: selectGisRules().paymentPeriod })}</p>
+    </aside>
+    <section className="review-danger" aria-labelledby="review-danger-title"><h3 id="review-danger-title">{t('ui.conclusion.dangerZone')}</h3>
+      <ResetPlan danger onDone={() => { window.location.hash = '#/guided/family/family.people' }} />
+    </section>
   </section>
 }
 

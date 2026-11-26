@@ -68,3 +68,66 @@ test('a sustainable-spending answer is retired when the plan changes', async ({ 
   await expect(answer).toBeVisible()
   expect(await answer.innerText()).not.toBe(first)
 })
+
+test('the default CA$750,000 accumulation target keeps the existing tax uncertainty in its status', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    localStorage.clear()
+    const { DEFAULT_INPUTS } = await import('/src/store.ts')
+    localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: {
+      inputs: { ...DEFAULT_INPUTS, fireTargetAssets: 750000 }, entryMode: 'professional', inputRevision: 0, resultRevision: null,
+    } }))
+  })
+  await page.reload()
+  await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+  const card = page.locator('.summary')
+  await expect(card).toHaveClass(/uncertain/)
+  await expect(card.locator('.conclusion-heading .ui-status')).toHaveText('Needs checks')
+  await expect(card.locator('.verdict')).toContainText('On track: the CA$750,000 target')
+  await expect(card.locator('.conclusion-metrics dd').first()).toHaveText('CA$750,000')
+  await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+})
+
+for (const uncertainty of ['tax', 'locked'] as const) {
+  for (const target of [1500000, 1e12]) {
+    test(`uncertain ${uncertainty} target ${target} retains a bad Shortfall status when late or never reached`, async ({ page }) => {
+      await page.goto('/')
+      await page.evaluate(async ({ uncertainty, target }) => {
+        localStorage.clear()
+        const { DEFAULT_INPUTS } = await import('/src/store.ts')
+        const inputs = { ...DEFAULT_INPUTS, fireAge: 40, fireTargetAssets: target,
+          ...(uncertainty === 'locked' ? { lockedRetirement: { balance: 1000, employeeContribution: 0, employerContribution: 0, accessibleAge: 55, jurisdiction: 'ON', owner: 'self' } } : {}) }
+        localStorage.setItem('fire-inputs', JSON.stringify({ version: 11, state: { inputs, entryMode: 'professional', inputRevision: 0, resultRevision: null } }))
+      }, { uncertainty, target })
+      await page.reload()
+      await page.getByRole('tab', { name: 'Will I hit my target?' }).click()
+      const card = page.locator('.summary')
+      const chip = card.locator('.conclusion-heading .ui-status')
+      await expect(card).toHaveClass(/uncertain bad/)
+      await expect(chip).toHaveText('Shortfall')
+      await expect(chip).toHaveClass(/ui-status-bad/)
+      await expect(chip).not.toHaveClass(/ui-status-est/)
+      await expect(card.locator('.verdict')).toHaveClass(/verdict-bad/)
+      await expect(card.locator('.verdict')).toContainText(target === 1e12 ? 'never reached' : 'Short:')
+      await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+      if (uncertainty === 'locked') await expect(card).toContainText('LIF limits and transfer rules have not been verified')
+      const colors = await chip.evaluate(element => {
+        const css = getComputedStyle(element), probe = document.createElement('span')
+        probe.style.color = 'var(--critical)'; probe.style.backgroundColor = 'var(--critical-tint)'
+        document.body.append(probe)
+        const expected = getComputedStyle(probe)
+        const value = { color: css.color, background: css.backgroundColor, expectedColor: expected.color, expectedBackground: expected.backgroundColor }
+        probe.remove(); return value
+      })
+      expect(colors.color).toBe(colors.expectedColor)
+      expect(colors.background).toBe(colors.expectedBackground)
+      // The FIRE-number branch already gives a definite failure priority over tax uncertainty.
+      if (uncertainty === 'tax' && target === 1500000) {
+        await page.getByRole('tab', { name: "What's my FIRE number?" }).click()
+        await expect(chip).toHaveText('Shortfall')
+        await expect(chip).toHaveClass(/ui-status-bad/)
+        await expect(page.getByTestId('person-tax-limit')).toBeVisible()
+      }
+    })
+  }
+}

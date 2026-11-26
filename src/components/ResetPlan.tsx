@@ -8,7 +8,7 @@ import { useStore } from '../store'
  * and the guided pages. Nothing changes until the user confirms; cancelling
  * returns focus to the button that opened the confirmation.
  */
-export function ResetPlan({ onDone }: { onDone?: () => void }) {
+export function ResetPlan({ onDone, danger = false }: { onDone?: () => void; danger?: boolean }) {
   const { t } = useTranslation()
   const reset = useStore((s) => s.reset)
   const [open, setOpen] = useState(false)
@@ -17,7 +17,7 @@ export function ResetPlan({ onDone }: { onDone?: () => void }) {
   useEffect(() => { if (open) cancel.current?.focus() }, [open])
   const close = () => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()) }
   return <div className="reset-plan">
-    <Button ref={trigger} type="button" className="reset" aria-expanded={open} data-testid="reset-plan" onClick={() => setOpen(true)}>{t('resetAll')}</Button>
+    <Button ref={trigger} variant={danger ? 'danger' : 'secondary'} type="button" className="reset" aria-expanded={open} data-testid="reset-plan" onClick={() => setOpen(true)}>{t('resetAll')}</Button>
     {open && <div role="alertdialog" aria-labelledby="reset-plan-title" aria-describedby="reset-plan-body" className="reset-confirm"
       onKeyDown={(event) => { if (event.key === 'Escape') close() }}>
       <strong id="reset-plan-title">{t('resetConfirmTitle')}</strong>

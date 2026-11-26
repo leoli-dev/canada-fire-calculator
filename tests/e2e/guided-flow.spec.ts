@@ -1,5 +1,6 @@
 import { chooseMode, chooseLanguage, openLanguages, expectMode } from './fixtures/app-bar'
 import { expect, test, type Page } from '@playwright/test'
+import { writeFileSync } from 'node:fs'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
@@ -85,7 +86,8 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await generate.click()
   await expect(page.getByRole('heading', { name: 'Your retirement projection' })).toBeVisible()
   await expect(page.locator('.results-column')).toBeVisible()
-  await expect(page.locator('.results-column')).toContainText('adds remaining registered balances')
+  await page.locator('.conclusion-estate > summary').click()
+  await expect(page.locator('.conclusion-estate p').filter({ hasText: 'adds remaining registered balances' })).toBeVisible()
   const annual = page.getByRole('button', { name: 'Annual financial details' })
   await annual.click()
   const annualDialog = page.getByRole('dialog', { name: 'Household annual estimate' })
@@ -110,6 +112,134 @@ test('guided mode completes a full UI flow and invalidates a stale result', asyn
   await generate.click()
   await annual.click()
   await expect(primaryAge.getByRole('cell').first()).toContainText('36')
+})
+
+test('PR-4 review controls, focus clearance and localized conclusions in both modes', async ({ page }, testInfo) => {
+  test.setTimeout(120_000)
+  const evidence: unknown[] = []
+  await completeGuidedQuestionnaire(page)
+  for (const view of [
+    { width: 1440, height: 1000, language: 'EN' },
+    { width: 390, height: 844, language: 'EN' },
+    { width: 320, height: 740, language: 'EN' },
+    { width: 320, height: 740, language: 'FR' },
+    { width: 390, height: 844, language: 'FR' },
+    { width: 320, height: 740, language: '中文' },
+    { width: 390, height: 844, language: '中文' },
+  ]) {
+    await page.setViewportSize({ width: view.width, height: view.height })
+    await chooseMode(page, 'guided')
+    await page.goto('/#/guided/review')
+    await chooseLanguage(page, view.language)
+    const generate = page.locator('.generate-results')
+    await expect(generate).toBeEnabled()
+    await page.evaluate(() => scrollTo(0, 0))
+    await expect(generate).toBeInViewport({ ratio: 1 })
+    evidence.push({ view, review: await page.locator('.generate-results').evaluate(button => ({ rect: button.getBoundingClientRect().toJSON(), disabled: (button as HTMLButtonElement).disabled, viewport: { width: innerWidth, height: innerHeight }, documentWidth: document.documentElement.scrollWidth })) })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(view.width)
+    const ledger = page.getByTestId('canonical-evidence')
+    const ledgerTitle = { EN: 'Canonical annual ledger', FR: 'Registre annuel canonique', 中文: '标准年度账本' }[view.language]!
+    await expect(ledger.locator('summary')).toHaveAccessibleName(ledgerTitle)
+    await expect(ledger.locator('.canonical-optional')).toHaveText({ EN: 'Optional', FR: 'Facultatif', 中文: '可选' }[view.language]!)
+    await expect(ledger.locator('.canonical-optional')).toBeVisible()
+    await expect(ledger).not.toHaveAttribute('open')
+    // The side date is a factual caption; the full source instruction remains in the rules disclosure.
+    const date = await page.locator('.review-rule-date').innerText()
+    expect(date).not.toMatch(/Open|Ouvrez|展开/)
+    await expect(page.getByTestId('rule-assumptions-details').locator('summary')).toContainText({ EN: 'Open for the sources', FR: 'Ouvrez pour les sources', 中文: '展开查看来源' }[view.language]!)
+    if (view.width <= 640) {
+      expect((await generate.boundingBox())!.height).toBe(48)
+      await expect(page.locator('.review-phone-summary')).toBeVisible()
+      const edits = await page.locator('.review-category-list button, .review-assumption-row button').evaluateAll(buttons => buttons.map(button => {
+        const rect = button.getBoundingClientRect(), row = button.parentElement!.getBoundingClientRect()
+        const siblings = [...button.parentElement!.children].filter(el => el !== button).map(el => el.getBoundingClientRect())
+        return { width: rect.width, height: rect.height, insideRow: rect.left >= row.left && rect.right <= row.right, overlaps: siblings.some(other => Math.min(rect.right, other.right) > Math.max(rect.left, other.left) && Math.min(rect.bottom, other.bottom) > Math.max(rect.top, other.top)) }
+      }))
+      for (const edit of edits) { expect(edit.width).toBeGreaterThanOrEqual(44); expect(edit.height).toBeGreaterThanOrEqual(44); expect(edit.insideRow).toBe(true); expect(edit.overlaps).toBe(false) }
+      evidence.push({ view, edits })
+      // Native focus must scroll the page-end Reset above the fixed action bar.
+      await page.getByTestId('reset-plan').focus()
+      const reset = (await page.getByTestId('reset-plan').boundingBox())!
+      const bar = (await page.locator('.review-generate-bar').boundingBox())!
+      expect(reset.y + reset.height).toBeLessThanOrEqual(bar.y)
+      await page.getByTestId('reset-plan').click()
+      await page.getByTestId('reset-cancel').click()
+      await expect(page.getByTestId('reset-plan')).toBeFocused()
+      await page.evaluate(() => scrollTo(0, 0))
+    }
+    await page.screenshot({ path: testInfo.outputPath(`review-${view.width}-${view.language}.png`) })
+    await generate.click()
+    const intro = (await page.locator('.results-intro').boundingBox())!
+    const card = (await page.locator('.summary').boundingBox())!
+    expect(intro.x).toBe(card.x)
+    expect(intro.width).toBe(card.width)
+    await expect(page.locator('.results-intro h2')).toBeFocused()
+    for (const mode of ['guided', 'professional'] as const) {
+      if (mode === 'professional') await chooseMode(page, mode)
+      if (mode === 'professional') {
+        await expect(page.getByTestId('canonical-evidence').locator('.canonical-optional')).toHaveCount(0)
+        await expect(page.getByTestId('canonical-evidence').locator('summary')).toHaveText(ledgerTitle)
+      }
+      const summary = page.locator('.summary')
+      await summary.scrollIntoViewIfNeeded()
+      await expect(summary.locator('[role="tab"]')).toHaveCount(4)
+      await expect(summary.locator('.conclusion-metrics dd')).toHaveCount(3)
+      await summary.locator('[role="tab"]').first().focus()
+      await page.keyboard.press('End')
+      await expect(summary.locator('[role="tab"]').last()).toHaveAttribute('aria-selected', 'true')
+      await page.keyboard.press('Home')
+      await expect(summary.locator('[role="tab"]').first()).toHaveAttribute('tabindex', '0')
+      await page.keyboard.press('ArrowLeft')
+      await expect(summary.locator('[role="tab"]').last()).toBeFocused()
+      await page.keyboard.press('ArrowRight')
+      await expect(summary.locator('[role="tab"]').first()).toBeFocused()
+      const tabStyles = await summary.locator('[role="tab"]').evaluateAll(tabs => tabs.map(tab => {
+        const css = getComputedStyle(tab)
+        return { overflowWrap: css.overflowWrap, wordBreak: css.wordBreak, hyphens: css.hyphens, clipped: tab.scrollWidth > tab.clientWidth }
+      }))
+      expect(tabStyles).toEqual(Array(4).fill({ overflowWrap: 'normal', wordBreak: 'normal', hyphens: 'manual', clipped: false }))
+      if (view.language === 'FR') {
+        const splitWords = await summary.locator('[role="tab"]').evaluateAll(tabs => tabs.flatMap(tab => {
+          const walker = document.createTreeWalker(tab, NodeFilter.SHOW_TEXT)
+          const split: string[] = []
+          while (walker.nextNode()) {
+            const node = walker.currentNode
+            for (const match of (node.textContent ?? '').matchAll(/\p{L}[\p{L}\p{M}]*/gu)) {
+              const range = document.createRange(); range.setStart(node, match.index!); range.setEnd(node, match.index! + match[0].length)
+              if (new Set(Array.from(range.getClientRects()).map(rect => rect.top)).size > 1) split.push(match[0])
+            }
+          }
+          return split
+        }))
+        expect(splitWords, 'French alphabetic words remain whole within each tab').toEqual([])
+      }
+      if (view.width <= 640) {
+        const boxes = await summary.locator('[role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.getBoundingClientRect().top))
+        expect(boxes[0]).toBe(boxes[1]); expect(boxes[2]).toBe(boxes[3]); expect(boxes[2]).toBeGreaterThan(boxes[0])
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(view.width)
+      evidence.push({ view, mode, summary: await summary.boundingBox(), tabStyles })
+      await page.screenshot({ path: testInfo.outputPath(`results-${mode}-${view.width}-${view.language}.png`) })
+    }
+    await chooseLanguage(page, 'EN')
+  }
+  writeFileSync(testInfo.outputPath('metrics.json'), JSON.stringify(evidence, null, 2))
+})
+
+test('PR-4 blocked review keeps Generate visible and links every blocker to its question', async ({ page }) => {
+  await page.goto('/#/guided/review')
+  const generate = page.locator('.generate-results')
+  await expect(generate).toBeDisabled()
+  await expect(generate).toBeInViewport({ ratio: 1 })
+  const items = page.locator('.review-blockers li')
+  const count = await items.count()
+  expect(count).toBeGreaterThan(0)
+  await expect(page.locator('.review-counts dd').last()).toHaveText(String(count))
+  await expect(generate).toHaveAttribute('aria-describedby', 'review-generate-blocked')
+  await expect(page.locator('#review-generate-blocked')).toContainText(String(count))
+  await items.first().getByRole('button').click()
+  await expect(page.locator('#question-title')).toBeFocused()
+  await expect(page).toHaveURL(/#\/guided\/family\//)
 })
 
 test('an answered-excluded budget basis labels the guided result as an estimate', async ({ page }) => {
