@@ -407,7 +407,7 @@ for (const locale of [
     await seed(page)
     await chooseLanguage(page, locale.switcher)
     await expect(results(page)).toContainText(cad(158_070, locale.language, 2))
-    const trigger = page.getByRole('button', { name: locale.opener, exact: true })
+    const trigger = page.locator('#results-overview').getByRole('button', { name: locale.opener, exact: true })
     await (await prepareProfessionalTarget(trigger)).focus()
     await page.keyboard.press('Enter')
     const sheet = page.getByRole('dialog', { name: locale.title })
