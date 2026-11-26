@@ -1,4 +1,4 @@
-import { Field, Button, Segmented } from '../ui'
+import { Field, Button, Segmented, Disclosure } from '../ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
@@ -42,7 +42,7 @@ export function CanonicalEvidenceControl() {
     current.commitPlan(transaction)
     if (current.entryMode === 'guided') useStore.getState().setGuidedView('review')
   }
-  return <details className="chart-card" data-testid="canonical-evidence">
+  return <Disclosure className="chart-card" data-testid="canonical-evidence">
     <summary>{t('canonical.title')}</summary>
     <p>{t('canonical.entryScope')}</p>
     <p>{t(state.canonical?.deterministicProjection ? 'canonical.selected' : 'canonical.optional')}</p>
@@ -66,5 +66,5 @@ export function CanonicalEvidenceControl() {
       <option value="nonRegFirst">{t('strat_nonRegFirst')}</option><option value="meltdownPaced">{t('strat_meltdownPaced')}</option><option value="rrspFirst">{t('strat_rrspFirst')}</option><option value="tfsaFirst">{t('strat_tfsaFirst')}</option>
     </select></Field>
     {state.inputs.balances.nonReg === 0 && <Button type="button" data-testid="canonical-no-nonreg" onClick={() => state.setAccountPresence('nonReg', false)}>{t('canonical.noNonReg')}</Button>}
-  </details>
+  </Disclosure>
 }

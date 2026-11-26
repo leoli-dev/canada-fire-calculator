@@ -1937,5 +1937,28 @@
       "budget": "Time budget reached. Remaining trials are uncomputed; no overall rate is shown."
     },
     "run": "Run {{count}} canonical trials"
+  },
+  "conclusion": {
+    "ok": "Sustainable",
+    "bad": "Shortfall",
+    "uncertain": "Needs checks",
+    "notComputed": "Not computed",
+    "fundsUntil": "Funds last until age",
+    "earliestAge": "Earliest retirement age",
+    "assetsAtRetirement": "Assets at retirement",
+    "fireNumber": "FIRE number",
+    "projectedAssets": "Projected assets at retirement",
+    "difference": "Surplus or gap",
+    "target": "Asset target",
+    "targetAge": "Age target is reached",
+    "estateExplanation": "How the estate value is calculated",
+    "yourPlan": "Your plan",
+    "ready": "Ready to generate",
+    "confirmed": "Answers confirmed",
+    "estimated": "Estimates used",
+    "blockers": "Items blocking generation",
+    "reviewSummary": "{{confirmed}} confirmed, {{estimated}} estimated, {{blockers}} blocking.",
+    "generateBlocked": "Resolve {{count}} blocking items before generating.",
+    "dangerZone": "Reset your plan"
   }
 }

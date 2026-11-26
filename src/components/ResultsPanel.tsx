@@ -1,4 +1,4 @@
-import { Segmented, Button, Field } from '../ui'
+import { Segmented, Button, Field, StatusChip, Callout, Disclosure } from '../ui'
 import { fundingGapMessageKey } from '../fundingGapMessages'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,9 +18,20 @@ import { track } from '../analytics'
 import { Jargon } from './Jargon'
 import { NumberInput } from './NumberInput'
 import { hasUnverifiedLockedWithdrawals } from '../engine/capabilities'
+import type { ReactNode } from 'react'
 
 type Mode = 'last' | 'when' | 'number' | 'target'
 const MODES: readonly Mode[] = ['last', 'when', 'number', 'target']
+
+function ConclusionVerdict({ children, tone, testId }: { children: ReactNode; tone: 'ok' | 'bad' | 'uncertain'; testId?: string }) {
+  const { t } = useTranslation()
+  return <div className="conclusion-heading"><StatusChip status={tone === 'uncertain' ? 'est' : tone}>{t(`conclusion.${tone}`)}</StatusChip><p className={`verdict${tone === 'bad' ? ' verdict-bad' : ''}`} data-testid={testId}>{children}</p></div>
+}
+
+function ConclusionMetrics({ items }: { items: readonly (readonly [string, ReactNode])[] }) {
+  const { t } = useTranslation()
+  return <dl className="conclusion-metrics">{items.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? t('conclusion.notComputed')}</dd></div>)}</dl>
+}
 
 /**
  * The "will my money last" sentence, shared by the results summary and the
@@ -35,7 +46,7 @@ export function headlineVerdict(t: TFunction, inputs: Inputs, result: Projection
   return unverified ? { text: t('modeledSuccessUnverified', { age: inputs.lifeExpectancy }), tone: 'uncertain' } : { text: t('success', { age: inputs.lifeExpectancy }), tone: 'ok' }
 }
 
-export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
+export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; annualAction?: ReactNode; legacyEstimate?: boolean; legacyOwnershipPending?: boolean; budgetBasisExcluded?: boolean; taxEstimate?: boolean; taxWarning?: boolean; personTax?: boolean }) {
   const { t } = useTranslation()
   const cad = useCad()
   const [mode, setMode] = useState<Mode>('last')
@@ -122,8 +133,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
   // is never reduced to one large final net worth.
   const firstShortfall = result.rows.find((row) => row.shortfall > 0.5)
   const estimateVerdict = <>
-    <p className={`verdict${result.success ? '' : ' verdict-bad'}`} data-testid="estimate-verdict">
-      {headlineVerdict(t, inputs, result, { estimate: true }).text}</p>
+    <ConclusionVerdict tone={result.success ? 'uncertain' : 'bad'} testId="estimate-verdict">
+      {headlineVerdict(t, inputs, result, { estimate: true }).text}</ConclusionVerdict>
     {firstShortfall && <p data-testid="estimate-shortfall">{t('estimateShortfall', { age: firstShortfall.age, shortfall: cad(firstShortfall.shortfall) })}</p>}
   </>
 
@@ -133,6 +144,8 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       <p className="hint">{t(props.legacyOwnershipPending ? 'migrationLegacySummary'
         : props.budgetBasisExcluded ? 'budget.estimateExcluded' : 'migrationApproximate')}</p>
       <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
+      <ConclusionMetrics items={[[t('finalNetWorth'), cad(result.finalNetWorth)]]} />
+      {props.annualAction}
     </div>
   )
 
@@ -140,12 +153,16 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
     {estimateVerdict}
     <p className="hint">{t('be11TaxLimit')}</p>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
+    <ConclusionMetrics items={[[t('finalNetWorth'), cad(result.finalNetWorth)]]} />
+    {props.annualAction}
   </div>
 
   if (props.personTax) return <div className="summary uncertain" data-testid="person-tax-summary">
-    <p className="verdict">{headlineVerdict(t, inputs, result, { personTax: true }).text}</p>
+    <ConclusionVerdict tone={result.success ? 'uncertain' : 'bad'}>{headlineVerdict(t, inputs, result, { personTax: true }).text}</ConclusionVerdict>
     <p>{t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong></p>
     <p className="hint">{t('be11.ledgerLimit')}</p>
+    <ConclusionMetrics items={[[t('finalNetWorth'), cad(result.finalNetWorth)]]} />
+    {props.annualAction}
   </div>
 
   return (
@@ -186,20 +203,25 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       <div role="tabpanel" id="mode-panel" aria-labelledby={`mode-tab-${mode}`}>
       {mode === 'last' && (
         <>
-          <p className="verdict">
+          <ConclusionVerdict tone={headlineVerdict(t, inputs, result, { taxWarning: props.taxWarning }).tone}>
             {headlineVerdict(t, inputs, result, { taxWarning: props.taxWarning }).text}
-          </p>
+          </ConclusionVerdict>
           {lockedWithdrawalUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
-          {result.success && lastResultUnverified && <ul className="needs-checks" data-testid="needs-checks">
+          {result.success && lastResultUnverified && <Callout variant="warn" className="conclusion-checks"><ul className="needs-checks" data-testid="needs-checks">
             {props.taxWarning && <li>{t('checkPersonTax')}</li>}
             {lockedWithdrawalUnverified && <li>{t('checkLockedLimits')}</li>}
             {result.terminalTaxStatus === 'unsupported' && <li>{t('checkClosingTax')}</li>}
-          </ul>}
+          </ul></Callout>}
+          <ConclusionMetrics items={[
+            [t('conclusion.fundsUntil'), result.success ? inputs.lifeExpectancy : result.depletedAge],
+            [t('finalNetWorth'), cad(result.finalNetWorth)],
+            [t('estateValue'), result.terminalTaxStatus === 'estimated' ? cad(result.estateValue) : null],
+          ]} />
           {/* FE-44: a failing plan gets a next step, not just a final net worth. */}
           {!result.success && <div className="next-steps" data-testid="next-steps">
             <p><strong>{t('nextStepsTitle')}</strong></p>
-            <Button variant="link" type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</Button>
-            <Button variant="link" type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</Button>
+            <Button variant="secondary" size="sm" type="button" className="text-action" onClick={() => setMode('when')}>{t('nextStepEarliest')}</Button>
+            <Button variant="secondary" size="sm" type="button" className="text-action" data-testid="next-step-sustainable" onClick={() => setSustainableRun({ answer: maxSustainableSpending(inputs, canonical), inputs, canonical })}>{t('nextStepSustainable')}</Button>
             {sustainable?.status === 'solved' && sustainable.value !== null && <p data-testid="next-step-sustainable-answer">{t('nextStepSustainableAnswer', { amount: cad(sustainable.value), age: inputs.lifeExpectancy })}</p>}
             {sustainable && sustainable.status !== 'solved' && <p className="hint">{t(`solver_${sustainable.status}`)}</p>}
           </div>}
@@ -209,6 +231,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               { age: Number(gap.eventId.split(':')[1]), amount: Math.ceil(gap.amount) })}
             </li>)}
           </ul>}
+          <Disclosure className="conclusion-estate"><summary>{t('conclusion.estateExplanation')}</summary>
           <p>
             {t('finalNetWorth')}: <strong>{cad(result.finalNetWorth)}</strong>
             {result.terminalTaxStatus === 'estimated' && <>
@@ -225,6 +248,7 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
           })}</p> : <p className="hint">{t('terminalUnsupported')}</p>}
           <p className="hint">{t(inputs.partner ? 'terminalEstimateNote' : 'terminalEstimateNoteSingle')}</p>
           {result.terminalTaxDisclosure === 'quebecSimplified' && <p className="hint" data-testid="terminal-qc-simplified">{t('terminalQcSimplified')}</p>}
+          </Disclosure>
           {dwzSpending?.status === 'solved' && dwzSpending.value !== null && (
             <>
               <p>
@@ -246,13 +270,18 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
 
       {mode === 'when' && (
         <>
-          <p className="verdict">
+          <ConclusionVerdict tone={earliest?.status === 'solved' ? (resultUnverified ? 'uncertain' : 'ok') : earliest?.status === 'infeasible' ? 'bad' : 'uncertain'}>
             {earliest?.status === 'solved'
               ? t('whenAnswer', { age: earliest.value })
               : earliest?.status === 'infeasible' ? t('whenNever', { age: earliest.lastVerifiedBound ?? inputs.currentAge })
                 : earliest?.reason ? t(`solverReason_${earliest.reason}`, { defaultValue: t(`solver_${earliest.status}`) })
                   : t(`solver_${earliest?.status ?? 'unsupported'}`)}
-          </p>
+          </ConclusionVerdict>
+          <ConclusionMetrics items={[
+            [t('conclusion.earliestAge'), earliest?.status === 'solved' ? earliest.value : null],
+            [t('conclusion.assetsAtRetirement'), earliest?.status === 'solved' && earliestAssets !== null ? cad(earliestAssets) : null],
+            [t('retirementSpending'), cad(inputs.retirementSpending)],
+          ]} />
           {earliest?.status !== 'solved' && earliest?.lastVerifiedBound !== null && earliest?.lastVerifiedBound !== undefined &&
             <p className="hint">{t('solverCheckedAge', { age: earliest.lastVerifiedBound, iterations: earliest.iterations })}</p>}
           {earliest?.status === 'solved' && earliestAssets !== null && (
@@ -277,13 +306,19 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
       {mode === 'number' && (
         <>
           {quickEstimateUnsupported ? <>
-            <p className="verdict">{quickEstimateMessage}</p>
+            <ConclusionVerdict tone="uncertain">{quickEstimateMessage}</ConclusionVerdict>
+            <ConclusionMetrics items={[[t('conclusion.fireNumber'), null], [t('conclusion.projectedAssets'), null], [t('conclusion.difference'), null]]} />
             {fireNumber?.status === 'searchLimit' && fireNumber.lastVerifiedBound !== null &&
               <p className="hint">{t('solverCheckedAssets', { amount: cad(fireNumber.lastVerifiedBound), iterations: fireNumber.iterations })}</p>}
           </> : <>
-          <p className="verdict">
+          <ConclusionVerdict tone={!ok ? 'bad' : resultUnverified ? 'uncertain' : 'ok'}>
             {t('numberAnswer', { age: inputs.fireAge, amount: cad(fireNumber!.value!) })}
-          </p>
+          </ConclusionVerdict>
+          <ConclusionMetrics items={[
+            [t('conclusion.fireNumber'), fireNumber?.value != null ? cad(fireNumber.value) : null],
+            [t('conclusion.projectedAssets'), Number.isFinite(projectedAtFire) ? cad(projectedAtFire!) : null],
+            [t('conclusion.difference'), Number.isFinite(projectedAtFire) && fireNumber?.value != null ? cad(projectedAtFire! >= fireNumber.value ? projectedAtFire! - fireNumber.value : fireNumber.value - projectedAtFire!) : null],
+          ]} />
           {Number.isFinite(projectedAtFire) && fireNumber?.value !== null && fireNumber?.value !== undefined && (
             <p>
               <Jargon
@@ -320,10 +355,10 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
               }}
             />
           </Field>
-          {!goal && <p className="hint">{t('targetUnset')}</p>}
-          {goal?.status === 'unsupported' && <p className="verdict">{quickEstimateMessage}</p>}
+          {!goal && <><StatusChip status="est">{t('conclusion.uncertain')}</StatusChip><p className="hint">{t('targetUnset')}</p></>}
+          {goal?.status === 'unsupported' && <ConclusionVerdict tone="uncertain">{quickEstimateMessage}</ConclusionVerdict>}
           {goal?.status === 'supported' && (
-            <p className="verdict">
+            <ConclusionVerdict tone={!ok ? 'bad' : targetResultUnverified ? 'uncertain' : 'ok'}>
               {goal.reachedAge !== null && goal.reachedAge < inputs.fireAge
                 ? t('targetReachedEarly', {
                     fireAge: inputs.fireAge,
@@ -345,13 +380,19 @@ export function ResultsPanel(props: { inputs: Inputs; result: ProjectionResult; 
                       age: goal.reachedAge,
                     })
                   : t('targetNever', { target: cad(target) })}
-            </p>
+            </ConclusionVerdict>
           )}
+          <ConclusionMetrics items={[
+            [t('conclusion.target'), goal?.status === 'supported' ? cad(target) : null],
+            [t('conclusion.projectedAssets'), goal?.status === 'supported' && goal.reachedAge !== null ? cad(goal.assetsAtFire) : null],
+            [t('conclusion.targetAge'), goal?.status === 'supported' ? goal.reachedAge : null],
+          ]} />
           {targetResultUnverified && <p className="hint">{t('lockedWithdrawalUnverified')}</p>}
           <p className="hint"><Jargon text={t('targetHint')} /></p>
         </>
       )}
       </div>
+      {props.annualAction}
     </div>
   )
 }

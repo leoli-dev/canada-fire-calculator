@@ -125,7 +125,7 @@ export default function App() {
         <aside>
           {entryMode === 'professional' && result && !hasBlockingIssues && <ResultPeek inputs={inputs} result={result}
             estimate={precisionBlocked || taxBlocked} personTax={result.taxCapability?.status === 'person'} taxWarning={taxWarning} />}
-          {!storageIssue && (entryMode === 'professional' || guidedView === 'review') && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
+          {!storageIssue && entryMode === 'professional' && <CanonicalEvidenceControl key={`${entryMode}:${inputRevision}:${i18n.language}`} />}
           {!storageIssue && (entryMode === 'guided' ? <GuidedFlow /> : <InputForm />)}
         </aside>
         {canonicalResult && <section className="results-column" id="results" tabIndex={-1}>
@@ -139,10 +139,11 @@ export default function App() {
         </section>}
         {result && !hasBlockingIssues && <section className="results-column" id="results" tabIndex={-1}>
           <ResultsPanel inputs={inputs} result={result} legacyEstimate={precisionBlocked} legacyOwnershipPending={unresolvedHousehold}
+            annualAction={<Button size="sm" type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>}
             budgetBasisExcluded={precision?.reasons.includes('budgetBasisExcluded') ?? false}
             taxEstimate={taxBlocked} taxWarning={taxWarning} personTax={result.taxCapability?.status === 'person'} />
           <div className="mobile-results-disclaimer"><CompactDisclaimer /></div>
-          {result && <><Button type="button" onClick={() => setAnnualToken({ revision: inputRevision, result: selected, entryMode })}>{annualSheetText(annualDetailsTitle, i18n.language)}</Button>{annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}</>}
+          {annualModel && <AnnualSheetDialog key={inputRevision} open={true} model={annualModel} moneyMode={displayMode} onClose={() => setAnnualToken(null)} />}
           {/* FE-37: gates withhold precise tax tools, never the charts. */}
           {!precisionBlocked && taxWarning && <p role="status" className="hint" data-testid="person-tax-limit">{t(inputs.province === 'QC' ? 'be11QcLimit' : singleLegacyPreview ? 'be11SingleEstimate' : 'be11TaxLimit')}</p>}
           {precisionBlocked && <p role="status" className="hint" data-testid="estimate-charts-note">{t('estimateChartsNote')}</p>}
