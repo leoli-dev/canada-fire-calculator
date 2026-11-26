@@ -28,6 +28,13 @@ describe('shared controls', () => {
       expect(button.disabled).toBe(true)
     }
   })
+  it('preserves an explicit caller busy state when loading is unset', () => {
+    const view = render(<Button aria-busy="true">Save</Button>)
+    const button = screen.getByRole('button', { name: 'Save' })
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    view.rerender(<Button aria-busy={false}>Save</Button>)
+    expect(button.getAttribute('aria-busy')).toBe('false')
+  })
   it('exposes selected button state and preserves caller handlers', async () => {
     const click = vi.fn()
     render(<Segmented aria-label="Language"><Button className="active">EN</Button><Button onClick={click}>FR</Button></Segmented>)

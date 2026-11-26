@@ -1,9 +1,11 @@
 /* Unlayered primitives take precedence over the legacy screen layer. */
+/* Screen geometry, including visibility and row grids, takes priority over the default button display. */
+@layer primitives { .ui-button { display: inline-flex; } }
 :where(button, input, select, textarea) { font-family: var(--font); }
 :where(button, input, select, textarea, summary, [tabindex]):focus-visible { outline: none; box-shadow: var(--focus-ring); }
 :focus:not(:focus-visible) { outline: none; }
 .ui-button {
-  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  position: relative; align-items: center; justify-content: center; gap: var(--s-2);
   min-height: var(--h-control); padding: var(--s-2) var(--s-4); border: 1px solid var(--line-strong);
   border-radius: var(--r-control); background: var(--surface); color: var(--ink);
   font-size: var(--fs-ui); font-weight: 600; line-height: var(--lh-tight); cursor: pointer;
@@ -20,7 +22,8 @@
 .ui-button-ghost, .ui-button-link { background: transparent; border-color: transparent; color: var(--accent); }
 .ui-button-link { min-height: auto; padding: 0; text-decoration: underline; }
 .ui-button-sm { min-height: var(--h-control-sm); padding: var(--s-1) var(--s-3); }
-.ui-button-label-loading { visibility: hidden; }
+.ui-button[hidden] { display: none; }
+.ui-button-label-loading { opacity: 0; }
 .ui-spinner { position: absolute; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--r-pill); animation: ui-spin 1s linear infinite; }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 .ui-segmented { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--s-1); padding: 3px; background: var(--surface-2); border: 0; border-radius: var(--r-control); }
@@ -32,10 +35,12 @@
 .field.ui-field:has(input[type='checkbox']) { grid-template-columns: minmax(0, 1fr) auto; }
 .field.ui-field .field-issue { grid-column: 2; }
 .field.ui-field :is(input:not([type='checkbox']), select) { width: 100%; }
-.ui-field :is(input:not([type='checkbox']):not([type='radio']), select), .ui-field:is(input, select) { min-height: var(--h-control); border-radius: var(--r-control); background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); padding: var(--s-2); font-size: var(--fs-ui); font-variant-numeric: tabular-nums; max-width: 100%; }
+.ui-field :where(input:not([type='checkbox']):not([type='radio']), select) { min-height: var(--h-control); border-radius: var(--r-control); background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); padding: var(--s-2); font-size: var(--fs-ui); font-variant-numeric: tabular-nums; max-width: 100%; }
 .ui-field input[inputmode='decimal'], .ui-field input[type='number'] { text-align: right; }
 .ui-field :is(input, select):disabled { opacity: .45; }
 .ui-field :is(input, select)[aria-invalid='true'] { border-color: var(--critical); }
+.ui-field :is(input, select).invalid-warning { border-color: var(--caution); }
+.ui-field :is(input, select).invalid-error { border-color: var(--critical); }
 .ui-field-help.ui-button { width: 20px; min-height: 20px; padding: 0; border-radius: var(--r-pill); font-size: var(--fs-caption); }
 .ui-choice { display: flex; align-items: flex-start; gap: var(--s-3); min-height: 52px; padding: var(--s-3) 14px; border: 1px solid var(--line-strong); border-radius: var(--r-control); background: var(--surface); color: var(--ink); cursor: pointer; }
 .ui-choice:hover { border-color: var(--accent); }
@@ -90,3 +95,10 @@
   .ui-sheet-handle { display: block; width: 32px; height: 4px; border-radius: var(--r-pill); margin: var(--s-2) auto 0; background: var(--line-strong); }
 }
 @media (prefers-reduced-motion: reduce) { .ui-spinner { animation: none; } }
+@media (forced-colors: active) {
+  :where(button, input, select, textarea, summary, [tabindex]):focus-visible,
+  .ui-button:focus-visible, .ui-segmented .ui-button:focus-visible,
+  .ui-choice:focus-visible, .ui-choice:has(input:focus-visible), .ui-disclosure > summary:focus-visible {
+    outline: 2px solid Highlight; outline-offset: 2px;
+  }
+}

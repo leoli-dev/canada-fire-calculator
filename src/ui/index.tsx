@@ -5,7 +5,7 @@ import './ui.css'
 const classes = (...values: (string | undefined | false)[]) => values.filter(Boolean).join(' ')
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'; size?: 'md' | 'sm'; loading?: boolean }
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = 'secondary', size = 'md', loading, disabled, className, children, type = 'button', ...props }, ref) {
-  return <button {...props} ref={ref} type={type} disabled={disabled || loading} aria-busy={loading || undefined} className={classes('ui-button', `ui-button-${variant}`, `ui-button-${size}`, className)}>{loading ? <><span className="ui-button-label-loading">{children}</span><span className="ui-spinner" aria-hidden="true" /></> : children}</button>
+  return <button {...props} ref={ref} type={type} disabled={disabled || loading} aria-busy={loading ? true : props['aria-busy']} className={classes('ui-button', `ui-button-${variant}`, `ui-button-${size}`, className)}>{loading ? <><span className="ui-button-label-loading">{children}</span><span className="ui-spinner" aria-hidden="true" /></> : children}</button>
 })
 
 type BoxProps = HTMLAttributes<HTMLElement> & { as?: 'div' | 'nav' | 'p' | 'section' | 'fieldset' | 'aside' }
@@ -46,6 +46,30 @@ export function Disclosure({ className, ...props }: DetailsHTMLAttributes<HTMLDe
   return <details {...props} className={classes('ui-disclosure', className)} />
 }
 
+/** Match native sequential focus, rather than all elements that can be focused by script. */
+function tabbableElements(root: HTMLElement | null): HTMLElement[] {
+  const candidates = Array.from(root?.querySelectorAll<HTMLElement>('a[href], area[href], button, input, select, textarea, summary, iframe, [contenteditable], [tabindex]') ?? [])
+  const visible = candidates.filter(element => {
+    const tabIndex = !element.hasAttribute('tabindex') && element.isContentEditable ? 0 : element.tabIndex
+    if (tabIndex < 0 || element.matches(':disabled, input[type="hidden"]') || element.closest('[hidden], [inert]')) return false
+    if (element.tagName === 'SUMMARY' && element.parentElement?.querySelector(':scope > summary') !== element) return false
+    const visibility = getComputedStyle(element).visibility
+    if (visibility === 'hidden' || visibility === 'collapse') return false
+    for (let ancestor: HTMLElement | null = element; ancestor && ancestor !== root; ancestor = ancestor.parentElement) {
+      const style = getComputedStyle(ancestor)
+      if (style.display === 'none') return false
+      if (ancestor instanceof HTMLDetailsElement && !ancestor.open && !ancestor.querySelector(':scope > summary')?.contains(element)) return false
+    }
+    // checkVisibility also handles content-visibility and missing layout boxes in real browsers.
+    return !element.checkVisibility || element.checkVisibility()
+  })
+  return visible.filter(element => {
+    if (!(element instanceof HTMLInputElement) || element.type !== 'radio' || !element.name) return true
+    const group = visible.filter((other): other is HTMLInputElement => other instanceof HTMLInputElement && other.type === 'radio' && other.name === element.name && other.form === element.form)
+    return element === (group.find(radio => radio.checked) ?? group[0])
+  }).sort((a, b) => (a.tabIndex > 0 ? a.tabIndex : Infinity) - (b.tabIndex > 0 ? b.tabIndex : Infinity))
+}
+
 export function Sheet({ open, onClose, title, closeLabel, children, id }: { open: boolean; onClose: () => void; title: ReactNode; closeLabel: string; children: ReactNode; id?: string }) {
   const generatedId = useId()
   const titleId = `${id ?? generatedId}-title`
@@ -57,7 +81,7 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
     const previous = document.activeElement as HTMLElement | null
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const focusable = () => Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? [])
+    const focusable = () => tabbableElements(panel.current)
     ;(focusable()[0] ?? panel.current)?.focus()
     const keyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current() }

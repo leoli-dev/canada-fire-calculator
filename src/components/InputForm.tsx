@@ -1,5 +1,5 @@
 import { Field, Button, Segmented } from '../ui'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_CHILD,
@@ -60,12 +60,15 @@ function Num(props: {
   const editSharedField = useStore((s) => s.editSharedField)
   const content = props.field ? contentForField(props.field) : undefined
   const inputs = useStore((s) => s.inputs)
+  const descriptionId = useId()
   return (
     <>
       <Field className="field">
         <span><Jargon text={props.label} /></span>
         <NumberInput
-          className={props.issue ? `invalid-${props.issue.severity}` : undefined}
+          className={missingMortgage ? 'invalid-error' : props.issue ? `invalid-${props.issue.severity}` : undefined}
+          invalid={missingMortgage || props.issue?.severity === 'error'}
+          describedBy={[...(missingMortgage ? [`${descriptionId}-mortgage`] : []), ...(props.issue ? [`${descriptionId}-issue`] : [])].join(' ') || undefined}
           value={props.value}
           draft={draft}
           preserveInvalidDraft={!!props.field}
@@ -83,9 +86,9 @@ function Num(props: {
             props.onChange(v ?? 0)
           }}
         />
-        {missingMortgage && <em className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
+        {missingMortgage && <em id={`${descriptionId}-mortgage`} className="field-issue error">{t('valPurchaseMortgageRequired', { age: home.buyAtAge, amount: Math.ceil(home.price - home.downPayment) })}</em>}
         {props.issue && (
-          <em className={`field-issue ${props.issue.severity}`}>
+          <em id={`${descriptionId}-issue`} className={`field-issue ${props.issue.severity}`}>
             {t(props.issue.key, props.issue.params)}
           </em>
         )}
@@ -103,17 +106,20 @@ function OptionalAge(props: {
   issue?: ValidationIssue
 }) {
   const { t } = useTranslation()
+  const descriptionId = useId()
   return (
     <Field className="field">
       <span><Jargon text={props.label} /></span>
       <NumberInput
         className={props.issue ? `invalid-${props.issue.severity}` : undefined}
+        invalid={props.issue?.severity === 'error'}
+        describedBy={props.issue ? descriptionId : undefined}
         value={props.value}
         placeholder="—"
         onChange={props.onChange}
       />
       {props.issue && (
-        <em className={`field-issue ${props.issue.severity}`}>
+        <em id={descriptionId} className={`field-issue ${props.issue.severity}`}>
           {t(props.issue.key, props.issue.params)}
         </em>
       )}

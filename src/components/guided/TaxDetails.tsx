@@ -44,8 +44,8 @@ function RoomFeedback({ room, planned, retained, couple, testId }: { room: Known
 /** One person's main room figure, in the shared text number input. */
 function RoomNumber({ id, testId, label, value, onChange }: { id: string; testId: string; label: string; value: Known<number>; onChange: (value: number | null) => void }) {
   const { t } = useTranslation()
-  return <div className="question-answer">
-    <Field htmlFor={id}>{label}</Field>
+  return <Field as="div" className="question-answer">
+    <label htmlFor={id}>{label}</label>
     <NumberInput id={id} testId={testId} className="question-number" value={value.status === 'known' ? value.value : null}
       placeholder={t('be12.unknown')}
       onChange={next => {
@@ -53,7 +53,7 @@ function RoomNumber({ id, testId, label, value, onChange }: { id: string; testId
         const current = value.status === 'known' ? value.value : null
         if (next !== current) onChange(next)
       }} />
-  </div>
+  </Field>
 }
 
 /** The advanced statement detail, open by default once any of it is recorded. */

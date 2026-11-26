@@ -195,10 +195,18 @@ test('language buttons are clickable beside the GitHub corner across responsive 
 
 test('question help follows the current page within one category', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
+  // Locale bundles load asynchronously. Exercise a slow bundle without treating a completed click as a completed switch.
+  await page.route('**/src/i18n/zh.json*', async route => {
+    await new Promise(resolve => setTimeout(resolve, 200))
+    await route.continue()
+  })
   await page.getByRole('button', { name: '中文' }).click()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
+  await expect(page.getByRole('button', { name: '中文' })).toHaveAttribute('aria-pressed', 'true')
 
   const help = page.locator('.question-help')
   await help.locator('summary').click()
+  await expect(help).toContainText('家庭人数')
   const householdHelp = await help.innerText()
   expect(householdHelp).toContain('家庭人数')
 

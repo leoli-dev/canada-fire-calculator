@@ -1,4 +1,5 @@
 @import './styles/tokens.css';
+@layer primitives, legacy;
 
 /* Existing screen geometry stays in a compatibility layer while primitives own control styles. */
 @layer legacy {

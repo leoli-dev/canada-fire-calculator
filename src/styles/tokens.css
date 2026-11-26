@@ -34,7 +34,7 @@
   --accent-hover: #123f87;
   --accent-tint: #e8effa;
   --on-accent: #ffffff;
-  --focus-ring: 0 0 0 3px var(--accent-tint), 0 0 0 1px var(--accent);
+  --focus-ring: 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-tint);
 
   /* semantic state (not accent) */
   --positive: #1e7a34;  --positive-tint: #e5f3e8;
