@@ -20,6 +20,27 @@ async function seed(page: Page, mode: 'professional' | 'guided' = 'professional'
   await expect(page.locator('#results .results-navigation')).toBeVisible()
 }
 
+/** Keep the real plan and DOM, but deliberately give the trailing sections enough viewport room to clamp Strategies. */
+async function clampedStrategiesFixture(page: Page) {
+  await page.evaluate(() => document.fonts.ready)
+  const measure = () => page.evaluate(() => {
+    const pane = document.getElementById('results')!
+    const paneScrolls = getComputedStyle(pane).overflowY === 'auto'
+    const root = paneScrolls ? pane : document.documentElement
+    const strategies = document.getElementById('results-strategies')!
+    const absoluteTop = root.scrollTop + strategies.getBoundingClientRect().top - (paneScrolls ? pane.getBoundingClientRect().top : 0)
+    const margin = parseFloat(getComputedStyle(strategies).scrollMarginTop)
+    return { max: root.scrollHeight - root.clientHeight, requested: absoluteTop - margin,
+      tail: root.scrollHeight - absoluteTop, margin, viewportHeight: innerHeight, rootHeight: root.clientHeight }
+  })
+  const natural = await measure()
+  // Overshoot by 128px rather than assuming a particular font, card height or scrollport chrome size.
+  const height = Math.ceil(natural.tail + natural.margin + 128 + natural.viewportHeight - natural.rootHeight)
+  await page.setViewportSize({ width: page.viewportSize()!.width, height })
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  return { natural, fixture: await measure(), viewport: page.viewportSize() }
+}
+
 for (const mode of ['guided', 'professional'] as const) {
   test(`${mode} section anchors focus content and observer follows its scrollport`, async ({ page }, info) => {
     await seed(page, mode)
@@ -223,10 +244,16 @@ test('clamped anchor jumps retain the focused destination until actual scrolling
   }
 })
 
-test('manual scroll end selects Scenarios while an explicit clamped Strategies destination wins at the same offset', async ({ page }) => {
-  for (const [mode, width] of [['guided', 1440], ['guided', 390], ['professional', 1440], ['professional', 1099], ['professional', 390]] as const) {
+test('manual scroll end selects Scenarios while an explicit clamped Strategies destination wins at the same offset', async ({ page }, info) => {
+  test.setTimeout(60_000)
+  for (const font of ['default', 'serif-large']) for (const [mode, width] of [['guided', 1440], ['guided', 390], ['professional', 1440], ['professional', 1099], ['professional', 390]] as const) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
     await seed(page, mode)
+    if (font === 'serif-large') await page.addStyleTag({ content: ':root { --font: serif; font-size: 18px; }' })
+    const geometry = await clampedStrategiesFixture(page)
+    await info.attach(`clamp-${font}-${mode}-${width}`, { body: JSON.stringify(geometry, null, 2), contentType: 'application/json' })
+    expect(geometry.fixture.max, 'The fixture must retain room for manual scrolling').toBeGreaterThan(160)
+    expect(geometry.fixture.requested - geometry.fixture.max, 'Strategies must overshoot the actual scroll maximum before testing the clamp').toBeGreaterThan(64)
     const nav = page.locator('.results-navigation')
     const scenarios = nav.locator('[href="#results-scenarios"]')
     const strategies = nav.locator('[href="#results-strategies"]')
@@ -249,8 +276,8 @@ test('manual scroll end selects Scenarios while an explicit clamped Strategies d
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     await expect(page.locator('#results-strategies')).toBeFocused()
     await expect(strategies).toHaveAttribute('aria-current', 'true')
-    // These four ordinary layouts clamp Strategies at the same offset as manual end.
-    if (mode === 'professional' || width === 1440) expect((await position()).offset).toBe(bottom.offset)
+    // Every fixture deliberately clamps, including Guided phone layouts and alternate fonts.
+    expect((await position()).offset).toBe(bottom.offset)
     await page.evaluate(() => {
       const pane = document.getElementById('results')!
       if (getComputedStyle(pane).overflowY === 'auto') pane.scrollBy(0, -80)
@@ -259,6 +286,27 @@ test('manual scroll end selects Scenarios while an explicit clamped Strategies d
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     await end()
     await expect(scenarios).toHaveAttribute('aria-current', 'true')
+  }
+})
+
+test('ordinary real-plan results select manual Scenarios at unmodified viewport sizes', async ({ page }) => {
+  for (const [mode, width] of [['guided', 1440], ['guided', 390], ['professional', 1440], ['professional', 1099], ['professional', 390]] as const) {
+    const viewport = { width, height: width === 390 ? 844 : 900 }
+    await page.setViewportSize(viewport)
+    await seed(page, mode)
+    await page.evaluate(() => document.fonts.ready)
+    await page.locator('.results-navigation a[href="#results-income"]').click()
+    const bottom = await page.evaluate(() => {
+      const pane = document.getElementById('results')!
+      const root = getComputedStyle(pane).overflowY === 'auto' ? pane : document.documentElement
+      if (root === pane) pane.scrollTo({ top: pane.scrollHeight, behavior: 'instant' })
+      else window.scrollTo({ top: root.scrollHeight, behavior: 'instant' })
+      return { offset: root.scrollTop, max: root.scrollHeight - root.clientHeight }
+    })
+    expect(page.viewportSize()).toEqual(viewport)
+    expect(bottom.max).toBeGreaterThan(0)
+    expect(bottom.offset).toBeCloseTo(bottom.max, 0)
+    await expect(page.locator('.results-navigation a[href="#results-scenarios"]')).toHaveAttribute('aria-current', 'true')
   }
 })
 
