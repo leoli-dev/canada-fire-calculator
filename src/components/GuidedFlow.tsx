@@ -1,5 +1,5 @@
-import { Button, Callout } from '../ui'
-import { useEffect, useMemo, useState } from 'react'
+import { Button, Callout, Sheet } from '../ui'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateInputs } from '../engine'
 import { accountSummary } from '../guidedReview'
@@ -12,7 +12,7 @@ import { QuestionPage, QuestionHelpRail } from './guided/QuestionPage'
 import { RuleAssumptions } from './RuleAssumptions'
 import { ResetPlan } from './ResetPlan'
 
-function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void }) {
+function CategoryNavigation({ pages, onNavigate, onReview }: { pages: QuestionDefinition[]; onNavigate: (id: string) => void; onReview?: () => void }) {
   const { t } = useTranslation()
   const state = useStore()
   const completed = pages.filter(page => pageIsComplete(page, state)).length
@@ -30,7 +30,7 @@ function CategoryNavigation({ pages, onNavigate }: { pages: QuestionDefinition[]
         <div>{categoryPages.map((page) => <Button variant="ghost" type="button" key={page.id} aria-current={page.id === state.activePageId ? 'page' : undefined} onClick={() => onNavigate(page.id)}><i className={`page-status ${pageIsComplete(page, state) ? 'done' : 'todo'}`} aria-hidden="true" /><span>{t(questionShortKey(page, state.inputs))}</span><small className="sr-only">{pageIsComplete(page, state) ? t('questionnaire.status.answered') : page.optional ? t('questionnaire.status.optional') : t('questionnaire.status.pending')}</small></Button>)}</div>
       </details>
     })}
-    <Button type="button" className="review-link" onClick={() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' }}>{t('questionnaire.reviewAnswers')}</Button>
+    <Button type="button" className="review-link" onClick={onReview ?? (() => { state.setGuidedView('review'); window.location.hash = '#/guided/review' })}>{t('questionnaire.reviewAnswers')}</Button>
   </nav>
 }
 
@@ -113,6 +113,29 @@ export function GuidedFlow() {
   const { t } = useTranslation()
   const state = useStore()
   const [directoryOpen, setDirectoryOpen] = useState(false)
+  const [phone, setPhone] = useState(() => window.matchMedia('(max-width: 640px)').matches)
+  const pendingDestination = useRef<string | null>(null)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 640px)')
+    const update = () => { setPhone(media.matches); setDirectoryOpen(false) }
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+  // Let Sheet restore the trigger before navigation focuses the next question.
+  useEffect(() => {
+    if (directoryOpen || !pendingDestination.current) return
+    const id = pendingDestination.current
+    pendingDestination.current = null
+    if (id === 'review') {
+      state.setGuidedView('review')
+      window.location.hash = '#/guided/review'
+    } else {
+      state.setActivePage(id)
+      window.location.hash = `#/guided/${pageById(id)?.categoryId}/${id}`
+    }
+  }, [directoryOpen])
+  const directoryNavigate = (id: string) => { pendingDestination.current = id; setDirectoryOpen(false) }
   const pages = useMemo(() => visibleQuestionPages(state.inputs, state.questionAnswers, state.canonical), [state.inputs, state.questionAnswers, state.canonical])
   const current = pages.find((page) => page.id === state.activePageId) ?? pages[0]
   const index = Math.max(0, pages.findIndex((page) => page.id === current.id))
@@ -169,8 +192,14 @@ export function GuidedFlow() {
   if (state.guidedView === 'review') return <AnswerReview pages={pages} />
 
   return <div className="questionnaire-layout">
-    <Button type="button" className="mobile-directory-trigger" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('questionnaire.directory')} · {t('questionnaire.categoryCount', { current: QUESTION_CATEGORIES.findIndex((category) => category.id === current.categoryId) + 1, total: QUESTION_CATEGORIES.length })}</Button>
-    <div className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><Button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</Button></div>
+    <div className="mobile-question-progress">
+      <div><span>{t('ui.mobileCategoryProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find(category => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex(page => page.id === current.id) + 1, total: categoryPages.length })}</span>
+        <Button variant="ghost" className="mobile-directory-trigger" aria-haspopup={phone ? 'dialog' : undefined} aria-controls="question-directory" aria-expanded={directoryOpen} onClick={() => setDirectoryOpen(!directoryOpen)}>{t('ui.contents')}</Button></div>
+      <progress aria-label={t('ui.overallProgress')} value={pages.filter(page => pageIsComplete(page, state)).length} max={pages.length} />
+    </div>
+    {phone ? <>{!directoryOpen && <div id="question-directory" className="directory-shell" hidden><CategoryNavigation pages={pages} onNavigate={navigate} /></div>}<Sheet closeButtonClassName="directory-close" id="question-directory" open={directoryOpen} onClose={() => setDirectoryOpen(false)} title={t('ui.contents')} closeLabel={t('questionnaire.closeDirectory')}>
+      <CategoryNavigation pages={pages} onNavigate={directoryNavigate} onReview={() => directoryNavigate('review')} />
+    </Sheet></> : <div id="question-directory" className={`directory-shell ${directoryOpen ? 'open' : ''}`}><CategoryNavigation pages={pages} onNavigate={navigate} /><Button type="button" className="directory-close" onClick={() => setDirectoryOpen(false)}>{t('questionnaire.closeDirectory')}</Button></div>}
     <div className="questionnaire-main"><QuestionPage definition={current} categoryProgress={t('ui.categoryProgress', { current: categoryPages.findIndex(page => page.id === current.id) + 1, total: categoryPages.length })} /><div className="question-pager"><Button type="button" disabled={index === 0} onClick={() => navigate(pages[index - 1].id)}>{t('guidedBack')}</Button><span data-testid="guided-progress"><span className="pager-category-progress">{t('questionnaire.pagerProgress', { category: t(`questionnaire.categories.${QUESTION_CATEGORIES.find((category) => category.id === current.categoryId)?.contentKey}`), current: categoryPages.findIndex((page) => page.id === current.id) + 1, total: categoryPages.length })}</span><span className="pager-next-label">{index < pages.length - 1 ? t('ui.nextQuestion', { label: t(questionShortKey(pages[index + 1], state.inputs)) }) : t('questionnaire.reviewAnswers')}</span></span><Button variant="primary" type="button" onClick={() => { if (index === pages.length - 1) { state.setGuidedView('review'); window.location.hash = '#/guided/review' } else navigate(pages[index + 1].id) }}>{index === pages.length - 1 ? t('questionnaire.reviewAnswers') : <><span className="pager-desktop-button-label">{t('guidedNext')}</span><span className="pager-mobile-button-label">{pages[index + 1]?.categoryId !== current.categoryId ? t('questionnaire.nextCategory') : t('guidedNext')}</span></>}</Button></div></div>
     <QuestionHelpRail guidanceKey={current.guidanceKey} />
   </div>

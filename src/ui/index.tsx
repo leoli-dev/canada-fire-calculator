@@ -77,7 +77,7 @@ function sameRadioGroup(a: HTMLElement, b: HTMLElement): boolean {
     && !!a.name && a.name === b.name && a.form === b.form
 }
 
-export function Sheet({ open, onClose, title, closeLabel, children, id }: { open: boolean; onClose: () => void; title: ReactNode; closeLabel: string; children: ReactNode; id?: string }) {
+export function Sheet({ open, onClose, title, closeLabel, children, id, closeButtonClassName }: { closeButtonClassName?: string; open: boolean; onClose: () => void; title: ReactNode; closeLabel: string; children: ReactNode; id?: string }) {
   const generatedId = useId()
   const titleId = `${id ?? generatedId}-title`
   const panel = useRef<HTMLDivElement>(null)
@@ -123,7 +123,7 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
     return () => { document.removeEventListener('keydown', keyDown, true); document.removeEventListener('focusin', focusIn); document.body.style.overflow = overflow; previous?.focus() }
   }, [open])
   if (!open) return null
-  return <div className="ui-sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><div ref={panel} id={id} className="ui-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><span className="sr-only" tabIndex={0} data-ui-focus-guard="start" onFocus={focusBoundary} /><div className="ui-sheet-handle" aria-hidden="true" /><div className="ui-sheet-header"><h2 id={titleId}>{title}</h2><Button aria-label={closeLabel} variant="ghost" onClick={onClose}>×</Button></div><div className="ui-sheet-body">{children}</div><span className="sr-only" tabIndex={0} data-ui-focus-guard="end" onFocus={focusBoundary} /></div></div>
+  return <div className="ui-sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><div ref={panel} id={id} className="ui-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><span className="sr-only" tabIndex={0} data-ui-focus-guard="start" onFocus={focusBoundary} /><div className="ui-sheet-handle" aria-hidden="true" /><div className="ui-sheet-header"><h2 id={titleId}>{title}</h2><Button className={closeButtonClassName} aria-label={closeLabel} variant="ghost" onClick={onClose}>×</Button></div><div className="ui-sheet-body">{children}</div><span className="sr-only" tabIndex={0} data-ui-focus-guard="end" onFocus={focusBoundary} /></div></div>
 }
 
 /** Kept outside its label to avoid nested interactive controls. */

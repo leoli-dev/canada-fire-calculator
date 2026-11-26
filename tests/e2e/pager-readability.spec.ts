@@ -20,10 +20,10 @@ for (const language of ['EN', 'FR'] as const) {
 
     for (const width of [320, 390, 1440]) {
       await page.setViewportSize({ width, height: 844 })
-      await expect(pager.locator('button').last()).toHaveAccessibleName(width <= 640 ? copy.questionnaire.nextCategory : copy.guidedNext)
+      await expect(pager.locator('button').last()).toHaveAccessibleName(copy.guidedNext)
       await pager.scrollIntoViewIfNeeded()
       const measured = await pager.evaluate(element => {
-        const progress = element.querySelector<HTMLElement>(innerWidth <= 640 ? '.pager-category-progress' : '.pager-next-label')!
+        const progress = (innerWidth <= 640 ? document.querySelector<HTMLElement>('.mobile-question-progress > div > span') : element.querySelector<HTMLElement>('.pager-next-label'))!
         const style = getComputedStyle(progress)
         const text = progress.textContent!
         const range = document.createRange()
@@ -41,7 +41,7 @@ for (const language of ['EN', 'FR'] as const) {
         return {
           text, lineCount, wordCount: text.trim().split(/\s+/).length, splitWords,
           columns: getComputedStyle(element).gridTemplateColumns.split(' '), overflowWrap: style.overflowWrap,
-          pager: element.getBoundingClientRect().toJSON(), progress: element.querySelector('[data-testid="guided-progress"]')!.getBoundingClientRect().toJSON(),
+          pager: element.getBoundingClientRect().toJSON(), progress: (innerWidth <= 640 ? document.querySelector('.mobile-question-progress')! : element.querySelector('[data-testid="guided-progress"]')!).getBoundingClientRect().toJSON(),
           buttons: [...element.querySelectorAll('button')].map(button => ({ text: button.textContent, ...button.getBoundingClientRect().toJSON() })),
           documentOverflow: document.documentElement.scrollWidth > innerWidth,
         }
@@ -62,6 +62,9 @@ for (const language of ['EN', 'FR'] as const) {
       if (width <= 640) {
         expect(measured.columns).toHaveLength(2)
         expect(measured.progress.width).toBe(measured.pager.width)
+        expect(next.width / back.width).toBeCloseTo(2, 1)
+        expect(measured.pager.bottom).toBe(844)
+        expect(measured.progress.top).toBe(52)
         expect(measured.progress.bottom).toBeLessThanOrEqual(Math.min(back.top, next.top))
       } else {
         expect(measured.columns).toHaveLength(3)
