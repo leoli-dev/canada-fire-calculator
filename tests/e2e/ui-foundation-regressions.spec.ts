@@ -129,6 +129,65 @@ test('sheet follows effective native tab order through conditional and disclosur
   await expect(trigger).toBeFocused()
 })
 
+for (const position of ['middle', 'trailing']) {
+  for (const selected of [false, true]) {
+    test(`sheet traverses ${selected ? 'a selected' : 'an unchecked'} radio group in the ${position} position`, async ({ page }) => {
+      await page.goto(`${harness}?radios=${position}${selected ? '&selected=one' : ''}`)
+      const trigger = page.getByRole('button', { name: 'Open sheet' })
+      await trigger.click()
+      const close = page.getByRole('button', { name: 'Close sheet' })
+      const first = page.getByRole('button', { name: 'First action' })
+      const final = page.getByRole('button', { name: 'Final action' })
+      const one = page.getByRole('radio', { name: 'One', exact: true })
+      const two = page.getByRole('radio', { name: 'Two', exact: true })
+      await expect(close).toBeFocused()
+
+      // Enter backwards using native traversal in the middle, or the trap at the trailing boundary.
+      if (position === 'middle') await final.focus()
+      await page.keyboard.press('Shift+Tab')
+      await expect(selected ? one : two).toBeFocused()
+      await page.keyboard.press('Shift+Tab')
+      await expect(first).toBeFocused()
+      await page.keyboard.press('Shift+Tab')
+      await expect(close).toBeFocused()
+
+      // Reopen fresh controls: Thorium can remember an unchecked group's last focused member.
+      await page.keyboard.press('Escape')
+      await expect(trigger).toBeFocused()
+      await trigger.click()
+      await expect(close).toBeFocused()
+      await page.keyboard.press('Tab')
+      await expect(first).toBeFocused()
+      await page.keyboard.press('Tab')
+      await expect(one).toBeFocused()
+      if (selected) {
+        await page.keyboard.press('ArrowRight')
+        await expect(two).toBeFocused()
+        await expect(two).toBeChecked()
+        await expect(one).not.toBeChecked()
+      } else {
+        await expect(one).not.toBeChecked()
+        await expect(two).not.toBeChecked()
+      }
+      await page.keyboard.press('Tab')
+      await expect(position === 'middle' ? final : close).toBeFocused()
+      if (position === 'middle') {
+        await page.keyboard.press('Shift+Tab')
+        // An unchecked group re-enters at its most recently focused member in Thorium.
+        await expect(selected ? two : one).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(final).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(close).toBeFocused()
+      }
+      await page.keyboard.press('Shift+Tab')
+      await expect(position === 'middle' ? final : two).toBeFocused()
+      await page.keyboard.press('Escape')
+      await expect(trigger).toBeFocused()
+    })
+  }
+}
+
 test('guided sibling fields use 48px inputs and professional errors retain semantic borders', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')

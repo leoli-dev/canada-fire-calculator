@@ -66,8 +66,15 @@ function tabbableElements(root: HTMLElement | null): HTMLElement[] {
   return visible.filter(element => {
     if (!(element instanceof HTMLInputElement) || element.type !== 'radio' || !element.name) return true
     const group = visible.filter((other): other is HTMLInputElement => other instanceof HTMLInputElement && other.type === 'radio' && other.name === element.name && other.form === element.form)
-    return element === (group.find(radio => radio.checked) ?? group[0])
+    const checked = group.find(radio => radio.checked)
+    // Any unchecked member can receive native focus, depending on direction and focus history.
+    return !checked || element === checked
   }).sort((a, b) => (a.tabIndex > 0 ? a.tabIndex : Infinity) - (b.tabIndex > 0 ? b.tabIndex : Infinity))
+}
+
+function sameRadioGroup(a: HTMLElement, b: HTMLElement): boolean {
+  return a instanceof HTMLInputElement && b instanceof HTMLInputElement && a.type === 'radio' && b.type === 'radio'
+    && !!a.name && a.name === b.name && a.form === b.form
 }
 
 export function Sheet({ open, onClose, title, closeLabel, children, id }: { open: boolean; onClose: () => void; title: ReactNode; closeLabel: string; children: ReactNode; id?: string }) {
@@ -87,10 +94,11 @@ export function Sheet({ open, onClose, title, closeLabel, children, id }: { open
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current() }
       if (event.key === 'Tab') {
         const items = focusable()
-        const index = items.indexOf(document.activeElement as HTMLElement)
+        const active = document.activeElement as HTMLElement
+        const index = items.indexOf(active)
         if (!items.length) { event.preventDefault(); panel.current?.focus() }
-        else if (event.shiftKey && index <= 0) { event.preventDefault(); items[items.length - 1].focus() }
-        else if (!event.shiftKey && (index < 0 || index === items.length - 1)) { event.preventDefault(); items[0].focus() }
+        else if (event.shiftKey && (index <= 0 || sameRadioGroup(active, items[0]))) { event.preventDefault(); items[items.length - 1].focus() }
+        else if (!event.shiftKey && (index < 0 || index === items.length - 1 || sameRadioGroup(active, items[items.length - 1]))) { event.preventDefault(); items[0].focus() }
       }
     }
     const focusIn = (event: FocusEvent) => { if (panel.current && !panel.current.contains(event.target as Node)) (focusable()[0] ?? panel.current).focus() }

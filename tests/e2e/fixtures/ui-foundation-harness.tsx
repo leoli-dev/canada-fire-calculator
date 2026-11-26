@@ -6,6 +6,8 @@ import { Button, Field, Segmented, Sheet } from '../../../src/ui'
 function Example() {
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const params = new URLSearchParams(location.search)
+  const radioPosition = params.get('radios')
   return <main style={{ display: 'block', padding: 24 }}>
     <Button id="calculate" loading={loading}>Calculate</Button>
     <Button onClick={() => setLoading(true)}>Start calculation</Button>
@@ -15,6 +17,14 @@ function Example() {
     <Field>Warning<input className="invalid-warning" /></Field>
     <Button onClick={() => setOpen(true)}>Open sheet</Button>
     <Sheet open={open} onClose={() => setOpen(false)} title="Mixed content" closeLabel="Close sheet">
+      {radioPosition ? <>
+        <Button>First action</Button>
+        <fieldset><legend>Options</legend>
+          <label><input type="radio" name="example" value="one" defaultChecked={params.get('selected') === 'one'} />One</label>
+          <label><input type="radio" name="example" value="two" defaultChecked={params.get('selected') === 'two'} />Two</label>
+        </fieldset>
+        {radioPosition === 'middle' && <Button>Final action</Button>}
+      </> : <>
       <Button>Visible action</Button>
       <details><summary>Closed details</summary><Button>Conditional action</Button></details>
       <details open><summary>Open details</summary><Button>Last visible action</Button></details>
@@ -25,6 +35,7 @@ function Example() {
       <div style={{ visibility: 'hidden' }}><Button>Invisible action</Button></div>
       <div inert=""><Button>Inert action</Button></div>
       <Button hidden>Hidden action</Button>
+      </>}
     </Sheet>
   </main>
 }
