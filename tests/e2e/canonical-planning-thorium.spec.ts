@@ -1,3 +1,4 @@
+import { showAnnualTable } from './fixtures/annual-sheet'
 import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
@@ -83,6 +84,7 @@ test('baseline summary and owner ledgers match unchanged replay in real and nomi
     await expect(candidateResults.getByTestId('canonical-estate')).toHaveText(await source(page).getByTestId('canonical-estate').innerText())
 
     await (await prepareProfessionalTarget(sourceSheet(page))).click()
+    await showAnnualTable(page)
     const values = [
       cell(page, 2028, 'value', 'estate'), cell(page, 2028, 'value', 'netWorth'),
       cell(page, 2027, 'value', 'account', ids.partnerTfsa, 'withdrawal'),
@@ -93,6 +95,7 @@ test('baseline summary and owner ledgers match unchanged replay in real and nomi
     await page.keyboard.press('Escape')
     await (await prepareProfessionalTarget(candidateSheet)).focus()
     await page.keyboard.press('Enter')
+    await showAnnualTable(page)
     await expect(dialog(page)).toHaveAccessibleDescription(currency === 'Real' ? /Base-year CAD \(2026\)/ : /Nominal CAD/)
     expect(await Promise.all(values.map(value => value.innerText()))).toEqual(sourceValues)
     await page.keyboard.press('Escape')
@@ -149,6 +152,7 @@ test('partial candidate retains blocked and uncomputed years in the replay and a
   await expect(candidate.getByTestId('canonical-coverage-table').locator('tbody tr')).toHaveCount(2)
   await expect(candidate).not.toContainText('Completed horizon')
   await (await prepareProfessionalTarget(candidate.getByTestId('planning-sheet'))).click()
+  await showAnnualTable(page)
   await expect(cell(page, 2027, 'value', 'netWorth')).toContainText(cad(581_290, 0))
   await expect(cell(page, 2030, 'value', 'netWorth')).toContainText('Not computed')
 })
@@ -272,5 +276,6 @@ test('without a canonical election the real App keeps the legacy summary and ann
   await expect(planning(page)).toHaveCount(0)
   await expect(page.locator('#results .summary').first()).toContainText('Final net worth: CA$638,880')
   await (await prepareProfessionalTarget(sourceSheet(page))).click()
+  await showAnnualTable(page)
   await expect(page.getByRole('dialog', { name: 'Household annual estimate' })).toBeVisible()
 })

@@ -1,3 +1,4 @@
+import { showAnnualTable } from './fixtures/annual-sheet'
 import { prepareProfessionalTarget, showProfessionalResults } from './fixtures/professional'
 import { chooseMode, chooseLanguage } from './fixtures/app-bar'
 import { existsSync } from 'node:fs'
@@ -33,6 +34,7 @@ test('professional household results open the current annual estimate and follow
   await page.keyboard.press('Enter')
   await expect(dialog).toHaveAccessibleDescription(/Household estimate/)
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+  await showAnnualTable(page)
   await expect(row(/Salary/).getByRole('cell').first()).toContainText(/Unknown|Not computed/)
   await expect(partner).toContainText('34')
   await expect(row(/Closing net worth/).getByRole('cell').last()).toContainText(expectedNetWorth.replace(/^[^\d−-]+/, ''))
@@ -44,11 +46,13 @@ test('professional household results open the current annual estimate and follow
   await (await prepareProfessionalTarget(partnerAge)).fill('38')
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener)).click()
+  await showAnnualTable(page)
   await expect(partner).toContainText('38')
   await (await prepareProfessionalTarget(dialog.getByRole('button', { name: 'Close', exact: true }), dialog.getByRole('button', { name: 'Close', exact: true, includeHidden: true }))).click()
   await (await prepareProfessionalTarget(scenario.getByRole('button', { name: 'Restore A as current inputs' }), scenario.getByRole('button', { name: 'Restore A as current inputs', includeHidden: true }))).click()
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener)).click()
+  await showAnnualTable(page)
   await expect(partner).toContainText('34')
   const detail = dialog.getByRole('complementary', { name: 'Cell details' })
   await (await prepareProfessionalTarget(dialog.getByRole('combobox', { name: 'Jump to year' }), dialog.getByRole('combobox', { name: 'Jump to year', includeHidden: true }))).selectOption('2033')
@@ -84,6 +88,7 @@ for (const locale of [
     await (await prepareProfessionalTarget(page.locator('label.field').filter({ hasText: /^Household/ }).locator('select'))).selectOption('couple')
     await chooseLanguage(page, locale.button)
     await (await prepareProfessionalTarget(page.getByRole('button', { name: locale.opener, exact: true }), page.getByRole('button', { name: locale.opener, exact: true, includeHidden: true }))).click()
+    await showAnnualTable(page)
     const dialog = page.getByRole('dialog', { name: locale.dialog })
     await (await prepareProfessionalTarget(dialog.getByRole('button', { name: new RegExp(`^${locale.retirement} \\(\\d{4}\\)$`) }), dialog.getByRole('button', { name: new RegExp(`^${locale.retirement} \\(\\d{4}\\)$`), includeHidden: true }))).click()
     const inspectTax = dialog.getByRole('button', { name: locale.inspect }).and(dialog.getByRole('button', { name: locale.tax }))
@@ -105,6 +110,7 @@ test('French underwater-sale details show the event label without its technical 
   await page.reload()
   await chooseLanguage(page, 'FR')
   await (await prepareProfessionalTarget(page.getByRole('button', { name: 'Détails financiers annuels', exact: true }), page.getByRole('button', { name: 'Détails financiers annuels', exact: true, includeHidden: true }))).click()
+  await showAnnualTable(page)
   const dialog = page.getByRole('dialog', { name: 'Estimation annuelle du ménage' })
   const technicalId = 'sale:60:principalResidence.sellAtAge'
   const event = dialog.getByRole('button', { name: /Résidence principale.*Financement d’événement enregistré/ })
@@ -138,6 +144,7 @@ for (const locale of [
     await page.reload()
     await chooseLanguage(page, locale.button)
     await (await prepareProfessionalTarget(page.getByRole('button', { name: locale.opener, exact: true }), page.getByRole('button', { name: locale.opener, exact: true, includeHidden: true }))).click()
+    await showAnnualTable(page)
     const dialog = page.getByRole('dialog', { name: locale.dialog })
     const year = dialog.getByRole('combobox', { name: locale.year })
     const detail = dialog.getByRole('complementary', { name: locale.details })
@@ -152,7 +159,7 @@ for (const locale of [
   })
 }
 
-async function openSheet(page: Page, query = '') {
+async function openSheet(page: Page, query = '', table = true) {
   await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html${query}`)
   const opener = page.getByRole('button', { name: 'Open fixture', includeHidden: true })
   await expect(opener).toBeVisible()
@@ -161,8 +168,10 @@ async function openSheet(page: Page, query = '') {
   await showProfessionalResults(page)
   await (await prepareProfessionalTarget(opener)).focus()
   await page.keyboard.press('Enter')
-  const dialog = page.getByRole('dialog')
+  const dialog = page.locator('dialog.annual-sheet-dialog')
   await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: /^(Close|Fermer|关闭)$/ })).toBeFocused()
+  if (table) await showAnnualTable(page)
   return { dialog, opener }
 }
 
@@ -173,9 +182,10 @@ function cell(dialog: Locator, rowName: string, year: number) {
 }
 
 test('StrictMode dialog traps focus and restores scroll and opener after either close path', async ({ page }) => {
-  const { dialog, opener } = await openSheet(page)
+  const { dialog, opener } = await openSheet(page, '', false)
   const close = dialog.getByRole('button', { name: 'Close', exact: true })
   await expect(close).toBeFocused()
+  await showAnnualTable(page)
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
   // The focus cycle may pass through browser chrome, but never the page behind the modal.
   for (const key of ['Shift+Tab', 'Tab', 'Tab']) {
@@ -188,6 +198,11 @@ test('StrictMode dialog traps focus and restores scroll and opener after either 
     await (await prepareProfessionalTarget(inspect)).focus()
     await page.keyboard.press('Enter')
     await expect(dialog.getByRole('complementary', { name: 'Cell details' })).toBeFocused()
+    if (await dialog.locator('.ui-sheet').isVisible()) {
+      await page.keyboard.press('Escape')
+      await expect(dialog.getByRole('complementary')).toHaveCount(0)
+      await expect(inspect).toBeFocused()
+    }
     if (method === 'escape') await page.keyboard.press('Escape')
     else await (await prepareProfessionalTarget(close)).click()
     await expect(dialog).toBeHidden()
@@ -197,6 +212,7 @@ test('StrictMode dialog traps focus and restores scroll and opener after either 
     if (method === 'escape') {
       await page.keyboard.press('Enter')
       await expect(dialog).toBeVisible()
+      await showAnnualTable(page)
       await expect(dialog.getByRole('complementary')).toHaveCount(0)
     }
   }
@@ -314,6 +330,8 @@ test('a short 320px viewport keeps Close and the table reachable with many jumps
   await (await prepareProfessionalTarget(dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2030' }), dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2030', includeHidden: true }))).focus()
   await page.keyboard.press('Enter')
   await expect(details).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(details).toBeHidden()
   const close = dialog.getByRole('button', { name: 'Close', exact: true })
   const port = dialog.getByRole('region', { name: 'Annual financial details' })
   await expect(close).toBeInViewport({ ratio: 1 })
@@ -338,7 +356,10 @@ test('a short 320px viewport keeps Close and the table reachable with many jumps
   }).toBeLessThanOrEqual(3)
   await (await prepareProfessionalTarget(dialog.getByRole('button', { name: 'Household milestone 18 (2031)' }), dialog.getByRole('button', { name: 'Household milestone 18 (2031)', includeHidden: true }))).click()
   await expect(dialog.getByRole('combobox', { name: 'Jump to year' })).toHaveValue('2031')
+  await dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2031' }).click()
   await expect(details).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(details).toBeHidden()
   await expect(close).toBeInViewport({ ratio: 1 })
   await (await prepareProfessionalTarget(close)).click()
   await expect(dialog).toBeHidden()
@@ -380,6 +401,7 @@ test('Chinese copy labels the viewer, keyboard inspection, status, and close con
   await expect(details.getByRole('heading')).toContainText('净遗产 · 2033')
   await expect(details).toContainText('已计算')
   await expect(details.getByRole('button', { name: '收起详情' })).toBeVisible()
+  if (await dialog.locator('.ui-sheet').isVisible()) await details.getByRole('button', { name: '收起详情' }).click()
   await (await prepareProfessionalTarget(dialog.getByRole('button', { name: '关闭', exact: true }), dialog.getByRole('button', { name: '关闭', exact: true, includeHidden: true }))).click()
   await expect(opener).toBeFocused()
 })
@@ -396,9 +418,10 @@ test('a new revision resets dialog state and cleanup tolerates a removed opener'
   await page.evaluate(() => window.dispatchEvent(new Event('fixture:revise')))
   await expect(dialog.getByRole('complementary')).toHaveCount(0)
   await expect(year).toHaveValue('2030')
-  await expect(dialog.getByRole('button', { name: 'Alex TFSA', exact: true })).toHaveAttribute('aria-expanded', 'false')
   const close = dialog.getByRole('button', { name: 'Close', exact: true })
   await expect(close).toBeFocused()
+  await showAnnualTable(page)
+  await expect(dialog.getByRole('button', { name: 'Alex TFSA', exact: true })).toHaveAttribute('aria-expanded', 'false')
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
   await (await prepareProfessionalTarget(close)).click()
   await expect(opener).toBeFocused()
@@ -441,5 +464,334 @@ for (const yearCount of [76, 88]) {
     const summary = `${testInfo.project.name} ${yearCount}×120 open ${openMs.toFixed(1)} ms and terminal jump ${jumpMs.toFixed(1)} ms (through two animation frames)`
     console.log(summary)
     await testInfo.attach('pressure timing', { body: summary, contentType: 'text/plain' })
+  })
+}
+
+for (const locale of [
+  { lang: 'en', width: 390, year: 'Year', table: 'Table', next: 'Next year', previous: 'Previous year', details: 'Cell details', close: 'Close' },
+  { lang: 'fr', width: 320, year: 'Année', table: 'Tableau', next: 'Année suivante', previous: 'Année précédente', details: 'Détails de la cellule', close: 'Fermer' },
+  { lang: 'zh', width: 390, year: '按年', table: '表格', next: '下一年', previous: '上一年', details: '单元格详情', close: '关闭' },
+]) {
+  test(`phone Year and detail Sheet retain ledger data and focus in ${locale.lang}`, async ({ page }) => {
+    await page.setViewportSize({ width: locale.width, height: 844 })
+    await page.goto(`/tests/e2e/fixtures/annual-sheet-harness.html?lang=${locale.lang}&mode=real`)
+    const opener = page.getByRole('button', { name: 'Open fixture' })
+    await opener.click()
+    const dialog = page.locator('dialog.annual-sheet-dialog')
+    await expect(dialog.getByRole('button', { name: locale.year, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(dialog.getByRole('table')).toBeHidden()
+    await expect(dialog.getByRole('button', { name: locale.previous, exact: true })).toBeDisabled()
+    await dialog.getByRole('button', { name: locale.next, exact: true }).click()
+    const row = dialog.locator('.annual-year-row').filter({ hasText: 'Alex pension' })
+    await expect(row).toHaveAccessibleName(/2031$/)
+    await row.click()
+    const sheet = dialog.getByRole('dialog', { name: locale.details, exact: true })
+    const detail = sheet.getByRole('complementary', { name: locale.details })
+    await expect(detail).toBeFocused()
+    await expect(detail.getByRole('heading')).toContainText('Alex pension · 2031')
+    await expect(sheet).toHaveAttribute('aria-modal', 'true')
+    for (let index = 0; index < 5; index++) {
+      await page.keyboard.press('Tab')
+      expect(await sheet.evaluate(node => node.contains(document.activeElement))).toBe(true)
+    }
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    await expect(dialog).toBeVisible()
+    await expect(row).toBeFocused()
+    const rowCount = await dialog.locator('.annual-year-row').count()
+    await dialog.getByRole('button', { name: locale.table, exact: true }).click()
+    await expect(dialog.getByRole('table')).toBeVisible()
+    await expect(dialog.locator('.annual-sheet-inspect')).toHaveCount(rowCount)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(locale.width)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+  })
+}
+
+test('glossary phone Sheet keeps term history, focus trapping and restoration', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const trigger = page.getByTestId('app-menu')
+  await trigger.click()
+  await page.getByRole('button', { name: 'Open glossary', exact: true }).click()
+  const drawer = page.locator('.drawer')
+  await expect(drawer).toHaveAttribute('aria-modal', 'true')
+  const geometry = await drawer.boundingBox()
+  expect(geometry!.width).toBe(390)
+  expect(geometry!.height).toBeCloseTo(844 * .85, 0)
+  await page.evaluate(async () => { const { useGlossary } = await import('/src/glossary.ts'); useGlossary.getState().open('rrsp') })
+  const back = drawer.locator('.drawer-back')
+  await expect(back).toBeVisible()
+  await back.click()
+  await expect(drawer.getByRole('heading')).toContainText('FIRE')
+  for (let index = 0; index < 5; index++) {
+    await page.keyboard.press('Tab')
+    expect(await drawer.evaluate(node => node.contains(document.activeElement))).toBe(true)
+  }
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeHidden()
+  await expect(trigger).toBeFocused()
+})
+
+test('desktop details reserve 340px without reducing table height and use the shared header surface', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { dialog } = await openSheet(page)
+  const column = dialog.locator('.annual-sheet-detail-column')
+  expect((await column.boundingBox())!.width).toBe(340)
+  const port = dialog.locator('.annual-sheet-scroll')
+  const before = (await port.boundingBox())!
+  const header = dialog.getByRole('columnheader').first()
+  expect(await header.evaluate(node => ({ background: getComputedStyle(node).backgroundColor, token: getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim() }))).toEqual({ background: 'rgb(233, 237, 242)', token: '#e9edf2' })
+  const firstColumn = dialog.getByRole('rowheader').first()
+  expect((await firstColumn.boundingBox())!.width).toBe(210)
+  await dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2030' }).click()
+  await expect(column.getByRole('complementary', { name: 'Cell details' })).toBeFocused()
+  expect((await port.boundingBox())!.height).toBe(before.height)
+  await expect(dialog.locator('.annual-sheet-selected')).toHaveCount(1)
+  await column.getByRole('button', { name: 'Hide details' }).click()
+  expect((await column.boundingBox())!.width).toBe(340)
+  expect((await port.boundingBox())!.height).toBe(before.height)
+})
+
+for (const locale of [
+  { language: 'EN', width: 390, scope: 'Scope and limitations', opener: 'Annual financial details', retirement: 'Retirement (2036)', next: 'Next year' },
+  { language: 'FR', width: 320, scope: 'Portée et limites', opener: 'Détails financiers annuels', retirement: 'Retraite (2036)', next: 'Année suivante' },
+  { language: '中文', width: 390, scope: '口径与限制', opener: '逐年财务明细', retirement: '退休 (2036)', next: '下一年' },
+]) {
+  test(`review fixes expose scope, wrap jumps and align the selected year in ${locale.language}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: locale.width, height: locale.width === 320 ? 740 : 844 })
+    await page.goto('/')
+    await chooseMode(page, 'professional')
+    await chooseLanguage(page, locale.language)
+    await showProfessionalResults(page)
+    const opener = page.getByRole('button', { name: locale.opener, exact: true })
+    await (await prepareProfessionalTarget(opener)).click()
+    const dialog = page.locator('dialog.annual-sheet-dialog')
+    await expect(dialog.locator('.annual-sheet-header > button')).toBeFocused()
+    const scope = dialog.locator('.annual-sheet-scope')
+    const description = await dialog.evaluate(node => document.getElementById(node.getAttribute('aria-describedby')!)!.textContent!)
+    await expect(dialog).toHaveAccessibleDescription(description)
+    await expect(scope.locator('summary')).toContainText(locale.scope)
+    await expect(scope.locator('.annual-scope-chevron')).toBeVisible()
+    await scope.locator('summary').click()
+    await expect(scope).toHaveAttribute('open', '')
+    await expect(dialog).toHaveAccessibleDescription(description)
+    await scope.locator('summary').click()
+    const controls = dialog.locator('.annual-sheet-controls')
+    expect(await controls.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+    for (const jump of await controls.getByRole('button').all()) await expect(jump).toBeInViewport({ ratio: 1 })
+    const touch = await dialog.locator('button, select, summary').evaluateAll(nodes => nodes.filter(node => node.getClientRects().length).map(node => {
+      const rect = node.getBoundingClientRect()
+      return { name: node.getAttribute('aria-label') ?? node.textContent, width: rect.width, height: rect.height }
+    }))
+    expect(touch.filter(target => target.width < 44 || target.height < 44)).toEqual([])
+    const row = dialog.locator('.annual-year-row').first()
+    await row.focus()
+    await expect(row).toHaveAccessibleDescription(/35\s*(Calculated|Calculé|已计算)/)
+    await controls.getByRole('button', { name: locale.retirement, exact: true }).click()
+    const table = dialog.locator('.annual-sheet-view button').last()
+    const year = dialog.locator('.annual-sheet-view button').first()
+    const port = dialog.locator('.annual-sheet-scroll')
+    const aligned = async (selected: string) => {
+      const geometry = await port.evaluate((node, selected) => {
+        const bounds = node.getBoundingClientRect()
+        const sticky = node.querySelector('thead th')!.getBoundingClientRect()
+        const header = [...node.querySelectorAll('thead th')].find(header => header.textContent === selected)!.getBoundingClientRect()
+        return { left: header.left, right: header.right, stickyRight: sticky.right, portRight: bounds.right, scrollLeft: node.scrollLeft }
+      }, selected)
+      expect(geometry.scrollLeft).toBeGreaterThan(0)
+      expect(geometry.left).toBeGreaterThanOrEqual(geometry.stickyRight - 1)
+      expect(geometry.right).toBeLessThanOrEqual(geometry.portRight + 1)
+      await expect(table).toBeFocused()
+      return geometry
+    }
+    await table.click()
+    const retirement = await aligned('2036')
+    await year.click()
+    await dialog.getByRole('button', { name: locale.next, exact: true }).click()
+    await table.click()
+    const stepped = await aligned('2037')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(locale.width)
+    await testInfo.attach('review geometry', { body: JSON.stringify({ locale, touch, retirement, stepped }), contentType: 'application/json' })
+  })
+}
+
+test('320px Table inspect and group controls meet both touch dimensions and focused Year exposes zero', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  const { dialog } = await openSheet(page, '', false)
+  const row = dialog.getByRole('button', { name: 'Inspect row: Alex pension, 2030' })
+  await row.focus()
+  await expect(row).toHaveAccessibleName('Inspect row: Alex pension, 2030')
+  await expect(row).toHaveAccessibleDescription(/CA\$0\s*Calculated/)
+  await showAnnualTable(page)
+  const controls = dialog.locator('th button')
+  expect(await controls.count()).toBeGreaterThan(10)
+  const sizes = await controls.evaluateAll(nodes => nodes.map(node => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })))
+  expect(sizes.filter(size => size.width < 44 || size.height < 44)).toEqual([])
+})
+
+for (const width of [1440, 390]) {
+  test(`inspecting a fully visible later column preserves Table scroll at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    const { dialog } = await openSheet(page, '?pressure=76')
+    const port = dialog.locator('.annual-sheet-scroll')
+    const year = width === 1440 ? 2033 : 2031
+    const target = cell(dialog, 'Pressure row 1', year)
+    await expect(target).toBeInViewport({ ratio: 1 })
+    const geometry = await target.evaluate(node => {
+      const bounds = node.getBoundingClientRect()
+      const label = node.parentElement!.querySelector('th')!.getBoundingClientRect()
+      return { left: bounds.left, right: bounds.right, stickyRight: label.right }
+    })
+    expect(geometry.left).toBeGreaterThanOrEqual(geometry.stickyRight)
+    const before = await port.evaluate(node => node.scrollLeft)
+    expect(before).toBe(0)
+    await target.click()
+    const details = dialog.getByRole('complementary', { name: 'Cell details' })
+    await expect(details).toBeFocused()
+    await expect(details.getByRole('heading')).toContainText(`Pressure row 1 · ${year}`)
+    const opened = await port.evaluate(node => node.scrollLeft)
+    expect(opened).toBe(before)
+    await details.getByRole('button', { name: 'Hide details', exact: true }).click()
+    await expect(details).toBeHidden()
+    await expect(dialog.getByRole('button', { name: `Inspect row: Pressure row 1, ${year}`, exact: true })).toBeFocused()
+    const closed = await port.evaluate(node => node.scrollLeft)
+    expect(closed).toBe(before)
+    await expect(target).toBeInViewport({ ratio: 1 })
+    // Direct jumps while Table is visible retain their independent alignment.
+    await dialog.getByRole('combobox', { name: 'Jump to year' }).selectOption('2040')
+    const jumped = await port.evaluate(node => node.scrollLeft)
+    expect(jumped).toBeGreaterThan(before)
+    await expect(dialog.getByRole('columnheader', { name: '2040', exact: true })).toBeInViewport({ ratio: 1 })
+    const later = cell(dialog, 'Pressure row 1', 2041)
+    await expect(later).toBeInViewport({ ratio: 1 })
+    await later.click()
+    await expect(details).toBeFocused()
+    await expect(details.getByRole('heading')).toContainText('Pressure row 1 · 2041')
+    expect(await port.evaluate(node => node.scrollLeft)).toBe(jumped)
+    await details.getByRole('button', { name: 'Hide details', exact: true }).click()
+    await expect(dialog.getByRole('button', { name: 'Inspect row: Pressure row 1, 2041', exact: true })).toBeFocused()
+    expect(await port.evaluate(node => node.scrollLeft)).toBe(jumped)
+    await testInfo.attach('inspection scroll', { body: JSON.stringify({ width, year, before, opened, closed, jumped }), contentType: 'application/json' })
+  })
+}
+
+test('repeated tab and responsive Table reveals align the year at the CSS phone breakpoint', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { dialog } = await openSheet(page, '?pressure=76', false)
+  const port = dialog.locator('.annual-sheet-scroll')
+  const picker = dialog.getByRole('combobox', { name: 'Jump to year' })
+  const close = dialog.getByRole('button', { name: 'Close', exact: true })
+  const measurements = []
+  const aligned = async (year: string) => {
+    const position = await port.evaluate((node, year) => {
+      const sticky = node.querySelector('thead th')!.getBoundingClientRect()
+      const selected = [...node.querySelectorAll('thead th')].find(header => header.textContent === year)!.getBoundingClientRect()
+      return { scrollLeft: node.scrollLeft, labelRight: sticky.right, selectedLeft: selected.left }
+    }, year)
+    expect(position.scrollLeft).toBeGreaterThan(0)
+    expect(Math.abs(position.selectedLeft - position.labelRight)).toBeLessThanOrEqual(1)
+    return position
+  }
+  for (const [width, year] of [[844, '2036'], [1440, '2037'], [641, '2038']] as const) {
+    await expect(dialog.locator('.annual-year-list')).toBeVisible()
+    await expect(port).toBeHidden()
+    await picker.selectOption(year)
+    await close.focus()
+    await page.setViewportSize({ width, height: width === 844 ? 390 : 900 })
+    await expect(port).toBeVisible()
+    await expect(dialog.locator('.annual-sheet-layout')).toHaveAttribute('data-view', 'table')
+    await expect(dialog.locator('.annual-sheet-view')).toBeHidden()
+    await expect(picker).toHaveValue(year)
+    measurements.push({ width, year, ...await aligned(year) })
+    await expect(close).toBeFocused()
+    await page.setViewportSize({ width: 640, height: 844 })
+    await expect(port).toBeHidden()
+    await expect(dialog.locator('.annual-year-list')).toBeVisible()
+    await expect(dialog.locator('.annual-sheet-view')).toBeVisible()
+  }
+  // The ordinary tab uses the same hidden-to-visible transition.
+  await picker.selectOption('2039')
+  const table = dialog.getByRole('button', { name: 'Table', exact: true })
+  await table.click()
+  await expect(port).toBeVisible()
+  measurements.push({ width: 640, year: '2039', ...await aligned('2039') })
+  await expect(table).toBeFocused()
+  // Crossing the breakpoint while Table remains visible must not realign it.
+  await port.evaluate(node => { node.scrollLeft = 275 })
+  await close.focus()
+  for (const width of [641, 844, 640, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(port).toBeVisible()
+    await expect.poll(() => port.evaluate(node => node.scrollLeft)).toBe(275)
+    await expect(close).toBeFocused()
+  }
+  await testInfo.attach('responsive reveal alignment', { body: JSON.stringify(measurements), contentType: 'application/json' })
+})
+
+for (const safeArea of [
+  { width: 844, height: 390, left: 0, right: 0, bottom: 0 },
+  { width: 844, height: 390, left: 47, right: 47, bottom: 21 },
+  { width: 390, height: 844, left: 0, right: 0, bottom: 0 },
+  { width: 390, height: 844, left: 0, right: 0, bottom: 34 },
+]) {
+  test(`annual safe area ${safeArea.width}x${safeArea.height} sides ${safeArea.left} bottom ${safeArea.bottom}`, async ({ page }, testInfo) => {
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, left: safeArea.left, right: safeArea.right, bottom: safeArea.bottom } })
+    await page.setViewportSize({ width: 390, height: 844 })
+    const { dialog, opener } = await openSheet(page, '?pressure=76', false)
+    const picker = dialog.getByRole('combobox', { name: 'Jump to year' })
+    await picker.selectOption('2036')
+    const close = dialog.getByRole('button', { name: 'Close', exact: true })
+    await close.focus()
+    await page.setViewportSize({ width: safeArea.width, height: safeArea.height })
+    if (safeArea.width <= 640) await showAnnualTable(page)
+    else await expect(close).toBeFocused()
+    const port = dialog.locator('.annual-sheet-scroll')
+    await expect(port).toBeVisible()
+    const geometry = await dialog.evaluate(node => {
+      const bounds = (selector: string) => node.querySelector(selector)!.getBoundingClientRect().toJSON()
+      const style = getComputedStyle(node.querySelector('.annual-sheet-layout')!)
+      return {
+        padding: { left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight), bottom: parseFloat(style.paddingBottom) },
+        title: bounds('.annual-sheet-title h2'), close: bounds('.annual-sheet-header > button'),
+        item: bounds('thead th:first-child'), table: bounds('.annual-sheet-scroll'),
+        body: bounds('.annual-sheet-body'), overflow: { x: node.scrollWidth - node.clientWidth, y: node.scrollHeight - node.clientHeight },
+      }
+    })
+    expect(geometry.padding).toEqual({ left: safeArea.left, right: safeArea.right, bottom: safeArea.bottom })
+    for (const bounds of [geometry.title, geometry.close, geometry.item, geometry.table, geometry.body]) {
+      expect(bounds.left).toBeGreaterThanOrEqual(safeArea.left)
+      expect(bounds.right).toBeLessThanOrEqual(safeArea.width - safeArea.right)
+      expect(bounds.bottom).toBeLessThanOrEqual(safeArea.height - safeArea.bottom)
+    }
+    expect(geometry.overflow).toEqual({ x: 0, y: 0 })
+    await expect(close).toBeInViewport({ ratio: 1 })
+    await expect(port).toBeInViewport({ ratio: 1 })
+    await expect(dialog.getByRole('columnheader', { name: '2036', exact: true })).toBeInViewport({ ratio: 1 })
+    const before = await port.evaluate(node => ({ left: node.scrollLeft, height: node.clientHeight }))
+    const target = cell(dialog, 'Pressure row 1', 2036)
+    await expect(target).toBeInViewport({ ratio: 1 })
+    await target.click()
+    const detail = dialog.getByRole('complementary', { name: 'Cell details' })
+    await expect(detail).toBeFocused()
+    if (safeArea.width <= 640) {
+      await expect(dialog.locator('.ui-sheet')).toBeVisible()
+      const bodyBottom = await dialog.locator('.ui-sheet-body').evaluate(node => node.getBoundingClientRect().bottom)
+      expect(bodyBottom).toBeLessThanOrEqual(safeArea.height - safeArea.bottom)
+      await page.keyboard.press('Escape')
+    } else await detail.getByRole('button', { name: 'Hide details', exact: true }).click()
+    await expect(detail).toBeHidden()
+    await expect(dialog.getByRole('button', { name: 'Inspect row: Pressure row 1, 2036', exact: true })).toBeFocused()
+    expect(await port.evaluate(node => ({ left: node.scrollLeft, height: node.clientHeight }))).toEqual(before)
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden')
+    await page.screenshot({ path: testInfo.outputPath('safe-area.png'), animations: 'disabled' })
+    await testInfo.attach('safe-area geometry', { body: JSON.stringify({ safeArea, geometry, node: process.version, browser: page.context().browser()!.version(), executablePath }), contentType: 'application/json' })
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('')
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(760)
   })
 }

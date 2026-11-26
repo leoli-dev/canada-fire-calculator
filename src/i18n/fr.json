@@ -68,6 +68,14 @@
       "estimates_other": "{{count}} estimations",
       "needsReview": "À vérifier",
       "none": "Aucun"
+    },
+    "annual": {
+      "view": "Vue annuelle",
+      "year": "Année",
+      "table": "Tableau",
+      "previous": "Année précédente",
+      "next": "Année suivante",
+      "scope": "Portée et limites"
     }
   },
   "title": "🇨🇦 Calculateur FIRE Canada",
